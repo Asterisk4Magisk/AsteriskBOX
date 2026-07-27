@@ -1,0 +1,368 @@
+{
+    "libraries": [
+        {
+            "uniqueId": "androidx.activity:activity-compose",
+            "artifactVersion": "1.13.0",
+            "name": "Activity Compose",
+            "description": "Compose integration with Activity",
+            "website": "https://developer.android.com/jetpack/androidx/releases/activity#1.13.0",
+            "scm": {
+                "url": "https://cs.android.com/androidx/platform/frameworks/support"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "com.github.asterisk4magisk:libbox",
+            "artifactVersion": "v1.14.0-beta.2",
+            "name": "AndroidLibBoxLite",
+            "description": "Pinned Android JNI and command API bindings for sing-box.",
+            "website": "https://github.com/Asterisk4Magisk/AndroidLibBoxLite",
+            "scm": {
+                "url": "https://github.com/Asterisk4Magisk/AndroidLibBoxLite"
+            },
+            "licenses": [
+                "LGPL-3.0"
+            ]
+        },
+        {
+            "uniqueId": "androidx.navigation3:navigation3-runtime",
+            "artifactVersion": "1.1.4",
+            "name": "Androidx Navigation 3 Runtime",
+            "description": "Provides the building blocks for a Compose first Navigation solution that easily supports extensions.",
+            "website": "https://developer.android.com/jetpack/androidx/releases/navigation3#1.1.4",
+            "scm": {
+                "url": "https://cs.android.com/androidx/platform/frameworks/support"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "androidx.navigation3:navigation3-ui",
+            "artifactVersion": "1.1.4",
+            "name": "Androidx Navigation 3 UI",
+            "description": "Provides a Navigation3 display that uses the building blocks from runtime to create a higher level solution.",
+            "website": "https://developer.android.com/jetpack/androidx/releases/navigation3#1.1.4",
+            "scm": {
+                "url": "https://cs.android.com/androidx/platform/frameworks/support"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "github:Asterisk4Magisk/asteriskd",
+            "artifactVersion": "v1.0.0",
+            "name": "asteriskd",
+            "description": "A root Android daemon that synchronizes local-address bypass rules and pinned eBPF maps.",
+            "website": "https://github.com/Asterisk4Magisk/asteriskd",
+            "scm": {
+                "url": "https://github.com/Asterisk4Magisk/asteriskd"
+            },
+            "licenses": [
+                "GPL-3.0"
+            ]
+        },
+        {
+            "uniqueId": "github:Asterisk4Magisk/bpf2socks",
+            "artifactVersion": "v1.0.1",
+            "name": "bpf2socks",
+            "description": "A root Android/Linux traffic bridge that forwards TCP and UDP through a SOCKS5 upstream using eBPF.",
+            "website": "https://github.com/Asterisk4Magisk/bpf2socks",
+            "scm": {
+                "url": "https://github.com/Asterisk4Magisk/bpf2socks"
+            },
+            "licenses": [
+                "GPL-3.0"
+            ]
+        },
+        {
+            "uniqueId": "github:Asterisk4Magisk/bpfmatcher",
+            "artifactVersion": "v1.0.0",
+            "name": "bpfmatcher",
+            "description": "An eBPF socket-filter loader for iptables xt_bpf matching.",
+            "website": "https://github.com/Asterisk4Magisk/bpfmatcher",
+            "scm": {
+                "url": "https://github.com/Asterisk4Magisk/bpfmatcher"
+            },
+            "licenses": [
+                "GPL-3.0"
+            ]
+        },
+        {
+            "uniqueId": "io.coil-kt.coil3:coil",
+            "artifactVersion": "3.5.0",
+            "name": "coil",
+            "description": "An image loading library for Android and Compose Multiplatform.",
+            "website": "https://github.com/coil-kt/coil",
+            "scm": {
+                "url": "https://github.com/coil-kt/coil"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "io.coil-kt.coil3:coil-compose",
+            "artifactVersion": "3.5.0",
+            "name": "coil-compose",
+            "description": "An image loading library for Android and Compose Multiplatform.",
+            "website": "https://github.com/coil-kt/coil",
+            "scm": {
+                "url": "https://github.com/coil-kt/coil"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "org.jetbrains.compose.foundation:foundation",
+            "artifactVersion": "1.11.1",
+            "name": "Compose Foundation",
+            "description": "Higher level abstractions of the Compose UI primitives. This library is design system agnostic, providing the high-level building blocks for both application and design-system developers",
+            "website": "https://github.com/JetBrains/compose-multiplatform",
+            "scm": {
+                "url": "https://github.com/JetBrains/compose-multiplatform"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "org.jetbrains.compose.material:material-icons-extended",
+            "artifactVersion": "1.7.3",
+            "name": "Compose Material Icons Extended",
+            "description": "Compose Material Design extended icons. This module contains all Material icons. It is a very large dependency and should not be included directly.",
+            "website": "https://github.com/JetBrains/compose-jb",
+            "scm": {
+                "url": "https://github.com/JetBrains/compose-jb"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "org.jetbrains.compose.material3:material3",
+            "artifactVersion": "1.12.0-alpha03",
+            "name": "Compose Material3 Components",
+            "description": "Compose Material You Design Components library",
+            "website": "https://github.com/JetBrains/compose-multiplatform",
+            "scm": {
+                "url": "https://github.com/JetBrains/compose-multiplatform"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "org.jetbrains.compose.ui:ui",
+            "artifactVersion": "1.11.1",
+            "name": "Compose UI",
+            "description": "Compose UI primitives. This library contains the primitives that form the Compose UI Toolkit, such as drawing, measurement and layout.",
+            "website": "https://github.com/JetBrains/compose-multiplatform",
+            "scm": {
+                "url": "https://github.com/JetBrains/compose-multiplatform"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "io.github.rosemoe:editor",
+            "artifactVersion": "0.24.6",
+            "name": "editor",
+            "description": "An awesome code editor library on Android",
+            "website": "https://github.com/Rosemoe/sora-editor",
+            "scm": {
+                "url": "https://github.com/Rosemoe/sora-editor/tree/master"
+            },
+            "licenses": [
+                "LGPL v2.1"
+            ]
+        },
+        {
+            "uniqueId": "github:heiher/hev-socks5-tunnel",
+            "artifactVersion": "2.16.0",
+            "name": "hev-socks5-tunnel",
+            "description": "A tun2socks tunnel that forwards TUN traffic to a SOCKS5 server.",
+            "website": "https://github.com/heiher/hev-socks5-tunnel",
+            "scm": {
+                "url": "https://github.com/heiher/hev-socks5-tunnel"
+            },
+            "licenses": [
+                "MIT"
+            ]
+        },
+        {
+            "uniqueId": "com.github.android-password-store:kage",
+            "artifactVersion": "0.6.0",
+            "name": "kage",
+            "description": "Kotlin implementation of the age file encryption library",
+            "website": "https://github.com/Android-Password-Store/kage",
+            "scm": {
+                "url": "https://github.com/Android-Password-Store/kage"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "org.jetbrains.kotlin:kotlin-stdlib",
+            "artifactVersion": "2.4.10",
+            "name": "Kotlin Stdlib",
+            "description": "Kotlin Standard Library",
+            "website": "https://kotlinlang.org/",
+            "scm": {
+                "url": "https://github.com/JetBrains/kotlin"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "org.jetbrains.kotlinx:kotlinx-serialization-json",
+            "artifactVersion": "1.11.0",
+            "name": "kotlinx-serialization-json",
+            "description": "Kotlin multiplatform serialization runtime library",
+            "website": "https://github.com/Kotlin/kotlinx.serialization",
+            "scm": {
+                "url": "https://github.com/Kotlin/kotlinx.serialization"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "io.ktor:ktor-http",
+            "artifactVersion": "3.5.1",
+            "name": "ktor-http",
+            "description": "Ktor is a framework for quickly creating web applications in Kotlin with minimal effort.",
+            "website": "https://github.com/ktorio/ktor",
+            "scm": {
+                "url": "https://github.com/ktorio/ktor.git"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "com.github.topjohnwu.libsu:core",
+            "artifactVersion": "6.0.0",
+            "name": "libsu",
+            "description": "A complete solution for apps using root permissions.",
+            "website": "https://github.com/topjohnwu/libsu",
+            "scm": {
+                "url": "https://github.com/topjohnwu/libsu"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "com.materialkolor:material-kolor",
+            "artifactVersion": "5.0.0",
+            "name": "MaterialKolor",
+            "description": "Material You dynamic color for Compose Multiplatform",
+            "website": "https://github.com/jordond/materialkolor",
+            "scm": {
+                "url": "https://github.com/jordond/materialkolor"
+            },
+            "licenses": [
+                "MIT"
+            ]
+        },
+        {
+            "uniqueId": "org.jetbrains.androidx.navigationevent:navigationevent-compose",
+            "artifactVersion": "1.1.0",
+            "name": "NavigationEvent Compose",
+            "description": "Compose integration with NavigationEvent",
+            "website": "https://github.com/JetBrains/compose-multiplatform",
+            "scm": {
+                "url": "https://github.com/JetBrains/compose-multiplatform"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "sh.calvin.reorderable:reorderable",
+            "artifactVersion": "3.1.0",
+            "name": "Reorderable",
+            "description": "A library for reordering items in lazy lists and grids in Compose",
+            "website": "https://github.com/Calvin-LL/Reorderable",
+            "scm": {
+                "url": "https://github.com/Calvin-LL/Reorderable"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "androidx.room:room-runtime",
+            "artifactVersion": "2.8.4",
+            "name": "Room-Runtime",
+            "description": "Android Room-Runtime",
+            "website": "https://developer.android.com/jetpack/androidx/releases/room#2.8.4",
+            "scm": {
+                "url": "https://cs.android.com/androidx/platform/frameworks/support"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "github:Asterisk4Magisk/setuidgid",
+            "artifactVersion": "v1.0.0",
+            "name": "setuidgid",
+            "description": "A privileged Android/Linux helper that launches a process under an explicit numeric UID and GID.",
+            "website": "https://github.com/Asterisk4Magisk/setuidgid",
+            "scm": {
+                "url": "https://github.com/Asterisk4Magisk/setuidgid"
+            },
+            "licenses": [
+                "GPL-3.0"
+            ]
+        },
+        {
+            "uniqueId": "github:SagerNet/sing-box",
+            "artifactVersion": "v1.14.0-beta.2",
+            "name": "sing-box",
+            "description": "An open platform for proxy and anti-censorship networking.",
+            "website": "https://github.com/SagerNet/sing-box",
+            "scm": {
+                "url": "https://github.com/SagerNet/sing-box"
+            },
+            "licenses": [
+                "GPL-3.0"
+            ]
+        },
+        {
+            "uniqueId": "org.snakeyaml:snakeyaml-engine",
+            "artifactVersion": "3.0.1",
+            "name": "SnakeYAML Engine",
+            "description": "Core YAML 1.2 parser and emitter for Java",
+            "website": "https://bitbucket.org/snakeyaml/snakeyaml-engine",
+            "scm": {
+                "url": "https://bitbucket.org/snakeyaml/snakeyaml-engine/src"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "com.journeyapps:zxing-android-embedded",
+            "artifactVersion": "4.3.0",
+            "name": "zxing-android-embedded",
+            "description": "Barcode scanner library for Android, based on the ZXing decoder",
+            "website": "https://github.com/journeyapps/zxing-android-embedded",
+            "scm": {
+                "url": "https://github.com/journeyapps/zxing-android-embedded"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        }
+    ]
+}

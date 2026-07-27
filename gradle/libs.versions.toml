@@ -1,0 +1,51 @@
+[versions]
+agp = "9.3.1"
+androidx-activity-compose = "1.13.0"
+androidx-navigation3 = "1.1.4"
+androidx-navigationevent = "1.1.0"
+androidx-room = "2.8.4"
+compose = "1.11.1"
+compose-material-icons = "1.7.3"
+compose-material3 = "1.12.0-alpha03"
+coil = "3.5.0"
+kotlin = "2.4.10"
+kotlinx-serialization-json = "1.11.0"
+kage = "0.6.0"
+ksp = "2.3.10"
+ktor = "3.5.1"
+libsu = "6.0.0"
+material-kolor = "5.0.0"
+reorderable = "3.1.0"
+sora-editor = "0.24.6"
+snakeyaml-engine = "3.0.1"
+zxing-android-embedded = "4.3.0"
+
+[libraries]
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }
+androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "androidx-navigation3" }
+androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "androidx-navigation3" }
+androidx-navigationevent = { module = "org.jetbrains.androidx.navigationevent:navigationevent-compose", version.ref = "androidx-navigationevent" }
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "androidx-room" }
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "androidx-room" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose" }
+compose-material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-material-icons" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose" }
+coil = { module = "io.coil-kt.coil3:coil", version.ref = "coil" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
+kage = { module = "com.github.android-password-store:kage", version.ref = "kage" }
+ktor-http = { module = "io.ktor:ktor-http", version.ref = "ktor" }
+libsu-core = { module = "com.github.topjohnwu.libsu:core", version.ref = "libsu" }
+material-kolor = { module = "com.materialkolor:material-kolor", version.ref = "material-kolor" }
+reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
+sora-editor = { module = "io.github.rosemoe:editor", version.ref = "sora-editor" }
+snakeyaml-engine = { module = "org.snakeyaml:snakeyaml-engine", version.ref = "snakeyaml-engine" }
+zxing-android-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxing-android-embedded" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

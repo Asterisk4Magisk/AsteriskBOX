@@ -1,0 +1,123 @@
+// Copyright 2026, AsteriskBOX contributors
+// SPDX-License-Identifier: GPL-3.0
+
+package engine.network
+
+import utils.toIntInRangeOrNull
+
+data class NetworkCidrAddress(
+    val address: String,
+    val prefixLength: Int,
+)
+
+private val Ipv6HextetRegex = Regex("[0-9A-Fa-f]{1,4}")
+
+fun isCidrAddress(cidr: String): Boolean {
+    return parseCidrAddressOrNull(cidr) != null
+}
+
+fun isIpv4CidrAddress(cidr: String): Boolean {
+    val address = parseCidrAddressOrNull(cidr)?.address ?: return false
+    return isIpv4Address(address)
+}
+
+fun parseCidrAddressOrNull(cidr: String): NetworkCidrAddress? {
+    val parts = cidr.trim().split("/", limit = 2)
+    if (parts.size != 2) return null
+
+    val address = parts[0].trim()
+    if ('%' in address) return null
+    val prefixLength = parsePrefixLength(parts[1]) ?: return null
+    val prefixRange = when {
+        address.contains(":") -> NetworkLimits.IPV6_PREFIX_MIN..NetworkLimits.IPV6_PREFIX_MAX
+        address.contains(".") -> NetworkLimits.IPV4_PREFIX_MIN..NetworkLimits.IPV4_PREFIX_MAX
+        else -> return null
+    }
+    val validAddress = when {
+        address.contains(":") -> isIpv6Address(address)
+        address.contains(".") -> isIpv4Address(address)
+        else -> false
+    }
+    if (!validAddress || prefixLength !in prefixRange) {
+        return null
+    }
+    return NetworkCidrAddress(
+        address = address,
+        prefixLength = prefixLength,
+    )
+}
+
+fun isIpAddress(address: String): Boolean {
+    val trimmed = address.trim()
+    return isIpv4Address(trimmed) || isIpv6Address(trimmed)
+}
+
+fun Int.isPort(): Boolean {
+    return this in NetworkLimits.PORT_MIN..NetworkLimits.PORT_MAX
+}
+
+fun String.toPortOrNull(): Int? {
+    val value = trim()
+    if (value.isEmpty() || !value.all(Char::isDigit)) return null
+    return value.toIntInRangeOrNull(NetworkLimits.PORT_MIN..NetworkLimits.PORT_MAX)
+}
+
+fun isIpv4Address(address: String): Boolean {
+    val octets = address.split(".")
+    return octets.size == 4 && octets.all { octet ->
+        octet.isNotEmpty() &&
+            octet.all(Char::isDigit) &&
+            (octet == "0" || !octet.startsWith('0')) &&
+            octet.toIntOrNull()?.let { it in NetworkLimits.IPV4_OCTET_MIN..NetworkLimits.IPV4_OCTET_MAX } == true
+    }
+}
+
+fun isIpv6Address(address: String): Boolean {
+    if (address.isBlank()) return false
+    val zoneSeparator = address.indexOf('%')
+    val withoutZone = if (zoneSeparator >= 0) {
+        if (
+            zoneSeparator == 0 ||
+            zoneSeparator == address.lastIndex ||
+            address.indexOf('%', zoneSeparator + 1) >= 0
+        ) {
+            return false
+        }
+        address.substring(0, zoneSeparator)
+    } else {
+        address
+    }
+    val normalized = if ('.' in withoutZone) {
+        val separator = withoutZone.lastIndexOf(':')
+        if (separator < 0 || !isIpv4Address(withoutZone.substring(separator + 1))) return false
+        withoutZone.substring(0, separator + 1) + "0:0"
+    } else {
+        withoutZone
+    }
+
+    val compressedParts = normalized.split("::")
+    if (compressedParts.size > 2) return false
+
+    if (compressedParts.size == 1) {
+        return parseIpv6Hextets(normalized)?.size == 8
+    }
+
+    val left = parseIpv6Hextets(compressedParts[0]) ?: return false
+    val right = parseIpv6Hextets(compressedParts[1]) ?: return false
+    return left.size + right.size < 8
+}
+
+private fun parsePrefixLength(prefix: String): Int? {
+    if (prefix.isEmpty() || !prefix.all(Char::isDigit)) return null
+    return prefix.toIntOrNull()
+}
+
+private fun parseIpv6Hextets(section: String): List<String>? {
+    if (section.isEmpty()) return emptyList()
+
+    val hextets = section.split(":")
+    if (hextets.any { it.isEmpty() || !Ipv6HextetRegex.matches(it) }) {
+        return null
+    }
+    return hextets
+}

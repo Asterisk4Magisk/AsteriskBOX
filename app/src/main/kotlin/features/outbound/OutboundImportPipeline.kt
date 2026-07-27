@@ -1,0 +1,1368 @@
+// Copyright 2026, AsteriskBOX contributors
+// SPDX-License-Identifier: GPL-3.0
+
+package features.outbound
+
+import engine.singbox.config.SingBoxDeprecatedConfigValidator
+import engine.singbox.config.SingBoxJson
+import java.net.URI
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
+import kotlin.io.encoding.Base64
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import org.snakeyaml.engine.v2.api.Load
+import org.snakeyaml.engine.v2.api.LoadSettings
+
+internal enum class OutboundImportFormat {
+    JSON,
+    YAML,
+    URL,
+}
+
+internal data class OutboundImportResult(
+    val format: OutboundImportFormat,
+    val outbounds: List<ImportedSingBoxOutbound>,
+)
+
+private val SupportedV2RayTransportTypes =
+    setOf("tcp", "raw", "http", "h2", "ws", "quic", "grpc", "httpupgrade")
+
+private val TlsCapableOutboundTypes =
+    setOf("http", "vmess", "vless", "trojan", "hysteria", "hysteria2", "shadowtls", "tuic", "anytls")
+
+/**
+ * A single import entry point shared by QR code, clipboard, files and subscriptions.
+ *
+ * Payload decoding is intentionally performed before format detection. Detection order is stable:
+ * sing-box JSON, Mihomo YAML, then conventional proxy URLs.
+ */
+internal object OutboundImportPipeline {
+    fun parse(content: String): OutboundImportResult {
+        require(content.isNotBlank()) { "Outbound import content is empty" }
+        val candidates = buildList {
+            add(content.trim().removePrefix("\uFEFF"))
+            decodeBase64Payload(content)?.let { decoded ->
+                if (decoded !in this) add(decoded)
+            }
+        }
+        val failures = mutableListOf<Throwable>()
+        val parsers = listOf<Pair<OutboundImportFormat, (String) -> List<ImportedSingBoxOutbound>>>(
+            OutboundImportFormat.JSON to SingBoxOutboundImporter::parseImport,
+            OutboundImportFormat.YAML to MihomoYamlOutboundParser::parse,
+            OutboundImportFormat.URL to ProxyUrlOutboundParser::parse,
+        )
+        parsers.forEach { (format, parser) ->
+            candidates.forEach { candidate ->
+                runCatching { parser(candidate) }
+                    .onSuccess { outbounds ->
+                        if (outbounds.isNotEmpty()) {
+                            return OutboundImportResult(format, outbounds)
+                        }
+                    }
+                    .onFailure(failures::add)
+            }
+        }
+        throw IllegalArgumentException(
+            failures.lastOrNull()?.message ?: "No supported proxy outbounds found",
+            failures.lastOrNull(),
+        )
+    }
+}
+
+private object MihomoYamlOutboundParser {
+    private val loader = Load(LoadSettings.builder().build())
+
+    fun parse(content: String): List<ImportedSingBoxOutbound> {
+        val root = loader.loadFromString(content) as? Map<*, *>
+            ?: throw IllegalArgumentException("YAML root must be a mapping")
+        val proxies = root["proxies"] as? List<*>
+            ?: throw IllegalArgumentException("Mihomo YAML must contain proxies")
+        val objects = proxies.mapNotNull { value ->
+            val proxy = value as? Map<*, *> ?: return@mapNotNull null
+            runCatching { proxy.toSingBoxOutbound() }.getOrNull()
+        }
+        return normalizeImportedObjects(objects)
+    }
+
+    private fun Map<*, *>.toSingBoxOutbound(): JsonObject? {
+        val sourceType = string("type").lowercase()
+        val type = when (sourceType) {
+            "socks", "socks5" -> "socks"
+            "ss" -> "shadowsocks"
+            "hy2" -> "hysteria2"
+            else -> sourceType
+        }
+        if (type !in SupportedSingBoxProxyOutboundTypes) return null
+        val server = string("server")
+        val port = int("port")
+        require(server.isNotBlank()) { "Mihomo proxy server is required" }
+        require(port in 1..65535) { "Mihomo proxy port is invalid" }
+        if (type == "shadowsocks" && !isSupportedShadowsocksPlugin(string("plugin"))) return null
+        val network = string("network").ifBlank { string("transport") }.lowercase()
+        if (type in setOf("vmess", "vless", "trojan") &&
+            network.isNotBlank() &&
+            network !in SupportedV2RayTransportTypes
+        ) return null
+        val vlessEncryption = string("encryption")
+        if (type == "vless" &&
+            vlessEncryption.isNotBlank() &&
+            !vlessEncryption.equals("none", ignoreCase = true)
+        ) return null
+        if (type == "trojan" && map("ss-opts").bool("enabled")) return null
+        if (type == "tuic" && string("token").isNotBlank()) return null
+        if (string("fingerprint").isNotBlank()) return null
+        if (
+            listOf("shadow-tls-opts", "restls-opts", "jls-opts", "tlsmirror-opts")
+                .any { option -> map(option).isNotEmpty() }
+        ) return null
+        val realityOptions = map("reality-opts")
+        if (realityOptions.bool("support-x25519mlkem768")) return null
+        if (realityOptions.isNotEmpty() && realityOptions.string("public-key").isBlank()) return null
+        val ipVersion = string("ip-version").lowercase()
+        if (ipVersion.isNotBlank() && ipVersion != "dual") return null
+        val nameCertVerify = string("name-cert-verify")
+        val configuredServerName = string("servername").ifBlank { string("sni") }
+        if (
+            nameCertVerify.isNotBlank() &&
+            !nameCertVerify.equals(
+                configuredServerName.ifBlank { server },
+                ignoreCase = true,
+            )
+        ) return null
+        val certificate = string("certificate")
+        val privateKey = string("private-key")
+        if (
+            type in TlsCapableOutboundTypes &&
+            certificate.isBlank() != privateKey.isBlank()
+        ) return null
+        val tlsRequested = requestsTls(type)
+        val tlsEnabled = bool("tls") ||
+            string("security").let { security ->
+                security.equals("tls", ignoreCase = true) ||
+                    security.equals("reality", ignoreCase = true)
+            } ||
+            type in setOf("trojan", "hysteria", "hysteria2", "tuic", "anytls", "shadowtls")
+        if (type !in TlsCapableOutboundTypes && tlsRequested) return null
+        if (type in TlsCapableOutboundTypes && tlsRequested && !tlsEnabled) return null
+        if (hasUnsupportedTransportOptions(network)) return null
+        val name = string("name").ifBlank { "$type-$server:$port" }
+        val snellVersion = int("version").takeIf { it > 0 } ?: 4
+        if (type == "snell" && snellVersion != 4) return null
+        if (type == "hysteria" &&
+            string("protocol").isNotBlank() &&
+            !string("protocol").equals("udp", ignoreCase = true)
+        ) return null
+        if (type == "hysteria2" &&
+            string("obfs").isNotBlank() &&
+            string("obfs").lowercase() !in setOf("salamander", "gecko")
+        ) return null
+        val serverPorts = if (type == "hysteria" || type == "hysteria2") {
+            portRanges("ports")
+        } else {
+            emptyList()
+        }
+        if (stringList("ports").isNotEmpty() && serverPorts.isEmpty()) return null
+        return buildJsonObject {
+            put("type", type)
+            put("tag", name)
+            put("server", server)
+            if (serverPorts.isEmpty()) {
+                put("server_port", port)
+            } else {
+                put("server_ports", JsonArray(serverPorts.map(::JsonPrimitive)))
+            }
+            putIfTrue("tcp_fast_open", bool("tfo"))
+            putIfTrue("tcp_multi_path", bool("mptcp"))
+            putNotBlank("bind_interface", string("interface-name"))
+            putPositive("routing_mark", int("routing-mark"))
+            putNotBlank("detour", string("dialer-proxy"))
+            when (type) {
+                "socks" -> {
+                    putNotBlank("version", if (sourceType == "socks") string("version") else "5")
+                    putNotBlank("username", string("username"))
+                    putNotBlank("password", string("password"))
+                    putNotBlank("network", string("network"))
+                    putUdpOverTcp(this@toSingBoxOutbound)
+                }
+                "http" -> {
+                    putNotBlank("username", string("username"))
+                    putNotBlank("password", string("password"))
+                    putNotBlank("path", string("path"))
+                    headers()?.let { put("headers", it) }
+                }
+                "shadowsocks" -> {
+                    putNotBlank("method", string("cipher").ifBlank { string("method") })
+                    putNotBlank("password", string("password"))
+                    val plugin = string("plugin")
+                    val pluginOptions = map("plugin-opts")
+                    if (plugin.isNotBlank()) {
+                        val normalizedPlugin = normalizeShadowsocksPlugin(
+                            plugin,
+                            pluginOptions.entries.joinToString(";") { (key, value) ->
+                                "$key=$value"
+                            },
+                        )
+                        checkNotNull(normalizedPlugin)
+                        put("plugin", normalizedPlugin.first)
+                        putNotBlank("plugin_opts", normalizedPlugin.second)
+                    }
+                    putNotBlank("network", string("network"))
+                    putUdpOverTcp(this@toSingBoxOutbound)
+                }
+                "vmess" -> {
+                    putNotBlank("uuid", string("uuid"))
+                    putNotBlank("security", string("cipher").ifBlank { string("security") })
+                    putPositive(
+                        "alter_id",
+                        get("alterId")?.toString()?.toIntOrNull() ?: int("alter-id"),
+                    )
+                    putIfTrue("global_padding", bool("global-padding"))
+                    putIfTrue("authenticated_length", bool("authenticated-length"))
+                    putNotBlank("packet_encoding", string("packet-encoding"))
+                }
+                "trojan" -> putNotBlank("password", string("password"))
+                "hysteria" -> {
+                    putNotBlank("auth_str", string("auth-str").ifBlank { string("auth") })
+                    putNotBlank("obfs", string("obfs"))
+                    putHysteriaBandwidth("up", get("up") ?: get("upmbps"))
+                    putHysteriaBandwidth("down", get("down") ?: get("downmbps"))
+                    hopIntervals("hop-interval").let { (minimum, _) ->
+                        putNotBlank("hop_interval", minimum)
+                    }
+                    putModernQuicFields(this@toSingBoxOutbound)
+                }
+                "vless" -> {
+                    putNotBlank("uuid", string("uuid"))
+                    putNotBlank("flow", string("flow"))
+                    putNotBlank("packet_encoding", string("packet-encoding"))
+                }
+                "shadowtls" -> {
+                    putPositive("version", int("version"))
+                    putNotBlank("password", string("password"))
+                }
+                "tuic" -> {
+                    putNotBlank("uuid", string("uuid"))
+                    putNotBlank("password", string("password"))
+                    putNotBlank("congestion_control", string("congestion-controller"))
+                    putNotBlank("udp_relay_mode", string("udp-relay-mode"))
+                    putIfTrue("udp_over_stream", bool("udp-over-stream"))
+                    putIfTrue("zero_rtt_handshake", bool("reduce-rtt"))
+                    putNotBlank("heartbeat", millisecondsDuration("heartbeat-interval"))
+                    putModernQuicFields(this@toSingBoxOutbound)
+                }
+                "hysteria2" -> {
+                    putNotBlank("password", string("password").ifBlank { string("auth") })
+                    val obfs = string("obfs")
+                    val obfsPassword = string("obfs-password")
+                    if (obfs.isNotBlank() || obfsPassword.isNotBlank()) {
+                        put("obfs", buildJsonObject {
+                            putNotBlank("type", obfs)
+                            putNotBlank("password", obfsPassword)
+                            putPositive(
+                                "min_packet_size",
+                                this@toSingBoxOutbound.int("obfs-min-packet-size"),
+                            )
+                            putPositive(
+                                "max_packet_size",
+                                this@toSingBoxOutbound.int("obfs-max-packet-size"),
+                            )
+                        })
+                    }
+                    putPositive("up_mbps", bandwidthMbps(get("up") ?: get("upmbps")))
+                    putPositive("down_mbps", bandwidthMbps(get("down") ?: get("downmbps")))
+                    hopIntervals("hop-interval").let { (minimum, maximum) ->
+                        putNotBlank("hop_interval", minimum)
+                        putNotBlank("hop_interval_max", maximum)
+                    }
+                    putNotBlank("bbr_profile", string("bbr-profile"))
+                    putModernQuicFields(this@toSingBoxOutbound)
+                }
+                "anytls" -> {
+                    putNotBlank("password", string("password"))
+                    putNotBlank(
+                        "idle_session_check_interval",
+                        secondsDuration("idle-session-check-interval"),
+                    )
+                    putNotBlank(
+                        "idle_session_timeout",
+                        secondsDuration("idle-session-timeout"),
+                    )
+                    putPositive("min_idle_session", int("min-idle-session"))
+                }
+                "snell" -> {
+                    put("version", snellVersion)
+                    putNotBlank("psk", string("psk"))
+                    putNotBlank("userkey", string("userkey"))
+                    putIfTrue("reuse", bool("reuse"))
+                    putNotBlank("obfs_mode", string("obfs-opts", "mode"))
+                    putNotBlank("obfs_host", string("obfs-opts", "host"))
+                }
+                "ssh" -> {
+                    putNotBlank("user", string("username").ifBlank { string("user") })
+                    putNotBlank("password", string("password"))
+                    putListable("private_key", stringList("private-key"))
+                    putNotBlank("private_key_passphrase", string("private-key-passphrase"))
+                    putListable("host_key", stringList("host-key"))
+                    putListable("host_key_algorithms", stringList("host-key-algorithms"))
+                    putNotBlank("client_version", string("client-version"))
+                    putListable("cipher", stringList("cipher"))
+                    putListable("mac", stringList("mac"))
+                    putListable("kex_algorithm", stringList("kex-algorithm"))
+                }
+            }
+            if (containsKey("udp") && !bool("udp") &&
+                type in setOf("socks", "shadowsocks", "vmess", "vless", "trojan")
+            ) {
+                put("network", "tcp")
+            }
+            buildTls(this@toSingBoxOutbound, type)?.let { put("tls", it) }
+            buildTransport(this@toSingBoxOutbound)?.let { put("transport", it) }
+            if (type in setOf("shadowsocks", "vmess", "trojan", "vless")) {
+                buildMultiplex(this@toSingBoxOutbound)?.let { put("multiplex", it) }
+            }
+        }
+    }
+
+    private fun buildTls(proxy: Map<*, *>, type: String): JsonObject? {
+        val serverName = proxy.string("servername")
+            .ifBlank { proxy.string("sni") }
+            .ifBlank { proxy.string("name-cert-verify") }
+        val enabled = proxy.bool("tls") ||
+            proxy.string("security").let { security ->
+                security.equals("tls", ignoreCase = true) ||
+                    security.equals("reality", ignoreCase = true)
+            } ||
+            type in setOf("trojan", "hysteria", "hysteria2", "tuic", "anytls", "shadowtls")
+        val insecure = proxy.bool("skip-cert-verify")
+        val fingerprint = proxy.string("client-fingerprint")
+        val disableSni = proxy.bool("disable-sni")
+        val reality = proxy.map("reality-opts")
+        val ech = proxy.map("ech-opts")
+        val certificate = proxy.string("certificate").takeIf {
+            type in TlsCapableOutboundTypes
+        }.orEmpty()
+        val privateKey = proxy.string("private-key").takeIf {
+            type in TlsCapableOutboundTypes
+        }.orEmpty()
+        if (!enabled) return null
+        return buildJsonObject {
+            put("enabled", true)
+            putNotBlank("server_name", serverName)
+            putIfTrue("insecure", insecure)
+            putIfTrue("disable_sni", disableSni)
+            val alpn = proxy.stringList("alpn")
+            if (alpn.isNotEmpty()) put("alpn", JsonArray(alpn.map(::JsonPrimitive)))
+            if (fingerprint.isNotBlank()) {
+                put("utls", buildJsonObject {
+                    put("enabled", true)
+                    put("fingerprint", fingerprint)
+                })
+            }
+            if (reality.isNotEmpty()) {
+                put("reality", buildJsonObject {
+                    put("enabled", true)
+                    putNotBlank("public_key", reality.string("public-key"))
+                    putNotBlank("short_id", reality.string("short-id"))
+                })
+            }
+            if (ech.isNotEmpty() && (ech.bool("enable") || ech.stringList("config").isNotEmpty())) {
+                put("ech", buildJsonObject {
+                    put("enabled", true)
+                    putListable("config", ech.stringList("config"))
+                    putNotBlank("query_server_name", ech.string("query-server-name"))
+                })
+            }
+            if (certificate.isNotBlank()) {
+                if ("-----BEGIN" in certificate) {
+                    put("client_certificate", certificate)
+                    put("client_key", privateKey)
+                } else {
+                    put("client_certificate_path", certificate)
+                    put("client_key_path", privateKey)
+                }
+            }
+        }
+    }
+
+    private fun buildMultiplex(proxy: Map<*, *>): JsonObject? {
+        val options = proxy.map("smux")
+        if (!options.bool("enabled")) return null
+        return buildJsonObject {
+            put("enabled", true)
+            options.string("protocol")
+                .takeIf { it in setOf("smux", "yamux", "h2mux") }
+                ?.let { put("protocol", it) }
+            putPositive("max_connections", options.int("max-connections"))
+            putPositive("min_streams", options.int("min-streams"))
+            putPositive("max_streams", options.int("max-streams"))
+            putIfTrue("padding", options.bool("padding"))
+            val brutal = options.map("brutal-opts")
+            if (brutal.bool("enabled")) {
+                put("brutal", buildJsonObject {
+                    put("enabled", true)
+                    putPositive("up_mbps", bandwidthMbps(brutal["up"]))
+                    putPositive("down_mbps", bandwidthMbps(brutal["down"]))
+                })
+            }
+        }
+    }
+
+    private fun buildTransport(proxy: Map<*, *>): JsonObject? {
+        val network = proxy.string("network")
+            .ifBlank { proxy.string("transport") }
+            .lowercase()
+        if (network.isBlank() || network == "tcp") return null
+        val sourceType = when (network) {
+            "h2" -> "http"
+            else -> network
+        }
+        val options = proxy.map("$network-opts").ifEmpty {
+            when (sourceType) {
+                "ws" -> proxy.map("ws-opts")
+                "grpc" -> proxy.map("grpc-opts")
+                "http" -> proxy.map("h2-opts").ifEmpty { proxy.map("http-opts") }
+                "httpupgrade" -> proxy.map("httpupgrade-opts")
+                else -> emptyMap()
+            }
+        }
+        val normalizedType = if (sourceType == "ws" && options.bool("v2ray-http-upgrade")) {
+            "httpupgrade"
+        } else {
+            sourceType
+        }
+        if (normalizedType !in setOf("http", "ws", "quic", "grpc", "httpupgrade")) return null
+        return buildJsonObject {
+            put("type", normalizedType)
+            when (normalizedType) {
+                "http" -> {
+                    options.stringList("host").takeIf(List<String>::isNotEmpty)?.let { hosts ->
+                        put("host", JsonArray(hosts.map(::JsonPrimitive)))
+                    }
+                    putNotBlank("path", options.stringList("path").firstOrNull().orEmpty())
+                    putNotBlank("method", options.string("method"))
+                    putNotBlank("idle_timeout", options.string("idle-timeout"))
+                    putNotBlank("ping_timeout", options.string("ping-timeout"))
+                    options.headers()?.let { put("headers", it) }
+                }
+                "ws" -> {
+                    putNotBlank("path", options.string("path"))
+                    options.headers()?.let { put("headers", it) }
+                    putPositive("max_early_data", options.int("max-early-data"))
+                    putNotBlank(
+                        "early_data_header_name",
+                        options.string("early-data-header-name"),
+                    )
+                }
+                "grpc" -> {
+                    putNotBlank(
+                        "service_name",
+                        options.string("grpc-service-name").ifBlank {
+                            options.string("service-name")
+                        },
+                    )
+                    putNotBlank("idle_timeout", options.string("idle-timeout"))
+                    putNotBlank("ping_timeout", options.string("ping-timeout"))
+                    putIfTrue("permit_without_stream", options.bool("permit-without-stream"))
+                }
+                "httpupgrade" -> {
+                    putNotBlank(
+                        "host",
+                        options.stringList("host").firstOrNull()
+                            ?: options.headerValues("Host").firstOrNull().orEmpty(),
+                    )
+                    putNotBlank("path", options.string("path"))
+                    options.headers(excludedNames = setOf("host"))?.let { put("headers", it) }
+                }
+                "quic" -> Unit
+            }
+        }
+    }
+
+    private fun Map<*, *>.requestsTls(type: String): Boolean =
+        bool("tls") ||
+            string("security").let { security ->
+                security.equals("tls", ignoreCase = true) ||
+                    security.equals("reality", ignoreCase = true)
+            } ||
+            listOf(
+                "servername",
+                "sni",
+                "name-cert-verify",
+                "client-fingerprint",
+                "certificate",
+            ).any { key -> string(key).isNotBlank() } ||
+            (type != "ssh" && string("private-key").isNotBlank()) ||
+            bool("skip-cert-verify") ||
+            bool("disable-sni") ||
+            map("reality-opts").isNotEmpty() ||
+            map("ech-opts").isNotEmpty()
+
+    private fun Map<*, *>.hasUnsupportedTransportOptions(network: String): Boolean {
+        val normalized = if (network == "h2") "http" else network
+        val options = map("$network-opts").ifEmpty {
+            when (normalized) {
+                "http" -> map("h2-opts").ifEmpty { map("http-opts") }
+                "ws" -> map("ws-opts")
+                "grpc" -> map("grpc-opts")
+                "httpupgrade" -> map("httpupgrade-opts")
+                "quic" -> map("quic-opts")
+                else -> emptyMap()
+            }
+        }
+        return when (normalized) {
+            "grpc" -> options.string("authority").isNotBlank() ||
+                options.string("mode").let { it.isNotBlank() && !it.equals("gun", true) }
+            "quic" -> options.isNotEmpty()
+            else -> false
+        }
+    }
+}
+
+private object ProxyUrlOutboundParser {
+    private val urlPattern = Regex(
+        """(?i)(?:socks4a?|socks5?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2|hy2|anytls|snell|ssh|tor|naive(?:\+https)?|wireguard)://[^\s<>"']+""",
+    )
+
+    fun parse(content: String): List<ImportedSingBoxOutbound> {
+        val links = content.lineSequence()
+            .flatMap { line -> urlPattern.findAll(line).map(MatchResult::value) }
+            .map { it.trim().trimEnd(',', ';') }
+            .distinct()
+            .toList()
+        if (links.isEmpty()) throw IllegalArgumentException("No proxy URLs found")
+        val failures = mutableListOf<Throwable>()
+        val objects = links.mapIndexedNotNull { index, link ->
+            runCatching { parseLink(link, index) }
+                .onFailure(failures::add)
+                .getOrNull()
+        }
+        if (objects.isEmpty() && failures.isNotEmpty()) {
+            val cause = failures.last()
+            throw IllegalArgumentException(
+                cause.message ?: "No supported proxy outbounds found",
+                cause,
+            )
+        }
+        return normalizeImportedObjects(objects)
+    }
+
+    private fun parseLink(link: String, index: Int): JsonObject? {
+        val scheme = link.substringBefore("://").lowercase()
+        if (scheme in setOf("tor", "naive", "naive+https", "wireguard")) return null
+        if (scheme == "vmess" && '@' !in link.substringAfter("://").substringBefore('#')) {
+            return parseLegacyVmess(link, index)
+        }
+        if (scheme == "ss") return parseShadowsocks(link, index)
+        val hopping = parsePortHoppingAuthority(link, scheme)
+        val uri = URI(hopping?.normalizedLink ?: link)
+        val query = parseQuery(uri.rawQuery)
+        val type = when (scheme) {
+            "http", "https" -> "http"
+            "socks", "socks4", "socks4a", "socks5" -> "socks"
+            "hy1" -> "hysteria"
+            "hy2" -> "hysteria2"
+            else -> scheme
+        }
+        if (type !in SupportedSingBoxProxyOutboundTypes) return null
+        val host = uri.host ?: extractBracketAwareHost(uri.rawAuthority)
+        val port = uri.port.takeIf { it > 0 } ?: defaultPort(scheme)
+        require(!host.isNullOrBlank()) { "Proxy URL server is required" }
+        require(port in 1..65535) { "Proxy URL port is invalid" }
+        val credentials = splitUserInfo(uri.rawUserInfo)
+        val authentication = decodeComponent(uri.rawUserInfo)
+        if (type == "hysteria" &&
+            query.first("protocol").isNotBlank() &&
+            !query.first("protocol").equals("udp", ignoreCase = true)
+        ) return null
+        if (type == "snell" && query.int("version").takeIf { it > 0 } != 4) return null
+        val transportType = query.first("type", "network").lowercase()
+        if (type in setOf("vmess", "vless", "trojan") &&
+            transportType.isNotBlank() &&
+            transportType !in SupportedV2RayTransportTypes
+        ) {
+            throw IllegalArgumentException("Unsupported V2Ray transport: $transportType")
+        }
+        if (
+            transportType in setOf("tcp", "raw") &&
+            query.first("headerType", "header_type").let { header ->
+                header.isNotBlank() && !header.equals("none", ignoreCase = true)
+            }
+        ) return null
+        if (transportType == "grpc" &&
+            (
+                query.first("authority").isNotBlank() ||
+                    query.first("mode").let { mode ->
+                        mode.isNotBlank() && !mode.equals("gun", ignoreCase = true)
+                    }
+                )
+        ) return null
+        if (transportType == "quic" &&
+            listOf("quicSecurity", "key", "headerType", "header_type")
+                .any { key -> query.first(key).isNotBlank() }
+        ) return null
+        if (
+            listOf("pinSHA256", "pcs", "vcn", "pqv", "spx", "fm")
+                .any { key -> query.first(key).isNotBlank() }
+        ) return null
+        val security = query.first("security", "tls")
+        val tlsEnabled = scheme == "https" ||
+            type in setOf("trojan", "hysteria", "hysteria2", "shadowtls", "tuic", "anytls") ||
+            security.equals("tls", ignoreCase = true) ||
+            security.equals("reality", ignoreCase = true) ||
+            query.bool("tls")
+        val tlsOptionsPresent =
+            listOf(
+                "sni",
+                "peer",
+                "serverName",
+                "servername",
+                "allowInsecure",
+                "allow_insecure",
+                "insecure",
+                "skip-cert-verify",
+                "fp",
+                "fingerprint",
+                "pbk",
+                "public-key",
+                "public_key",
+                "sid",
+                "short-id",
+                "short_id",
+                "ech",
+            ).any { key -> query.values(key).isNotEmpty() }
+        if (type !in TlsCapableOutboundTypes && (tlsEnabled || tlsOptionsPresent)) return null
+        if (type in TlsCapableOutboundTypes && tlsOptionsPresent && !tlsEnabled) return null
+        if (security.equals("reality", ignoreCase = true) &&
+            query.first("pbk", "public-key", "public_key").isBlank()
+        ) return null
+        val vlessEncryption = query.first("encryption")
+        if (type == "vless" &&
+            vlessEncryption.isNotBlank() &&
+            !vlessEncryption.equals("none", ignoreCase = true)
+        ) return null
+        if (type == "hysteria2" &&
+            query.first("obfs").let { obfs ->
+                obfs.isNotBlank() && obfs.lowercase() !in setOf("salamander", "gecko")
+            }
+        ) return null
+        if (type in setOf("vmess", "vless") && credentials.first.isBlank()) return null
+        val queryServerPorts = if (type == "hysteria2") {
+            normalizePortRanges(query.first("mport"))
+        } else {
+            emptyList()
+        }
+        if (type == "hysteria2" &&
+            query.first("mport").isNotBlank() &&
+            queryServerPorts.isEmpty()
+        ) return null
+        val serverPorts = hopping?.serverPorts ?: queryServerPorts
+        val tag = decodeComponent(uri.rawFragment).ifBlank { "$type-${index + 1}" }
+        return buildJsonObject {
+            put("type", type)
+            put("tag", tag)
+            put("server", host)
+            if (serverPorts.isEmpty()) {
+                put("server_port", port)
+            } else {
+                put("server_ports", JsonArray(serverPorts.map(::JsonPrimitive)))
+            }
+            when (type) {
+                "socks" -> {
+                    put("version", when (scheme) {
+                        "socks4" -> "4"
+                        "socks4a" -> "4a"
+                        else -> "5"
+                    })
+                    putNotBlank("username", credentials.first)
+                    putNotBlank("password", credentials.second)
+                }
+                "http" -> {
+                    putNotBlank("username", credentials.first)
+                    putNotBlank("password", credentials.second)
+                    putNotBlank("path", decodeComponent(uri.rawPath))
+                }
+                "vmess" -> {
+                    put("uuid", credentials.first)
+                    put(
+                        "security",
+                        query.first("encryption", "scy").ifBlank { "auto" },
+                    )
+                    putPositive("alter_id", query.int("alterId", "alter-id", "aid"))
+                    putNotBlank(
+                        "packet_encoding",
+                        query.first("packetEncoding", "packet_encoding"),
+                    )
+                }
+                "trojan" -> putNotBlank("password", authentication)
+                "hysteria" -> {
+                    putNotBlank("auth_str", authentication.ifBlank { query.first("auth") })
+                    putNotBlank("obfs", query.first("obfsParam", "obfs-param"))
+                    putPositive("up_mbps", query.int("upmbps", "up"))
+                    putPositive("down_mbps", query.int("downmbps", "down"))
+                }
+                "vless" -> {
+                    putNotBlank("uuid", credentials.first)
+                    putNotBlank("flow", query.first("flow"))
+                    putNotBlank("packet_encoding", query.first("packetEncoding", "packet_encoding"))
+                }
+                "shadowtls" -> {
+                    putNotBlank("password", authentication)
+                    putPositive("version", query.int("version"))
+                }
+                "tuic" -> {
+                    putNotBlank("uuid", credentials.first)
+                    putNotBlank("password", credentials.second)
+                    putNotBlank("congestion_control", query.first("congestion_control", "congestion-controller"))
+                    putNotBlank("udp_relay_mode", query.first("udp_relay_mode", "udp-relay-mode"))
+                    putIfTrue("zero_rtt_handshake", query.bool("allow_insecure_0rtt", "reduce-rtt"))
+                }
+                "hysteria2" -> {
+                    putNotBlank("password", authentication)
+                    val obfsType = query.first("obfs")
+                    val obfsPassword = query.first("obfs-password", "obfs_password")
+                    if (obfsType.isNotBlank() || obfsPassword.isNotBlank()) {
+                        put("obfs", buildJsonObject {
+                            putNotBlank("type", obfsType)
+                            putNotBlank("password", obfsPassword)
+                        })
+                    }
+                    putPositive("up_mbps", query.int("upmbps", "up"))
+                    putPositive("down_mbps", query.int("downmbps", "down"))
+                }
+                "anytls" -> putNotBlank("password", authentication)
+                "snell" -> {
+                    putNotBlank("psk", authentication)
+                    put("version", 4)
+                    putNotBlank("obfs_mode", query.first("obfs", "obfs_mode"))
+                    putNotBlank("obfs_host", query.first("obfs-host", "obfs_host"))
+                }
+                "ssh" -> {
+                    putNotBlank("user", credentials.first)
+                    putNotBlank("password", credentials.second)
+                    putNotBlank("private_key_path", query.first("private_key_path", "private-key-path"))
+                    putNotBlank("private_key_passphrase", query.first("private_key_passphrase"))
+                }
+            }
+            buildUrlTls(type, scheme, query)?.let { put("tls", it) }
+            buildUrlTransport(query)?.let { put("transport", it) }
+        }
+    }
+
+    private fun parseLegacyVmess(link: String, index: Int): JsonObject {
+        val encoded = link.substringAfter("://").substringBefore('#')
+        val decoded = decodeBase64(encoded)
+            ?: throw IllegalArgumentException("Invalid VMess URL payload")
+        val source = SingBoxJson.parseToJsonElement(decoded) as? JsonObject
+            ?: throw IllegalArgumentException("VMess URL payload must be JSON")
+        val server = source.string("add")
+        val port = source.int("port")
+        require(server.isNotBlank() && port in 1..65535) { "Invalid VMess server" }
+        require(source.string("v").let { it.isBlank() || it == "2" }) {
+            "Unsupported VMess URL version"
+        }
+        require(source.string("id").isNotBlank()) { "VMess UUID is required" }
+        val fragment = decodeComponent(link.substringAfter('#', ""))
+        val tag = source.string("ps").ifBlank { fragment }.ifBlank { "vmess-${index + 1}" }
+        val tlsMode = source.string("tls").lowercase()
+        require(tlsMode.isBlank() || tlsMode in setOf("tls", "reality")) {
+            "Unsupported VMess TLS mode"
+        }
+        val tlsEnabled = tlsMode in setOf("tls", "reality") || source.string("pbk").isNotBlank()
+        val transportType = source.string("net").lowercase().ifBlank { "tcp" }
+        require(
+            transportType in SupportedV2RayTransportTypes,
+        ) { "Unsupported VMess transport" }
+        val headerType = source.string("type")
+        require(
+            transportType !in setOf("tcp", "raw") ||
+                headerType.isBlank() ||
+                headerType.equals("none", ignoreCase = true),
+        ) { "Unsupported VMess TCP header" }
+        require(
+            transportType != "grpc" ||
+                (
+                    source.string("host").isBlank() &&
+                        headerType.let {
+                            it.isBlank() ||
+                                it.equals("none", true) ||
+                                it.equals("gun", true)
+                        }
+                    ),
+        ) { "Unsupported VMess gRPC options" }
+        require(
+            transportType != "quic" ||
+                (
+                    headerType.isBlank() &&
+                        source.string("host").isBlank() &&
+                        source.string("path").isBlank()
+                    ),
+        ) { "Unsupported VMess QUIC options" }
+        require(
+            listOf("pcs", "vcn", "pqv", "spx")
+                .none { field -> source.string(field).isNotBlank() },
+        ) { "Unsupported VMess security option" }
+        require(!tlsMode.equals("reality") || source.string("pbk").isNotBlank()) {
+            "VMess Reality public key is required"
+        }
+        val queryLike = mapOf(
+            "security" to listOf(tlsMode),
+            "sni" to listOf(source.string("sni")),
+            "type" to listOf(transportType),
+            "path" to listOf(source.string("path")),
+            "host" to listOf(source.string("host")),
+            "serviceName" to listOf(
+                source.string("serviceName").ifBlank { source.string("path") },
+            ),
+            "fp" to listOf(source.string("fp")),
+            "alpn" to listOf(source.string("alpn")),
+            "insecure" to listOf(source.string("insecure")),
+            "pbk" to listOf(source.string("pbk")),
+            "sid" to listOf(source.string("sid")),
+        )
+        return buildJsonObject {
+            put("type", "vmess")
+            put("tag", tag)
+            put("server", server)
+            put("server_port", port)
+            putNotBlank("uuid", source.string("id"))
+            putNotBlank("security", source.string("scy").ifBlank { "auto" })
+            putPositive("alter_id", source.int("aid"))
+            if (tlsEnabled) buildUrlTls("vmess", "vmess", queryLike)?.let { put("tls", it) }
+            buildUrlTransport(queryLike)?.let { put("transport", it) }
+        }
+    }
+
+    private fun parseShadowsocks(link: String, index: Int): JsonObject? {
+        val body = link.substringAfter("://")
+        val fragment = decodeComponent(body.substringAfter('#', ""))
+        val withoutFragment = body.substringBefore('#')
+        val beforeQuery = withoutFragment.substringBefore('?')
+        val rawQuery = withoutFragment.substringAfter('?', "")
+        val decodedFull = if ('@' !in beforeQuery) decodeBase64(beforeQuery) else null
+        val authority = decodedFull ?: beforeQuery
+        val userInfo = authority.substringBeforeLast('@', "")
+        val endpoint = authority.substringAfterLast('@', authority)
+        val decodedUserInfo = decodeBase64(userInfo) ?: decodeComponent(userInfo)
+        val method = decodedUserInfo.substringBefore(':')
+        val password = decodedUserInfo.substringAfter(':', "")
+        val endpointUri = URI("ss://$endpoint")
+        val host = endpointUri.host ?: extractBracketAwareHost(endpoint)
+        val port = endpointUri.port
+        require(!host.isNullOrBlank() && port in 1..65535) { "Invalid Shadowsocks URL" }
+        val query = parseQuery(rawQuery)
+        val pluginValue = query.first("plugin")
+        val plugin = if (pluginValue.isBlank()) {
+            null
+        } else {
+            normalizeShadowsocksPlugin(
+                pluginValue.substringBefore(';'),
+                pluginValue.substringAfter(';', ""),
+            ) ?: return null
+        }
+        return buildJsonObject {
+            put("type", "shadowsocks")
+            put("tag", fragment.ifBlank { "shadowsocks-${index + 1}" })
+            put("server", host)
+            put("server_port", port)
+            putNotBlank("method", method)
+            putNotBlank("password", password)
+            if (plugin != null) {
+                put("plugin", plugin.first)
+                putNotBlank("plugin_opts", plugin.second)
+            }
+        }
+    }
+
+    private fun buildUrlTls(
+        type: String,
+        scheme: String,
+        query: Map<String, List<String>>,
+    ): JsonObject? {
+        val security = query.first("security", "tls")
+        val enabled = scheme == "https" ||
+            type in setOf("trojan", "hysteria", "hysteria2", "shadowtls", "tuic", "anytls") ||
+            security.equals("tls", true) ||
+            security.equals("reality", true) ||
+            query.bool("tls")
+        val serverName = query.first("sni", "peer", "serverName", "servername")
+        val insecure = query.bool(
+            "allowInsecure",
+            "allow_insecure",
+            "insecure",
+            "skip-cert-verify",
+        )
+        val fingerprint = query.first("fp", "fingerprint")
+        val realityPublicKey = query.first("pbk", "public-key", "public_key")
+        val realityShortId = query.first("sid", "short-id", "short_id")
+        if (!enabled) return null
+        return buildJsonObject {
+            put("enabled", true)
+            putNotBlank("server_name", serverName)
+            putIfTrue("insecure", insecure)
+            query.values("alpn")
+                .flatMap { value -> value.split(',') }
+                .filter(String::isNotBlank)
+                .takeIf(List<String>::isNotEmpty)
+                ?.let { values -> put("alpn", JsonArray(values.map(::JsonPrimitive))) }
+            if (fingerprint.isNotBlank()) {
+                put("utls", buildJsonObject {
+                    put("enabled", true)
+                    put("fingerprint", fingerprint)
+                })
+            }
+            if (realityPublicKey.isNotBlank()) {
+                put("reality", buildJsonObject {
+                    put("enabled", true)
+                    put("public_key", realityPublicKey)
+                    putNotBlank("short_id", realityShortId)
+                })
+            }
+            query.values("ech").takeIf(List<String>::isNotEmpty)?.let { configs ->
+                put("ech", buildJsonObject {
+                    put("enabled", true)
+                    put("config", JsonArray(configs.map(::JsonPrimitive)))
+                })
+            }
+        }
+    }
+
+    private fun buildUrlTransport(query: Map<String, List<String>>): JsonObject? {
+        val transportType = query.first("type", "network").lowercase()
+        if (transportType.isBlank() || transportType in setOf("tcp", "raw")) return null
+        val type = when (transportType) {
+            "h2" -> "http"
+            else -> transportType
+        }
+        if (type !in SupportedV2RayTransportTypes.map { value ->
+                if (value == "h2") "http" else value
+            }
+        ) return null
+        return buildJsonObject {
+            put("type", type)
+            when (type) {
+                "http" -> {
+                    query.values("host")
+                        .flatMap { value -> value.split(',') }
+                        .filter(String::isNotBlank)
+                        .takeIf(List<String>::isNotEmpty)
+                        ?.let { hosts -> put("host", JsonArray(hosts.map(::JsonPrimitive))) }
+                    putNotBlank("path", query.first("path"))
+                    putNotBlank("method", query.first("method"))
+                }
+                "ws" -> {
+                    putNotBlank("path", query.first("path"))
+                    query.first("host").takeIf(String::isNotBlank)?.let { host ->
+                        put("headers", buildJsonObject { put("Host", host) })
+                    }
+                    putPositive("max_early_data", query.int("ed", "max-early-data"))
+                    putNotBlank(
+                        "early_data_header_name",
+                        query.first("eh", "early-data-header-name"),
+                    )
+                }
+                "grpc" -> {
+                    putNotBlank(
+                        "service_name",
+                        query.first("serviceName", "service_name", "service-name"),
+                    )
+                }
+                "httpupgrade" -> {
+                    putNotBlank("host", query.first("host"))
+                    putNotBlank("path", query.first("path"))
+                }
+                "quic" -> Unit
+            }
+        }
+    }
+}
+
+private fun normalizeImportedObjects(objects: List<JsonObject>): List<ImportedSingBoxOutbound> {
+    if (objects.isEmpty()) throw IllegalArgumentException("No supported proxy outbounds found")
+    val root = buildJsonObject { put("outbounds", JsonArray(objects)) }
+    SingBoxDeprecatedConfigValidator.validate(root)
+    return SingBoxOutboundImporter.parseImport(
+        SingBoxJson.encodeToString(JsonElement.serializer(), root),
+    )
+}
+
+private fun decodeBase64Payload(content: String): String? {
+    val compact = content.trim().filterNot(Char::isWhitespace)
+    if (compact.length < 16 || !compact.matches(Regex("""[A-Za-z0-9_+/=-]+"""))) return null
+    return decodeBase64(compact)?.takeIf { decoded ->
+        decoded.isNotBlank() && decoded.count(Char::isISOControl) <= decoded.length / 20
+    }
+}
+
+private fun decodeBase64(value: String): String? {
+    val compact = value.trim().filterNot(Char::isWhitespace)
+    val padded = compact + "=".repeat((4 - compact.length % 4) % 4)
+    return sequenceOf(Base64.UrlSafe, Base64.Default)
+        .mapNotNull { decoder ->
+            runCatching {
+                decoder.decode(padded).decodeToString()
+            }.getOrNull()
+        }
+        .firstOrNull()
+}
+
+private fun parseQuery(rawQuery: String?): Map<String, List<String>> {
+    if (rawQuery.isNullOrBlank()) return emptyMap()
+    return rawQuery.split('&')
+        .mapNotNull { part ->
+            val key = decodeComponent(part.substringBefore('='))
+            if (key.isBlank()) null else key to decodeComponent(part.substringAfter('=', ""))
+        }
+        .groupBy({ it.first }, { it.second })
+}
+
+private data class PortHoppingLink(
+    val normalizedLink: String,
+    val serverPorts: List<String>,
+)
+
+private fun parsePortHoppingAuthority(link: String, scheme: String): PortHoppingLink? {
+    if (scheme != "hysteria2" && scheme != "hy2") return null
+    val authorityStart = link.indexOf("://").takeIf { it >= 0 }?.plus(3) ?: return null
+    val authorityEnd = sequenceOf(
+        link.indexOf('/', authorityStart),
+        link.indexOf('?', authorityStart),
+        link.indexOf('#', authorityStart),
+    ).filter { it >= 0 }.minOrNull() ?: link.length
+    val authority = link.substring(authorityStart, authorityEnd)
+    val userInfo = authority.substringBeforeLast('@', "")
+    val endpoint = authority.substringAfterLast('@')
+    val host = if (endpoint.startsWith('[')) {
+        endpoint.substringBefore(']') + "]"
+    } else {
+        endpoint.substringBefore(':')
+    }
+    val portList = if (endpoint.startsWith('[')) {
+        endpoint.substringAfter(']', "").removePrefix(":")
+    } else {
+        endpoint.substringAfter(':', "")
+    }
+    if (',' !in portList && '-' !in portList) return null
+    val serverPorts = normalizePortRanges(portList)
+    if (serverPorts.isEmpty()) return null
+    val firstPort = serverPorts.firstOrNull()
+        ?.substringBefore(':')
+        ?.toIntOrNull()
+        ?.takeIf { it in 1..65535 }
+        ?: return null
+    val normalizedAuthority = buildString {
+        if (userInfo.isNotBlank()) append(userInfo).append('@')
+        append(host).append(':').append(firstPort)
+    }
+    return PortHoppingLink(
+        normalizedLink = link.replaceRange(authorityStart, authorityEnd, normalizedAuthority),
+        serverPorts = serverPorts,
+    )
+}
+
+private fun splitUserInfo(rawUserInfo: String?): Pair<String, String> {
+    val raw = decodeComponent(rawUserInfo)
+    val decoded = if (':' !in raw) decodeBase64(raw)?.takeIf { ':' in it } else null
+    val credentials = decoded ?: raw
+    return decodeComponent(credentials.substringBefore(':')) to
+        decodeComponent(credentials.substringAfter(':', ""))
+}
+
+private fun normalizePortRanges(value: String): List<String> =
+    value.split(',')
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .let { items ->
+            val result = mutableListOf<String>()
+            items.forEach { item ->
+                val normalized = item.replace(Regex("""^(\d+)-(\d+)$"""), "$1:$2")
+                val bounds = normalized.split(':')
+                    .mapNotNull(String::toIntOrNull)
+                when {
+                    bounds.size == 1 && bounds[0] in 1..65535 -> Unit
+                    bounds.size == 2 &&
+                        bounds[0] in 1..65535 &&
+                        bounds[1] in bounds[0]..65535 -> Unit
+                    else -> return emptyList()
+                }
+                result += normalized
+            }
+            result
+        }
+
+private fun extractBracketAwareHost(authority: String?): String? {
+    val endpoint = authority?.substringAfterLast('@') ?: return null
+    return if (endpoint.startsWith('[')) endpoint.substringAfter('[').substringBefore(']')
+    else endpoint.substringBeforeLast(':', endpoint)
+}
+
+private fun defaultPort(scheme: String): Int = when (scheme) {
+    "http" -> 80
+    "https", "hysteria2", "hy2" -> 443
+    "ssh" -> 22
+    else -> -1
+}
+
+private fun decodeComponent(value: String?): String {
+    if (value.isNullOrBlank()) return ""
+    return runCatching {
+        URLDecoder.decode(value.replace("+", "%2B"), StandardCharsets.UTF_8.name())
+    }.getOrDefault(value)
+}
+
+private fun JsonObject.string(name: String): String =
+    (get(name) as? JsonPrimitive)?.contentOrNull.orEmpty()
+
+private fun JsonObject.int(name: String): Int =
+    (get(name) as? JsonPrimitive)?.intOrNull ?: string(name).toIntOrNull() ?: 0
+
+private fun Map<String, List<String>>.first(vararg names: String): String =
+    names.firstNotNullOfOrNull { name ->
+        entries.firstOrNull { entry -> entry.key.equals(name, ignoreCase = true) }
+            ?.value
+            ?.firstOrNull()
+            ?.takeIf(String::isNotBlank)
+    }.orEmpty()
+
+private fun Map<String, List<String>>.values(vararg names: String): List<String> =
+    names.firstNotNullOfOrNull { name ->
+        entries.firstOrNull { entry -> entry.key.equals(name, ignoreCase = true) }
+            ?.value
+            ?.filter(String::isNotBlank)
+            ?.takeIf(List<String>::isNotEmpty)
+    }.orEmpty()
+
+private fun Map<String, List<String>>.int(vararg names: String): Int =
+    first(*names).filter(Char::isDigit).toIntOrNull() ?: 0
+
+private fun Map<String, List<String>>.bool(vararg names: String): Boolean =
+    first(*names).let { it == "1" || it.equals("true", true) }
+
+private fun Map<*, *>.string(name: String): String = get(name)?.toString().orEmpty()
+
+private fun Map<*, *>.string(parent: String, name: String): String =
+    map(parent).string(name)
+
+private fun Map<*, *>.int(name: String): Int = when (val value = get(name)) {
+    is Number -> value.toInt()
+    else -> value?.toString()?.toIntOrNull() ?: 0
+}
+
+private fun Map<*, *>.bool(name: String): Boolean = when (val value = get(name)) {
+    is Boolean -> value
+    is Number -> value.toInt() != 0
+    else -> value?.toString()?.let { it == "1" || it.equals("true", true) } == true
+}
+
+private fun Map<*, *>.map(name: String): Map<*, *> = get(name) as? Map<*, *> ?: emptyMap<Any?, Any?>()
+
+private fun Map<*, *>.list(name: String): List<*> = get(name) as? List<*> ?: emptyList<Any?>()
+
+private fun Map<*, *>.stringList(name: String): List<String> = when (val value = get(name)) {
+    is Iterable<*> -> value.mapNotNull { item -> item?.toString()?.takeIf(String::isNotBlank) }
+    null -> emptyList()
+    else -> listOf(value.toString()).filter(String::isNotBlank)
+}
+
+private fun Map<*, *>.headerValues(name: String): List<String> {
+    val headers = map("headers")
+    val value = headers.entries
+        .firstOrNull { entry -> entry.key?.toString()?.equals(name, ignoreCase = true) == true }
+        ?.value
+    return when (value) {
+        is Iterable<*> -> value.mapNotNull { item ->
+            item?.toString()?.takeIf(String::isNotBlank)
+        }
+        null -> emptyList()
+        else -> listOf(value.toString()).filter(String::isNotBlank)
+    }
+}
+
+private fun Map<*, *>.headers(excludedNames: Set<String> = emptySet()): JsonObject? {
+    val headers = map("headers")
+    if (headers.isEmpty()) return null
+    return buildJsonObject {
+        headers.forEach { (key, value) ->
+            if (key == null || value == null) return@forEach
+            if (excludedNames.any { name -> key.toString().equals(name, ignoreCase = true) }) {
+                return@forEach
+            }
+            when (value) {
+                is Iterable<*> -> {
+                    val values = value.mapNotNull { item ->
+                        item?.toString()?.takeIf(String::isNotBlank)
+                    }
+                    if (values.isNotEmpty()) {
+                        put(key.toString(), JsonArray(values.map(::JsonPrimitive)))
+                    }
+                }
+                else -> value.toString().takeIf(String::isNotBlank)?.let { text ->
+                    put(key.toString(), text)
+                }
+            }
+        }
+    }.takeIf(JsonObject::isNotEmpty)
+}
+
+private fun isSupportedShadowsocksPlugin(plugin: String): Boolean =
+    plugin.isBlank() ||
+        plugin.equals("obfs", ignoreCase = true) ||
+        plugin.equals("obfs-local", ignoreCase = true) ||
+        plugin.equals("v2ray-plugin", ignoreCase = true)
+
+private fun normalizeShadowsocksPlugin(
+    plugin: String,
+    options: String,
+): Pair<String, String>? {
+    val normalizedName = when {
+        plugin.equals("obfs", ignoreCase = true) -> "obfs-local"
+        plugin.equals("obfs-local", ignoreCase = true) -> "obfs-local"
+        plugin.equals("v2ray-plugin", ignoreCase = true) -> "v2ray-plugin"
+        else -> return null
+    }
+    if (normalizedName != "obfs-local") return normalizedName to options
+    val normalizedOptions = options.split(';')
+        .map(String::trim)
+        .filter(String::isNotBlank)
+        .map { option ->
+            val key = option.substringBefore('=')
+            val value = option.substringAfter('=', "")
+            when {
+                key.equals("mode", ignoreCase = true) -> "obfs=$value"
+                key.equals("host", ignoreCase = true) -> "obfs-host=$value"
+                else -> option
+            }
+        }
+        .joinToString(";")
+    return normalizedName to normalizedOptions
+}
+
+private fun Map<*, *>.portRanges(name: String): List<String> =
+    normalizePortRanges(stringList(name).joinToString(","))
+
+private fun Map<*, *>.hopIntervals(name: String): Pair<String, String> {
+    val value = get(name)?.toString()?.trim().orEmpty()
+    if (value.isBlank()) return "" to ""
+    val range = Regex("""^(\d+(?:\.\d+)?)(?:s)?-(\d+(?:\.\d+)?)(?:s)?$""")
+        .matchEntire(value)
+    return if (range != null) {
+        "${range.groupValues[1]}s" to "${range.groupValues[2]}s"
+    } else {
+        value.asSecondsDuration() to ""
+    }
+}
+
+private fun Map<*, *>.secondsDuration(name: String): String =
+    get(name)?.toString()?.trim().orEmpty().asSecondsDuration()
+
+private fun Map<*, *>.millisecondsDuration(name: String): String {
+    val value = get(name)?.toString()?.trim().orEmpty()
+    if (value.isBlank()) return ""
+    if (value.any(Char::isLetter)) return value
+    val milliseconds = value.toLongOrNull() ?: return ""
+    return if (milliseconds % 1_000L == 0L) {
+        "${milliseconds / 1_000L}s"
+    } else {
+        "${milliseconds}ms"
+    }
+}
+
+private fun String.asSecondsDuration(): String {
+    if (isBlank()) return ""
+    return if (any(Char::isLetter)) this else "${this}s"
+}
+
+private fun bandwidthMbps(value: Any?): Int {
+    if (value is Number) return value.toInt().coerceAtLeast(0)
+    val text = value?.toString()?.trim().orEmpty()
+    text.toIntOrNull()?.let { return it.coerceAtLeast(0) }
+    val match = Regex(
+        """^(\d+(?:\.\d+)?)\s*([KMGT]?)([bB])ps$""",
+        RegexOption.IGNORE_CASE,
+    ).matchEntire(text) ?: return 0
+    val amount = match.groupValues[1].toDoubleOrNull() ?: return 0
+    val prefixFactor = when (match.groupValues[2].uppercase()) {
+        "K" -> 0.001
+        "M" -> 1.0
+        "G" -> 1_000.0
+        "T" -> 1_000_000.0
+        else -> 0.000001
+    }
+    val byteFactor = if (match.groupValues[3] == "B") 8.0 else 1.0
+    return kotlin.math.round(amount * prefixFactor * byteFactor)
+        .toInt()
+        .coerceAtLeast(0)
+}
+
+private fun kotlinx.serialization.json.JsonObjectBuilder.putHysteriaBandwidth(
+    name: String,
+    value: Any?,
+) {
+    when (value) {
+        is Number -> putPositive("${name}_mbps", value.toInt())
+        null -> Unit
+        else -> {
+            val text = value.toString().trim()
+            val numeric = text.toIntOrNull()
+            if (numeric != null) {
+                putPositive("${name}_mbps", numeric)
+            } else {
+                putNotBlank(name, text)
+            }
+        }
+    }
+}
+
+private fun kotlinx.serialization.json.JsonObjectBuilder.putUdpOverTcp(proxy: Map<*, *>) {
+    if (!proxy.bool("udp-over-tcp")) return
+    val version = proxy.int("udp-over-tcp-version")
+    if (version > 0) {
+        put("udp_over_tcp", buildJsonObject {
+            put("enabled", true)
+            put("version", version)
+        })
+    } else {
+        put("udp_over_tcp", true)
+    }
+}
+
+private fun kotlinx.serialization.json.JsonObjectBuilder.putModernQuicFields(proxy: Map<*, *>) {
+    val streamWindow = proxy.int("max-stream-receive-window")
+        .takeIf { it > 0 }
+        ?: proxy.int("recv-window-conn")
+    val connectionWindow = proxy.int("max-connection-receive-window")
+        .takeIf { it > 0 }
+        ?: proxy.int("recv-window")
+    putPositive("stream_receive_window", streamWindow)
+    putPositive("connection_receive_window", connectionWindow)
+    if (proxy.bool("disable-mtu-discovery") || proxy.bool("disable_mtu_discovery")) {
+        put("disable_path_mtu_discovery", true)
+    }
+}
+
+private fun kotlinx.serialization.json.JsonObjectBuilder.putListable(
+    name: String,
+    values: List<String>,
+) {
+    if (values.isNotEmpty()) put(name, JsonArray(values.map(::JsonPrimitive)))
+}
+
+private fun kotlinx.serialization.json.JsonObjectBuilder.putNotBlank(name: String, value: String) {
+    if (value.isNotBlank()) put(name, value)
+}
+
+private fun kotlinx.serialization.json.JsonObjectBuilder.putPositive(name: String, value: Int) {
+    if (value > 0) put(name, value)
+}
+
+private fun kotlinx.serialization.json.JsonObjectBuilder.putIfTrue(name: String, value: Boolean) {
+    if (value) put(name, true)
+}
