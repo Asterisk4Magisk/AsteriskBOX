@@ -98,8 +98,6 @@ import app.modes.OutboundListSortName
 import app.modes.OutboundListSortType
 import app.navigation.Route
 import app.withRemovedManagedOutbound
-import engine.singbox.config.SingBoxConfigChecker
-import engine.singbox.config.SingBoxJson
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.importing.ImportOperation
 import features.importing.ImportSource
@@ -116,8 +114,6 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import org.asterisk.zcc.abox.R
 import sh.calvin.reorderable.ReorderableItem
 import ui.clipboard.getPlainText
@@ -195,8 +191,9 @@ internal fun OutboundListPage(
         val targetGroupId = selectedGroup?.id ?: return
         var stage = ImportStage.PARSE
         try {
-            validateCompleteSingBoxJsonWhenPresent(content)
-            val result = withContext(Dispatchers.Default) { OutboundImportPipeline.parse(content) }
+            val result = withContext(Dispatchers.Default) {
+                parseOutboundImportContent(content)
+            }
             val imported = result.outbounds
             val candidateState = appState.withImportedOutbounds(
                 groupId = targetGroupId,
@@ -1314,13 +1311,6 @@ internal fun outboundImportManualMenuHeightDp(windowHeightDp: Int): Int =
 
 @Composable
 private fun OutboundGroupState.displayName(): String = name
-
-private fun validateCompleteSingBoxJsonWhenPresent(content: String) {
-    val element = runCatching { SingBoxJson.parseToJsonElement(content) }.getOrNull()
-    if (element is JsonObject && element["outbounds"] is JsonArray) {
-        SingBoxConfigChecker.check(content)
-    }
-}
 
 private fun Context.readOutboundImportFile(uri: Uri): String {
     val content = contentResolver.openInputStream(uri)?.use { input ->

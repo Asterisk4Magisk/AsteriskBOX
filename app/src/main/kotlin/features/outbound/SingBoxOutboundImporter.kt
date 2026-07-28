@@ -29,53 +29,108 @@ internal data class ImportedSingBoxOutbound(
     val json: String,
 )
 
+private data class RawOutboundImportCandidate(
+    val sourceIndex: Int,
+    val outbound: JsonObject,
+)
+
 internal object SingBoxOutboundImporter {
-    fun parseConfiguration(content: String): List<ImportedSingBoxOutbound> {
+    fun parseConfiguration(
+        content: String,
+        formatter: SingBoxOutboundConfigFormatter = LibboxSingBoxOutboundConfigFormatter,
+    ): List<ImportedSingBoxOutbound> {
         val root = parseSingBoxJson(content)
         val outbounds = root["outbounds"] as? JsonArray
             ?: throw IllegalArgumentException("sing-box configuration must contain an outbounds array")
-        return parseOutboundArray(root, outbounds)
+        return parseRawOutboundArray(outbounds, formatter)
     }
 
-    fun parseImport(content: String): List<ImportedSingBoxOutbound> {
+    fun parseImport(
+        content: String,
+        formatter: SingBoxOutboundConfigFormatter = LibboxSingBoxOutboundConfigFormatter,
+    ): List<ImportedSingBoxOutbound> {
         if (content.isBlank()) {
             throw IllegalArgumentException("Outbound import content is empty")
         }
         return when (val element = SingBoxJson.parseToJsonElement(content)) {
             is JsonObject -> {
-                val outbounds = element["outbounds"] as? JsonArray
-                if (outbounds != null) {
-                    parseOutboundArray(element, outbounds)
+                if ("outbounds" in element) {
+                    val outbounds = element["outbounds"] as? JsonArray
+                        ?: throw IllegalArgumentException(
+                            "sing-box configuration must contain an outbounds array",
+                        )
+                    parseRawOutboundArray(outbounds, formatter)
                 } else {
-                    parseStandaloneOutbounds(JsonArray(listOf(element)))
+                    parseRawOutboundArray(JsonArray(listOf(element)), formatter)
                 }
             }
-            is JsonArray -> parseStandaloneOutbounds(element)
+            is JsonArray -> parseRawOutboundArray(element, formatter)
             else -> throw IllegalArgumentException("Outbound import must be a JSON object or array")
         }
     }
 
-    private fun parseStandaloneOutbounds(outbounds: JsonArray): List<ImportedSingBoxOutbound> {
-        val root = buildJsonObject { put("outbounds", outbounds) }
-        return parseOutboundArray(root, outbounds)
+    fun parsePreparedOutbounds(
+        outbounds: List<JsonObject>,
+    ): List<ImportedSingBoxOutbound> = parsePreparedOutboundArray(
+        outbounds = JsonArray(outbounds),
+        sourceIndexes = outbounds.indices.toList(),
+    )
+
+    private fun parseRawOutboundArray(
+        outbounds: JsonArray,
+        formatter: SingBoxOutboundConfigFormatter,
+    ): List<ImportedSingBoxOutbound> {
+        val candidates = extractSupportedCandidates(outbounds)
+        val minimalRoot = buildJsonObject {
+            put(
+                "outbounds",
+                JsonArray(candidates.map(RawOutboundImportCandidate::outbound)),
+            )
+        }
+        val formatted = formatter.format(
+            SingBoxJson.encodeToString(JsonElement.serializer(), minimalRoot),
+        )
+        val formattedRoot = parseSingBoxJson(formatted)
+        val formattedOutbounds = formattedRoot["outbounds"] as? JsonArray
+            ?: throw IllegalArgumentException(
+                "Formatted sing-box configuration must contain an outbounds array",
+            )
+        if (formattedOutbounds.size != candidates.size) {
+            throw IllegalArgumentException(
+                "Formatted sing-box configuration changed the outbound count",
+            )
+        }
+        return parsePreparedOutboundArray(
+            outbounds = formattedOutbounds,
+            sourceIndexes = candidates.map(RawOutboundImportCandidate::sourceIndex),
+        )
     }
 
-    private fun parseOutboundArray(
-        root: JsonObject,
+    private fun parsePreparedOutboundArray(
         outbounds: JsonArray,
+        sourceIndexes: List<Int>,
     ): List<ImportedSingBoxOutbound> {
+        require(outbounds.size == sourceIndexes.size) {
+            "Prepared outbound indexes do not match outbound count"
+        }
+        val root = buildJsonObject { put("outbounds", outbounds) }
         SingBoxDeprecatedConfigValidator.validate(root)
-        val imported = outbounds.mapIndexedNotNull { index, element ->
+        val imported = outbounds.mapIndexedNotNull { convertedIndex, element ->
+            val sourceIndex = sourceIndexes[convertedIndex]
             val outbound = element as? JsonObject
-                ?: throw IllegalArgumentException("Outbound at index $index must be a JSON object")
+                ?: throw IllegalArgumentException(
+                    "Formatted outbound at index $sourceIndex must be a JSON object",
+                )
             val type = outbound.stringField("type")
-                ?: throw IllegalArgumentException("Outbound at index $index has no type")
+                ?: throw IllegalArgumentException(
+                    "Formatted outbound at index $sourceIndex has no type",
+                )
             if (type !in SupportedSingBoxProxyOutboundTypes) return@mapIndexedNotNull null
             val tag = outbound.stringField("tag").orEmpty()
             val remarks = tag
                 .takeUnless { value -> value.startsWith(ManagedSingBoxTagPrefix) }
                 ?.takeIf(String::isNotBlank)
-                ?: "$type-${index + 1}"
+                ?: "$type-${sourceIndex + 1}"
             ImportedSingBoxOutbound(
                 sourceTag = tag,
                 remarks = remarks,
@@ -83,10 +138,30 @@ internal object SingBoxOutboundImporter {
                 json = SingBoxJson.encodeToString(JsonElement.serializer(), outbound),
             )
         }
-        if (imported.isEmpty()) {
-            throw IllegalArgumentException("No supported proxy outbounds found")
+        if (imported.size != outbounds.size) {
+            throw IllegalArgumentException(
+                "Formatted sing-box configuration contains an unsupported outbound",
+            )
         }
         return imported
+    }
+
+    private fun extractSupportedCandidates(
+        outbounds: JsonArray,
+    ): List<RawOutboundImportCandidate> {
+        val candidates = outbounds.mapIndexedNotNull { index, element ->
+            val outbound = element as? JsonObject
+                ?: throw IllegalArgumentException("Outbound at index $index must be a JSON object")
+            val type = outbound.stringField("type")
+                ?: throw IllegalArgumentException("Outbound at index $index has no type")
+            outbound
+                .takeIf { type in SupportedSingBoxProxyOutboundTypes }
+                ?.let { RawOutboundImportCandidate(index, it) }
+        }
+        if (candidates.isEmpty()) {
+            throw IllegalArgumentException("No supported proxy outbounds found")
+        }
+        return candidates
     }
 }
 

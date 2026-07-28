@@ -52,6 +52,16 @@ internal fun outboundListBottomExtraDp(): Int {
     return OutboundListBaseBottomExtraDp + OutboundCardHeightDp + OutboundGridSpacingDp
 }
 
+internal fun parseOutboundImportContent(
+    content: String,
+    jsonFormatter: SingBoxOutboundConfigFormatter = LibboxSingBoxOutboundConfigFormatter,
+): OutboundImportResult {
+    return OutboundImportPipeline.parse(
+        content = content,
+        jsonFormatter = jsonFormatter,
+    )
+}
+
 internal fun List<OutboundState>.sortedForOutboundList(sort: Int): List<OutboundState> {
     return when (sort) {
         OutboundListSortName -> sortedWith(

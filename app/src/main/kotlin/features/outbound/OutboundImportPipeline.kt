@@ -3,10 +3,8 @@
 
 package features.outbound
 
-import engine.singbox.config.SingBoxDeprecatedConfigValidator
 import engine.singbox.config.SingBoxJson
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -78,7 +76,11 @@ private val NaiveUrlQueryParameters = setOf(
  * sing-box JSON, Mihomo YAML, then conventional proxy URLs.
  */
 internal object OutboundImportPipeline {
-    fun parse(content: String): OutboundImportResult {
+    fun parse(
+        content: String,
+        jsonFormatter: SingBoxOutboundConfigFormatter =
+            LibboxSingBoxOutboundConfigFormatter,
+    ): OutboundImportResult {
         require(content.isNotBlank()) { "Outbound import content is empty" }
         val candidates = buildList {
             add(content.trim().removePrefix("\uFEFF"))
@@ -88,7 +90,9 @@ internal object OutboundImportPipeline {
         }
         val failures = mutableListOf<Throwable>()
         val parsers = listOf<Pair<OutboundImportFormat, (String) -> List<ImportedSingBoxOutbound>>>(
-            OutboundImportFormat.JSON to SingBoxOutboundImporter::parseImport,
+            OutboundImportFormat.JSON to { candidate ->
+                SingBoxOutboundImporter.parseImport(candidate, jsonFormatter)
+            },
             OutboundImportFormat.YAML to MihomoYamlOutboundParser::parse,
             OutboundImportFormat.URL to ProxyUrlOutboundParser::parse,
         )
@@ -100,7 +104,12 @@ internal object OutboundImportPipeline {
                             return OutboundImportResult(format, outbounds)
                         }
                     }
-                    .onFailure(failures::add)
+                    .onFailure { failure ->
+                        failures += failure
+                        if (format == OutboundImportFormat.JSON && candidate.isJsonDocument()) {
+                            throw failure
+                        }
+                    }
             }
         }
         throw IllegalArgumentException(
@@ -109,6 +118,9 @@ internal object OutboundImportPipeline {
         )
     }
 }
+
+private fun String.isJsonDocument(): Boolean =
+    runCatching { SingBoxJson.parseToJsonElement(this) }.isSuccess
 
 private object MihomoYamlOutboundParser {
     private val loader = Load(LoadSettings.builder().build())
@@ -1228,11 +1240,7 @@ private object ProxyUrlOutboundParser {
 
 private fun normalizeImportedObjects(objects: List<JsonObject>): List<ImportedSingBoxOutbound> {
     if (objects.isEmpty()) throw IllegalArgumentException("No supported proxy outbounds found")
-    val root = buildJsonObject { put("outbounds", JsonArray(objects)) }
-    SingBoxDeprecatedConfigValidator.validate(root)
-    return SingBoxOutboundImporter.parseImport(
-        SingBoxJson.encodeToString(JsonElement.serializer(), root),
-    )
+    return SingBoxOutboundImporter.parsePreparedOutbounds(objects)
 }
 
 private fun decodeBase64Payload(content: String): String? {

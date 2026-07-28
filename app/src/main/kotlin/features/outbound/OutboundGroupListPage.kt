@@ -10,7 +10,6 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -63,11 +62,9 @@ import app.LocalNavigator
 import app.LocalUpdateAppState
 import app.OutboundGroupState
 import app.collectAppState
-import app.nextAvailableOutboundGroupId
 import app.managedOutboundGroupSelectorTag
+import app.nextAvailableOutboundGroupId
 import app.withRemovedManagedOutboundTags
-import engine.singbox.config.SingBoxConfigChecker
-import engine.singbox.config.SingBoxJson
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.importing.ImportOperation
 import features.importing.ImportSource
@@ -84,7 +81,6 @@ import features.subscription.subscriptionUserAgentOptionFor
 import features.subscription.usecase.SubscriptionPreparation
 import features.subscription.usecase.SubscriptionSyncStage
 import features.subscription.usecase.prepareSubscription
-import java.net.URI
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -92,18 +88,17 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import org.asterisk.zcc.abox.R
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskModalBottomSheet
 import ui.components.WarningConfirmDialog
-import ui.icons.AsteriskIcons as Icons
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 import utils.toReadableDateTimeOrDash
+import java.net.URI
+import ui.icons.AsteriskIcons as Icons
 
 @Composable
 internal fun OutboundGroupListPage(
@@ -208,8 +203,7 @@ internal fun OutboundGroupListPage(
                 is SubscriptionPreparation.Success -> {
                     advance(ImportStage.PARSE)
                     val importResult = withContext(Dispatchers.Default) {
-                        validateCompleteSingBoxJsonWhenPresent(preparation.content)
-                        OutboundImportPipeline.parse(preparation.content)
+                        parseOutboundImportContent(preparation.content)
                     }
                     val previousTags = snapshot.outbounds
                         .filter { outbound -> outbound.groupId == group.id }
@@ -1054,13 +1048,6 @@ private fun SubscriptionSyncStage.toImportStage(): ImportStage = when (this) {
     SubscriptionSyncStage.Downloading -> ImportStage.DOWNLOAD
     SubscriptionSyncStage.Decrypting -> ImportStage.DECRYPT
     SubscriptionSyncStage.Verifying -> ImportStage.VERIFY
-}
-
-private fun validateCompleteSingBoxJsonWhenPresent(content: String) {
-    val element = runCatching { SingBoxJson.parseToJsonElement(content) }.getOrNull()
-    if (element is JsonObject && element["outbounds"] is JsonArray) {
-        SingBoxConfigChecker.check(content)
-    }
 }
 
 private fun String.isHttpUrl(): Boolean =
