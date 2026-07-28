@@ -224,5 +224,5 @@ private val SingBoxDelayGroupTypes = setOf(
 )
 
 private const val SingBoxDelayBatchSize = 10
-private const val SingBoxDelayBatchTimeoutMillis = 30_000L
+private const val SingBoxDelayBatchTimeoutMillis = 15_000L
 private const val SingBoxDelayDeadlineGraceMillis = 2_000L

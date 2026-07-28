@@ -77,7 +77,7 @@ internal data class SingBoxRuntimeState(
     val proxies: SingBoxProxiesState = SingBoxProxiesState(),
     val proxiesRefreshing: Boolean = false,
     val delayTestingTarget: String? = null,
-    val delayTestingNodes: Set<String> = emptySet(),
+    val delayTestingBaselines: Map<String, Long> = emptyMap(),
     val delayFailureBaselines: Map<String, Long> = emptyMap(),
     val lastError: String = "",
 )

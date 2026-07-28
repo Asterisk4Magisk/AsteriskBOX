@@ -121,7 +121,7 @@ private data class SingBoxProxyPageRuntimeState(
     val proxies: SingBoxProxiesState,
     val proxiesRefreshing: Boolean,
     val delayTestingTarget: String?,
-    val delayTestingNodes: Set<String>,
+    val delayTestingBaselines: Map<String, Long>,
     val delayFailedNodes: Set<String>,
     val lastError: String,
 )
@@ -130,7 +130,7 @@ private fun SingBoxRuntimeState.toProxyPageRuntimeState() = SingBoxProxyPageRunt
     proxies = proxies,
     proxiesRefreshing = proxiesRefreshing,
     delayTestingTarget = delayTestingTarget,
-    delayTestingNodes = delayTestingNodes,
+    delayTestingBaselines = delayTestingBaselines,
     delayFailedNodes = delayFailureBaselines.keys,
     lastError = lastError,
 )
@@ -485,7 +485,10 @@ fun SingBoxProxyPage(
                                             delayStatus = resolveSingBoxProxyDelayStatus(
                                                 nodeName = node.name,
                                                 delay = node.delay,
-                                                testingNodes = runtimeState.delayTestingNodes,
+                                                delayUpdatedAtEpochSeconds =
+                                                    node.delayUpdatedAtEpochSeconds,
+                                                testingBaselines =
+                                                    runtimeState.delayTestingBaselines,
                                                 failedNodes = runtimeState.delayFailedNodes,
                                             ),
                                             onSelect = { selectProxy(group, node) },

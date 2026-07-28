@@ -24,11 +24,20 @@ internal enum class SingBoxProxyDelayStatus {
 internal fun resolveSingBoxProxyDelayStatus(
     nodeName: String,
     delay: Int?,
-    testingNodes: Set<String>,
+    delayUpdatedAtEpochSeconds: Long?,
+    testingBaselines: Map<String, Long>,
     failedNodes: Set<String>,
 ): SingBoxProxyDelayStatus {
+    val testingBaseline = testingBaselines[nodeName]
+    val hasFreshMeasuredDelay =
+        delay != null &&
+            delay >= 0 &&
+            delayUpdatedAtEpochSeconds != null &&
+            testingBaseline != null &&
+            delayUpdatedAtEpochSeconds > testingBaseline
     return when {
-        nodeName in testingNodes -> SingBoxProxyDelayStatus.Testing
+        hasFreshMeasuredDelay -> SingBoxProxyDelayStatus.Measured
+        testingBaseline != null -> SingBoxProxyDelayStatus.Testing
         nodeName in failedNodes -> SingBoxProxyDelayStatus.Failed
         delay != null && delay >= 0 -> SingBoxProxyDelayStatus.Measured
         delay != null -> SingBoxProxyDelayStatus.Failed

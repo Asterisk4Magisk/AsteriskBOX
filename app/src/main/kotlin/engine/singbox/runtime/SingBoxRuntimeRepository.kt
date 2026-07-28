@@ -101,7 +101,7 @@ internal class SingBoxRuntimeRepository(
                     traffic = current.traffic.copy(connected = false),
                     proxiesRefreshing = false,
                     delayTestingTarget = null,
-                    delayTestingNodes = emptySet(),
+                    delayTestingBaselines = emptyMap(),
                     lastError = "",
                 )
             }
@@ -307,7 +307,7 @@ internal class SingBoxRuntimeRepository(
                         traffic = current.traffic.copy(connected = false),
                         proxiesRefreshing = false,
                         delayTestingTarget = null,
-                        delayTestingNodes = emptySet(),
+                        delayTestingBaselines = emptyMap(),
                         lastError = message,
                     )
                 }
@@ -389,7 +389,7 @@ internal class SingBoxRuntimeRepository(
             mutableState.update { current ->
                 current.copy(
                     delayTestingTarget = target,
-                    delayTestingNodes = plan.targetNames,
+                    delayTestingBaselines = baselineTimes,
                 )
             }
             try {
@@ -437,7 +437,7 @@ internal class SingBoxRuntimeRepository(
                     if (current.delayTestingTarget == target) {
                         current.copy(
                             delayTestingTarget = null,
-                            delayTestingNodes = emptySet(),
+                            delayTestingBaselines = emptyMap(),
                         )
                     } else {
                         current
