@@ -829,7 +829,12 @@
     <string name="outbound_field_domain_resolver">Domain resolver</string>
     <string name="outbound_field_download_bandwidth_mbps">Download bandwidth (Mbps)</string>
     <string name="outbound_field_early_data_header">Early data header</string>
+    <string name="outbound_field_ech">ECH</string>
+    <string name="outbound_field_ech_config">ECH config</string>
+    <string name="outbound_field_ech_config_path">ECH config path</string>
+    <string name="outbound_field_ech_query_server_name">ECH query server name</string>
     <string name="outbound_field_encryption_method">Encryption method</string>
+    <string name="outbound_field_extra_headers">Extra headers</string>
     <string name="outbound_field_fallback_delay">Fallback delay</string>
     <string name="outbound_field_fallback_network_types">Fallback network types</string>
     <string name="outbound_field_flow">Flow</string>
@@ -844,6 +849,7 @@
     <string name="outbound_field_idle_session_check_interval">Idle session check interval</string>
     <string name="outbound_field_idle_session_timeout">Idle session timeout</string>
     <string name="outbound_field_idle_timeout">Idle timeout</string>
+    <string name="outbound_field_insecure_concurrency">Insecure concurrency</string>
     <string name="outbound_field_ipv4_bind_address">IPv4 bind address</string>
     <string name="outbound_field_ipv6_bind_address">IPv6 bind address</string>
     <string name="outbound_field_key_exchange_algorithms">Key exchange algorithms</string>
@@ -907,6 +913,7 @@
     <string name="outbound_field_udp_over_tcp_version">UDP over TCP version</string>
     <string name="outbound_field_udp_relay_mode">UDP relay mode</string>
     <string name="outbound_field_upload_bandwidth_mbps">Upload bandwidth (Mbps)</string>
+    <string name="outbound_field_use_quic">Use QUIC</string>
     <string name="outbound_field_user">User</string>
     <string name="outbound_field_user_key">User key</string>
     <string name="outbound_field_username">Username</string>

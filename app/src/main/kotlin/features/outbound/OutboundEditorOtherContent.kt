@@ -5,6 +5,51 @@ package features.outbound
 
 import androidx.compose.foundation.lazy.LazyListScope
 
+internal fun naiveOutboundFields() = listOf(
+    outboundField("username", "Username"),
+    outboundField("password", "Password", OutboundFieldKind.SECRET),
+    outboundField("insecure_concurrency", "Insecure concurrency", OutboundFieldKind.INTEGER),
+    outboundField("extra_headers", "Extra headers", OutboundFieldKind.KEY_VALUE),
+    outboundField("udp_over_tcp.enabled", "UDP over TCP", OutboundFieldKind.BOOLEAN),
+    outboundField(
+        "udp_over_tcp.version",
+        "UDP over TCP version",
+        OutboundFieldKind.INTEGER,
+        conditions = listOf(OutboundFieldCondition("udp_over_tcp.enabled")),
+    ),
+    outboundField("quic", "Use QUIC", OutboundFieldKind.BOOLEAN),
+    outboundSelect(
+        "quic_congestion_control",
+        "QUIC congestion control",
+        listOf("", "bbr", "bbr2", "cubic", "reno"),
+        conditions = listOf(OutboundFieldCondition("quic")),
+    ),
+)
+
+internal fun naiveTlsFields() = listOf(
+    outboundField("tls.enabled", "TLS", OutboundFieldKind.BOOLEAN),
+    outboundField("tls.server_name", "Server name"),
+    outboundField("tls.certificate_path", "CA certificate path"),
+    outboundField("tls.certificate", "CA certificate", OutboundFieldKind.MULTILINE),
+    outboundField("tls.ech.enabled", "ECH", OutboundFieldKind.BOOLEAN),
+    outboundField(
+        "tls.ech.config",
+        "ECH config",
+        OutboundFieldKind.TEXT_LIST,
+        conditions = listOf(OutboundFieldCondition("tls.ech.enabled")),
+    ),
+    outboundField(
+        "tls.ech.config_path",
+        "ECH config path",
+        conditions = listOf(OutboundFieldCondition("tls.ech.enabled")),
+    ),
+    outboundField(
+        "tls.ech.query_server_name",
+        "ECH query server name",
+        conditions = listOf(OutboundFieldCondition("tls.ech.enabled")),
+    ),
+)
+
 internal fun shadowTlsOutboundFields() = listOf(
     outboundSelect("version", "ShadowTLS version", listOf("1", "2", "3")),
     outboundField(
@@ -65,6 +110,10 @@ internal fun sshOutboundFields() = listOf(
 )
 
 internal fun LazyListScope.shadowTlsOutboundEditor(state: OutboundEditorContentState) {
+    outboundEditorSections(state)
+}
+
+internal fun LazyListScope.naiveOutboundEditor(state: OutboundEditorContentState) {
     outboundEditorSections(state)
 }
 

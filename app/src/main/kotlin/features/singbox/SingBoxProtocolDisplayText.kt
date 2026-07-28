@@ -28,6 +28,7 @@ internal fun String.displaySingBoxProtocolName(compact: Boolean = false): String
         "socks", "socks5" -> "SOCKS5"
         "http" -> "HTTP"
         "https" -> "HTTPS"
+        "naive", "naiveproxy", "naive-proxy" -> "NaiveProxy"
         "trojan" -> "Trojan"
         "hysteria" -> "Hysteria"
         "hysteria2", "hy2" -> "Hysteria2"

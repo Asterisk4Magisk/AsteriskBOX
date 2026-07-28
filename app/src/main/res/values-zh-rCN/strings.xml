@@ -815,7 +815,12 @@
     <string name="outbound_field_domain_resolver">域名解析器</string>
     <string name="outbound_field_download_bandwidth_mbps">下载带宽（Mbps）</string>
     <string name="outbound_field_early_data_header">Early Data 请求头</string>
+    <string name="outbound_field_ech">ECH</string>
+    <string name="outbound_field_ech_config">ECH 配置</string>
+    <string name="outbound_field_ech_config_path">ECH 配置路径</string>
+    <string name="outbound_field_ech_query_server_name">ECH 查询服务器名称</string>
     <string name="outbound_field_encryption_method">加密方法</string>
+    <string name="outbound_field_extra_headers">额外请求头</string>
     <string name="outbound_field_fallback_delay">回退延迟</string>
     <string name="outbound_field_fallback_network_types">回退网络类型</string>
     <string name="outbound_field_flow">流控模式</string>
@@ -830,6 +835,7 @@
     <string name="outbound_field_idle_session_check_interval">空闲会话检查间隔</string>
     <string name="outbound_field_idle_session_timeout">空闲会话超时</string>
     <string name="outbound_field_idle_timeout">空闲超时</string>
+    <string name="outbound_field_insecure_concurrency">非安全并发连接数</string>
     <string name="outbound_field_ipv4_bind_address">IPv4 绑定地址</string>
     <string name="outbound_field_ipv6_bind_address">IPv6 绑定地址</string>
     <string name="outbound_field_key_exchange_algorithms">密钥交换算法</string>
@@ -893,6 +899,7 @@
     <string name="outbound_field_udp_over_tcp_version">UDP over TCP 版本</string>
     <string name="outbound_field_udp_relay_mode">UDP 中继模式</string>
     <string name="outbound_field_upload_bandwidth_mbps">上传带宽（Mbps）</string>
+    <string name="outbound_field_use_quic">使用 QUIC</string>
     <string name="outbound_field_user">用户</string>
     <string name="outbound_field_user_key">用户密钥</string>
     <string name="outbound_field_username">用户名</string>

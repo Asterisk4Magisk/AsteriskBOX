@@ -9,8 +9,8 @@ import android.content.Context
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,14 +31,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -66,17 +66,19 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import app.LocalAppServices
 import app.LocalAppStateStore
@@ -86,7 +88,6 @@ import app.LocalUpdateAppState
 import app.OutboundGroupState
 import app.OutboundState
 import app.collectAppState
-import app.withRemovedManagedOutbound
 import app.modes.OutboundListLayoutAuto
 import app.modes.OutboundListLayoutDouble
 import app.modes.OutboundListLayoutMultiple
@@ -96,6 +97,7 @@ import app.modes.OutboundListSortLatency
 import app.modes.OutboundListSortName
 import app.modes.OutboundListSortType
 import app.navigation.Route
+import app.withRemovedManagedOutbound
 import engine.singbox.config.SingBoxConfigChecker
 import engine.singbox.config.SingBoxJson
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
@@ -104,6 +106,7 @@ import features.importing.ImportSource
 import features.importing.ImportStage
 import features.importing.importFailureContext
 import features.importing.reportImportFailure
+import features.singbox.displaySingBoxProtocolName
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -128,11 +131,11 @@ import ui.components.draggedCardShadow
 import ui.components.longPressReorderDragHandle
 import ui.components.rememberAsteriskReorderableLazyGridState
 import ui.components.singBoxOptionLabel
-import ui.icons.AsteriskIcons as Icons
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
-import features.singbox.displaySingBoxProtocolName
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import ui.icons.AsteriskIcons as Icons
 
 private enum class OutboundImportMenuLevel {
     MAIN,
@@ -162,6 +165,12 @@ internal fun OutboundListPage(
     val pagerState = rememberPagerState(pageCount = { groups.size.coerceAtLeast(1) })
     var importMenuExpanded by remember { mutableStateOf(false) }
     var importMenuLevel by remember { mutableStateOf(OutboundImportMenuLevel.MAIN) }
+    val manualImportMenuScrollState = rememberScrollState()
+    val manualImportMenuHeight = with(LocalDensity.current) {
+        outboundImportManualMenuHeightDp(
+            windowHeightDp = LocalWindowInfo.current.containerSize.height.toDp().value.toInt(),
+        ).dp
+    }
     var query by rememberSaveable { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<OutboundState?>(null) }
     var pingingOutboundIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
@@ -501,49 +510,71 @@ internal fun OutboundListPage(
                                                         )
                                                     },
                                                     onClick = {
-                                                        importMenuLevel =
-                                                            OutboundImportMenuLevel.MANUAL
+                                                        scope.launch {
+                                                            manualImportMenuScrollState.scrollTo(0)
+                                                            importMenuLevel =
+                                                                OutboundImportMenuLevel.MANUAL
+                                                        }
                                                     },
                                                 )
                                             }
                                             OutboundImportMenuLevel.MANUAL -> {
-                                                DropdownMenuItem(
-                                                    text = {
-                                                        Text(
-                                                            stringResource(R.string.outbound_import_manual),
-                                                        )
-                                                    },
-                                                    leadingIcon = {
-                                                        Icon(
-                                                            Icons.Rounded.ChevronLeft,
-                                                            contentDescription = null,
-                                                        )
-                                                    },
-                                                    onClick = {
-                                                        importMenuLevel =
-                                                            OutboundImportMenuLevel.MAIN
-                                                    },
-                                                )
-                                                HorizontalDivider()
-                                                OutboundEditorRegistry.descriptors.forEach { descriptor ->
-                                                    OutboundMenuItem(
-                                                        text = singBoxOptionLabel(
-                                                            descriptor.title,
-                                                            descriptor.type,
-                                                        ),
-                                                        icon = outboundTypeIcon(descriptor.type),
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(manualImportMenuHeight),
+                                                ) {
+                                                    DropdownMenuItem(
+                                                        text = {
+                                                            Text(
+                                                                stringResource(
+                                                                    R.string.outbound_import_manual,
+                                                                ),
+                                                            )
+                                                        },
+                                                        leadingIcon = {
+                                                            Icon(
+                                                                Icons.Rounded.ChevronLeft,
+                                                                contentDescription = null,
+                                                            )
+                                                        },
                                                         onClick = {
-                                                            importMenuExpanded = false
-                                                            selectedGroup?.let { group ->
-                                                                navigator.push(
-                                                                    Route.OutboundEdit(
-                                                                        groupId = group.id,
-                                                                        type = descriptor.type,
-                                                                    ),
-                                                                )
-                                                            }
+                                                            importMenuLevel =
+                                                                OutboundImportMenuLevel.MAIN
                                                         },
                                                     )
+                                                    HorizontalDivider()
+                                                    Column(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .weight(1f)
+                                                            .verticalScroll(
+                                                                manualImportMenuScrollState,
+                                                            ),
+                                                    ) {
+                                                        OutboundEditorRegistry.descriptors.forEach { descriptor ->
+                                                            OutboundMenuItem(
+                                                                text = singBoxOptionLabel(
+                                                                    descriptor.title,
+                                                                    descriptor.type,
+                                                                ),
+                                                                icon = outboundTypeIcon(
+                                                                    descriptor.type,
+                                                                ),
+                                                                onClick = {
+                                                                    importMenuExpanded = false
+                                                                    selectedGroup?.let { group ->
+                                                                        navigator.push(
+                                                                            Route.OutboundEdit(
+                                                                                groupId = group.id,
+                                                                                type = descriptor.type,
+                                                                            ),
+                                                                        )
+                                                                    }
+                                                                },
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -1232,7 +1263,7 @@ private fun OutboundOptionsMenu(
 
 private fun outboundTypeIcon(type: String): ImageVector = when (type) {
     "socks" -> Icons.Rounded.Lan
-    "http" -> Icons.Rounded.Http
+    "http", "naive" -> Icons.Rounded.Http
     "shadowsocks" -> Icons.Rounded.Security
     "vmess" -> Icons.Rounded.Hub
     "trojan" -> Icons.Rounded.VpnLock
@@ -1271,6 +1302,15 @@ private val OutboundCardMenuIconOffset = outboundCardMenuIconOffsetDp(
 )
 private val OutboundEmptyStateMinHeight = 320.dp
 private const val OutboundPingConcurrency = 8
+private const val OutboundImportManualMenuMaxHeightDp = 500
+// Mirrors Material3's 48dp window margin and 8dp content padding on both vertical edges.
+private const val OutboundImportMenuVerticalChromeDp = 2 * (48 + 8)
+
+internal fun outboundImportManualMenuHeightDp(windowHeightDp: Int): Int =
+    minOf(
+        OutboundImportManualMenuMaxHeightDp,
+        (windowHeightDp - OutboundImportMenuVerticalChromeDp).coerceAtLeast(0),
+    )
 
 @Composable
 private fun OutboundGroupState.displayName(): String = name

@@ -13,7 +13,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import org.asterisk.zcc.abox.R
 
@@ -77,6 +76,7 @@ internal object OutboundEditorRegistry {
     val descriptors: List<OutboundEditorDescriptor> = listOf(
         OutboundEditorDescriptor("socks", "SOCKS"),
         OutboundEditorDescriptor("http", "HTTP"),
+        OutboundEditorDescriptor("naive", "NaiveProxy"),
         OutboundEditorDescriptor("shadowsocks", "Shadowsocks"),
         OutboundEditorDescriptor("vmess", "VMess"),
         OutboundEditorDescriptor("trojan", "Trojan"),
@@ -102,6 +102,13 @@ internal object OutboundEditorRegistry {
     private fun createSchema(type: String): OutboundEditorSchema = when (type) {
         "socks" -> schema(type, descriptor(type).title, socksOutboundFields())
         "http" -> schema(type, descriptor(type).title, httpOutboundFields(), tls = true)
+        "naive" -> schema(
+            type,
+            descriptor(type).title,
+            naiveOutboundFields(),
+            tls = true,
+            tlsFieldSpecs = naiveTlsFields(),
+        )
         "shadowsocks" -> schema(
             type,
             descriptor(type).title,
@@ -168,13 +175,21 @@ internal object OutboundEditorRegistry {
         transport: Boolean = false,
         multiplex: Boolean = false,
         quic: Boolean = false,
+        tlsFieldSpecs: List<OutboundFieldSpec>? = null,
     ): OutboundEditorSchema = OutboundEditorSchema(
         type = type,
         title = title,
         sections = buildList {
             add(OutboundSectionSpec(OutboundEditorSection.SERVER, serverFields()))
             add(OutboundSectionSpec(OutboundEditorSection.PROTOCOL, protocolFields))
-            if (tls) add(OutboundSectionSpec(OutboundEditorSection.TLS, tlsFields()))
+            if (tls) {
+                add(
+                    OutboundSectionSpec(
+                        OutboundEditorSection.TLS,
+                        tlsFieldSpecs ?: tlsFields(),
+                    ),
+                )
+            }
             if (transport) add(OutboundSectionSpec(OutboundEditorSection.TRANSPORT, transportFields()))
             if (multiplex) add(OutboundSectionSpec(OutboundEditorSection.MULTIPLEX, multiplexFields()))
             if (quic) add(OutboundSectionSpec(OutboundEditorSection.QUIC, quicFields()))
@@ -511,6 +526,7 @@ internal val SingBoxTlsCipherSuites = listOf(
 )
 
 internal val MandatoryTlsOutboundTypes = setOf(
+    "naive",
     "hysteria",
     "shadowtls",
     "tuic",
@@ -551,7 +567,12 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Domain resolver" -> R.string.outbound_field_domain_resolver
     "Download bandwidth (Mbps)" -> R.string.outbound_field_download_bandwidth_mbps
     "Early data header" -> R.string.outbound_field_early_data_header
+    "ECH" -> R.string.outbound_field_ech
+    "ECH config" -> R.string.outbound_field_ech_config
+    "ECH config path" -> R.string.outbound_field_ech_config_path
+    "ECH query server name" -> R.string.outbound_field_ech_query_server_name
     "Encryption method" -> R.string.outbound_field_encryption_method
+    "Extra headers" -> R.string.outbound_field_extra_headers
     "Fallback delay" -> R.string.outbound_field_fallback_delay
     "Fallback network types" -> R.string.outbound_field_fallback_network_types
     "Flow" -> R.string.outbound_field_flow
@@ -566,6 +587,7 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Idle session check interval" -> R.string.outbound_field_idle_session_check_interval
     "Idle session timeout" -> R.string.outbound_field_idle_session_timeout
     "Idle timeout" -> R.string.outbound_field_idle_timeout
+    "Insecure concurrency" -> R.string.outbound_field_insecure_concurrency
     "IPv4 bind address" -> R.string.outbound_field_ipv4_bind_address
     "IPv6 bind address" -> R.string.outbound_field_ipv6_bind_address
     "Key exchange algorithms" -> R.string.outbound_field_key_exchange_algorithms
@@ -629,6 +651,7 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "UDP over TCP version" -> R.string.outbound_field_udp_over_tcp_version
     "UDP relay mode" -> R.string.outbound_field_udp_relay_mode
     "Upload bandwidth (Mbps)" -> R.string.outbound_field_upload_bandwidth_mbps
+    "Use QUIC" -> R.string.outbound_field_use_quic
     "User" -> R.string.outbound_field_user
     "User key" -> R.string.outbound_field_user_key
     "Username" -> R.string.outbound_field_username

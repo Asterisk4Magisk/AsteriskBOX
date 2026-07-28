@@ -264,6 +264,7 @@ private fun JsonObject.stringField(name: String): String? =
 internal val SupportedSingBoxProxyOutboundTypes = linkedSetOf(
     "socks",
     "http",
+    "naive",
     "shadowsocks",
     "vmess",
     "trojan",

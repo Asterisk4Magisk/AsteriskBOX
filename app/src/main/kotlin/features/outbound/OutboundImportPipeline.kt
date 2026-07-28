@@ -5,22 +5,20 @@ package features.outbound
 
 import engine.singbox.config.SingBoxDeprecatedConfigValidator
 import engine.singbox.config.SingBoxJson
-import java.net.URI
-import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
-import kotlin.io.encoding.Base64
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.snakeyaml.engine.v2.api.Load
 import org.snakeyaml.engine.v2.api.LoadSettings
+import java.net.URI
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
+import kotlin.io.encoding.Base64
 
 internal enum class OutboundImportFormat {
     JSON,
@@ -37,7 +35,41 @@ private val SupportedV2RayTransportTypes =
     setOf("tcp", "raw", "http", "h2", "ws", "quic", "grpc", "httpupgrade")
 
 private val TlsCapableOutboundTypes =
-    setOf("http", "vmess", "vless", "trojan", "hysteria", "hysteria2", "shadowtls", "tuic", "anytls")
+    setOf(
+        "http",
+        "naive",
+        "vmess",
+        "vless",
+        "trojan",
+        "hysteria",
+        "hysteria2",
+        "shadowtls",
+        "tuic",
+        "anytls",
+    )
+
+private val NaiveQuicCongestionControls = setOf("", "bbr", "bbr2", "cubic", "reno")
+
+private val NaiveUrlQueryParameters = setOf(
+    "security",
+    "tls",
+    "sni",
+    "peer",
+    "servername",
+    "ech",
+    "insecure-concurrency",
+    "insecure_concurrency",
+    "extra-headers",
+    "extra_headers",
+    "udp-over-tcp",
+    "udp_over_tcp",
+    "udp-over-tcp-version",
+    "udp_over_tcp_version",
+    "quic",
+    "quic-congestion-control",
+    "quic_congestion_control",
+    "padding",
+)
 
 /**
  * A single import entry point shared by QR code, clipboard, files and subscriptions.
@@ -108,6 +140,7 @@ private object MihomoYamlOutboundParser {
         require(port in 1..65535) { "Mihomo proxy port is invalid" }
         if (type == "shadowsocks" && !isSupportedShadowsocksPlugin(string("plugin"))) return null
         val network = string("network").ifBlank { string("transport") }.lowercase()
+        if (type == "naive" && network.isNotBlank()) return null
         if (type in setOf("vmess", "vless", "trojan") &&
             network.isNotBlank() &&
             network !in SupportedV2RayTransportTypes
@@ -138,6 +171,7 @@ private object MihomoYamlOutboundParser {
                 ignoreCase = true,
             )
         ) return null
+        if (type == "naive" && hasUnsupportedNaiveTlsOptions()) return null
         val certificate = string("certificate")
         val privateKey = string("private-key")
         if (
@@ -150,7 +184,15 @@ private object MihomoYamlOutboundParser {
                 security.equals("tls", ignoreCase = true) ||
                     security.equals("reality", ignoreCase = true)
             } ||
-            type in setOf("trojan", "hysteria", "hysteria2", "tuic", "anytls", "shadowtls")
+            type in setOf(
+                "naive",
+                "trojan",
+                "hysteria",
+                "hysteria2",
+                "tuic",
+                "anytls",
+                "shadowtls",
+            )
         if (type !in TlsCapableOutboundTypes && tlsRequested) return null
         if (type in TlsCapableOutboundTypes && tlsRequested && !tlsEnabled) return null
         if (hasUnsupportedTransportOptions(network)) return null
@@ -198,6 +240,41 @@ private object MihomoYamlOutboundParser {
                     putNotBlank("password", string("password"))
                     putNotBlank("path", string("path"))
                     headers()?.let { put("headers", it) }
+                }
+                "naive" -> {
+                    putNotBlank("username", string("username"))
+                    putNotBlank("password", string("password"))
+                    val rawConcurrency = firstValue(
+                        "insecure-concurrency",
+                        "insecure_concurrency",
+                    )
+                    val concurrency = rawConcurrency?.toString()?.toIntOrNull()
+                    require(rawConcurrency == null || concurrency != null && concurrency >= 0) {
+                        "Mihomo Naive insecure concurrency is invalid"
+                    }
+                    concurrency?.takeIf { it > 0 }?.let {
+                        put("insecure_concurrency", it)
+                    }
+                    naiveExtraHeaders()?.let { put("extra_headers", it) }
+                    val udpOverTcp = bool("udp-over-tcp") || bool("udp_over_tcp")
+                    val udpOverTcpVersion = naiveYamlUdpOverTcpVersion()
+                    require(udpOverTcpVersion == null || udpOverTcp) {
+                        "Mihomo Naive UDP over TCP version requires UDP over TCP"
+                    }
+                    if (udpOverTcp) {
+                        put("udp_over_tcp", buildJsonObject {
+                            put("enabled", true)
+                            udpOverTcpVersion?.let { put("version", it) }
+                        })
+                    }
+                    putIfTrue("quic", bool("quic"))
+                    val congestionControl = string("quic-congestion-control")
+                        .ifBlank { string("quic_congestion_control") }
+                        .lowercase()
+                    require(congestionControl in NaiveQuicCongestionControls) {
+                        "Unsupported Naive QUIC congestion control"
+                    }
+                    putNotBlank("quic_congestion_control", congestionControl)
                 }
                 "shadowsocks" -> {
                     putNotBlank("method", string("cipher").ifBlank { string("method") })
@@ -324,11 +401,43 @@ private object MihomoYamlOutboundParser {
             ) {
                 put("network", "tcp")
             }
-            buildTls(this@toSingBoxOutbound, type)?.let { put("tls", it) }
+            val tls = if (type == "naive") {
+                buildNaiveTls(this@toSingBoxOutbound)
+            } else {
+                buildTls(this@toSingBoxOutbound, type)
+            }
+            tls?.let { put("tls", it) }
             buildTransport(this@toSingBoxOutbound)?.let { put("transport", it) }
             if (type in setOf("shadowsocks", "vmess", "trojan", "vless")) {
                 buildMultiplex(this@toSingBoxOutbound)?.let { put("multiplex", it) }
             }
+        }
+    }
+
+    private fun buildNaiveTls(proxy: Map<*, *>): JsonObject = buildJsonObject {
+        put("enabled", true)
+        putNotBlank(
+            "server_name",
+            proxy.string("servername")
+                .ifBlank { proxy.string("sni") }
+                .ifBlank { proxy.string("name-cert-verify") },
+        )
+        val ech = proxy.map("ech-opts")
+        val echConfig = ech.stringList("config")
+        val echConfigPath = ech.string("config-path")
+        val echQueryServerName = ech.string("query-server-name")
+        if (
+            ech.bool("enable") ||
+            echConfig.isNotEmpty() ||
+            echConfigPath.isNotBlank() ||
+            echQueryServerName.isNotBlank()
+        ) {
+            put("ech", buildJsonObject {
+                put("enabled", true)
+                putListable("config", echConfig)
+                putNotBlank("config_path", echConfigPath)
+                putNotBlank("query_server_name", echQueryServerName)
+            })
         }
     }
 
@@ -529,7 +638,7 @@ private object MihomoYamlOutboundParser {
 
 private object ProxyUrlOutboundParser {
     private val urlPattern = Regex(
-        """(?i)(?:socks4a?|socks5?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2|hy2|anytls|snell|ssh|tor|naive(?:\+https)?|wireguard)://[^\s<>"']+""",
+        """(?i)(?:socks4a?|socks5?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2|hy2|anytls|snell|ssh|tor|naive(?:\+(?:https|quic))?|wireguard)://[^\s<>"']+""",
     )
 
     fun parse(content: String): List<ImportedSingBoxOutbound> {
@@ -557,7 +666,7 @@ private object ProxyUrlOutboundParser {
 
     private fun parseLink(link: String, index: Int): JsonObject? {
         val scheme = link.substringBefore("://").lowercase()
-        if (scheme in setOf("tor", "naive", "naive+https", "wireguard")) return null
+        if (scheme in setOf("tor", "wireguard")) return null
         if (scheme == "vmess" && '@' !in link.substringAfter("://").substringBefore('#')) {
             return parseLegacyVmess(link, index)
         }
@@ -570,10 +679,12 @@ private object ProxyUrlOutboundParser {
             "socks", "socks4", "socks4a", "socks5" -> "socks"
             "hy1" -> "hysteria"
             "hy2" -> "hysteria2"
+            "naive", "naive+https", "naive+quic" -> "naive"
             else -> scheme
         }
         if (type !in SupportedSingBoxProxyOutboundTypes) return null
-        val host = uri.host ?: extractBracketAwareHost(uri.rawAuthority)
+        val host = (uri.host ?: extractBracketAwareHost(uri.rawAuthority))
+            ?.removeSurrounding("[", "]")
         val port = uri.port.takeIf { it > 0 } ?: defaultPort(scheme)
         require(!host.isNullOrBlank()) { "Proxy URL server is required" }
         require(port in 1..65535) { "Proxy URL port is invalid" }
@@ -613,9 +724,18 @@ private object ProxyUrlOutboundParser {
             listOf("pinSHA256", "pcs", "vcn", "pqv", "spx", "fm")
                 .any { key -> query.first(key).isNotBlank() }
         ) return null
+        if (type == "naive") validateNaiveUrlOptions(query)
         val security = query.first("security", "tls")
         val tlsEnabled = scheme == "https" ||
-            type in setOf("trojan", "hysteria", "hysteria2", "shadowtls", "tuic", "anytls") ||
+            type in setOf(
+                "naive",
+                "trojan",
+                "hysteria",
+                "hysteria2",
+                "shadowtls",
+                "tuic",
+                "anytls",
+            ) ||
             security.equals("tls", ignoreCase = true) ||
             security.equals("reality", ignoreCase = true) ||
             query.bool("tls")
@@ -690,6 +810,55 @@ private object ProxyUrlOutboundParser {
                     putNotBlank("password", credentials.second)
                     putNotBlank("path", decodeComponent(uri.rawPath))
                 }
+                "naive" -> {
+                    putNotBlank("username", credentials.first)
+                    putNotBlank("password", credentials.second)
+                    val rawConcurrency = query.first(
+                        "insecure-concurrency",
+                        "insecure_concurrency",
+                    )
+                    val concurrency = rawConcurrency.toIntOrNull()
+                    require(
+                        rawConcurrency.isBlank() ||
+                            concurrency != null && concurrency >= 0,
+                    ) {
+                        "Naive URL insecure concurrency is invalid"
+                    }
+                    concurrency?.takeIf { it > 0 }?.let {
+                        put("insecure_concurrency", it)
+                    }
+                    parseNaiveExtraHeaders(query)?.let { put("extra_headers", it) }
+                    val udpOverTcp = query.naiveBoolean(
+                        "UDP over TCP",
+                        "udp-over-tcp",
+                        "udp_over_tcp",
+                    ) ?: false
+                    val udpOverTcpVersion = query.naiveUdpOverTcpVersion()
+                    require(udpOverTcpVersion == null || udpOverTcp) {
+                        "Naive URL UDP over TCP version requires UDP over TCP"
+                    }
+                    if (udpOverTcp) {
+                        put("udp_over_tcp", buildJsonObject {
+                            put("enabled", true)
+                            udpOverTcpVersion?.let { put("version", it) }
+                        })
+                    }
+                    val queryQuic = query.naiveBoolean("QUIC", "quic")
+                    require(scheme != "naive+quic" || queryQuic != false) {
+                        "naive+quic URL cannot disable QUIC"
+                    }
+                    if (scheme == "naive+quic" || queryQuic == true) {
+                        put("quic", true)
+                    }
+                    val congestionControl = query.first(
+                        "quic-congestion-control",
+                        "quic_congestion_control",
+                    ).lowercase()
+                    require(congestionControl in NaiveQuicCongestionControls) {
+                        "Unsupported Naive QUIC congestion control"
+                    }
+                    putNotBlank("quic_congestion_control", congestionControl)
+                }
                 "vmess" -> {
                     put("uuid", credentials.first)
                     put(
@@ -752,8 +921,15 @@ private object ProxyUrlOutboundParser {
                     putNotBlank("private_key_passphrase", query.first("private_key_passphrase"))
                 }
             }
-            buildUrlTls(type, scheme, query)?.let { put("tls", it) }
-            buildUrlTransport(query)?.let { put("transport", it) }
+            val tls = if (type == "naive") {
+                buildNaiveUrlTls(query)
+            } else {
+                buildUrlTls(type, scheme, query)
+            }
+            tls?.let { put("tls", it) }
+            if (type != "naive") {
+                buildUrlTransport(query)?.let { put("transport", it) }
+            }
         }
     }
 
@@ -935,6 +1111,71 @@ private object ProxyUrlOutboundParser {
         }
     }
 
+    private fun buildNaiveUrlTls(query: Map<String, List<String>>): JsonObject =
+        buildJsonObject {
+            put("enabled", true)
+            putNotBlank(
+                "server_name",
+                query.first("sni", "peer", "serverName", "servername"),
+            )
+            query.allValues("ech")
+                .filter(String::isNotBlank)
+                .takeIf(List<String>::isNotEmpty)
+                ?.let { configs ->
+                put("ech", buildJsonObject {
+                    put("enabled", true)
+                    put("config", JsonArray(configs.map(::JsonPrimitive)))
+                })
+            }
+        }
+
+    private fun validateNaiveUrlOptions(query: Map<String, List<String>>) {
+        val unsupportedParameter = query.keys.firstOrNull { name ->
+            name.lowercase() !in NaiveUrlQueryParameters
+        }
+        require(unsupportedParameter == null) {
+            "Unsupported Naive URL parameter: $unsupportedParameter"
+        }
+        query.allValues("security").forEach { security ->
+            require(security.isBlank() || security.equals("tls", ignoreCase = true)) {
+                "Naive URL only supports TLS"
+            }
+        }
+        query.allValues("tls").forEach { tls ->
+            require(
+                tls.isBlank() ||
+                    tls == "1" ||
+                    tls.equals("true", ignoreCase = true) ||
+                    tls.equals("tls", ignoreCase = true),
+            ) {
+                "Naive URL requires TLS"
+            }
+        }
+    }
+
+    private fun parseNaiveExtraHeaders(
+        query: Map<String, List<String>>,
+    ): JsonObject? {
+        val encodedHeaders = query.first("extra-headers", "extra_headers")
+        if (encodedHeaders.isBlank()) return null
+        val headers = linkedMapOf<String, String>()
+        encodedHeaders
+            .replace("\r\n", "\n")
+            .split('\n')
+            .filter(String::isNotBlank)
+            .forEach { line ->
+                val separator = line.indexOf(':')
+                require(separator > 0) { "Invalid Naive extra header" }
+                val name = line.substring(0, separator).trim()
+                require(name.isHttpHeaderName()) { "Invalid Naive extra header name" }
+                headers[name] = line.substring(separator + 1).trim()
+            }
+        require(headers.isNotEmpty()) { "Naive extra headers are empty" }
+        return buildJsonObject {
+            headers.forEach { (name, value) -> put(name, value) }
+        }
+    }
+
     private fun buildUrlTransport(query: Map<String, List<String>>): JsonObject? {
         val transportType = query.first("type", "network").lowercase()
         if (transportType.isBlank() || transportType in setOf("tcp", "raw")) return null
@@ -1069,11 +1310,17 @@ private fun parsePortHoppingAuthority(link: String, scheme: String): PortHopping
 }
 
 private fun splitUserInfo(rawUserInfo: String?): Pair<String, String> {
-    val raw = decodeComponent(rawUserInfo)
-    val decoded = if (':' !in raw) decodeBase64(raw)?.takeIf { ':' in it } else null
-    val credentials = decoded ?: raw
-    return decodeComponent(credentials.substringBefore(':')) to
-        decodeComponent(credentials.substringAfter(':', ""))
+    val raw = rawUserInfo.orEmpty()
+    if (':' in raw) {
+        return decodeComponent(raw.substringBefore(':')) to
+            decodeComponent(raw.substringAfter(':', ""))
+    }
+    val decoded = decodeBase64(decodeComponent(raw))?.takeIf { ':' in it }
+    return if (decoded != null) {
+        decoded.substringBefore(':') to decoded.substringAfter(':', "")
+    } else {
+        decodeComponent(raw) to ""
+    }
 }
 
 private fun normalizePortRanges(value: String): List<String> =
@@ -1106,10 +1353,15 @@ private fun extractBracketAwareHost(authority: String?): String? {
 
 private fun defaultPort(scheme: String): Int = when (scheme) {
     "http" -> 80
-    "https", "hysteria2", "hy2" -> 443
+    "https", "hysteria2", "hy2", "naive", "naive+https", "naive+quic" -> 443
     "ssh" -> 22
     else -> -1
 }
+
+private fun String.isHttpHeaderName(): Boolean =
+    isNotBlank() && all { character ->
+        character.isLetterOrDigit() || character in "!#$%&'*+-.^_`|~"
+    }
 
 private fun decodeComponent(value: String?): String {
     if (value.isNullOrBlank()) return ""
@@ -1140,6 +1392,40 @@ private fun Map<String, List<String>>.values(vararg names: String): List<String>
             ?.takeIf(List<String>::isNotEmpty)
     }.orEmpty()
 
+private fun Map<String, List<String>>.allValues(vararg names: String): List<String> =
+    entries
+        .filter { entry -> names.any { name -> entry.key.equals(name, ignoreCase = true) } }
+        .flatMap { entry -> entry.value }
+
+private fun Map<String, List<String>>.naiveBoolean(
+    label: String,
+    vararg names: String,
+): Boolean? {
+    val values = allValues(*names)
+    if (values.isEmpty()) return null
+    val parsed = values.map { value ->
+        when {
+            value == "1" || value.equals("true", ignoreCase = true) -> true
+            value == "0" || value.equals("false", ignoreCase = true) -> false
+            else -> throw IllegalArgumentException("Naive URL $label is invalid")
+        }
+    }
+    require(parsed.distinct().size == 1) {
+        "Naive URL $label has conflicting values"
+    }
+    return parsed.first()
+}
+
+private fun Map<String, List<String>>.naiveUdpOverTcpVersion(): Int? {
+    val values = allValues("udp-over-tcp-version", "udp_over_tcp_version")
+    if (values.isEmpty()) return null
+    require(values.size == 1) {
+        "Naive URL UDP over TCP version must be specified once"
+    }
+    return values.single().toIntOrNull()?.takeIf { it in 1..2 }
+        ?: throw IllegalArgumentException("Naive URL UDP over TCP version is invalid")
+}
+
 private fun Map<String, List<String>>.int(vararg names: String): Int =
     first(*names).filter(Char::isDigit).toIntOrNull() ?: 0
 
@@ -1150,6 +1436,22 @@ private fun Map<*, *>.string(name: String): String = get(name)?.toString().orEmp
 
 private fun Map<*, *>.string(parent: String, name: String): String =
     map(parent).string(name)
+
+private fun Map<*, *>.firstValue(vararg names: String): Any? =
+    names.firstNotNullOfOrNull { name ->
+        entries.firstOrNull { entry ->
+            entry.key?.toString()?.equals(name, ignoreCase = true) == true
+        }?.value
+    }
+
+private fun Map<*, *>.naiveYamlUdpOverTcpVersion(): Int? {
+    val rawVersion = firstValue(
+        "udp-over-tcp-version",
+        "udp_over_tcp_version",
+    ) ?: return null
+    return rawVersion.toString().toIntOrNull()?.takeIf { it in 1..2 }
+        ?: throw IllegalArgumentException("Mihomo Naive UDP over TCP version is invalid")
+}
 
 private fun Map<*, *>.int(name: String): Int = when (val value = get(name)) {
     is Number -> value.toInt()
@@ -1163,6 +1465,50 @@ private fun Map<*, *>.bool(name: String): Boolean = when (val value = get(name))
 }
 
 private fun Map<*, *>.map(name: String): Map<*, *> = get(name) as? Map<*, *> ?: emptyMap<Any?, Any?>()
+
+private fun Map<*, *>.hasUnsupportedNaiveTlsOptions(): Boolean {
+    val tlsValue = firstValue("tls")
+    val security = string("security")
+    return tlsValue != null && !bool("tls") ||
+        security.isNotBlank() && !security.equals("tls", ignoreCase = true) ||
+        bool("skip-cert-verify") ||
+        bool("disable-sni") ||
+        string("client-fingerprint").isNotBlank() ||
+        stringList("alpn").isNotEmpty() ||
+        map("reality-opts").isNotEmpty() ||
+        string("certificate").isNotBlank() ||
+        string("private-key").isNotBlank()
+}
+
+private fun Map<*, *>.naiveExtraHeaders(): JsonObject? {
+    val rawHeaders = firstValue("extra-headers", "extra_headers") ?: return null
+    val headers = rawHeaders as? Map<*, *>
+        ?: throw IllegalArgumentException("Mihomo Naive extra headers must be a mapping")
+    if (headers.isEmpty()) return null
+    return buildJsonObject {
+        headers.forEach { (key, value) ->
+            val name = key?.toString()?.trim().orEmpty()
+            require(name.isHttpHeaderName()) {
+                "Mihomo Naive extra header name is invalid"
+            }
+            when (value) {
+                is Iterable<*> -> {
+                    val values = value.mapNotNull { item ->
+                        item?.toString()?.takeIf(String::isNotBlank)
+                    }
+                    require(values.isNotEmpty()) {
+                        "Mihomo Naive extra header value is required"
+                    }
+                    put(name, JsonArray(values.map(::JsonPrimitive)))
+                }
+                null -> throw IllegalArgumentException(
+                    "Mihomo Naive extra header value is required",
+                )
+                else -> put(name, value.toString())
+            }
+        }
+    }
+}
 
 private fun Map<*, *>.list(name: String): List<*> = get(name) as? List<*> ?: emptyList<Any?>()
 

@@ -37,6 +37,7 @@ internal fun LazyListScope.outboundEditorContent(state: OutboundEditorContentSta
     when (state.schema.type) {
         "socks" -> socksOutboundEditor(state)
         "http" -> httpOutboundEditor(state)
+        "naive" -> naiveOutboundEditor(state)
         "shadowsocks" -> shadowsocksOutboundEditor(state)
         "vmess" -> vmessOutboundEditor(state)
         "trojan" -> trojanOutboundEditor(state)
