@@ -142,10 +142,11 @@ internal class SingBoxCommandClient(
             while (items.hasNext()) {
                 val item = items.next()
                 itemNames += item.tag
-                nodes[item.tag] = SingBoxProxyNode(
+                nodes[item.tag] = singBoxProxyNode(
                     name = item.tag,
                     type = item.type,
-                    delay = item.urlTestDelay.takeIf { it > 0 },
+                    urlTestDelay = item.urlTestDelay,
+                    urlTestTime = item.urlTestTime,
                 )
             }
             groups += SingBoxProxyGroup(
@@ -239,6 +240,20 @@ internal class SingBoxCommandClient(
         const val StatusIntervalNanos = 1_000_000_000L
     }
 }
+
+internal fun singBoxProxyNode(
+    name: String,
+    type: String,
+    udp: Boolean = false,
+    urlTestDelay: Int,
+    urlTestTime: Long,
+): SingBoxProxyNode = SingBoxProxyNode(
+    name = name,
+    type = type,
+    udp = udp,
+    delay = urlTestDelay.takeIf { delay -> delay > 0 },
+    delayUpdatedAtEpochSeconds = urlTestTime.takeIf { time -> time > 0L },
+)
 
 internal class SingBoxCommandLogWriter(
     private val appendPersisted: (level: String, message: String, time: String) -> Unit =

@@ -6,18 +6,15 @@ package engine.singbox.runtime
 import android.content.Context
 import app.AppState
 import app.modes.RunModeVpnService
-import app.modes.isRootRunMode
 import engine.proxy.ProxyEngineStartRequest
 import engine.root.prepareRootConfigBuildContext
 import engine.root.writeRootConfigFile
-import engine.singbox.SingBoxControlConfig
 import engine.singbox.singBoxControlConfig
 import engine.singbox.singBoxModeName
 import engine.vpn.VpnSingBoxConfigFactory
 import features.logs.AndroidAppLogger
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.StatusMessage
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,6 +41,7 @@ internal class SingBoxRuntimeRepository(
     private val trafficHistory = SingBoxTrafficHistoryBuffer(MaxTrafficHistorySize)
     private val trafficHistoryLock = Any()
     private val sessionLock = Any()
+    private val delayTestRunGate = SingBoxDelayTestRunGate()
     @Volatile
     private var session: SingBoxCommandClient? = null
     private var sessionTarget: SingBoxCommandTarget? = null
@@ -103,6 +101,7 @@ internal class SingBoxRuntimeRepository(
                     traffic = current.traffic.copy(connected = false),
                     proxiesRefreshing = false,
                     delayTestingTarget = null,
+                    delayTestingNodes = emptySet(),
                     lastError = "",
                 )
             }
@@ -195,12 +194,7 @@ internal class SingBoxRuntimeRepository(
     suspend fun testGroupDelay(
         appState: AppState,
         groupName: String,
-        url: String,
-    ): Result<SingBoxDelayResult> = runDelayTest(appState, groupName) { proxies ->
-        val group = proxies.groups.firstOrNull { it.name == groupName }
-            ?: error("sing-box group is unavailable: $groupName")
-        group.name to group.all
-    }
+    ): Result<SingBoxDelayResult> = runDelayTest(appState, groupName)
 
     fun refreshConnectivity() {
         refreshDeviceState()
@@ -312,6 +306,8 @@ internal class SingBoxRuntimeRepository(
                         running = false,
                         traffic = current.traffic.copy(connected = false),
                         proxiesRefreshing = false,
+                        delayTestingTarget = null,
+                        delayTestingNodes = emptySet(),
                         lastError = message,
                     )
                 }
@@ -353,6 +349,10 @@ internal class SingBoxRuntimeRepository(
                         running = true,
                         proxies = proxies,
                         proxiesRefreshing = false,
+                        delayFailureBaselines = retainUnresolvedSingBoxDelayFailures(
+                            failedTargetBaselines = current.delayFailureBaselines,
+                            proxies = proxies,
+                        ),
                         lastError = "",
                     )
                 }
@@ -378,24 +378,72 @@ internal class SingBoxRuntimeRepository(
     private suspend fun runDelayTest(
         appState: AppState,
         target: String,
-        resolve: (SingBoxProxiesState) -> Pair<String, List<String>>,
     ): Result<SingBoxDelayResult> = runCatching {
-        val active = requireActiveSession(appState)
-        val before = state.value.proxies
-        val (groupName, nodeNames) = resolve(before)
-        mutableState.update { current -> current.copy(delayTestingTarget = target) }
-        try {
-            active.urlTest(groupName)
-            val updated = withTimeout(DelayTestWaitMillis.milliseconds) {
-                state.first { runtime -> runtime.proxies.updatedAtMillis > before.updatedAtMillis }
-            }.proxies
-            SingBoxDelayResult(
-                delays = nodeNames.mapNotNull { name ->
-                    updated.nodeByName[name]?.delay?.let { delay -> name to delay }
-                }.toMap(),
+        delayTestRunGate.runExclusive {
+            val active = requireActiveSession(appState)
+            val before = state.value
+            val plan = buildSingBoxDelayTestPlan(before.proxies, target)
+            val baselineTimes = plan.freshnessBaselines(
+                failureBaselines = before.delayFailureBaselines,
             )
-        } finally {
-            mutableState.update { current -> current.copy(delayTestingTarget = null) }
+            mutableState.update { current ->
+                current.copy(
+                    delayTestingTarget = target,
+                    delayTestingNodes = plan.targetNames,
+                )
+            }
+            try {
+                delay(DelayTestTimestampBoundaryWaitMillis.milliseconds)
+                val submissions = submitSingBoxDelayCommands(
+                    commandGroupNames = plan.commandGroupNames,
+                    submit = active::urlTest,
+                )
+                if (submissions.successfulGroupNames.isEmpty()) {
+                    mutableState.update { current ->
+                        current.copy(
+                            delayFailureBaselines = mergeSingBoxDelayFailures(
+                                currentFailureBaselines = current.delayFailureBaselines,
+                                result = SingBoxDelayResult(failedTargets = plan.targetNames),
+                                runBaselines = baselineTimes,
+                            ),
+                        )
+                    }
+                    error("Failed to submit sing-box delay test commands")
+                }
+                val knownFailures = plan.knownSubmissionFailures(submissions)
+                val completed = awaitSingBoxDelayTestSnapshot(
+                    runtimeStates = state,
+                    plan = plan,
+                    baselineTimes = baselineTimes,
+                    knownFailures = knownFailures,
+                    timeoutMillis = plan.deadlineMillis(),
+                )
+                val result = plan.finish(
+                    proxies = completed ?: state.value.proxies,
+                    baselineTimes = baselineTimes,
+                )
+                mutableState.update { current ->
+                    current.copy(
+                        delayFailureBaselines = mergeSingBoxDelayFailures(
+                            currentFailureBaselines = current.delayFailureBaselines,
+                            result = result,
+                            runBaselines = baselineTimes,
+                        ),
+                    )
+                }
+                result
+            } finally {
+                mutableState.update { current ->
+                    if (current.delayTestingTarget == target) {
+                        current.copy(
+                            delayTestingTarget = null,
+                            delayTestingNodes = emptySet(),
+                        )
+                    } else {
+                        current
+                    }
+                }
+            }
         }
     }
 
@@ -431,7 +479,7 @@ internal class SingBoxRuntimeRepository(
         const val ConnectRetryMillis = 750L
         const val ReconnectDelayMillis = 1_000L
         const val SessionWaitMillis = 8_000L
-        const val DelayTestWaitMillis = 15_000L
+        const val DelayTestTimestampBoundaryWaitMillis = 1_100L
         const val RootReloadWaitMillis = 750L
         const val LogTag = "SingBoxRuntime"
     }

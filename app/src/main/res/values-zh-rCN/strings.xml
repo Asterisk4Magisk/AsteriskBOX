@@ -211,6 +211,8 @@
     <string name="sing_box_proxies_group_test">整组测试</string>
     <string name="sing_box_proxies_delay_timeout">超时</string>
     <string name="sing_box_proxies_delay_not_tested">未测试</string>
+    <string name="sing_box_proxies_delay_testing">测试中</string>
+    <string name="sing_box_proxies_delay_status_failed">失败</string>
     <string name="sing_box_proxies_delay_failed">延迟测试失败</string>
     <string name="sing_box_proxies_delay_done">延迟测试完成</string>
     <string name="sing_box_proxies_select_failed">切换代理失败</string>

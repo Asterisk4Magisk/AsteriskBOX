@@ -121,6 +121,8 @@ private data class SingBoxProxyPageRuntimeState(
     val proxies: SingBoxProxiesState,
     val proxiesRefreshing: Boolean,
     val delayTestingTarget: String?,
+    val delayTestingNodes: Set<String>,
+    val delayFailedNodes: Set<String>,
     val lastError: String,
 )
 
@@ -128,6 +130,8 @@ private fun SingBoxRuntimeState.toProxyPageRuntimeState() = SingBoxProxyPageRunt
     proxies = proxies,
     proxiesRefreshing = proxiesRefreshing,
     delayTestingTarget = delayTestingTarget,
+    delayTestingNodes = delayTestingNodes,
+    delayFailedNodes = delayFailureBaselines.keys,
     lastError = lastError,
 )
 
@@ -314,7 +318,7 @@ fun SingBoxProxyPage(
     fun testGroup(group: SingBoxProxyGroup) {
         if (!requireRuntime() || testingTarget != null) return
         scope.launch {
-            services.singBoxRuntime.testGroupDelay(appState, group.name, group.testUrl)
+            services.singBoxRuntime.testGroupDelay(appState, group.name)
                 .onSuccess { tipNotifier.show(delayDoneMessage) }
                 .onFailure { error -> tipNotifier.showError(error, delayFailedMessage) }
         }
@@ -478,6 +482,12 @@ fun SingBoxProxyPage(
                                             ),
                                             selectionEnabled = selectionEnabled,
                                             compact = columns > 1,
+                                            delayStatus = resolveSingBoxProxyDelayStatus(
+                                                nodeName = node.name,
+                                                delay = node.delay,
+                                                testingNodes = runtimeState.delayTestingNodes,
+                                                failedNodes = runtimeState.delayFailedNodes,
+                                            ),
                                             onSelect = { selectProxy(group, node) },
                                         )
                                     }
@@ -811,6 +821,7 @@ private fun SingBoxProxyNodeCard(
     selected: Boolean,
     selectionEnabled: Boolean,
     compact: Boolean,
+    delayStatus: SingBoxProxyDelayStatus,
     onSelect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -852,6 +863,7 @@ private fun SingBoxProxyNodeCard(
             ProtocolDelayLine(
                 protocol = node.type,
                 delay = node.delay,
+                delayStatus = delayStatus,
                 selected = selected,
                 compact = compact,
             )
@@ -874,13 +886,20 @@ private fun SingBoxProxyNodeCard(
 private fun ProtocolDelayLine(
     protocol: String,
     delay: Int?,
+    delayStatus: SingBoxProxyDelayStatus,
     selected: Boolean,
     compact: Boolean,
 ) {
-    val delayText = when {
-        delay == null -> stringResource(R.string.sing_box_proxies_delay_not_tested)
-        delay < 0 -> stringResource(R.string.sing_box_proxies_delay_timeout)
-        else -> stringResource(R.string.monitor_milliseconds, delay)
+    val delayText = when (delayStatus) {
+        SingBoxProxyDelayStatus.NotTested ->
+            stringResource(R.string.sing_box_proxies_delay_not_tested)
+        SingBoxProxyDelayStatus.Testing ->
+            stringResource(R.string.sing_box_proxies_delay_testing)
+        SingBoxProxyDelayStatus.Measured -> delay?.let { measuredDelay ->
+            stringResource(R.string.monitor_milliseconds, measuredDelay)
+        } ?: stringResource(R.string.sing_box_proxies_delay_not_tested)
+        SingBoxProxyDelayStatus.Failed ->
+            stringResource(R.string.sing_box_proxies_delay_status_failed)
     }.trim()
     Row(
         modifier = Modifier
@@ -917,7 +936,7 @@ private fun ProtocolDelayLine(
                     MaterialTheme.typography.labelMedium
                 },
                 fontWeight = FontWeight.Medium,
-                color = delayColor(delay),
+                color = delayColor(delayStatus, delay),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.End,
@@ -1012,13 +1031,20 @@ private fun SingBoxProxyLoadingCard() {
 }
 
 @Composable
-private fun delayColor(delay: Int?): Color {
-    return when {
-        delay == null -> MaterialTheme.colorScheme.onSurfaceVariant
-        delay < 0 -> MaterialTheme.colorScheme.error
-        delay < 300 -> MaterialTheme.colorScheme.primary
-        delay < 500 -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.error
+private fun delayColor(
+    delayStatus: SingBoxProxyDelayStatus,
+    delay: Int?,
+): Color {
+    return when (delayStatus) {
+        SingBoxProxyDelayStatus.NotTested -> MaterialTheme.colorScheme.onSurfaceVariant
+        SingBoxProxyDelayStatus.Testing -> MaterialTheme.colorScheme.primary
+        SingBoxProxyDelayStatus.Failed -> MaterialTheme.colorScheme.error
+        SingBoxProxyDelayStatus.Measured -> when {
+            delay == null -> MaterialTheme.colorScheme.onSurfaceVariant
+            delay < 300 -> MaterialTheme.colorScheme.primary
+            delay < 500 -> MaterialTheme.colorScheme.tertiary
+            else -> MaterialTheme.colorScheme.error
+        }
     }
 }
 

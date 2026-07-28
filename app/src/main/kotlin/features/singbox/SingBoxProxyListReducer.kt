@@ -14,6 +14,28 @@ import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.runtime.SingBoxProxiesState
 import engine.singbox.runtime.SingBoxProxyGroup
 
+internal enum class SingBoxProxyDelayStatus {
+    NotTested,
+    Testing,
+    Measured,
+    Failed,
+}
+
+internal fun resolveSingBoxProxyDelayStatus(
+    nodeName: String,
+    delay: Int?,
+    testingNodes: Set<String>,
+    failedNodes: Set<String>,
+): SingBoxProxyDelayStatus {
+    return when {
+        nodeName in testingNodes -> SingBoxProxyDelayStatus.Testing
+        nodeName in failedNodes -> SingBoxProxyDelayStatus.Failed
+        delay != null && delay >= 0 -> SingBoxProxyDelayStatus.Measured
+        delay != null -> SingBoxProxyDelayStatus.Failed
+        else -> SingBoxProxyDelayStatus.NotTested
+    }
+}
+
 internal fun prioritizeGlobalSingBoxProxyGroup(
     proxies: SingBoxProxiesState,
 ): SingBoxProxiesState {

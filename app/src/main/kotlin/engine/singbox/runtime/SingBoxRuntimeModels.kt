@@ -42,6 +42,7 @@ internal data class SingBoxProxyNode(
     val type: String,
     val udp: Boolean = false,
     val delay: Int? = null,
+    val delayUpdatedAtEpochSeconds: Long? = null,
 )
 
 internal data class SingBoxProxyGroup(
@@ -76,11 +77,14 @@ internal data class SingBoxRuntimeState(
     val proxies: SingBoxProxiesState = SingBoxProxiesState(),
     val proxiesRefreshing: Boolean = false,
     val delayTestingTarget: String? = null,
+    val delayTestingNodes: Set<String> = emptySet(),
+    val delayFailureBaselines: Map<String, Long> = emptyMap(),
     val lastError: String = "",
 )
 
 internal data class SingBoxDelayResult(
     val delays: Map<String, Int> = emptyMap(),
+    val failedTargets: Set<String> = emptySet(),
 ) {
     val firstDelay: Int?
         get() = delays.values.firstOrNull()
