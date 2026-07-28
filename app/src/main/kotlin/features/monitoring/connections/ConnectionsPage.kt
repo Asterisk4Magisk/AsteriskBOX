@@ -95,7 +95,15 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
     val closeFailed = stringResource(R.string.monitor_connections_close_failed)
     val closeAllFailed = stringResource(R.string.monitor_connections_close_all_failed)
     val unavailableLabel = stringResource(R.string.common_unavailable)
-    val referenceLabels = remember(appState) { appState.managedReferenceRemarks() }
+    val globalSelectorLabel = stringResource(R.string.routing_global)
+    val directLabel = stringResource(R.string.routing_direct)
+    val referenceLabels = remember(appState, globalSelectorLabel, directLabel) {
+        connectionPolicyChainReferenceLabels(
+            managedLabels = appState.managedReferenceRemarks(),
+            globalSelectorLabel = globalSelectorLabel,
+            directLabel = directLabel,
+        )
+    }
     ObserveMonitoring(MonitoringIntent.Connections)
 
     val displayedConnections = resolveDisplayedConnections(
