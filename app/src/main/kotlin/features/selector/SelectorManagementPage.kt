@@ -1142,12 +1142,9 @@ private fun SelectorTargetRow(
 private fun buildSelectorTargets(
     state: AppState,
     selectorId: Int,
-): List<SelectorTargetUi> = selectableManagedOutbounds(
+): List<SelectorTargetUi> = selectorTargetChoices(
     state = state,
-    excludedTag = state.selectors.firstOrNull { selector -> selector.id == selectorId }
-        ?.tag
-        .orEmpty(),
-    excludedSelectorId = selectorId,
+    selectorId = selectorId,
 ).map { choice ->
     SelectorTargetUi(
         tag = choice.tag,

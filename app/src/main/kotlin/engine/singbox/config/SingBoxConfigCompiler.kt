@@ -5,17 +5,14 @@ package engine.singbox.config
 
 import android.content.Context
 import app.AppState
-import app.SingBoxSelectorState
-import app.SingBoxSelectorTypeSelector
-import app.SingBoxSelectorTypeUrlTest
 import app.SingBoxRouteRuleActionReject
 import app.SingBoxRouteRuleLogicalModeOr
 import app.SingBoxRouteRuleState
 import app.SingBoxRouteRuleTypeLogical
+import app.SingBoxSelectorTypeSelector
+import app.SingBoxSelectorTypeUrlTest
 import app.managedOutboundGroupSelectorTag
-import app.withUnavailableManagedRuleSetsDisabled
 import app.managedRuleSetChoices
-import app.withPrunedDnsServerReferences
 import app.modes.RunModeBpf2Socks
 import app.modes.RunModeTproxy
 import app.modes.RunModeTun
@@ -24,6 +21,8 @@ import app.modes.RunModeVpnService
 import app.modes.SingBoxModeDirect
 import app.modes.SingBoxModeGlobal
 import app.modes.isRootRunMode
+import app.withPrunedDnsServerReferences
+import app.withUnavailableManagedRuleSetsDisabled
 import engine.network.toPortOrNull
 import engine.proxy.LocalProxyLoopbackAddress
 import engine.proxy.toLocalProxyOptions
@@ -365,13 +364,12 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
             managedGroupTags += groupTag
         }
     }
-    val globalSelectorMembers = (
-        listOf(APP_DIRECT_OUTBOUND) +
-            managedGroupTags +
-            endpointCandidateTags
-        ).distinct()
     val managedSelectors = appState.selectors
         .distinctBy { selector -> selector.id }
+        .filter { selector ->
+            selector.type == SingBoxSelectorTypeSelector ||
+                selector.type == SingBoxSelectorTypeUrlTest
+        }
     val baseAvailableCustomMembers = (
         managedGroupTags +
             candidateSelectorTags +
@@ -406,6 +404,13 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
         .map { selector -> selector.tag }
         .filter(emittableManagedSelectorTags::contains)
         .distinct()
+    val globalSelectorMembers = (
+        listOf(APP_DIRECT_OUTBOUND) +
+            managedGroupTags +
+            customSelectorTags +
+            customUrlTestTags +
+            endpointCandidateTags
+        ).distinct()
     val availableCustomMembers = (
         managedGroupTags +
             customSelectorTags +

@@ -7,6 +7,7 @@ import app.AppState
 import app.DefaultSingBoxUrlTestIdleTimeout
 import app.DefaultSingBoxUrlTestInterval
 import app.DefaultSingBoxUrlTestUrl
+import app.ManagedOutboundChoice
 import app.SingBoxSelectorTypeSelector
 import app.SingBoxSelectorTypeUrlTest
 import app.SingBoxSelectorState
@@ -17,13 +18,22 @@ import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.isSingBoxDurationNotGreaterThan
 import java.net.URI
 
-internal fun selectorTargetTags(
+internal fun selectorTargetChoices(
     state: AppState,
     selectorId: Int = 0,
-): List<String> = selectableManagedOutbounds(
+): List<ManagedOutboundChoice> = selectableManagedOutbounds(
     state = state,
     excludedTag = state.selectors.firstOrNull { selector -> selector.id == selectorId }?.tag.orEmpty(),
     excludedSelectorId = selectorId,
+    includeGlobalSelector = false,
+)
+
+internal fun selectorTargetTags(
+    state: AppState,
+    selectorId: Int = 0,
+): List<String> = selectorTargetChoices(
+    state = state,
+    selectorId = selectorId,
 ).map { choice -> choice.tag }
 
 internal fun selectorCardMemberCount(memberTags: Iterable<String>): Int = memberTags.count()
