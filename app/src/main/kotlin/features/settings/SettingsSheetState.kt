@@ -27,9 +27,6 @@ internal class SettingsSheetState(
     var showTunSettings by mutableStateOf(false)
     var tunSettingsDraft by mutableStateOf(TunSettingsDraft())
 
-    var showDnsSettings by mutableStateOf(false)
-    var dnsSettingsDraft by mutableStateOf(DnsSettingsDraft())
-
     var showSnifferSettings by mutableStateOf(false)
     var snifferSettingsDraft by mutableStateOf(SnifferSettingsDraft())
 
@@ -53,11 +50,6 @@ internal class SettingsSheetState(
     fun openTunSettings(appState: AppState) {
         tunSettingsDraft = appState.toTunSettingsDraft()
         showTunSettings = true
-    }
-
-    fun openDnsSettings(appState: AppState) {
-        dnsSettingsDraft = appState.toDnsSettingsDraft()
-        showDnsSettings = true
     }
 
     fun openSnifferSettings(appState: AppState) {

@@ -74,7 +74,7 @@ import features.outbound.OutboundEditorPage
 import features.outbound.OutboundListPage
 import features.endpoint.EndpointEditorPage
 import features.endpoint.EndpointListPage
-import features.dns.DnsRuleManagementPage
+import features.dns.DnsManagementPage
 import features.selector.SelectorManagementPage
 import features.singbox.SingBoxDashboardPage
 import features.singbox.SingBoxProxyPage
@@ -181,8 +181,11 @@ fun AppContent(
                 entry<Route.RoutingManagement> {
                     RoutingManagementPage(padding = padding)
                 }
-                entry<Route.DnsRuleManagement> {
-                    DnsRuleManagementPage(padding = padding)
+                entry<Route.DnsManagement> { route ->
+                    DnsManagementPage(
+                        padding = padding,
+                        initiallyOpenDnsSettings = route.openSettings,
+                    )
                 }
                 entry<Route.OutboundEdit> { route ->
                     key(route.outboundId, route.groupId, route.type) {

@@ -399,6 +399,7 @@
     <string name="settings_sniffer_protocol_ntp">NTP</string>
     <string name="settings_dns">DNS 设置</string>
     <string name="settings_dns_summary">编辑核心 DNS 服务器与行为</string>
+    <string name="dns_settings_entry_summary">配置 DNS 服务器、缓存与解析行为</string>
     <string name="settings_dns_section_basic">基础</string>
     <string name="settings_dns_section_servers">DNS 服务器</string>
     <string name="settings_dns_final">默认 DNS 服务器</string>
@@ -910,9 +911,8 @@
     <string name="outbound_field_uuid">UUID</string>
 
     <!-- DNS and routing management -->
-    <string name="settings_dns_rule_management">DNS 规则管理</string>
-    <string name="settings_dns_rule_management_summary">编辑核心 DNS 路由规则</string>
-    <string name="dns_rules_title">DNS 规则管理</string>
+    <string name="settings_dns_management">DNS 管理</string>
+    <string name="dns_management_title">DNS 管理</string>
     <string name="dns_rule_remarks">别名</string>
     <string name="dns_rule_unnamed">未命名规则</string>
     <string name="dns_rule_evaluation_fallback">评估规则 %1$d</string>

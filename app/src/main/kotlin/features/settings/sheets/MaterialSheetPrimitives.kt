@@ -19,6 +19,7 @@ import ui.components.AsteriskActionButton
 @Composable
 internal fun SettingsModalBottomSheet(
     show: Boolean,
+    dismissEnabled: Boolean = true,
     title: String,
     startAction: @Composable () -> Unit,
     endAction: @Composable () -> Unit,
@@ -27,6 +28,7 @@ internal fun SettingsModalBottomSheet(
 ) {
     AsteriskModalBottomSheet(
         show = show,
+        dismissEnabled = dismissEnabled,
         onDismissRequest = onDismissRequest,
         title = title,
         startAction = { startAction() },

@@ -13,10 +13,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import app.AppState
 import app.LocalAppServices
-import app.selectableDetourOutbounds
-import app.selectableDnsEndpoints
-import app.withPrunedDnsServerReferences
-import features.settings.sheets.DnsSettingsBottomSheet
 import features.settings.sheets.ExternalInterfacesBottomSheet
 import features.settings.sheets.IgnoredInterfacesBottomSheet
 import features.settings.sheets.LocalProxySettingsBottomSheet
@@ -223,50 +219,6 @@ internal fun SettingsBottomSheetsHost(
                     )
                 },
                 close = { sheetState.showTunSettings = false },
-            )
-        },
-    )
-    DnsSettingsBottomSheet(
-        show = sheetState.showDnsSettings,
-        saving = validating,
-        draft = sheetState.dnsSettingsDraft,
-        outboundProxyChoices = selectableDetourOutbounds(
-            state = appState,
-            excludedTag = "",
-            includeGlobalSelector = true,
-        ),
-        endpointChoicesByServerType = mapOf(
-            "tailscale" to selectableDnsEndpoints(appState, "tailscale"),
-            "openconnect" to selectableDnsEndpoints(appState, "openconnect"),
-            "openvpn" to selectableDnsEndpoints(appState, "openvpn"),
-        ),
-        onDraftChange = { sheetState.dnsSettingsDraft = it },
-        onDismissRequest = { sheetState.showDnsSettings = false },
-        onSave = { draft ->
-            validateAndCommit(
-                operation = "save_dns_settings",
-                transform = { state ->
-                    state.copy(
-                        enableLocalDns = draft.enableLocalDns,
-                        dnsFinal = draft.dnsFinal,
-                        routeDefaultDomainResolver = draft.routeDefaultDomainResolver,
-                        dnsCacheCapacity = draft.dnsCacheCapacity,
-                        dnsOptimisticCache = draft.dnsOptimisticCache,
-                        dnsDisableCache = draft.dnsDisableCache,
-                        dnsDisableExpire = draft.dnsDisableExpire,
-                        dnsTimeout = draft.dnsTimeout,
-                        dnsServers = draft.dnsServers,
-                        nextDnsServerId = draft.nextDnsServerId,
-                        dnsRules = state.dnsRules
-                            .replaceDnsServerTagReferences(
-                                draft.dnsServerTagReplacements,
-                            )
-                            .replaceDnsPreferredByTagReferences(
-                                draft.dnsPreferredByTagReplacements,
-                            ),
-                    ).withPrunedDnsServerReferences()
-                },
-                close = { sheetState.showDnsSettings = false },
             )
         },
     )

@@ -16,8 +16,7 @@ internal val SettingsGeneralItems = listOf(
 )
 
 internal enum class SettingsCoreItem {
-    Dns,
-    DnsRules,
+    DnsManagement,
     Sniffer,
     Outbounds,
     Selectors,
@@ -27,8 +26,7 @@ internal enum class SettingsCoreItem {
 }
 
 internal val SettingsCoreItems = listOf(
-    SettingsCoreItem.Dns,
-    SettingsCoreItem.DnsRules,
+    SettingsCoreItem.DnsManagement,
     SettingsCoreItem.Sniffer,
     SettingsCoreItem.Outbounds,
     SettingsCoreItem.Selectors,

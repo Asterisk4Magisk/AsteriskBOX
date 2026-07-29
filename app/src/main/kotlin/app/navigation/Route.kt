@@ -45,7 +45,9 @@ sealed interface Route : NavKey {
     data object RoutingManagement : Route
 
     @Serializable
-    data object DnsRuleManagement : Route
+    data class DnsManagement(
+        val openSettings: Boolean = false,
+    ) : Route
 
     @Serializable
     data class OutboundEdit(

@@ -36,8 +36,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -48,27 +48,27 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.ManagedOutboundChoice
+import app.ManagedReferenceChoice
 import app.SingBoxDnsRuleActions
 import app.SingBoxDnsRuleState
 import app.SingBoxDnsServerState
 import app.SingBoxDnsServerTypes
-import app.ManagedOutboundChoice
-import app.ManagedReferenceChoice
 import app.visibleManagedReference
 import engine.network.isCidrAddress
-import engine.network.isIpv4CidrAddress
 import engine.network.isIpAddress
+import engine.network.isIpv4CidrAddress
 import engine.singbox.DefaultSingBoxDnsFakeIpRange
 import engine.singbox.DefaultSingBoxDnsTimeout
+import engine.singbox.config.sanitized
+import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.isSingBoxDnsQueryType
 import engine.singbox.isSingBoxDnsRCode
-import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.isSingBoxPortRange
 import engine.singbox.isSingBoxUnsigned16
 import engine.singbox.isSingBoxUnsigned32
-import engine.singbox.config.sanitized
-import features.dns.DnsRuleMatcherGroups
 import features.dns.DnsMatchResponseChoice
+import features.dns.DnsRuleMatcherGroups
 import features.dns.withDnsRuleMatchValues
 import features.settings.DnsSettingsDraft
 import features.settings.withDnsServerTagReplacement
@@ -77,17 +77,19 @@ import ui.components.AsteriskInfoChip
 import ui.components.ReferenceSelectionCard
 import ui.components.StringListEditor
 import ui.components.localizedLabel
-import ui.components.singBoxProtocolChoices
 import ui.components.singBoxOptionLabel
-import ui.icons.AsteriskIcons as Icons
+import ui.components.singBoxProtocolChoices
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
-import utils.toTrimmedNonEmptyDistinctList
+import ui.icons.AsteriskIcons as Icons
 
 private val DnsIpVersions = listOf("", "4", "6")
 private val DnsNetworks = listOf("", "tcp", "udp")
 private val DnsNetworkTypes = listOf("wifi", "cellular", "ethernet", "other")
 private val DnsRejectMethods = listOf("default", "drop")
+
+internal fun dnsSettingsSheetDismissEnabled(saving: Boolean): Boolean = !saving
+
 private val DnsResponseCodes = listOf(
     "",
     "NOERROR",
@@ -191,6 +193,7 @@ internal fun DnsSettingsBottomSheet(
 
     SettingsModalBottomSheet(
         show = show,
+        dismissEnabled = dnsSettingsSheetDismissEnabled(saving),
         title = stringResource(R.string.settings_dns),
         startAction = {
             TextButton(

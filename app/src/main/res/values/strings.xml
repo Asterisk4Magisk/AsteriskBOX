@@ -404,6 +404,7 @@
     <string name="settings_sniffer_protocol_ntp">NTP</string>
     <string name="settings_dns">DNS settings</string>
     <string name="settings_dns_summary">Edit core DNS servers and behavior</string>
+    <string name="dns_settings_entry_summary">Configure DNS servers, cache, and resolution behavior</string>
     <string name="settings_dns_section_basic">Basic</string>
     <string name="settings_dns_section_servers">DNS servers</string>
     <string name="settings_dns_final">Default DNS server</string>
@@ -924,9 +925,8 @@
     <string name="outbound_field_uuid">UUID</string>
 
     <!-- DNS and routing management -->
-    <string name="settings_dns_rule_management">DNS rule management</string>
-    <string name="settings_dns_rule_management_summary">Edit core DNS routing rules</string>
-    <string name="dns_rules_title">DNS rule management</string>
+    <string name="settings_dns_management">DNS management</string>
+    <string name="dns_management_title">DNS management</string>
     <string name="dns_rule_remarks">Remarks</string>
     <string name="dns_rule_unnamed">Unnamed rule</string>
     <string name="dns_rule_evaluation_fallback">Evaluation %1$d</string>

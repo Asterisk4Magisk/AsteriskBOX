@@ -97,8 +97,7 @@ internal fun SettingsGeneralSection(
 internal fun SettingsCoreSection(
     snifferSettingsSummary: String,
     coreLogLevel: String,
-    onOpenDnsSettings: () -> Unit,
-    onOpenDnsRules: () -> Unit,
+    onOpenDnsManagement: () -> Unit,
     onOpenSnifferSettings: () -> Unit,
     onOpenOutbounds: () -> Unit,
     onOpenSelectors: () -> Unit,
@@ -115,17 +114,11 @@ internal fun SettingsCoreSection(
     SettingsSectionCard {
         SettingsCoreItems.forEach { item ->
             when (item) {
-                SettingsCoreItem.Dns -> ArrowPreference(
-                    title = stringResource(R.string.settings_dns),
+                SettingsCoreItem.DnsManagement -> ArrowPreference(
+                    title = stringResource(R.string.settings_dns_management),
                     icon = Icons.Rounded.Dns,
                     summary = stringResource(R.string.settings_dns_summary),
-                    onClick = onOpenDnsSettings,
-                )
-                SettingsCoreItem.DnsRules -> ArrowPreference(
-                    title = stringResource(R.string.settings_dns_rule_management),
-                    icon = Icons.Rounded.Policy,
-                    summary = stringResource(R.string.settings_dns_rule_management_summary),
-                    onClick = onOpenDnsRules,
+                    onClick = onOpenDnsManagement,
                 )
                 SettingsCoreItem.Sniffer -> ArrowPreference(
                     title = stringResource(R.string.settings_sniffer),

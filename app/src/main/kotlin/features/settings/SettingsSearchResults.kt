@@ -81,13 +81,8 @@ internal fun settingsTopLevelSearchItems(
         ),
         SettingsSearchItem(
             SettingsSectionId.Core,
-            stringResource(R.string.settings_dns),
+            stringResource(R.string.settings_dns_management),
             stringResource(R.string.settings_dns_summary),
-        ),
-        SettingsSearchItem(
-            SettingsSectionId.Core,
-            stringResource(R.string.settings_dns_rule_management),
-            stringResource(R.string.settings_dns_rule_management_summary),
         ),
         SettingsSearchItem(SettingsSectionId.Core, stringResource(R.string.settings_sniffer), snifferSummary),
         SettingsSearchItem(

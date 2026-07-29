@@ -198,7 +198,9 @@ private fun SettingsContent(
     )
     val sheetState = rememberSettingsSheetState(updateAppState)
     val nestedSearchEntries = settingsNestedSearchEntries(
-        onOpenDns = { sheetState.openDnsSettings(appState) },
+        onOpenDns = {
+            navigator.push(Route.DnsManagement(openSettings = true))
+        },
         onOpenSniffer = { sheetState.openSnifferSettings(appState) },
         onOpenLocalProxy = { sheetState.openLocalProxySettings(appState) },
         onOpenTun = { sheetState.openTunSettings(appState) },
@@ -291,8 +293,7 @@ private fun SettingsContent(
                 SettingsCoreSection(
                     snifferSettingsSummary = snifferSummary,
                     coreLogLevel = appState.coreLogLevel,
-                    onOpenDnsSettings = { sheetState.openDnsSettings(appState) },
-                    onOpenDnsRules = { navigator.push(Route.DnsRuleManagement) },
+                    onOpenDnsManagement = { navigator.push(Route.DnsManagement()) },
                     onOpenSnifferSettings = { sheetState.openSnifferSettings(appState) },
                     onOpenOutbounds = { navigator.push(Route.OutboundList) },
                     onOpenSelectors = { navigator.push(Route.SelectorManagement) },

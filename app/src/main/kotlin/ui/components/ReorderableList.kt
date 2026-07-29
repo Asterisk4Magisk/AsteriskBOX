@@ -19,6 +19,24 @@ internal class AsteriskReorderableLazyGridState(
     val hapticFeedback: HapticFeedback,
 )
 
+internal fun translateAsteriskReorderableLazyGridMove(
+    fromIndex: Int,
+    toIndex: Int,
+    itemCount: Int,
+    indexOffset: Int,
+): Pair<Int, Int>? {
+    val translatedFromIndex = fromIndex - indexOffset
+    val translatedToIndex = toIndex - indexOffset
+    if (
+        translatedFromIndex == translatedToIndex ||
+        translatedFromIndex !in 0 until itemCount ||
+        translatedToIndex !in 0 until itemCount
+    ) {
+        return null
+    }
+    return translatedFromIndex to translatedToIndex
+}
+
 @Composable
 internal fun rememberAsteriskReorderableLazyGridState(
     lazyGridState: LazyGridState,
@@ -32,11 +50,12 @@ internal fun rememberAsteriskReorderableLazyGridState(
         lazyGridState = lazyGridState,
         scrollThresholdPadding = scrollThresholdPadding,
     ) { from, to ->
-        val fromIndex = from.index - indexOffset
-        val toIndex = to.index - indexOffset
-        if (fromIndex == toIndex || fromIndex !in 0 until itemCount || toIndex !in 0 until itemCount) {
-            return@rememberReorderableLazyGridState
-        }
+        val (fromIndex, toIndex) = translateAsteriskReorderableLazyGridMove(
+            fromIndex = from.index,
+            toIndex = to.index,
+            itemCount = itemCount,
+            indexOffset = indexOffset,
+        ) ?: return@rememberReorderableLazyGridState
         onMove(fromIndex, toIndex)
         hapticFeedback.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
     }

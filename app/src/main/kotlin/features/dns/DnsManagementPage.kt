@@ -68,6 +68,8 @@ import app.managedInboundTags
 import app.managedReferenceRemarks
 import app.managedRuleSetChoices
 import app.nextAvailableDnsRuleId
+import app.selectableDetourOutbounds
+import app.selectableDnsEndpoints
 import app.selectablePreferredByDnsServers
 import app.withPrunedDnsEvaluationReferences
 import engine.singbox.config.sanitized
@@ -75,11 +77,15 @@ import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.logs.FailureLogContext
 import features.logs.reportFailure
 import features.resources.runtime.singBoxRuleSetFiles
+import features.settings.SettingsActionRow
+import features.settings.SettingsSectionCard
 import features.settings.sheets.DnsRuleEditorSheet
 import features.settings.sheets.DnsRuleEditorState
+import features.settings.sheets.DnsSettingsBottomSheet
 import features.settings.sheets.dnsRuleActionLabel
 import features.settings.sheets.dnsRuleSummary
 import features.settings.sheets.dnsServerTypeLabel
+import features.settings.toDnsSettingsDraft
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -90,17 +96,17 @@ import ui.components.AsteriskInfoChip
 import ui.components.WarningConfirmDialog
 import ui.components.draggedCardShadow
 import ui.components.longPressReorderDragHandle
-import ui.components.rememberAsteriskReorderableLazyGridState
 import ui.components.managedInboundChoices
-import ui.components.singBoxOptionLabel
-import ui.icons.AsteriskIcons as Icons
+import ui.components.rememberAsteriskReorderableLazyGridState
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
+import ui.icons.AsteriskIcons as Icons
 
 @Composable
-internal fun DnsRuleManagementPage(
+internal fun DnsManagementPage(
     padding: PaddingValues,
+    initiallyOpenDnsSettings: Boolean = false,
 ) {
     val appState by LocalAppStateStore.current.collectAppState()
     val updateAppState = LocalUpdateAppState.current
@@ -118,10 +124,14 @@ internal fun DnsRuleManagementPage(
         )
     }
     var showEditor by remember { mutableStateOf(false) }
+    var showDnsSettings by remember { mutableStateOf(initiallyOpenDnsSettings) }
+    var dnsSettingsDraft by remember { mutableStateOf(appState.toDnsSettingsDraft()) }
     var pendingDelete by remember { mutableStateOf<SingBoxDnsRuleState?>(null) }
     var savingRule by remember { mutableStateOf(false) }
+    var savingDnsSettings by remember { mutableStateOf(false) }
     val saveFailedMessage = stringResource(R.string.dns_rule_save_failed)
     val enableFailedMessage = stringResource(R.string.dns_rule_enable_failed)
+    val validationFailedMessage = stringResource(R.string.settings_sing_box_validation_failed)
     val serverChoices = appState.dnsServers.map { server ->
         server.tag to server.remarks.ifBlank { dnsServerTypeLabel(server.type) }
     }
@@ -219,7 +229,7 @@ internal fun DnsRuleManagementPage(
             TopAppBar(
                 title = {
                     Column {
-                        Text(stringResource(R.string.dns_rules_title))
+                        Text(stringResource(R.string.dns_management_title))
                         val countMotion = AsteriskMotion.fastEffects<Float>()
                         AnimatedContent(
                             targetState = appState.dnsRules.size,
@@ -279,6 +289,10 @@ internal fun DnsRuleManagementPage(
             columns = if (isWideScreen) 2 else 1,
             contentPadding = pageListPadding(contentPadding, bottomExtra = 24.dp),
             interactionsEnabled = !savingRule,
+            onOpenDnsSettings = {
+                dnsSettingsDraft = appState.toDnsSettingsDraft()
+                showDnsSettings = true
+            },
             onMove = { fromIndex, toIndex ->
                 updateAppState { state ->
                     state.copy(dnsRules = state.dnsRules.moveDnsRule(fromIndex, toIndex))
@@ -313,6 +327,68 @@ internal fun DnsRuleManagementPage(
             onDelete = { pendingDelete = it },
         )
     }
+
+    DnsSettingsBottomSheet(
+        show = showDnsSettings,
+        saving = savingDnsSettings,
+        draft = dnsSettingsDraft,
+        outboundProxyChoices = selectableDetourOutbounds(
+            state = appState,
+            excludedTag = "",
+            includeGlobalSelector = true,
+        ),
+        endpointChoicesByServerType = mapOf(
+            "tailscale" to selectableDnsEndpoints(appState, "tailscale"),
+            "openconnect" to selectableDnsEndpoints(appState, "openconnect"),
+            "openvpn" to selectableDnsEndpoints(appState, "openvpn"),
+        ),
+        onDraftChange = { dnsSettingsDraft = it },
+        onDismissRequest = {
+            if (!savingDnsSettings) {
+                showDnsSettings = false
+            }
+        },
+        onSave = { savedDraft ->
+            if (!savingDnsSettings) {
+                val baseState = appState
+                val candidateState = baseState.withDnsSettings(savedDraft)
+                savingDnsSettings = true
+                scope.launch {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            validateSingBoxRuntimeConfiguration(context, candidateState)
+                        }
+                        var committed = false
+                        updateAppState { current ->
+                            if (current === baseState) {
+                                committed = true
+                                candidateState
+                            } else {
+                                current
+                            }
+                        }
+                        if (committed) {
+                            showDnsSettings = false
+                        } else {
+                            tipNotifier.show(validationFailedMessage)
+                        }
+                    } catch (error: Throwable) {
+                        if (error is CancellationException) throw error
+                        reportFailure(
+                            context = FailureLogContext(
+                                operation = "save_dns_settings",
+                                stage = "validate",
+                            ),
+                            error = error,
+                        )
+                        tipNotifier.show(validationFailedMessage)
+                    } finally {
+                        savingDnsSettings = false
+                    }
+                }
+            }
+        },
+    )
 
     DnsRuleEditorSheet(
         show = showEditor,
@@ -384,15 +460,18 @@ private fun DnsRuleGrid(
     columns: Int,
     contentPadding: PaddingValues,
     interactionsEnabled: Boolean,
+    onOpenDnsSettings: () -> Unit,
     onMove: (Int, Int) -> Unit,
     onEnabledChange: (SingBoxDnsRuleState, Boolean) -> Unit,
     onEdit: (SingBoxDnsRuleState) -> Unit,
     onDelete: (SingBoxDnsRuleState) -> Unit,
 ) {
     val gridState = rememberLazyGridState()
+    val layout = dnsManagementGridLayout(rules.size)
     val reorderableState = rememberAsteriskReorderableLazyGridState(
         lazyGridState = gridState,
         itemCount = rules.size,
+        indexOffset = layout.ruleIndexOffset,
         scrollThresholdPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
         onMove = onMove,
     )
@@ -404,39 +483,56 @@ private fun DnsRuleGrid(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (rules.isEmpty()) {
-            item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
-                DnsRuleEmptyState()
-            }
-        } else {
-            items(
-                items = rules,
-                key = SingBoxDnsRuleState::id,
-                contentType = { "dns-rule" },
-            ) { rule ->
-                ReorderableItem(
-                    state = reorderableState.reorderableState,
-                    key = rule.id,
-                    modifier = Modifier.fillMaxWidth(),
-                    animateItemModifier = Modifier.animateItem(),
-                ) { isDragging ->
-                    DnsRuleCard(
-                        rule = rule,
-                        referenceLabels = referenceLabels,
-                        unavailableLabel = unavailableLabel,
-                        isDragging = isDragging,
-                        interactionsEnabled = interactionsEnabled,
-                        onEnabledChange = { enabled -> onEnabledChange(rule, enabled) },
-                        onEdit = { onEdit(rule) },
-                        onDelete = { onDelete(rule) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .longPressReorderDragHandle(
-                                scope = this,
-                                enabled = interactionsEnabled && rules.size > 1,
-                                state = reorderableState,
-                            ),
-                    )
+        layout.sections.forEach { section ->
+            when (section) {
+                DnsManagementGridSection.Settings -> {
+                    item(key = "dns-settings", span = { GridItemSpan(maxLineSpan) }) {
+                        SettingsSectionCard(bottomPadding = 0.dp) {
+                            SettingsActionRow(
+                                title = stringResource(R.string.settings_dns),
+                                summary = stringResource(R.string.dns_settings_entry_summary),
+                                icon = Icons.Rounded.Tune,
+                                onClick = onOpenDnsSettings,
+                            )
+                        }
+                    }
+                }
+                DnsManagementGridSection.EmptyState -> {
+                    item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                        DnsRuleEmptyState()
+                    }
+                }
+                DnsManagementGridSection.Rules -> {
+                    items(
+                        items = rules,
+                        key = SingBoxDnsRuleState::id,
+                        contentType = { "dns-rule" },
+                    ) { rule ->
+                        ReorderableItem(
+                            state = reorderableState.reorderableState,
+                            key = rule.id,
+                            modifier = Modifier.fillMaxWidth(),
+                            animateItemModifier = Modifier.animateItem(),
+                        ) { isDragging ->
+                            DnsRuleCard(
+                                rule = rule,
+                                referenceLabels = referenceLabels,
+                                unavailableLabel = unavailableLabel,
+                                isDragging = isDragging,
+                                interactionsEnabled = interactionsEnabled,
+                                onEnabledChange = { enabled -> onEnabledChange(rule, enabled) },
+                                onEdit = { onEdit(rule) },
+                                onDelete = { onDelete(rule) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .longPressReorderDragHandle(
+                                        scope = this,
+                                        enabled = interactionsEnabled && rules.size > 1,
+                                        state = reorderableState,
+                                    ),
+                            )
+                        }
+                    }
                 }
             }
         }
