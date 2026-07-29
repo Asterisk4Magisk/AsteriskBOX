@@ -13,24 +13,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.effects.ProxyStatusSynchronizer
-import app.effects.SingBoxRuntimeSynchronizer
 import app.effects.ResourceFileSynchronizer
 import app.effects.RootBootScriptSynchronizer
-import app.effects.Tun2SocksRuntimeFileSynchronizer
+import app.effects.SingBoxRuntimeSynchronizer
 import app.effects.TrafficStatsNotificationSynchronizer
-import data.AndroidAppStateStore
-import data.AppSettingsPreferences
+import app.effects.Tun2SocksRuntimeFileSynchronizer
+import engine.proxy.AndroidProxyEngine
+import engine.proxy.ProxyServiceUseCase
 import features.logs.AndroidCoreLogRepository
 import features.logs.AndroidLogcatRepository
 import features.monitoring.MonitoringRepository
-import engine.proxy.AndroidProxyEngine
-import engine.proxy.ProxyServiceUseCase
 import features.resources.ResourceFileUseCase
 import features.settings.locale.ProvideAppLanguage
-import features.settings.usecase.SwitchRunModeUseCase
 import features.settings.usecase.RootBootScriptUseCase
 import features.settings.usecase.RootEbpfProbeUseCase
-import features.subscription.runtime.AndroidSubscriptionPreparer
+import features.settings.usecase.SwitchRunModeUseCase
 import system.AndroidNetworkInterfaceProvider
 import system.AndroidPackageProvider
 import system.AndroidRootShellGateway
@@ -52,7 +49,7 @@ fun App(
     val application = appContext as AsteriskApplication
     val appScope = application.appScope
     val rootAccess = remember { AndroidRootShellGateway() }
-    val stateStore = remember(appContext) { AndroidAppStateStore.get(appContext) }
+    val stateStore = remember(application) { application.stateStore }
     val userSpaces = remember(appContext, rootAccess) {
         AndroidUserSpaceProvider(
             context = appContext,
@@ -75,12 +72,8 @@ fun App(
             resourceFilePicker = resourceFilePicker,
         )
     }
-    val subscriptionPreparer = remember(appContext) {
-        AndroidSubscriptionPreparer(
-            installationHwid = AppSettingsPreferences(appContext)
-                .getOrCreateSubscriptionHwid(),
-        )
-    }
+    val outboundSubscriptionUpdater =
+        remember(application) { application.outboundSubscriptionUpdater }
     val singBoxRuntime = application.singBoxRuntime
     val monitoring = remember(appScope, appContext, rootAccess, stateStore, singBoxRuntime) {
         MonitoringRepository(appScope, appContext, rootAccess, stateStore, singBoxRuntime)
@@ -124,7 +117,7 @@ fun App(
         packageCatalog,
         networkInterfaces,
         resourceFileUseCase,
-        subscriptionPreparer,
+        outboundSubscriptionUpdater,
         qrCodeScanner,
         resourceFilePicker,
         singBoxRuntime,
@@ -144,7 +137,7 @@ fun App(
             packageCatalog = packageCatalog,
             networkInterfaces = networkInterfaces,
             resourceFileUseCase = resourceFileUseCase,
-            subscriptionPreparer = subscriptionPreparer,
+            outboundSubscriptionUpdater = outboundSubscriptionUpdater,
             qrCodeScanner = qrCodeScanner,
             importFilePicker = resourceFilePicker,
             singBoxRuntime = singBoxRuntime,

@@ -4,28 +4,38 @@
 package features.subscription.runtime
 
 import android.os.Build
-import android.util.Base64
 import app.SubscriptionInfo
 import engine.singbox.config.SingBoxConfigChecker
+import features.importing.MaxImportErrorPreviewBytes
+import features.importing.readImportUtf8WithinLimit
+import features.importing.requireImportTextWithinLimit
+import features.importing.sanitizeImportErrorPreview
 import features.subscription.usecase.SubscriptionSyncStage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import kage.Age
 import kage.crypto.x25519.X25519Identity
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.io.encoding.Base64
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 internal sealed interface AndroidSubscriptionPreparation {
     data class Success(
         val content: String,
         val subscriptionInfo: SubscriptionInfo,
-        val updateIntervalMillis: Long? = null,
+        val etag: String = "",
+        val lastModified: String = "",
+    ) : AndroidSubscriptionPreparation
+
+    data class NotModified(
+        val subscriptionInfo: SubscriptionInfo,
+        val etag: String,
+        val lastModified: String,
     ) : AndroidSubscriptionPreparation
 
     data class Failure(
@@ -33,7 +43,8 @@ internal sealed interface AndroidSubscriptionPreparation {
         val error: Throwable,
         val content: String? = null,
         val subscriptionInfo: SubscriptionInfo? = null,
-        val updateIntervalMillis: Long? = null,
+        val etag: String = "",
+        val lastModified: String = "",
     ) : AndroidSubscriptionPreparation
 }
 
@@ -46,9 +57,11 @@ internal class AndroidSubscriptionPreparer(
         userAgent: String,
         ageSecretKey: String,
         fetchOptions: AndroidSubscriptionFetchOptions,
+        etag: String = "",
+        lastModified: String = "",
         verifyConfiguration: Boolean = true,
         onStage: (SubscriptionSyncStage) -> Unit = {},
-    ): AndroidSubscriptionPreparation = subscriptionFetchLock.withLock {
+    ): AndroidSubscriptionPreparation {
         var stage = if (sourceContent == null) {
             SubscriptionSyncStage.Downloading
         } else {
@@ -56,7 +69,7 @@ internal class AndroidSubscriptionPreparer(
         }
         var downloaded: DownloadedSubscription? = null
         var decryptedContent: String? = null
-        try {
+        return try {
             val source = if (sourceContent == null) {
                 onStage(SubscriptionSyncStage.Downloading)
                 stage = SubscriptionSyncStage.Downloading
@@ -66,16 +79,27 @@ internal class AndroidSubscriptionPreparer(
                         userAgent = userAgent,
                         hwid = fetchOptions.hwid.trim().ifBlank { installationHwid },
                         proxy = fetchOptions.toHttpProxy(),
+                        etag = etag,
+                        lastModified = lastModified,
                     )
-                }.also { downloaded = it }.content
+                }.also { result ->
+                    downloaded = result
+                    if (result is DownloadedSubscription.NotModified) {
+                        return AndroidSubscriptionPreparation.NotModified(
+                            subscriptionInfo = result.subscriptionInfo,
+                            etag = result.etag,
+                            lastModified = result.lastModified,
+                        )
+                    }
+                }.let { result -> (result as DownloadedSubscription.Content).content }
             } else {
-                sourceContent
+                requireImportTextWithinLimit(sourceContent)
             }
 
             onStage(SubscriptionSyncStage.Decrypting)
             stage = SubscriptionSyncStage.Decrypting
             decryptedContent = withContext(Dispatchers.Default) {
-                source.decryptAgeIfNeeded(ageSecretKey)
+                requireImportTextWithinLimit(source.decryptAgeIfNeeded(ageSecretKey))
             }.takeIf(String::isNotBlank)
                 ?: error("Configuration file is empty")
 
@@ -90,7 +114,8 @@ internal class AndroidSubscriptionPreparer(
             AndroidSubscriptionPreparation.Success(
                 content = decryptedContent,
                 subscriptionInfo = downloaded?.subscriptionInfo ?: SubscriptionInfo(),
-                updateIntervalMillis = downloaded?.updateIntervalMillis,
+                etag = downloaded?.etag.orEmpty(),
+                lastModified = downloaded?.lastModified.orEmpty(),
             )
         } catch (error: CancellationException) {
             throw error
@@ -100,23 +125,39 @@ internal class AndroidSubscriptionPreparer(
                 error = error,
                 content = decryptedContent,
                 subscriptionInfo = downloaded?.subscriptionInfo,
-                updateIntervalMillis = downloaded?.updateIntervalMillis,
+                etag = downloaded?.etag.orEmpty(),
+                lastModified = downloaded?.lastModified.orEmpty(),
             )
         }
     }
 }
 
-private data class DownloadedSubscription(
-    val content: String,
-    val subscriptionInfo: SubscriptionInfo,
-    val updateIntervalMillis: Long?,
-)
+private sealed interface DownloadedSubscription {
+    val subscriptionInfo: SubscriptionInfo
+    val etag: String
+    val lastModified: String
+
+    data class Content(
+        val content: String,
+        override val subscriptionInfo: SubscriptionInfo,
+        override val etag: String,
+        override val lastModified: String,
+    ) : DownloadedSubscription
+
+    data class NotModified(
+        override val subscriptionInfo: SubscriptionInfo,
+        override val etag: String,
+        override val lastModified: String,
+    ) : DownloadedSubscription
+}
 
 private fun downloadSubscription(
     sourceUrl: String,
     userAgent: String,
     hwid: String,
     proxy: AndroidSubscriptionProxy?,
+    etag: String,
+    lastModified: String,
 ): DownloadedSubscription {
     val url = URI(sourceUrl).toURL()
     val connection = (
@@ -129,14 +170,35 @@ private fun downloadSubscription(
         connection.setRequestProperty("Accept", "application/json, text/plain, */*")
         connection.setRequestProperty("User-Agent", userAgent.ifBlank { DefaultUserAgent })
         connection.setRequestProperty("X-Hwid", hwid)
+        etag.takeIf(String::isNotBlank)?.let { value ->
+            connection.setRequestProperty("If-None-Match", value)
+        }
+        lastModified.takeIf(String::isNotBlank)?.let { value ->
+            connection.setRequestProperty("If-Modified-Since", value)
+        }
         proxy?.basicAuthorizationOrNull()?.let { authorization ->
             connection.setRequestProperty("Proxy-Authorization", authorization)
         }
         val responseCode = connection.responseCode
+        val responseEtag = connection.getHeaderField(EtagHeader).orEmpty().ifBlank { etag }
+        val responseLastModified = connection
+            .getHeaderField(LastModifiedHeader)
+            .orEmpty()
+            .ifBlank { lastModified }
+        val subscriptionInfo = connection
+            .getHeaderField(SubscriptionUserInfoHeader)
+            .toSubscriptionInfo()
+        if (responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) {
+            return DownloadedSubscription.NotModified(
+                subscriptionInfo = subscriptionInfo,
+                etag = responseEtag,
+                lastModified = responseLastModified,
+            )
+        }
         if (responseCode !in 200..299) {
             val message = connection.errorStream
-                ?.bufferedReader(StandardCharsets.UTF_8)
-                ?.use { it.readText() }
+                ?.use { it.readUtf8Preview(MaxImportErrorPreviewBytes) }
+                ?.let(::sanitizeImportErrorPreview)
                 ?.trim()
                 .orEmpty()
             error(
@@ -147,17 +209,12 @@ private fun downloadSubscription(
                 },
             )
         }
-        val content = connection.inputStream
-            .bufferedReader(StandardCharsets.UTF_8)
-            .use { it.readText() }
-        return DownloadedSubscription(
+        val content = connection.inputStream.use(InputStream::readImportUtf8WithinLimit)
+        return DownloadedSubscription.Content(
             content = content,
-            subscriptionInfo = connection
-                .getHeaderField(SubscriptionUserInfoHeader)
-                .toSubscriptionInfo(),
-            updateIntervalMillis = connection
-                .getHeaderField(ProfileUpdateIntervalHeader)
-                .toUpdateIntervalMillisOrNull(),
+            subscriptionInfo = subscriptionInfo,
+            etag = responseEtag,
+            lastModified = responseLastModified,
         )
     } finally {
         connection.disconnect()
@@ -167,7 +224,7 @@ private fun downloadSubscription(
 private fun AndroidSubscriptionProxy.basicAuthorizationOrNull(): String? {
     if (username.isBlank() && password.isBlank()) return null
     val credentials = "$username:$password".toByteArray(StandardCharsets.UTF_8)
-    return "Basic ${Base64.encodeToString(credentials, Base64.NO_WRAP)}"
+    return "Basic ${Base64.Default.encode(credentials)}"
 }
 
 private fun String?.toSubscriptionInfo(): SubscriptionInfo {
@@ -188,12 +245,17 @@ private fun String?.toSubscriptionInfo(): SubscriptionInfo {
     )
 }
 
-private fun String?.toUpdateIntervalMillisOrNull(): Long? {
-    return this
-        ?.trim()
-        ?.toLongOrNull()
-        ?.takeIf { hours -> hours > 0L }
-        ?.let { hours -> Math.multiplyExact(hours, MillisPerHour) }
+private fun InputStream.readUtf8Preview(maxBytes: Int): String {
+    val output = ByteArrayOutputStream(minOf(maxBytes, DefaultReadBufferBytes))
+    val buffer = ByteArray(DefaultReadBufferBytes)
+    var remaining = maxBytes
+    while (remaining > 0) {
+        val read = read(buffer, 0, minOf(buffer.size, remaining))
+        if (read < 0) break
+        output.write(buffer, 0, read)
+        remaining -= read
+    }
+    return output.toString(StandardCharsets.UTF_8.name())
 }
 
 private fun String.decryptAgeIfNeeded(ageSecretKey: String): String {
@@ -222,13 +284,12 @@ private fun String.decryptAgeIfNeeded(ageSecretKey: String): String {
 }
 
 private const val SubscriptionUserInfoHeader = "subscription-userinfo"
-private const val ProfileUpdateIntervalHeader = "profile-update-interval"
+private const val EtagHeader = "ETag"
+private const val LastModifiedHeader = "Last-Modified"
 private const val DefaultUserAgent = "sing-box"
 private const val AgeSecretKeyPrefix = "AGE-SECRET-KEY-"
 private const val AgeHeader = "age-encryption.org/v1"
 private const val ArmoredAgeHeader = "-----BEGIN AGE ENCRYPTED FILE-----"
 private const val ConnectTimeoutMillis = 15_000
 private const val ReadTimeoutMillis = 30_000
-private const val MillisPerHour = 60L * 60L * 1000L
-
-private val subscriptionFetchLock = Mutex()
+private const val DefaultReadBufferBytes = 8 * 1024

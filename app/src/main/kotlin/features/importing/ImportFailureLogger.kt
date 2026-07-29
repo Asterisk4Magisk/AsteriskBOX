@@ -8,6 +8,7 @@ import features.logs.FailureLogContext
 import features.logs.reportFailure
 
 internal enum class ImportOperation(internal val logValue: String) {
+    ENDPOINT("endpoint"),
     OUTBOUND("outbound"),
     OUTBOUND_SUBSCRIPTION("outbound_subscription"),
 }
@@ -39,9 +40,17 @@ internal fun reportImportFailure(
 ) {
     reportFailure(
         context = importFailureContext(operation, source, stage),
-        error = error,
+        error = error?.toSanitizedImportFailure(),
         logger = logger,
     )
+}
+
+private fun Throwable.toSanitizedImportFailure(): Throwable {
+    val sanitized = IllegalStateException(
+        sanitizeImportMessage(message ?: this::class.simpleName ?: "Import failed"),
+    )
+    sanitized.stackTrace = stackTrace
+    return sanitized
 }
 
 internal fun importFailureContext(

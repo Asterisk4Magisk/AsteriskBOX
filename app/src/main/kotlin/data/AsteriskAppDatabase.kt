@@ -22,7 +22,7 @@ internal const val AsteriskDatabaseName = "asteriskbox-state.db"
         CustomResourceFileEntity::class,
         ProxyAppListSelectedAppEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(RoomTypeConverters::class)

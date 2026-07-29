@@ -100,10 +100,15 @@ import app.navigation.Route
 import app.withRemovedManagedOutbound
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.importing.ImportOperation
+import features.importing.ImportResultDialog
+import features.importing.ImportResultPresentation
 import features.importing.ImportSource
 import features.importing.ImportStage
+import features.importing.importFailureResultPresentation
 import features.importing.importFailureContext
+import features.importing.readImportUtf8WithinLimit
 import features.importing.reportImportFailure
+import features.importing.toImportResultPresentation
 import features.singbox.displaySingBoxProtocolName
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -169,6 +174,9 @@ internal fun OutboundListPage(
     }
     var query by rememberSaveable { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<OutboundState?>(null) }
+    var importResultPresentation by remember {
+        mutableStateOf<ImportResultPresentation?>(null)
+    }
     var pingingOutboundIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
     val outboundPinger = remember { AndroidOutboundPinger() }
     val selectedGroup = groups.getOrNull(pagerState.currentPage) ?: groups.firstOrNull()
@@ -194,12 +202,19 @@ internal fun OutboundListPage(
             val result = withContext(Dispatchers.Default) {
                 parseOutboundImportContent(content)
             }
-            val imported = result.outbounds
-            val candidateState = appState.withImportedOutbounds(
+            val plan = appState.planOutboundImport(
                 groupId = targetGroupId,
-                imported = imported,
+                parsed = result,
                 replaceGroup = false,
+                strict = false,
             )
+            if (!plan.committed) {
+                importResultPresentation = plan.outcome.toImportResultPresentation(
+                    committed = false,
+                )
+                return
+            }
+            val candidateState = plan.state
             stage = ImportStage.VALIDATE
             withContext(Dispatchers.IO) {
                 validateSingBoxRuntimeConfiguration(context, candidateState)
@@ -215,28 +230,37 @@ internal fun OutboundListPage(
                 }
             }
             if (committed) {
-                services.tipNotifier.show(
-                    resources.getQuantityString(
-                        R.plurals.outbound_import_success,
-                        imported.size,
-                        imported.size,
-                    ),
-                )
+                val presentation = plan.outcome.toImportResultPresentation(committed = true)
+                if (presentation.showDialog) {
+                    importResultPresentation = presentation
+                } else {
+                    services.tipNotifier.show(
+                        resources.getQuantityString(
+                            R.plurals.outbound_import_success,
+                            plan.outcome.accepted.size,
+                            plan.outcome.accepted.size,
+                        ),
+                    )
+                }
             } else {
                 reportImportFailure(
                     operation = ImportOperation.OUTBOUND,
                     source = source,
                     stage = stage,
                 )
-                services.tipNotifier.show(importFailedMessage)
+                importResultPresentation =
+                    plan.outcome.toImportResultPresentation(committed = false)
             }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
-            services.tipNotifier.showError(
-                error,
-                importFailedMessage,
-                importFailureContext(ImportOperation.OUTBOUND, source, stage),
+            reportImportFailure(
+                operation = ImportOperation.OUTBOUND,
+                source = source,
+                stage = stage,
+            )
+            importResultPresentation = importFailureResultPresentation(
+                error.message ?: importFailedMessage,
             )
         }
     }
@@ -709,6 +733,13 @@ internal fun OutboundListPage(
             pendingDelete = null
         },
     )
+
+    importResultPresentation?.let { presentation ->
+        ImportResultDialog(
+            presentation = presentation,
+            onDismissRequest = { importResultPresentation = null },
+        )
+    }
 }
 
 @Composable
@@ -1314,7 +1345,7 @@ private fun OutboundGroupState.displayName(): String = name
 
 private fun Context.readOutboundImportFile(uri: Uri): String {
     val content = contentResolver.openInputStream(uri)?.use { input ->
-        input.bufferedReader(Charsets.UTF_8).use { reader -> reader.readText() }
+        input.readImportUtf8WithinLimit()
     } ?: error("Unable to open outbound file")
     require(content.isNotBlank()) { "Outbound file is empty" }
     return content

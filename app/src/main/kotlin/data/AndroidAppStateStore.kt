@@ -67,6 +67,19 @@ class AndroidAppStateStore private constructor(
         persist(pendingSave.nextState, pendingSave.revision)
     }
 
+    fun compareAndSet(expected: AppState, updated: AppState): Boolean {
+        var committed = false
+        update { current ->
+            if (current === expected) {
+                committed = true
+                updated
+            } else {
+                current
+            }
+        }
+        return committed
+    }
+
     private fun loadInitialState(): LoadedAppState {
         return runBlocking(Dispatchers.IO) {
             val persistedState = runCatching {
@@ -138,6 +151,7 @@ class AndroidAppStateStore private constructor(
         )
             // Keep committed state in the main DB file for file-based backup tools.
             .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
+            .addMigrations(MIGRATION_1_2)
             .build()
     }
 

@@ -7,6 +7,7 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import app.OutboundGroupState
+import app.OutboundGroupUpdateStatus
 import app.OutboundState
 import app.SingBoxEndpointState
 import app.SingBoxSelectorState
@@ -31,7 +32,17 @@ internal data class OutboundGroupEntity(
     val updateViaProxy: Boolean,
     val ageSecretKey: String,
     val enabled: Boolean,
+    val strictImport: Boolean,
+    val lastUpdateAttemptAtMillis: Long,
     val lastUpdatedAtMillis: Long,
+    val lastUpdateStatus: String,
+    val lastUpdateImportedCount: Int,
+    val lastUpdateSkippedCount: Int,
+    val lastUpdateDuplicateCount: Int,
+    val consecutiveUpdateFailures: Int,
+    val lastUpdateErrorSummary: String,
+    val subscriptionEtag: String,
+    val subscriptionLastModified: String,
 ) {
     fun toState(): OutboundGroupState =
         OutboundGroupState(
@@ -44,7 +55,19 @@ internal data class OutboundGroupEntity(
             updateViaProxy = updateViaProxy,
             ageSecretKey = ageSecretKey,
             enabled = enabled,
+            strictImport = strictImport,
+            lastUpdateAttemptAtMillis = lastUpdateAttemptAtMillis,
             lastUpdatedAtMillis = lastUpdatedAtMillis,
+            lastUpdateStatus = runCatching {
+                OutboundGroupUpdateStatus.valueOf(lastUpdateStatus)
+            }.getOrDefault(OutboundGroupUpdateStatus.NEVER),
+            lastUpdateImportedCount = lastUpdateImportedCount,
+            lastUpdateSkippedCount = lastUpdateSkippedCount,
+            lastUpdateDuplicateCount = lastUpdateDuplicateCount,
+            consecutiveUpdateFailures = consecutiveUpdateFailures,
+            lastUpdateErrorSummary = lastUpdateErrorSummary,
+            subscriptionEtag = subscriptionEtag,
+            subscriptionLastModified = subscriptionLastModified,
         )
 
     companion object {
@@ -60,7 +83,17 @@ internal data class OutboundGroupEntity(
                 updateViaProxy = group.updateViaProxy,
                 ageSecretKey = group.ageSecretKey,
                 enabled = group.enabled,
+                strictImport = group.strictImport,
+                lastUpdateAttemptAtMillis = group.lastUpdateAttemptAtMillis,
                 lastUpdatedAtMillis = group.lastUpdatedAtMillis,
+                lastUpdateStatus = group.lastUpdateStatus.name,
+                lastUpdateImportedCount = group.lastUpdateImportedCount,
+                lastUpdateSkippedCount = group.lastUpdateSkippedCount,
+                lastUpdateDuplicateCount = group.lastUpdateDuplicateCount,
+                consecutiveUpdateFailures = group.consecutiveUpdateFailures,
+                lastUpdateErrorSummary = group.lastUpdateErrorSummary,
+                subscriptionEtag = group.subscriptionEtag,
+                subscriptionLastModified = group.subscriptionLastModified,
             )
     }
 }

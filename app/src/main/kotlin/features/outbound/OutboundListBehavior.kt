@@ -12,6 +12,7 @@ import app.modes.OutboundListSortLatency
 import app.modes.OutboundListSortName
 import app.modes.OutboundListSortType
 import engine.singbox.config.SingBoxJson
+import features.importing.ImportOutcome
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -55,8 +56,8 @@ internal fun outboundListBottomExtraDp(): Int {
 internal fun parseOutboundImportContent(
     content: String,
     jsonFormatter: SingBoxOutboundConfigFormatter = LibboxSingBoxOutboundConfigFormatter,
-): OutboundImportResult {
-    return OutboundImportPipeline.parse(
+): ImportOutcome<ImportedSingBoxOutbound> {
+    return OutboundImportPipeline.parseOutcome(
         content = content,
         jsonFormatter = jsonFormatter,
     )

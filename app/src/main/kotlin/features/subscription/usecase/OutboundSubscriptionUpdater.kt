@@ -1,0 +1,483 @@
+// Copyright 2026, AsteriskBOX contributors
+// SPDX-License-Identifier: GPL-3.0
+
+package features.subscription.usecase
+
+import app.AppState
+import app.OutboundGroupState
+import app.OutboundGroupUpdateStatus
+import features.importing.ImportOutcome
+import features.importing.ImportStage
+import features.importing.sanitizePersistedImportSummary
+import features.outbound.ImportedSingBoxOutbound
+import features.outbound.planOutboundImport
+import app.withRemovedManagedOutboundTags
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+
+internal enum class SubscriptionUpdateTrigger {
+    MANUAL,
+    BATCH,
+    BACKGROUND,
+}
+
+internal sealed interface OutboundSubscriptionUpdateResult {
+    val isSuccessfulCheck: Boolean
+
+    data class Success(
+        val outcome: ImportOutcome<ImportedSingBoxOutbound>,
+    ) : OutboundSubscriptionUpdateResult {
+        override val isSuccessfulCheck: Boolean = true
+    }
+
+    data class Partial(
+        val outcome: ImportOutcome<ImportedSingBoxOutbound>,
+    ) : OutboundSubscriptionUpdateResult {
+        override val isSuccessfulCheck: Boolean = true
+    }
+
+    data object NotModified : OutboundSubscriptionUpdateResult {
+        override val isSuccessfulCheck: Boolean = true
+    }
+
+    data class Failed(
+        val stage: ImportStage,
+        val error: Throwable,
+        val outcome: ImportOutcome<ImportedSingBoxOutbound>? = null,
+    ) : OutboundSubscriptionUpdateResult {
+        override val isSuccessfulCheck: Boolean = false
+    }
+
+    data class DeferredProxy(
+        val backgroundRetry: Boolean,
+    ) : OutboundSubscriptionUpdateResult {
+        override val isSuccessfulCheck: Boolean = false
+    }
+
+    data class Cancelled(
+        val reason: String,
+    ) : OutboundSubscriptionUpdateResult {
+        override val isSuccessfulCheck: Boolean = false
+    }
+}
+
+internal interface SubscriptionStateGateway {
+    fun snapshot(): AppState
+
+    fun compareAndSet(expected: AppState, updated: AppState): Boolean
+}
+
+internal class OutboundSubscriptionUpdater(
+    private val stateGateway: SubscriptionStateGateway,
+    private val prepare: suspend (
+        group: OutboundGroupState,
+        state: AppState,
+    ) -> SubscriptionPreparation,
+    private val parse: (String) -> ImportOutcome<ImportedSingBoxOutbound>,
+    private val validate: suspend (AppState) -> Unit,
+    private val nowMillis: () -> Long = System::currentTimeMillis,
+    private val proxyAvailable: (AppState) -> Boolean = AppState::proxyRunning,
+    private val preparePermits: Semaphore = Semaphore(2),
+    private val validationCommitMutex: Mutex = Mutex(),
+) {
+    private val groupMutexes = ConcurrentHashMap<Int, Mutex>()
+
+    suspend fun update(
+        groupId: Int,
+        trigger: SubscriptionUpdateTrigger,
+        onStage: (ImportStage) -> Unit = {},
+    ): OutboundSubscriptionUpdateResult {
+        val mutex = groupMutexes.computeIfAbsent(groupId) { Mutex() }
+        return mutex.withLock {
+            updateSingleFlight(groupId, trigger, onStage)
+        }
+    }
+
+    private suspend fun updateSingleFlight(
+        groupId: Int,
+        trigger: SubscriptionUpdateTrigger,
+        onStage: (ImportStage) -> Unit,
+    ): OutboundSubscriptionUpdateResult {
+        repeat(MaxFetchAttempts) { fetchAttempt ->
+            val initialState = stateGateway.snapshot()
+            val group = initialState.outboundGroups.firstOrNull { it.id == groupId }
+                ?: return OutboundSubscriptionUpdateResult.Cancelled("Subscription group was deleted")
+            if (trigger == SubscriptionUpdateTrigger.BACKGROUND && !group.enabled) {
+                return OutboundSubscriptionUpdateResult.Cancelled(
+                    "Disabled subscription group was not updated",
+                )
+            }
+            if (group.updateViaProxy && !proxyAvailable(initialState)) {
+                return OutboundSubscriptionUpdateResult.DeferredProxy(
+                    backgroundRetry = trigger == SubscriptionUpdateTrigger.BACKGROUND,
+                )
+            }
+
+            val prepared = try {
+                onStage(ImportStage.DOWNLOAD)
+                preparePermits.withPermit {
+                    prepare(group, initialState)
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                return recordFailure(
+                    groupId = groupId,
+                    trigger = trigger,
+                    stage = ImportStage.DOWNLOAD,
+                    message = error.message ?: "Subscription download failed",
+                )
+            }
+
+            when (prepared) {
+                is SubscriptionPreparation.Failure -> {
+                    return recordFailure(
+                        groupId = groupId,
+                        trigger = trigger,
+                        stage = prepared.stage.toImportStage(),
+                        message = prepared.error.message ?: "Subscription update failed",
+                    )
+                }
+
+                is SubscriptionPreparation.NotModified -> {
+                    val commit = validationCommitMutex.withLock {
+                        commitNotModified(
+                            groupId = groupId,
+                            trigger = trigger,
+                            fetchedGroup = group,
+                        )
+                    }
+                    if (commit === CommitResult.Refetch && fetchAttempt + 1 < MaxFetchAttempts) {
+                        return@repeat
+                    }
+                    return commit.toPublicResult()
+                }
+
+                is SubscriptionPreparation.Success -> {
+                    val outcome = try {
+                        onStage(ImportStage.PARSE)
+                        preparePermits.withPermit {
+                            parse(prepared.content)
+                        }
+                    } catch (error: CancellationException) {
+                        throw error
+                    } catch (error: Throwable) {
+                        return recordFailure(
+                            groupId = groupId,
+                            trigger = trigger,
+                            stage = ImportStage.PARSE,
+                            message = error.message ?: "Subscription parsing failed",
+                        )
+                    }
+                    val commit = validationCommitMutex.withLock {
+                        commitParsed(
+                            groupId = groupId,
+                            trigger = trigger,
+                            fetchedGroup = group,
+                            prepared = prepared,
+                            outcome = outcome,
+                            onStage = onStage,
+                        )
+                    }
+                    if (commit === CommitResult.Refetch && fetchAttempt + 1 < MaxFetchAttempts) {
+                        return@repeat
+                    }
+                    return commit.toPublicResult()
+                }
+            }
+        }
+        return OutboundSubscriptionUpdateResult.Cancelled(
+            "Subscription settings changed during update",
+        )
+    }
+
+    private suspend fun commitNotModified(
+        groupId: Int,
+        trigger: SubscriptionUpdateTrigger,
+        fetchedGroup: OutboundGroupState,
+    ): CommitResult {
+        repeat(MaxCommitAttempts) {
+            val snapshot = stateGateway.snapshot()
+            val currentGroup = snapshot.currentGroupOrCancelled(groupId, trigger)
+                ?: return CommitResult.Cancelled
+            if (currentGroup.fetchIdentity() != fetchedGroup.fetchIdentity()) {
+                return CommitResult.Refetch
+            }
+            val now = nowMillis()
+            val candidate = snapshot.withUpdatedGroup(groupId) { group ->
+                group.copy(
+                    lastUpdateAttemptAtMillis = now,
+                    lastUpdatedAtMillis = now,
+                    lastUpdateStatus = OutboundGroupUpdateStatus.NOT_MODIFIED,
+                    lastUpdateImportedCount = 0,
+                    lastUpdateSkippedCount = 0,
+                    lastUpdateDuplicateCount = 0,
+                    consecutiveUpdateFailures = 0,
+                    lastUpdateErrorSummary = "",
+                )
+            }
+            if (stateGateway.compareAndSet(snapshot, candidate)) {
+                return CommitResult.NotModified
+            }
+        }
+        return CommitResult.Failed(
+            stage = ImportStage.COMMIT,
+            message = StateChangedMessage,
+        )
+    }
+
+    private suspend fun commitParsed(
+        groupId: Int,
+        trigger: SubscriptionUpdateTrigger,
+        fetchedGroup: OutboundGroupState,
+        prepared: SubscriptionPreparation.Success,
+        outcome: ImportOutcome<ImportedSingBoxOutbound>,
+        onStage: (ImportStage) -> Unit,
+    ): CommitResult {
+        repeat(MaxCommitAttempts) {
+            val snapshot = stateGateway.snapshot()
+            val currentGroup = snapshot.currentGroupOrCancelled(groupId, trigger)
+                ?: return CommitResult.Cancelled
+            if (currentGroup.fetchIdentity() != fetchedGroup.fetchIdentity()) {
+                return CommitResult.Refetch
+            }
+            val plan = snapshot.planOutboundImport(
+                groupId = groupId,
+                parsed = outcome,
+                replaceGroup = true,
+                strict = currentGroup.strictImport,
+            )
+            if (!plan.committed) {
+                val message = plan.outcome.issues.lastOrNull()?.message
+                    ?: "No supported proxy outbounds were accepted"
+                val failed = snapshot.failureCandidate(
+                    groupId = groupId,
+                    now = nowMillis(),
+                    message = message,
+                    skippedCount = plan.outcome.skippedCount,
+                    duplicateCount = plan.outcome.duplicateCount,
+                )
+                if (stateGateway.compareAndSet(snapshot, failed)) {
+                    return CommitResult.Failed(
+                        stage = ImportStage.VALIDATE,
+                        message = message,
+                        outcome = plan.outcome,
+                    )
+                }
+                return@repeat
+            }
+
+            val previousTags = snapshot.outbounds
+                .asSequence()
+                .filter { outbound -> outbound.groupId == groupId }
+                .mapTo(mutableSetOf()) { outbound -> outbound.tag }
+            val isPartial = plan.outcome.skippedCount > 0
+            val now = nowMillis()
+            val summary = if (isPartial) {
+                plan.outcome.issues.firstOrNull()?.message.orEmpty()
+            } else {
+                ""
+            }
+            val candidate = plan.state
+                .withRemovedManagedOutboundTags(previousTags)
+                .withUpdatedGroup(groupId) { group ->
+                    group.copy(
+                        lastUpdateAttemptAtMillis = now,
+                        lastUpdatedAtMillis = now,
+                        lastUpdateStatus = if (isPartial) {
+                            OutboundGroupUpdateStatus.PARTIAL
+                        } else {
+                            OutboundGroupUpdateStatus.SUCCESS
+                        },
+                        lastUpdateImportedCount = plan.outcome.accepted.size,
+                        lastUpdateSkippedCount = plan.outcome.skippedCount,
+                        lastUpdateDuplicateCount = plan.outcome.duplicateCount,
+                        consecutiveUpdateFailures = 0,
+                        lastUpdateErrorSummary = sanitizePersistedImportSummary(summary),
+                        subscriptionEtag = prepared.etag,
+                        subscriptionLastModified = prepared.lastModified,
+                    )
+                }
+            try {
+                onStage(ImportStage.VALIDATE)
+                validate(candidate)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                val failed = snapshot.failureCandidate(
+                    groupId = groupId,
+                    now = now,
+                    message = error.message ?: "Subscription validation failed",
+                    skippedCount = plan.outcome.skippedCount,
+                    duplicateCount = plan.outcome.duplicateCount,
+                )
+                if (stateGateway.compareAndSet(snapshot, failed)) {
+                    return CommitResult.Failed(
+                        stage = ImportStage.VALIDATE,
+                        message = error.message ?: "Subscription validation failed",
+                        outcome = plan.outcome,
+                    )
+                }
+                return@repeat
+            }
+            onStage(ImportStage.COMMIT)
+            if (stateGateway.compareAndSet(snapshot, candidate)) {
+                return if (isPartial) {
+                    CommitResult.Partial(plan.outcome)
+                } else {
+                    CommitResult.Success(plan.outcome)
+                }
+            }
+        }
+        return CommitResult.Failed(
+            stage = ImportStage.COMMIT,
+            message = StateChangedMessage,
+            outcome = outcome,
+        )
+    }
+
+    private suspend fun recordFailure(
+        groupId: Int,
+        trigger: SubscriptionUpdateTrigger,
+        stage: ImportStage,
+        message: String,
+        skippedCount: Int = 0,
+        duplicateCount: Int = 0,
+    ): OutboundSubscriptionUpdateResult = validationCommitMutex.withLock {
+        repeat(MaxCommitAttempts) {
+            val snapshot = stateGateway.snapshot()
+            if (snapshot.currentGroupOrCancelled(groupId, trigger) == null) {
+                return@withLock OutboundSubscriptionUpdateResult.Cancelled(
+                    "Subscription group is no longer eligible for update",
+                )
+            }
+            val candidate = snapshot.failureCandidate(
+                groupId = groupId,
+                now = nowMillis(),
+                message = message,
+                skippedCount = skippedCount,
+                duplicateCount = duplicateCount,
+            )
+            if (stateGateway.compareAndSet(snapshot, candidate)) {
+                val summary = sanitizePersistedImportSummary(message)
+                return@withLock OutboundSubscriptionUpdateResult.Failed(
+                    stage = stage,
+                    error = IllegalStateException(summary),
+                )
+            }
+        }
+        OutboundSubscriptionUpdateResult.Failed(
+            stage = ImportStage.COMMIT,
+            error = IllegalStateException(StateChangedMessage),
+        )
+    }
+
+    private fun AppState.currentGroupOrCancelled(
+        groupId: Int,
+        trigger: SubscriptionUpdateTrigger,
+    ): OutboundGroupState? {
+        val group = outboundGroups.firstOrNull { it.id == groupId } ?: return null
+        if (trigger == SubscriptionUpdateTrigger.BACKGROUND && !group.enabled) return null
+        return group
+    }
+
+    private fun AppState.withUpdatedGroup(
+        groupId: Int,
+        transform: (OutboundGroupState) -> OutboundGroupState,
+    ): AppState = copy(
+        outboundGroups = outboundGroups.map { group ->
+            if (group.id == groupId) transform(group) else group
+        },
+    )
+
+    private fun AppState.failureCandidate(
+        groupId: Int,
+        now: Long,
+        message: String,
+        skippedCount: Int,
+        duplicateCount: Int,
+    ): AppState = withUpdatedGroup(groupId) { group ->
+        group.copy(
+            lastUpdateAttemptAtMillis = now,
+            lastUpdateStatus = OutboundGroupUpdateStatus.FAILED,
+            lastUpdateImportedCount = 0,
+            lastUpdateSkippedCount = skippedCount,
+            lastUpdateDuplicateCount = duplicateCount,
+            consecutiveUpdateFailures = group.consecutiveUpdateFailures + 1,
+            lastUpdateErrorSummary = sanitizePersistedImportSummary(message),
+        )
+    }
+
+    private fun OutboundGroupState.fetchIdentity(): FetchIdentity = FetchIdentity(
+        url = url,
+        userAgent = userAgent,
+        hwid = hwid,
+        updateViaProxy = updateViaProxy,
+        ageSecretKey = ageSecretKey,
+        etag = subscriptionEtag,
+        lastModified = subscriptionLastModified,
+    )
+
+    private fun SubscriptionSyncStage.toImportStage(): ImportStage = when (this) {
+        SubscriptionSyncStage.Downloading -> ImportStage.DOWNLOAD
+        SubscriptionSyncStage.Decrypting -> ImportStage.DECRYPT
+        SubscriptionSyncStage.Verifying -> ImportStage.VALIDATE
+    }
+
+    private sealed interface CommitResult {
+        data class Success(
+            val outcome: ImportOutcome<ImportedSingBoxOutbound>,
+        ) : CommitResult
+
+        data class Partial(
+            val outcome: ImportOutcome<ImportedSingBoxOutbound>,
+        ) : CommitResult
+
+        data object NotModified : CommitResult
+        data object Refetch : CommitResult
+        data object Cancelled : CommitResult
+
+        data class Failed(
+            val stage: ImportStage,
+            val message: String,
+            val outcome: ImportOutcome<ImportedSingBoxOutbound>? = null,
+        ) : CommitResult
+    }
+
+    private fun CommitResult.toPublicResult(): OutboundSubscriptionUpdateResult = when (this) {
+        is CommitResult.Success -> OutboundSubscriptionUpdateResult.Success(outcome)
+        is CommitResult.Partial -> OutboundSubscriptionUpdateResult.Partial(outcome)
+        CommitResult.NotModified -> OutboundSubscriptionUpdateResult.NotModified
+        CommitResult.Refetch -> OutboundSubscriptionUpdateResult.Cancelled(
+            "Subscription settings changed during update",
+        )
+        CommitResult.Cancelled -> OutboundSubscriptionUpdateResult.Cancelled(
+            "Subscription group is no longer eligible for update",
+        )
+        is CommitResult.Failed -> OutboundSubscriptionUpdateResult.Failed(
+            stage = stage,
+            error = IllegalStateException(sanitizePersistedImportSummary(message)),
+            outcome = outcome,
+        )
+    }
+
+    private data class FetchIdentity(
+        val url: String,
+        val userAgent: String,
+        val hwid: String,
+        val updateViaProxy: Boolean,
+        val ageSecretKey: String,
+        val etag: String,
+        val lastModified: String,
+    )
+
+    private companion object {
+        const val MaxFetchAttempts = 2
+        const val MaxCommitAttempts = 2
+        const val StateChangedMessage = "Application state changed during subscription update"
+    }
+}

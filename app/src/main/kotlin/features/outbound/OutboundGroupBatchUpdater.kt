@@ -5,6 +5,7 @@ package features.outbound
 
 import app.OutboundGroupState
 import features.importing.ImportStage
+import features.importing.ImportResultPresentation
 import kotlinx.coroutines.CancellationException
 
 internal sealed interface OutboundGroupUpdateResult {
@@ -12,6 +13,8 @@ internal sealed interface OutboundGroupUpdateResult {
 
     data class Success(
         val outboundCount: Int,
+        val presentation: ImportResultPresentation? = null,
+        val notModified: Boolean = false,
     ) : OutboundGroupUpdateResult {
         override val isSuccess: Boolean = true
     }
@@ -19,6 +22,7 @@ internal sealed interface OutboundGroupUpdateResult {
     data class Failure(
         val stage: ImportStage,
         val error: Throwable,
+        val presentation: ImportResultPresentation? = null,
     ) : OutboundGroupUpdateResult {
         override val isSuccess: Boolean = false
     }

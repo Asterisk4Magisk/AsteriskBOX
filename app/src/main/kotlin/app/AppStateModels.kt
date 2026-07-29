@@ -37,6 +37,15 @@ data class SubscriptionInfo(
 }
 
 @Stable
+enum class OutboundGroupUpdateStatus {
+    NEVER,
+    SUCCESS,
+    PARTIAL,
+    NOT_MODIFIED,
+    FAILED,
+}
+
+@Stable
 data class OutboundGroupState(
     val id: Int,
     val name: String,
@@ -47,7 +56,17 @@ data class OutboundGroupState(
     val updateViaProxy: Boolean = false,
     val ageSecretKey: String = "",
     val enabled: Boolean = true,
+    val strictImport: Boolean = false,
+    val lastUpdateAttemptAtMillis: Long = 0L,
     val lastUpdatedAtMillis: Long = 0L,
+    val lastUpdateStatus: OutboundGroupUpdateStatus = OutboundGroupUpdateStatus.NEVER,
+    val lastUpdateImportedCount: Int = 0,
+    val lastUpdateSkippedCount: Int = 0,
+    val lastUpdateDuplicateCount: Int = 0,
+    val consecutiveUpdateFailures: Int = 0,
+    val lastUpdateErrorSummary: String = "",
+    val subscriptionEtag: String = "",
+    val subscriptionLastModified: String = "",
 )
 
 @Stable

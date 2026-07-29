@@ -14,6 +14,17 @@ import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.config.SingBoxDeprecatedConfigValidator
 import engine.singbox.config.SingBoxJson
 import engine.singbox.config.parseSingBoxJson
+import features.importing.ImportIssue
+import features.importing.ImportIssueReason
+import features.importing.ImportIssueSeverity
+import features.importing.IndexedImportCandidate
+import features.importing.ImportMutation
+import features.importing.ImportMutationCode
+import features.importing.ImportOutcome
+import features.importing.ImportStage
+import features.importing.deduplicateImportCandidates
+import features.importing.importFingerprint
+import features.importing.requireImportCandidateCount
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -23,6 +34,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 internal data class ImportedSingBoxOutbound(
+    val sourceIndex: Int? = null,
     val sourceTag: String = "",
     val remarks: String,
     val type: String,
@@ -49,24 +61,112 @@ internal object SingBoxOutboundImporter {
         content: String,
         formatter: SingBoxOutboundConfigFormatter = LibboxSingBoxOutboundConfigFormatter,
     ): List<ImportedSingBoxOutbound> {
-        if (content.isBlank()) {
-            throw IllegalArgumentException("Outbound import content is empty")
+        val outcome = parseImportOutcome(content, formatter)
+        if (outcome.accepted.isEmpty()) {
+            throw IllegalArgumentException(
+                outcome.issues.firstOrNull()?.message ?: "No supported proxy outbounds found",
+            )
         }
-        return when (val element = SingBoxJson.parseToJsonElement(content)) {
+        return outcome.accepted
+    }
+
+    fun parseImportOutcome(
+        content: String,
+        formatter: SingBoxOutboundConfigFormatter = LibboxSingBoxOutboundConfigFormatter,
+    ): ImportOutcome<ImportedSingBoxOutbound> {
+        require(content.isNotBlank()) { "Outbound import content is empty" }
+        val element = SingBoxJson.parseToJsonElement(content)
+        val mutations = mutableListOf<ImportMutation>()
+        val outbounds = when (element) {
             is JsonObject -> {
                 if ("outbounds" in element) {
-                    val outbounds = element["outbounds"] as? JsonArray
+                    element.keys
+                        .filterNot { key -> key == "outbounds" }
+                        .forEach {
+                            mutations += ImportMutation(
+                                code = ImportMutationCode.IGNORED_SECTION,
+                                message = "Ignored a top-level sing-box section",
+                            )
+                        }
+                    element["outbounds"] as? JsonArray
                         ?: throw IllegalArgumentException(
                             "sing-box configuration must contain an outbounds array",
                         )
-                    parseRawOutboundArray(outbounds, formatter)
                 } else {
-                    parseRawOutboundArray(JsonArray(listOf(element)), formatter)
+                    JsonArray(listOf(element))
                 }
             }
-            is JsonArray -> parseRawOutboundArray(element, formatter)
+            is JsonArray -> element
             else -> throw IllegalArgumentException("Outbound import must be a JSON object or array")
         }
+        val issues = mutableListOf<ImportIssue>()
+        try {
+            requireImportCandidateCount(outbounds.size)
+        } catch (_: IllegalArgumentException) {
+            return ImportOutcome(
+                format = OutboundImportFormat.JSON,
+                detectedCount = outbounds.size,
+                accepted = emptyList(),
+                issues = listOf(
+                    ImportIssue(
+                        reason = ImportIssueReason.TOO_MANY_CANDIDATES,
+                        severity = ImportIssueSeverity.ERROR,
+                        stage = ImportStage.PARSE,
+                        message = "Import contains too many outbound candidates",
+                    ),
+                ),
+                mutations = mutations,
+            )
+        }
+        val accepted = outbounds.mapIndexedNotNull { index, item ->
+            val outbound = item as? JsonObject
+            if (outbound == null) {
+                issues += rejectedJsonOutbound(
+                    reason = ImportIssueReason.INVALID_ENTRY,
+                    sourceIndex = index,
+                    message = "Outbound entry must be a JSON object",
+                )
+                return@mapIndexedNotNull null
+            }
+            val type = outbound.stringField("type")
+            if (type.isNullOrBlank()) {
+                issues += rejectedJsonOutbound(
+                    reason = ImportIssueReason.INVALID_FIELD,
+                    sourceIndex = index,
+                    message = "Outbound entry has no type",
+                )
+                return@mapIndexedNotNull null
+            }
+            if (type !in SupportedSingBoxProxyOutboundTypes) {
+                issues += rejectedJsonOutbound(
+                    reason = ImportIssueReason.UNSUPPORTED_TYPE,
+                    sourceIndex = index,
+                    detectedType = type,
+                    message = "Outbound type is not supported",
+                )
+                return@mapIndexedNotNull null
+            }
+            runCatching {
+                parseRawOutboundArray(JsonArray(listOf(outbound)), formatter)
+                    .single()
+                    .copy(sourceIndex = index)
+            }.getOrElse {
+                issues += rejectedJsonOutbound(
+                    reason = ImportIssueReason.INVALID_ENTRY,
+                    sourceIndex = index,
+                    detectedType = type,
+                    message = "Outbound entry could not be normalized",
+                )
+                null
+            }
+        }
+        return ImportOutcome(
+            format = OutboundImportFormat.JSON,
+            detectedCount = outbounds.size,
+            accepted = accepted,
+            issues = issues,
+            mutations = mutations,
+        )
     }
 
     fun parsePreparedOutbounds(
@@ -132,6 +232,7 @@ internal object SingBoxOutboundImporter {
                 ?.takeIf(String::isNotBlank)
                 ?: "$type-${sourceIndex + 1}"
             ImportedSingBoxOutbound(
+                sourceIndex = sourceIndex,
                 sourceTag = tag,
                 remarks = remarks,
                 type = type,
@@ -164,6 +265,20 @@ internal object SingBoxOutboundImporter {
         return candidates
     }
 }
+
+private fun rejectedJsonOutbound(
+    reason: ImportIssueReason,
+    sourceIndex: Int,
+    message: String,
+    detectedType: String? = null,
+): ImportIssue = ImportIssue(
+    reason = reason,
+    severity = ImportIssueSeverity.ERROR,
+    stage = ImportStage.PARSE,
+    sourceIndex = sourceIndex,
+    detectedType = detectedType,
+    message = message,
+)
 
 internal fun createManualOutbound(
     type: String,
@@ -332,6 +447,173 @@ internal fun AppState.withImportedOutbounds(
         .mapTo(mutableSetOf(), OutboundState::tag)
     return updated.withRemovedManagedOutboundTags(removedTags)
 }
+
+internal data class OutboundImportPlan(
+    val state: AppState,
+    val outcome: ImportOutcome<ImportedSingBoxOutbound>,
+    val committed: Boolean,
+)
+
+internal fun AppState.planOutboundImport(
+    groupId: Int,
+    parsed: ImportOutcome<ImportedSingBoxOutbound>,
+    replaceGroup: Boolean,
+    strict: Boolean,
+): OutboundImportPlan {
+    require(outboundGroups.any { group -> group.id == groupId }) {
+        "Outbound group does not exist: $groupId"
+    }
+    val existingFingerprints = if (replaceGroup) {
+        emptySet()
+    } else {
+        outbounds
+            .asSequence()
+            .filter { outbound -> outbound.groupId == groupId }
+            .map { outbound ->
+                importFingerprint(
+                    type = outbound.type,
+                    remarks = outbound.remarks,
+                    json = outbound.json,
+                )
+            }
+            .toSet()
+    }
+    val deduplicated = deduplicateImportCandidates(
+        candidates = parsed.accepted.map { outbound ->
+            IndexedImportCandidate(
+                sourceIndex = outbound.sourceIndex,
+                value = outbound,
+            )
+        },
+        existingFingerprints = existingFingerprints,
+    ) { outbound ->
+        importFingerprint(
+            type = outbound.type,
+            remarks = outbound.remarks,
+            json = outbound.json,
+        )
+    }
+    val duplicateCount = parsed.duplicateCount + deduplicated.duplicateCount
+    val baseMutations = parsed.mutations + deduplicated.mutations
+    val preliminaryOutcome = ImportOutcome(
+        format = parsed.format,
+        detectedCount = parsed.detectedCount,
+        accepted = deduplicated.accepted,
+        duplicateCount = duplicateCount,
+        issues = parsed.issues,
+        mutations = baseMutations,
+        priorOmittedDetailCount = parsed.omittedDetailCount,
+    )
+
+    if (replaceGroup && strict && preliminaryOutcome.skippedCount > 0) {
+        return OutboundImportPlan(
+            state = this,
+            outcome = ImportOutcome(
+                format = preliminaryOutcome.format,
+                detectedCount = preliminaryOutcome.detectedCount,
+                accepted = preliminaryOutcome.accepted,
+                duplicateCount = preliminaryOutcome.duplicateCount,
+                issues = preliminaryOutcome.issues + ImportIssue(
+                    reason = ImportIssueReason.STRICT_MODE_REJECTED,
+                    severity = ImportIssueSeverity.ERROR,
+                    stage = ImportStage.VALIDATE,
+                    message =
+                        "Strict import rejected invalid entries; the previous subscription was preserved",
+                ),
+                mutations = preliminaryOutcome.mutations,
+                priorOmittedDetailCount = preliminaryOutcome.omittedDetailCount,
+            ),
+            committed = false,
+        )
+    }
+    if (preliminaryOutcome.accepted.isEmpty()) {
+        val needsNoSupportedIssue =
+            preliminaryOutcome.skippedCount > 0 &&
+                preliminaryOutcome.issues.none { issue ->
+                    issue.reason == ImportIssueReason.NO_SUPPORTED_ITEMS
+                }
+        return OutboundImportPlan(
+            state = this,
+            outcome = if (needsNoSupportedIssue) {
+                ImportOutcome(
+                    format = preliminaryOutcome.format,
+                    detectedCount = preliminaryOutcome.detectedCount,
+                    accepted = preliminaryOutcome.accepted,
+                    duplicateCount = preliminaryOutcome.duplicateCount,
+                    issues = preliminaryOutcome.issues + ImportIssue(
+                        reason = ImportIssueReason.NO_SUPPORTED_ITEMS,
+                        severity = ImportIssueSeverity.ERROR,
+                        stage = ImportStage.VALIDATE,
+                        message = "No supported outbound candidates were accepted",
+                    ),
+                    mutations = preliminaryOutcome.mutations,
+                    priorOmittedDetailCount = preliminaryOutcome.omittedDetailCount,
+                )
+            } else {
+                preliminaryOutcome
+            },
+            committed = false,
+        )
+    }
+
+    val appliedState = withImportedOutbounds(
+        groupId = groupId,
+        imported = preliminaryOutcome.accepted,
+        replaceGroup = replaceGroup,
+    )
+    val storedAdditions = appliedState.outbounds.takeLast(preliminaryOutcome.accepted.size)
+    val referenceMutations = preliminaryOutcome.accepted.zip(storedAdditions)
+        .flatMap { (source, stored) ->
+            removedManagedReferenceMutations(source, stored)
+        }
+    return OutboundImportPlan(
+        state = appliedState,
+        outcome = ImportOutcome(
+            format = preliminaryOutcome.format,
+            detectedCount = preliminaryOutcome.detectedCount,
+            accepted = preliminaryOutcome.accepted,
+            duplicateCount = preliminaryOutcome.duplicateCount,
+            issues = preliminaryOutcome.issues,
+            mutations = preliminaryOutcome.mutations + referenceMutations,
+            priorOmittedDetailCount = preliminaryOutcome.omittedDetailCount,
+        ),
+        committed = true,
+    )
+}
+
+private fun removedManagedReferenceMutations(
+    imported: ImportedSingBoxOutbound,
+    stored: OutboundState,
+): List<ImportMutation> {
+    val source = SingBoxJson.parseToJsonElement(imported.json) as? JsonObject ?: return emptyList()
+    val normalized = SingBoxJson.parseToJsonElement(stored.json) as? JsonObject ?: return emptyList()
+    return buildList {
+        if (source.hasNonBlankString("detour") && !normalized.hasNonBlankString("detour")) {
+            add(
+                ImportMutation(
+                    code = ImportMutationCode.REMOVED_DETOUR,
+                    sourceIndex = imported.sourceIndex,
+                    message = "Removed an unresolved outbound detour",
+                ),
+            )
+        }
+        if (
+            source.hasNonBlankString("domain_resolver") &&
+            !normalized.hasNonBlankString("domain_resolver")
+        ) {
+            add(
+                ImportMutation(
+                    code = ImportMutationCode.REMOVED_DOMAIN_RESOLVER,
+                    sourceIndex = imported.sourceIndex,
+                    message = "Removed an unresolved domain resolver",
+                ),
+            )
+        }
+    }
+}
+
+private fun JsonObject.hasNonBlankString(name: String): Boolean =
+    (get(name) as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true
 
 private fun JsonObject.stringField(name: String): String? =
     (get(name) as? JsonPrimitive)?.contentOrNull

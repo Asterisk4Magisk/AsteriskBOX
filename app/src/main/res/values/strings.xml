@@ -47,6 +47,7 @@
     <string name="common_false">False</string>
     <string name="common_search">Search</string>
     <string name="common_retry">Retry</string>
+    <string name="common_close">Close</string>
     <string name="common_all">All</string>
     <string name="common_save">Save</string>
     <string name="common_add">Add</string>
@@ -605,15 +606,26 @@
     <string name="outbound_group_custom_user_agent">Custom User-Agent</string>
     <string name="outbound_group_update_interval">Update interval (hours, optional)</string>
     <string name="outbound_group_update_interval_value">Every %1$s h</string>
-    <string name="outbound_group_update_interval_invalid">Enter a positive number of hours or leave empty</string>
+    <string name="outbound_group_update_interval_invalid">Enter at least 0.25 hours, or leave empty</string>
     <string name="outbound_group_update_via_proxy">Update through the running proxy</string>
+    <string name="outbound_group_strict_import">Strict import</string>
+    <string name="outbound_group_strict_import_summary">Keep existing nodes if any subscription entry is invalid</string>
     <string name="outbound_group_age_secret_key">Mihomo Age secret key</string>
+    <string name="outbound_group_status_never">Never checked</string>
+    <string name="outbound_group_status_success">Success</string>
+    <string name="outbound_group_status_partial">Partial</string>
+    <string name="outbound_group_status_not_modified">Not modified</string>
+    <string name="outbound_group_status_failed">Failed</string>
+    <string name="outbound_group_status_details">%1$s · Checked %2$s · Imported %3$d, skipped %4$d, duplicate %5$d</string>
     <string name="outbound_group_http_warning">This subscription uses unencrypted HTTP. HTTPS is recommended.</string>
     <string name="outbound_group_delete_title">Delete group?</string>
     <string name="outbound_group_delete_message">The group “%1$s” and all of its outbounds will be permanently deleted.</string>
     <string name="outbound_group_sync_failed">Unable to update group</string>
     <string name="outbound_group_sync_all">Update all group subscriptions</string>
     <string name="outbound_group_sync_all_progress_title">Updating group subscriptions</string>
+    <string name="outbound_group_sync_all_result_title">Subscription update results</string>
+    <string name="outbound_group_sync_all_result_failed">Update failed</string>
+    <string name="outbound_group_sync_not_modified">Subscription is already up to date</string>
     <string name="outbound_group_sync_all_progress">%1$d / %2$d</string>
     <string name="outbound_group_sync_stage_downloading">Downloading subscription</string>
     <string name="outbound_group_sync_stage_decrypting">Decrypting subscription</string>
@@ -621,8 +633,6 @@
     <string name="outbound_group_sync_stage_parsing">Parsing outbounds</string>
     <string name="outbound_group_sync_stage_validating">Validating configuration</string>
     <string name="outbound_group_sync_stage_committing">Saving updates</string>
-    <string name="outbound_group_sync_all_success">Updated subscriptions: %1$d</string>
-    <string name="outbound_group_sync_all_partial">Updated: %1$d; failed: %2$d</string>
     <string name="outbound_group_sync_all_cancelled">Update cancelled: updated %1$d; failed %2$d; skipped %3$d</string>
     <string name="outbound_management">Outbound management</string>
     <plurals name="outbound_count">
@@ -641,6 +651,17 @@
     </plurals>
     <string name="outbound_import_failed">Unable to import outbounds</string>
     <string name="outbound_import_empty_clipboard">Clipboard is empty</string>
+    <string name="import_result_success_title">Import complete</string>
+    <string name="import_result_partial_title">Import partially complete</string>
+    <string name="import_result_details_title">Import complete with details</string>
+    <string name="import_result_duplicates_title">No new items</string>
+    <string name="import_result_failure_title">Import not applied</string>
+    <string name="import_result_summary">Imported: %1$d · Skipped: %2$d · Duplicates: %3$d</string>
+    <string name="import_result_entry_prefix">Entry %1$d: </string>
+    <plurals name="import_result_omitted_details">
+        <item quantity="one">%1$d more detail omitted</item>
+        <item quantity="other">%1$d more details omitted</item>
+    </plurals>
     <string name="outbound_manual_add">Add outbound</string>
     <string name="outbound_manual_edit">Edit outbound</string>
     <string name="outbound_remarks">Remarks</string>
@@ -745,11 +766,14 @@
     <string name="endpoint_add">Add endpoint</string>
     <string name="endpoint_import_clipboard">Import from clipboard</string>
     <string name="endpoint_import_file">Import file</string>
+    <string name="endpoint_import_formats_summary">sing-box JSON, WireGuard, OpenVPN, or OpenConnect</string>
+    <string name="endpoint_import_safety_summary">Unsafe or external directives are rejected</string>
     <plurals name="endpoint_import_success">
         <item quantity="one">Imported %1$d endpoint</item>
         <item quantity="other">Imported %1$d endpoints</item>
     </plurals>
     <string name="endpoint_import_failed">Unable to import endpoints</string>
+    <string name="endpoint_import_state_changed">Settings changed during import; nothing was applied</string>
     <string name="endpoint_import_empty_clipboard">Clipboard is empty</string>
     <string name="endpoint_search">Search remarks or endpoint type</string>
     <string name="endpoint_empty">No managed endpoints</string>

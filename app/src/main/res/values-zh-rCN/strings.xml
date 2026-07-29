@@ -47,6 +47,7 @@
     <string name="common_false">否</string>
     <string name="common_search">搜索</string>
     <string name="common_retry">重试</string>
+    <string name="common_close">关闭</string>
     <string name="common_all">全部</string>
     <string name="common_save">保存</string>
     <string name="common_add">添加</string>
@@ -598,15 +599,26 @@
     <string name="outbound_group_custom_user_agent">自定义 User-Agent</string>
     <string name="outbound_group_update_interval">更新间隔（小时，可选）</string>
     <string name="outbound_group_update_interval_value">每 %1$s 小时</string>
-    <string name="outbound_group_update_interval_invalid">请输入正数小时或留空</string>
+    <string name="outbound_group_update_interval_invalid">请输入不少于 0.25 小时的数值，或留空</string>
     <string name="outbound_group_update_via_proxy">通过当前运行的代理更新</string>
+    <string name="outbound_group_strict_import">严格导入</string>
+    <string name="outbound_group_strict_import_summary">订阅中任一条目无效时保留现有节点</string>
     <string name="outbound_group_age_secret_key">Mihomo Age 私钥</string>
+    <string name="outbound_group_status_never">尚未检查</string>
+    <string name="outbound_group_status_success">成功</string>
+    <string name="outbound_group_status_partial">部分成功</string>
+    <string name="outbound_group_status_not_modified">未修改</string>
+    <string name="outbound_group_status_failed">失败</string>
+    <string name="outbound_group_status_details">%1$s · 检查于 %2$s · 导入 %3$d，跳过 %4$d，重复 %5$d</string>
     <string name="outbound_group_http_warning">该订阅使用未加密的 HTTP，建议改用 HTTPS。</string>
     <string name="outbound_group_delete_title">删除分组？</string>
     <string name="outbound_group_delete_message">分组“%1$s”及其中的所有出站将被永久删除。</string>
     <string name="outbound_group_sync_failed">分组更新失败</string>
     <string name="outbound_group_sync_all">更新全部分组订阅</string>
     <string name="outbound_group_sync_all_progress_title">正在更新分组订阅</string>
+    <string name="outbound_group_sync_all_result_title">订阅更新结果</string>
+    <string name="outbound_group_sync_all_result_failed">更新失败</string>
+    <string name="outbound_group_sync_not_modified">订阅已是最新</string>
     <string name="outbound_group_sync_all_progress">第 %1$d / %2$d 个</string>
     <string name="outbound_group_sync_stage_downloading">正在下载订阅</string>
     <string name="outbound_group_sync_stage_decrypting">正在解密订阅</string>
@@ -614,8 +626,6 @@
     <string name="outbound_group_sync_stage_parsing">正在解析出站</string>
     <string name="outbound_group_sync_stage_validating">正在校验配置</string>
     <string name="outbound_group_sync_stage_committing">正在保存更新</string>
-    <string name="outbound_group_sync_all_success">已更新订阅：%1$d 个</string>
-    <string name="outbound_group_sync_all_partial">已更新：%1$d 个；失败：%2$d 个</string>
     <string name="outbound_group_sync_all_cancelled">已取消更新：成功 %1$d 个；失败 %2$d 个；跳过 %3$d 个</string>
     <string name="outbound_management">出站管理</string>
     <plurals name="outbound_count">
@@ -632,6 +642,16 @@
     </plurals>
     <string name="outbound_import_failed">出站导入失败</string>
     <string name="outbound_import_empty_clipboard">剪切板为空</string>
+    <string name="import_result_success_title">导入完成</string>
+    <string name="import_result_partial_title">部分导入完成</string>
+    <string name="import_result_details_title">导入完成，存在详情</string>
+    <string name="import_result_duplicates_title">没有新增项目</string>
+    <string name="import_result_failure_title">未应用导入</string>
+    <string name="import_result_summary">已导入：%1$d · 已跳过：%2$d · 重复：%3$d</string>
+    <string name="import_result_entry_prefix">第 %1$d 项：</string>
+    <plurals name="import_result_omitted_details">
+        <item quantity="other">另有 %1$d 条详情未显示</item>
+    </plurals>
     <string name="outbound_manual_add">添加出站</string>
     <string name="outbound_manual_edit">编辑出站</string>
     <string name="outbound_remarks">别名</string>
@@ -732,10 +752,13 @@
     <string name="endpoint_add">添加端点</string>
     <string name="endpoint_import_clipboard">从剪切板导入</string>
     <string name="endpoint_import_file">从文件导入</string>
+    <string name="endpoint_import_formats_summary">sing-box JSON、WireGuard、OpenVPN 或 OpenConnect</string>
+    <string name="endpoint_import_safety_summary">不安全或引用外部文件的指令将被拒绝</string>
     <plurals name="endpoint_import_success">
         <item quantity="other">已导入 %1$d 个端点</item>
     </plurals>
     <string name="endpoint_import_failed">端点导入失败</string>
+    <string name="endpoint_import_state_changed">导入期间设置已变化，未应用任何内容</string>
     <string name="endpoint_import_empty_clipboard">剪切板为空</string>
     <string name="endpoint_search">搜索别名或端点类型</string>
     <string name="endpoint_empty">暂无托管端点</string>

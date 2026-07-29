@@ -22,7 +22,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -61,29 +63,33 @@ import app.LocalIsWideScreen
 import app.LocalNavigator
 import app.LocalUpdateAppState
 import app.OutboundGroupState
+import app.OutboundGroupUpdateStatus
 import app.collectAppState
 import app.managedOutboundGroupSelectorTag
 import app.nextAvailableOutboundGroupId
 import app.withRemovedManagedOutboundTags
-import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.importing.ImportOperation
+import features.importing.ImportResultDetail
+import features.importing.ImportResultDialog
+import features.importing.ImportResultPresentation
 import features.importing.ImportSource
 import features.importing.ImportStage
-import features.importing.importFailureContext
+import features.importing.importFailureResultPresentation
 import features.importing.reportImportFailure
+import features.importing.sanitizeImportMessage
+import features.importing.toImportResultPresentation
 import features.settings.SettingsDropdownRow
 import features.settings.SettingsSwitchRow
+import features.subscription.SubscriptionSchedule
 import features.subscription.SubscriptionUserAgentOption
 import features.subscription.SubscriptionUserAgentOptions
+import features.subscription.parseSubscriptionSchedule
 import features.subscription.resolveUserAgent
-import features.subscription.runtime.toSubscriptionFetchOptions
 import features.subscription.subscriptionUserAgentOptionFor
-import features.subscription.usecase.SubscriptionPreparation
-import features.subscription.usecase.SubscriptionSyncStage
-import features.subscription.usecase.prepareSubscription
+import features.subscription.usecase.OutboundSubscriptionUpdateResult
+import features.subscription.usecase.SubscriptionUpdateTrigger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
@@ -121,6 +127,12 @@ internal fun OutboundGroupListPage(
     var batchSyncJob by remember { mutableStateOf<Job?>(null) }
     var batchSyncProgress by remember { mutableStateOf<OutboundGroupBatchProgress?>(null) }
     var batchSyncCancelling by remember { mutableStateOf(false) }
+    var batchSyncResults by remember {
+        mutableStateOf<List<OutboundGroupBatchEntryPresentation>?>(null)
+    }
+    var importResultPresentation by remember {
+        mutableStateOf<ImportResultPresentation?>(null)
+    }
     val importFailedMessage = stringResource(R.string.outbound_group_sync_failed)
     val subscriptionGroups = appState.outboundGroups.outboundSubscriptionGroups()
 
@@ -169,91 +181,49 @@ internal fun OutboundGroupListPage(
 
     suspend fun updateGroupSubscription(
         requestedGroup: OutboundGroupState,
+        trigger: SubscriptionUpdateTrigger = SubscriptionUpdateTrigger.MANUAL,
         onStage: (ImportStage) -> Unit = {},
     ): OutboundGroupUpdateResult {
-        var stage = ImportStage.DOWNLOAD
-        fun advance(nextStage: ImportStage) {
-            stage = nextStage
-            onStage(nextStage)
-        }
-
-        return try {
-            val snapshot = stateStore.state.value
-            val group = snapshot.outboundGroups.firstOrNull { it.id == requestedGroup.id }
-                ?: return OutboundGroupUpdateResult.Failure(
-                    stage = ImportStage.COMMIT,
-                    error = IllegalStateException("Outbound group no longer exists"),
+        return when (
+            val result = services.outboundSubscriptionUpdater.update(
+                groupId = requestedGroup.id,
+                trigger = trigger,
+                onStage = onStage,
+            )
+        ) {
+            is OutboundSubscriptionUpdateResult.Success ->
+                OutboundGroupUpdateResult.Success(
+                    outboundCount = result.outcome.accepted.size,
+                    presentation = result.outcome.toImportResultPresentation(committed = true),
                 )
-            advance(ImportStage.DOWNLOAD)
-            when (
-                val preparation = prepareSubscription(
-                    sourceUrl = group.url,
-                    userAgent = group.userAgent,
-                    ageSecretKey = group.ageSecretKey,
-                    localContent = null,
-                    subscriptionPreparer = services.subscriptionPreparer,
-                    fetchOptions = snapshot.toSubscriptionFetchOptions(
-                        useRunningProxy = group.updateViaProxy,
-                        hwid = group.hwid,
+            is OutboundSubscriptionUpdateResult.Partial ->
+                OutboundGroupUpdateResult.Success(
+                    outboundCount = result.outcome.accepted.size,
+                    presentation = result.outcome.toImportResultPresentation(committed = true),
+                )
+            OutboundSubscriptionUpdateResult.NotModified ->
+                OutboundGroupUpdateResult.Success(
+                    outboundCount = 0,
+                    notModified = true,
+                )
+            is OutboundSubscriptionUpdateResult.Failed ->
+                OutboundGroupUpdateResult.Failure(
+                    stage = result.stage,
+                    error = result.error,
+                    presentation = result.outcome?.toImportResultPresentation(committed = false),
+                )
+            is OutboundSubscriptionUpdateResult.DeferredProxy ->
+                OutboundGroupUpdateResult.Failure(
+                    stage = ImportStage.DOWNLOAD,
+                    error = IllegalStateException(
+                        "The local proxy must be running before this subscription can update",
                     ),
-                    verifyConfiguration = false,
-                    onStage = { syncStage -> advance(syncStage.toImportStage()) },
                 )
-            ) {
-                is SubscriptionPreparation.Success -> {
-                    advance(ImportStage.PARSE)
-                    val importResult = withContext(Dispatchers.Default) {
-                        parseOutboundImportContent(preparation.content)
-                    }
-                    val previousTags = snapshot.outbounds
-                        .filter { outbound -> outbound.groupId == group.id }
-                        .mapTo(mutableSetOf()) { outbound -> outbound.tag }
-                    val importedState = snapshot.withImportedOutbounds(
-                        groupId = group.id,
-                        imported = importResult.outbounds,
-                        replaceGroup = true,
-                    )
-                    val candidateState = importedState.copy(
-                        outboundGroups = importedState.outboundGroups.map { item ->
-                            if (item.id == group.id) {
-                                item.copy(lastUpdatedAtMillis = System.currentTimeMillis())
-                            } else {
-                                item
-                            }
-                        },
-                    ).withRemovedManagedOutboundTags(previousTags)
-                    advance(ImportStage.VALIDATE)
-                    withContext(Dispatchers.IO) {
-                        validateSingBoxRuntimeConfiguration(context, candidateState)
-                    }
-                    advance(ImportStage.COMMIT)
-                    var committed = false
-                    updateAppState { state ->
-                        if (state === snapshot) {
-                            committed = true
-                            candidateState
-                        } else {
-                            state
-                        }
-                    }
-                    if (committed) {
-                        OutboundGroupUpdateResult.Success(importResult.outbounds.size)
-                    } else {
-                        OutboundGroupUpdateResult.Failure(
-                            stage = stage,
-                            error = IllegalStateException("Application state changed during subscription update"),
-                        )
-                    }
-                }
-                is SubscriptionPreparation.Failure -> OutboundGroupUpdateResult.Failure(
-                    stage = preparation.stage.toImportStage(),
-                    error = preparation.error,
+            is OutboundSubscriptionUpdateResult.Cancelled ->
+                OutboundGroupUpdateResult.Failure(
+                    stage = ImportStage.COMMIT,
+                    error = IllegalStateException(result.reason),
                 )
-            }
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Throwable) {
-            OutboundGroupUpdateResult.Failure(stage = stage, error = error)
         }
     }
 
@@ -270,24 +240,35 @@ internal fun OutboundGroupListPage(
             try {
                 when (val result = updateGroupSubscription(group)) {
                     is OutboundGroupUpdateResult.Success -> {
-                        services.tipNotifier.show(
-                            resources.getQuantityString(
-                                R.plurals.outbound_import_success,
-                                result.outboundCount,
-                                result.outboundCount,
-                            ),
-                        )
+                        if (result.presentation?.showDialog == true) {
+                            importResultPresentation = result.presentation
+                        } else if (result.notModified) {
+                            services.tipNotifier.show(
+                                resources.getString(
+                                    R.string.outbound_group_sync_not_modified,
+                                ),
+                            )
+                        } else {
+                            services.tipNotifier.show(
+                                resources.getQuantityString(
+                                    R.plurals.outbound_import_success,
+                                    result.outboundCount,
+                                    result.outboundCount,
+                                ),
+                            )
+                        }
                     }
                     is OutboundGroupUpdateResult.Failure -> {
-                        services.tipNotifier.showError(
-                            result.error,
-                            importFailedMessage,
-                            importFailureContext(
-                                ImportOperation.OUTBOUND_SUBSCRIPTION,
-                                ImportSource.SUBSCRIPTION,
-                                result.stage,
-                            ),
+                        reportImportFailure(
+                            operation = ImportOperation.OUTBOUND_SUBSCRIPTION,
+                            source = ImportSource.SUBSCRIPTION,
+                            stage = result.stage,
+                            error = result.error,
                         )
+                        importResultPresentation = result.presentation
+                            ?: importFailureResultPresentation(
+                                result.error.message ?: importFailedMessage,
+                            )
                     }
                 }
             } finally {
@@ -309,15 +290,23 @@ internal fun OutboundGroupListPage(
         val groupIds = groups.mapTo(mutableSetOf()) { it.id }
         syncingGroupIds += groupIds
         batchSyncCancelling = false
+        batchSyncResults = null
         var completedCount = 0
         var updatedCount = 0
         var failedCount = 0
+        val entryResults = mutableListOf<OutboundGroupBatchEntryPresentation>()
         lateinit var syncJob: Job
         syncJob = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                val result = updateOutboundGroupsSequentially(
+                updateOutboundGroupsSequentially(
                     groups = groups,
-                    updateGroup = ::updateGroupSubscription,
+                    updateGroup = { group, onStage ->
+                        updateGroupSubscription(
+                            requestedGroup = group,
+                            trigger = SubscriptionUpdateTrigger.BATCH,
+                            onStage = onStage,
+                        )
+                    },
                     onGroupStarted = { group, currentIndex, totalCount ->
                         batchSyncProgress = OutboundGroupBatchProgress(
                             groupId = group.id,
@@ -333,8 +322,9 @@ internal fun OutboundGroupListPage(
                             ?.takeIf { it.groupId == group.id }
                             ?.copy(stage = stage)
                     },
-                    onGroupCompleted = { _, updateResult ->
+                    onGroupCompleted = { group, updateResult ->
                         completedCount += 1
+                        entryResults += updateResult.toBatchEntryPresentation(group.name)
                         when (updateResult) {
                             is OutboundGroupUpdateResult.Success -> updatedCount += 1
                             is OutboundGroupUpdateResult.Failure -> {
@@ -352,20 +342,7 @@ internal fun OutboundGroupListPage(
                         )
                     },
                 )
-                services.tipNotifier.show(
-                    if (result.failedCount == 0) {
-                        resources.getString(
-                            R.string.outbound_group_sync_all_success,
-                            result.updatedCount,
-                        )
-                    } else {
-                        resources.getString(
-                            R.string.outbound_group_sync_all_partial,
-                            result.updatedCount,
-                            result.failedCount,
-                        )
-                    },
-                )
+                batchSyncResults = entryResults.toList()
             } catch (_: CancellationException) {
                 val skippedCount = groups.size - completedCount
                 withContext(NonCancellable) {
@@ -531,6 +508,138 @@ internal fun OutboundGroupListPage(
         onConfirm = {
             pendingDelete?.let(::deleteGroup)
             pendingDelete = null
+        },
+    )
+    importResultPresentation?.let { presentation ->
+        ImportResultDialog(
+            presentation = presentation,
+            onDismissRequest = { importResultPresentation = null },
+        )
+    }
+    batchSyncResults?.let { results ->
+        OutboundGroupBatchResultDialog(
+            results = results,
+            onDismissRequest = { batchSyncResults = null },
+        )
+    }
+}
+
+private data class OutboundGroupBatchEntryPresentation(
+    val groupName: String,
+    val succeeded: Boolean,
+    val notModified: Boolean,
+    val importedCount: Int,
+    val skippedCount: Int,
+    val duplicateCount: Int,
+    val details: List<ImportResultDetail>,
+)
+
+private fun OutboundGroupUpdateResult.toBatchEntryPresentation(
+    groupName: String,
+): OutboundGroupBatchEntryPresentation = when (this) {
+    is OutboundGroupUpdateResult.Success -> OutboundGroupBatchEntryPresentation(
+        groupName = groupName,
+        succeeded = true,
+        notModified = notModified,
+        importedCount = presentation?.acceptedCount ?: outboundCount,
+        skippedCount = presentation?.skippedCount ?: 0,
+        duplicateCount = presentation?.duplicateCount ?: 0,
+        details = presentation?.details.orEmpty(),
+    )
+    is OutboundGroupUpdateResult.Failure -> OutboundGroupBatchEntryPresentation(
+        groupName = groupName,
+        succeeded = false,
+        notModified = false,
+        importedCount = presentation?.acceptedCount ?: 0,
+        skippedCount = presentation?.skippedCount ?: 0,
+        duplicateCount = presentation?.duplicateCount ?: 0,
+        details = presentation?.details ?: listOf(
+            ImportResultDetail(
+                sourceIndex = null,
+                message = sanitizeImportMessage(
+                    error.message ?: "Subscription update failed",
+                ),
+                isError = true,
+            ),
+        ),
+    )
+}
+
+@Composable
+private fun OutboundGroupBatchResultDialog(
+    results: List<OutboundGroupBatchEntryPresentation>,
+    onDismissRequest: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = {
+            Text(stringResource(R.string.outbound_group_sync_all_result_title))
+        },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                results.forEach { result ->
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = result.groupName,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = when {
+                                !result.succeeded -> stringResource(
+                                    R.string.outbound_group_sync_all_result_failed,
+                                )
+                                result.notModified -> stringResource(
+                                    R.string.outbound_group_sync_not_modified,
+                                )
+                                else -> stringResource(
+                                    R.string.import_result_summary,
+                                    result.importedCount,
+                                    result.skippedCount,
+                                    result.duplicateCount,
+                                )
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (result.succeeded) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                        )
+                        if (!result.succeeded) {
+                            Text(
+                                text = stringResource(
+                                    R.string.import_result_summary,
+                                    result.importedCount,
+                                    result.skippedCount,
+                                    result.duplicateCount,
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        result.details.forEach { detail ->
+                            Text(
+                                text = detail.message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (detail.isError) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismissRequest) {
+                Text(stringResource(R.string.common_close))
+            }
         },
     )
 }
@@ -709,6 +818,61 @@ private fun OutboundGroupCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                     )
+                    if (group.url.isNotBlank()) {
+                        val status = group.subscriptionStatusPresentation()
+                        val statusLabel = stringResource(
+                            when (status.status) {
+                                OutboundGroupUpdateStatus.NEVER ->
+                                    R.string.outbound_group_status_never
+                                OutboundGroupUpdateStatus.SUCCESS ->
+                                    R.string.outbound_group_status_success
+                                OutboundGroupUpdateStatus.PARTIAL ->
+                                    R.string.outbound_group_status_partial
+                                OutboundGroupUpdateStatus.NOT_MODIFIED ->
+                                    R.string.outbound_group_status_not_modified
+                                OutboundGroupUpdateStatus.FAILED ->
+                                    R.string.outbound_group_status_failed
+                            },
+                        )
+                        val statusText = if (
+                            status.status == OutboundGroupUpdateStatus.NEVER ||
+                            status.attemptAtMillis <= 0L
+                        ) {
+                            statusLabel
+                        } else {
+                            stringResource(
+                                R.string.outbound_group_status_details,
+                                statusLabel,
+                                status.attemptAtMillis.toReadableDateTimeOrDash(),
+                                status.importedCount,
+                                status.skippedCount,
+                                status.duplicateCount,
+                            )
+                        }
+                        val statusColor = when (status.status) {
+                            OutboundGroupUpdateStatus.FAILED ->
+                                MaterialTheme.colorScheme.error
+                            OutboundGroupUpdateStatus.PARTIAL ->
+                                MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        Text(
+                            text = statusText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = statusColor,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (status.summary.isNotBlank()) {
+                            Text(
+                                text = status.summary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = statusColor,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
                 Switch(
                     checked = group.enabled,
@@ -775,10 +939,11 @@ private fun OutboundGroupEditorSheet(
     var showCustomUserAgentDialog by remember(editorSession) { mutableStateOf(false) }
     var updateInterval by remember(editorSession) { mutableStateOf(group?.updateInterval.orEmpty()) }
     var updateViaProxy by remember(editorSession) { mutableStateOf(group?.updateViaProxy == true) }
+    var strictImport by remember(editorSession) { mutableStateOf(group?.strictImport == true) }
     var ageSecretKey by remember(editorSession) { mutableStateOf(group?.ageSecretKey.orEmpty()) }
     val validUrl = url.isBlank() || url.isHttpUrl()
-    val validInterval = updateInterval.isBlank() ||
-        (updateInterval.toDoubleOrNull()?.let { it > 0 } == true)
+    val validInterval =
+        parseSubscriptionSchedule(updateInterval) !is SubscriptionSchedule.Invalid
     val canSave = name.isNotBlank() && validUrl && validInterval
     val hasSubscription = url.isNotBlank()
     val userAgent = userAgentOption.resolveUserAgent(customUserAgent)
@@ -808,25 +973,31 @@ private fun OutboundGroupEditorSheet(
                 icon = Icons.Rounded.Save,
                 enabled = canSave,
                 onClick = {
+                    val trimmedUrl = url.trim()
+                    val trimmedHwid = hwid.trim()
+                    val trimmedAgeSecretKey = ageSecretKey.trim()
+                    val edited = group?.copy(
+                        name = name.trim(),
+                        url = trimmedUrl,
+                        userAgent = userAgent,
+                        updateInterval = updateInterval.trim(),
+                        hwid = trimmedHwid,
+                        updateViaProxy = updateViaProxy,
+                        ageSecretKey = trimmedAgeSecretKey,
+                        strictImport = strictImport,
+                    ) ?: OutboundGroupState(
+                        id = 0,
+                        name = name.trim(),
+                        url = trimmedUrl,
+                        userAgent = userAgent,
+                        updateInterval = updateInterval.trim(),
+                        hwid = trimmedHwid,
+                        updateViaProxy = updateViaProxy,
+                        ageSecretKey = trimmedAgeSecretKey,
+                        strictImport = strictImport,
+                    )
                     onSave(
-                        group?.copy(
-                            name = name.trim(),
-                            url = url.trim(),
-                            userAgent = userAgent,
-                            updateInterval = updateInterval.trim(),
-                            hwid = hwid.trim(),
-                            updateViaProxy = updateViaProxy,
-                            ageSecretKey = ageSecretKey.trim(),
-                        ) ?: OutboundGroupState(
-                            id = 0,
-                            name = name.trim(),
-                            url = url.trim(),
-                            userAgent = userAgent,
-                            updateInterval = updateInterval.trim(),
-                            hwid = hwid.trim(),
-                            updateViaProxy = updateViaProxy,
-                            ageSecretKey = ageSecretKey.trim(),
-                        ),
+                        edited.clearingSubscriptionMetadataChangedFrom(group),
                     )
                 },
             )
@@ -961,6 +1132,15 @@ private fun OutboundGroupEditorSheet(
                                 checked = updateViaProxy,
                                 onCheckedChange = { updateViaProxy = it },
                             )
+                            SettingsSwitchRow(
+                                title = stringResource(R.string.outbound_group_strict_import),
+                                summary = stringResource(
+                                    R.string.outbound_group_strict_import_summary,
+                                ),
+                                icon = Icons.Rounded.Security,
+                                checked = strictImport,
+                                onCheckedChange = { strictImport = it },
+                            )
                             OutlinedTextField(
                                 value = updateInterval,
                                 onValueChange = { value ->
@@ -1044,16 +1224,42 @@ private fun CustomSubscriptionUserAgentDialog(
     )
 }
 
-private fun SubscriptionSyncStage.toImportStage(): ImportStage = when (this) {
-    SubscriptionSyncStage.Downloading -> ImportStage.DOWNLOAD
-    SubscriptionSyncStage.Decrypting -> ImportStage.DECRYPT
-    SubscriptionSyncStage.Verifying -> ImportStage.VERIFY
-}
-
 private fun String.isHttpUrl(): Boolean =
     runCatching {
         val uri = URI(trim())
         (uri.scheme == "http" || uri.scheme == "https") && !uri.host.isNullOrBlank()
     }.getOrDefault(false)
+
+private fun OutboundGroupState.clearingSubscriptionMetadataChangedFrom(
+    previous: OutboundGroupState?,
+): OutboundGroupState {
+    if (previous == null) return this
+    if (url != previous.url) {
+        return copy(
+            lastUpdateAttemptAtMillis = 0L,
+            lastUpdatedAtMillis = 0L,
+            lastUpdateStatus = OutboundGroupUpdateStatus.NEVER,
+            lastUpdateImportedCount = 0,
+            lastUpdateSkippedCount = 0,
+            lastUpdateDuplicateCount = 0,
+            consecutiveUpdateFailures = 0,
+            lastUpdateErrorSummary = "",
+            subscriptionEtag = "",
+            subscriptionLastModified = "",
+        )
+    }
+    if (
+        userAgent != previous.userAgent ||
+        hwid != previous.hwid ||
+        updateViaProxy != previous.updateViaProxy ||
+        ageSecretKey != previous.ageSecretKey
+    ) {
+        return copy(
+            subscriptionEtag = "",
+            subscriptionLastModified = "",
+        )
+    }
+    return this
+}
 
 private val GroupEditorSectionSpacing = 12.dp

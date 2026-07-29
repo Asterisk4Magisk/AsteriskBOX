@@ -14,7 +14,7 @@ import features.resources.ResourceFileUseCase
 import features.settings.usecase.SwitchRunModeUseCase
 import features.settings.usecase.RootBootScriptUseCase
 import features.settings.usecase.RootEbpfProbeUseCase
-import features.subscription.runtime.AndroidSubscriptionPreparer
+import features.subscription.usecase.OutboundSubscriptionUpdater
 import kotlinx.coroutines.CoroutineScope
 import system.AndroidNetworkInterfaceProvider
 import system.AndroidPackageProvider
@@ -30,7 +30,7 @@ internal data class AppServices(
     val packageCatalog: AndroidPackageProvider,
     val networkInterfaces: AndroidNetworkInterfaceProvider,
     val resourceFileUseCase: ResourceFileUseCase,
-    val subscriptionPreparer: AndroidSubscriptionPreparer,
+    val outboundSubscriptionUpdater: OutboundSubscriptionUpdater,
     val qrCodeScanner: suspend () -> String?,
     val importFilePicker: suspend () -> Uri?,
     val singBoxRuntime: SingBoxRuntimeRepository,

@@ -20,12 +20,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -71,8 +69,15 @@ import app.collectAppState
 import app.navigation.Route
 import app.withRemovedManagedOutboundTags
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
-import features.logs.FailureLogContext
-import features.logs.reportFailure
+import features.importing.ImportOperation
+import features.importing.ImportResultDialog
+import features.importing.ImportResultPresentation
+import features.importing.ImportSource
+import features.importing.ImportStage
+import features.importing.importFailureResultPresentation
+import features.importing.readImportUtf8WithinLimit
+import features.importing.reportImportFailure
+import features.importing.toImportResultPresentation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -83,14 +88,15 @@ import ui.clipboard.setPlainText
 import ui.components.AsteriskPinnedSearchArea
 import ui.components.WarningConfirmDialog
 import ui.components.singBoxOptionLabel
-import ui.icons.AsteriskIcons as Icons
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
+import ui.icons.AsteriskIcons as Icons
 
 @Composable
 internal fun EndpointListPage(padding: PaddingValues) {
-    val appState by LocalAppStateStore.current.collectAppState()
+    val stateStore = LocalAppStateStore.current
+    val appState by stateStore.collectAppState()
     val updateAppState = LocalUpdateAppState.current
     val navigator = LocalNavigator.current
     val services = LocalAppServices.current
@@ -102,6 +108,9 @@ internal fun EndpointListPage(padding: PaddingValues) {
     var query by rememberSaveable { mutableStateOf("") }
     var addMenuExpanded by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
+    var importResultPresentation by remember {
+        mutableStateOf<ImportResultPresentation?>(null)
+    }
     var pendingDelete by remember { mutableStateOf<SingBoxEndpointState?>(null) }
     val typeSearchLabels = SupportedSingBoxEndpointTypes.associateWith { type ->
         endpointTypeTitle(type)
@@ -112,58 +121,72 @@ internal fun EndpointListPage(padding: PaddingValues) {
         }
     }
     val importFailedMessage = stringResource(R.string.endpoint_import_failed)
+    val stateChangedMessage = stringResource(R.string.endpoint_import_state_changed)
     val emptyClipboardMessage = stringResource(R.string.endpoint_import_empty_clipboard)
     val copiedMessage = stringResource(R.string.endpoint_editor_copied)
     val countEffectsMotion = AsteriskMotion.fastEffects<Float>()
 
-    suspend fun importContent(content: String) {
+    suspend fun importContent(
+        content: String,
+        source: ImportSource,
+    ) {
         if (importing) return
         importing = true
+        var stage = ImportStage.PARSE
         try {
-            val imported = withContext(Dispatchers.Default) {
-                SingBoxEndpointImporter.parseImport(content)
+            val snapshot = stateStore.state.value
+            val parsed = withContext(Dispatchers.Default) {
+                EndpointImportPipeline.parseOutcome(content)
             }
-            val candidateState = appState.withImportedEndpoints(imported)
+            val plan = snapshot.planEndpointImport(parsed)
+            if (!plan.committed) {
+                importResultPresentation =
+                    plan.outcome.toImportResultPresentation(committed = false)
+                return
+            }
+            stage = ImportStage.VALIDATE
             withContext(Dispatchers.IO) {
                 validateSingBoxRuntimeConfiguration(
                     context = context,
-                    state = candidateState,
+                    state = plan.state,
                 )
             }
-            var committed = false
-            updateAppState { state ->
-                if (state !== appState) {
-                    state
-                } else {
-                    committed = true
-                    candidateState
-                }
-            }
+            stage = ImportStage.COMMIT
+            val committed = stateStore.compareAndSet(snapshot, plan.state)
             if (committed) {
-                services.tipNotifier.show(
-                    resources.getQuantityString(
-                        R.plurals.endpoint_import_success,
-                        imported.size,
-                        imported.size,
-                    ),
-                )
+                val presentation =
+                    plan.outcome.toImportResultPresentation(committed = true)
+                if (presentation.showDialog) {
+                    importResultPresentation = presentation
+                } else {
+                    services.tipNotifier.show(
+                        resources.getQuantityString(
+                            R.plurals.endpoint_import_success,
+                            plan.outcome.accepted.size,
+                            plan.outcome.accepted.size,
+                        ),
+                    )
+                }
             } else {
-                reportFailure(
-                    FailureLogContext(
-                        operation = "endpoint_import",
-                        stage = "commit",
-                    ),
+                reportImportFailure(
+                    operation = ImportOperation.ENDPOINT,
+                    source = source,
+                    stage = ImportStage.COMMIT,
                 )
-                services.tipNotifier.show(importFailedMessage)
+                importResultPresentation =
+                    importFailureResultPresentation(stateChangedMessage)
             }
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
-            services.tipNotifier.showError(
-                error,
-                importFailedMessage,
-                FailureLogContext(operation = "endpoint_import"),
+            reportImportFailure(
+                operation = ImportOperation.ENDPOINT,
+                source = source,
+                stage = stage,
+                error = error,
             )
+            importResultPresentation =
+                importFailureResultPresentation(importFailedMessage)
         } finally {
             importing = false
         }
@@ -175,7 +198,7 @@ internal fun EndpointListPage(padding: PaddingValues) {
             if (content.isBlank()) {
                 services.tipNotifier.show(emptyClipboardMessage)
             } else {
-                importContent(content)
+                importContent(content, ImportSource.CLIPBOARD)
             }
         }
     }
@@ -185,18 +208,18 @@ internal fun EndpointListPage(padding: PaddingValues) {
             try {
                 val uri = services.importFilePicker() ?: return@launch
                 val content = withContext(Dispatchers.IO) { context.readEndpointImportFile(uri) }
-                importContent(content)
+                importContent(content, ImportSource.FILE)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
-                services.tipNotifier.showError(
-                    error,
-                    importFailedMessage,
-                    FailureLogContext(
-                        operation = "endpoint_import",
-                        stage = "read",
-                    ),
+                reportImportFailure(
+                    operation = ImportOperation.ENDPOINT,
+                    source = ImportSource.FILE,
+                    stage = ImportStage.READ,
+                    error = error,
                 )
+                importResultPresentation =
+                    importFailureResultPresentation(importFailedMessage)
             }
         }
     }
@@ -295,7 +318,18 @@ internal fun EndpointListPage(padding: PaddingValues) {
                                 }
                                 HorizontalDivider()
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.endpoint_import_clipboard)) },
+                                    text = {
+                                        Column {
+                                            Text(stringResource(R.string.endpoint_import_clipboard))
+                                            Text(
+                                                stringResource(
+                                                    R.string.endpoint_import_formats_summary,
+                                                ),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    },
                                     leadingIcon = {
                                         Icon(Icons.Rounded.ContentCopy, contentDescription = null)
                                     },
@@ -305,7 +339,18 @@ internal fun EndpointListPage(padding: PaddingValues) {
                                     },
                                 )
                                 DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.endpoint_import_file)) },
+                                    text = {
+                                        Column {
+                                            Text(stringResource(R.string.endpoint_import_file))
+                                            Text(
+                                                stringResource(
+                                                    R.string.endpoint_import_safety_summary,
+                                                ),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    },
                                     leadingIcon = {
                                         Icon(Icons.Rounded.FileUpload, contentDescription = null)
                                     },
@@ -389,6 +434,13 @@ internal fun EndpointListPage(padding: PaddingValues) {
             pendingDelete = null
         },
     )
+
+    importResultPresentation?.let { presentation ->
+        ImportResultDialog(
+            presentation = presentation,
+            onDismissRequest = { importResultPresentation = null },
+        )
+    }
 }
 
 @Composable
@@ -545,5 +597,5 @@ private fun SingBoxEndpointState.matchesQuery(query: String, localizedType: Stri
 
 private fun Context.readEndpointImportFile(uri: Uri): String =
     contentResolver.openInputStream(uri)?.use { input ->
-        input.bufferedReader(Charsets.UTF_8).use { reader -> reader.readText() }
+        input.readImportUtf8WithinLimit()
     } ?: throw IllegalArgumentException()

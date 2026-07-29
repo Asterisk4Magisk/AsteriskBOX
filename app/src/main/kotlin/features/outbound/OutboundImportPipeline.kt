@@ -4,6 +4,16 @@
 package features.outbound
 
 import engine.singbox.config.SingBoxJson
+import features.importing.ImportFormat
+import features.importing.ImportIssue
+import features.importing.ImportIssueReason
+import features.importing.ImportIssueSeverity
+import features.importing.ImportLimitException
+import features.importing.ImportOutcome
+import features.importing.ImportStage
+import features.importing.MaxImportBytes
+import features.importing.requireImportCandidateCount
+import features.importing.requireImportTextWithinLimit
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -18,10 +28,12 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import kotlin.io.encoding.Base64
 
-internal enum class OutboundImportFormat {
-    JSON,
-    YAML,
-    URL,
+internal enum class OutboundImportFormat(
+    override val id: String,
+) : ImportFormat {
+    JSON("json"),
+    YAML("yaml"),
+    URL("url"),
 }
 
 internal data class OutboundImportResult(
@@ -81,60 +93,191 @@ internal object OutboundImportPipeline {
         jsonFormatter: SingBoxOutboundConfigFormatter =
             LibboxSingBoxOutboundConfigFormatter,
     ): OutboundImportResult {
+        val outcome = parseOutcome(content, jsonFormatter)
+        if (outcome.accepted.isEmpty()) {
+            throw IllegalArgumentException(
+                outcome.issues.firstOrNull()?.message ?: "No supported proxy outbounds found",
+            )
+        }
+        return OutboundImportResult(
+            format = outcome.format as OutboundImportFormat,
+            outbounds = outcome.accepted,
+        )
+    }
+
+    fun parseOutcome(
+        content: String,
+        jsonFormatter: SingBoxOutboundConfigFormatter =
+            LibboxSingBoxOutboundConfigFormatter,
+    ): ImportOutcome<ImportedSingBoxOutbound> {
         require(content.isNotBlank()) { "Outbound import content is empty" }
+        requireImportTextWithinLimit(content)
         val candidates = buildList {
             add(content.trim().removePrefix("\uFEFF"))
             decodeBase64Payload(content)?.let { decoded ->
                 if (decoded !in this) add(decoded)
             }
         }
-        val failures = mutableListOf<Throwable>()
-        val parsers = listOf<Pair<OutboundImportFormat, (String) -> List<ImportedSingBoxOutbound>>>(
-            OutboundImportFormat.JSON to { candidate ->
-                SingBoxOutboundImporter.parseImport(candidate, jsonFormatter)
-            },
-            OutboundImportFormat.YAML to MihomoYamlOutboundParser::parse,
-            OutboundImportFormat.URL to ProxyUrlOutboundParser::parse,
-        )
-        parsers.forEach { (format, parser) ->
-            candidates.forEach { candidate ->
-                runCatching { parser(candidate) }
-                    .onSuccess { outbounds ->
-                        if (outbounds.isNotEmpty()) {
-                            return OutboundImportResult(format, outbounds)
-                        }
-                    }
-                    .onFailure { failure ->
-                        failures += failure
-                        if (format == OutboundImportFormat.JSON && candidate.isJsonDocument()) {
-                            throw failure
-                        }
-                    }
+        candidates.forEach { candidate ->
+            if (candidate.isJsonDocument()) {
+                return runCatching {
+                    SingBoxOutboundImporter.parseImportOutcome(candidate, jsonFormatter)
+                }.getOrElse {
+                    invalidRecognizedOutboundDocument(
+                        format = OutboundImportFormat.JSON,
+                        message = "Invalid sing-box JSON import document",
+                    )
+                }
             }
         }
-        throw IllegalArgumentException(
-            failures.lastOrNull()?.message ?: "No supported proxy outbounds found",
-            failures.lastOrNull(),
-        )
+        candidates.forEach { candidate ->
+            MihomoYamlOutboundParser.parseOutcomeOrNull(candidate)?.let { return it }
+        }
+        candidates.forEach { candidate ->
+            ProxyUrlOutboundParser.parseOutcomeOrNull(candidate)?.let { return it }
+        }
+        throw IllegalArgumentException("No supported proxy outbounds found")
     }
 }
 
 private fun String.isJsonDocument(): Boolean =
-    runCatching { SingBoxJson.parseToJsonElement(this) }.isSuccess
+    runCatching { SingBoxJson.parseToJsonElement(this) }.isSuccess ||
+        looksLikeJsonContainer()
+
+private fun String.looksLikeJsonContainer(): Boolean {
+    val trimmed = trimStart()
+    if (trimmed.firstOrNull() == '{') return true
+    if (trimmed.firstOrNull() != '[') return false
+    val nextToken = trimmed.drop(1).firstOrNull { character -> !character.isWhitespace() }
+        ?: return true
+    return nextToken in setOf('{', '[', '"', ']', '-', 't', 'f', 'n') ||
+        nextToken.isDigit()
+}
+
+private fun invalidRecognizedOutboundDocument(
+    format: OutboundImportFormat,
+    message: String,
+): ImportOutcome<ImportedSingBoxOutbound> = ImportOutcome(
+    format = format,
+    detectedCount = 0,
+    accepted = emptyList(),
+    issues = listOf(
+        ImportIssue(
+            reason = ImportIssueReason.INVALID_DOCUMENT,
+            severity = ImportIssueSeverity.ERROR,
+            stage = ImportStage.PARSE,
+            message = message,
+        ),
+    ),
+)
 
 private object MihomoYamlOutboundParser {
     private val loader = Load(LoadSettings.builder().build())
 
     fun parse(content: String): List<ImportedSingBoxOutbound> {
-        val root = loader.loadFromString(content) as? Map<*, *>
-            ?: throw IllegalArgumentException("YAML root must be a mapping")
-        val proxies = root["proxies"] as? List<*>
+        val outcome = parseOutcomeOrNull(content)
             ?: throw IllegalArgumentException("Mihomo YAML must contain proxies")
-        val objects = proxies.mapNotNull { value ->
-            val proxy = value as? Map<*, *> ?: return@mapNotNull null
-            runCatching { proxy.toSingBoxOutbound() }.getOrNull()
+        if (outcome.accepted.isEmpty()) {
+            throw IllegalArgumentException(
+                outcome.issues.firstOrNull()?.message ?: "No supported proxy outbounds found",
+            )
         }
-        return normalizeImportedObjects(objects)
+        return outcome.accepted
+    }
+
+    fun parseOutcomeOrNull(content: String): ImportOutcome<ImportedSingBoxOutbound>? {
+        val loaded = runCatching { loader.loadFromString(content) as? Map<*, *> }
+        val root = loaded.getOrNull()
+        if (root == null) {
+            return if (MihomoProxiesHeader.containsMatchIn(content)) {
+                invalidRecognizedOutboundDocument(
+                    format = OutboundImportFormat.YAML,
+                    message = "Invalid Mihomo YAML import document",
+                )
+            } else {
+                null
+            }
+        }
+        if ("proxies" !in root) return null
+        val proxies = root["proxies"] as? List<*>
+            ?: return invalidRecognizedOutboundDocument(
+                format = OutboundImportFormat.YAML,
+                message = "Mihomo YAML proxies must be a list",
+            )
+        try {
+            requireImportCandidateCount(proxies.size)
+        } catch (_: ImportLimitException) {
+            return tooManyOutboundCandidates(
+                format = OutboundImportFormat.YAML,
+                detectedCount = proxies.size,
+            )
+        }
+        val issues = mutableListOf<ImportIssue>()
+        val accepted = proxies.mapIndexedNotNull { index, value ->
+            val proxy = value as? Map<*, *>
+            if (proxy == null) {
+                issues += rejectedOutboundCandidate(
+                    reason = ImportIssueReason.INVALID_ENTRY,
+                    sourceIndex = index,
+                    message = "Mihomo proxy entry must be a mapping",
+                )
+                return@mapIndexedNotNull null
+            }
+            val sourceType = proxy.string("type").lowercase()
+            val type = when (sourceType) {
+                "socks", "socks5" -> "socks"
+                "ss" -> "shadowsocks"
+                "hy2" -> "hysteria2"
+                else -> sourceType
+            }
+            if (type !in SupportedSingBoxProxyOutboundTypes) {
+                issues += rejectedOutboundCandidate(
+                    reason = ImportIssueReason.UNSUPPORTED_TYPE,
+                    sourceIndex = index,
+                    detectedType = sourceType.ifBlank { null },
+                    message = "Mihomo proxy type is not supported",
+                )
+                return@mapIndexedNotNull null
+            }
+            val converted = runCatching { proxy.toSingBoxOutbound() }
+                .getOrElse {
+                    issues += rejectedOutboundCandidate(
+                        reason = ImportIssueReason.INVALID_FIELD,
+                        sourceIndex = index,
+                        detectedType = type,
+                        message = "Mihomo proxy fields are invalid",
+                    )
+                    return@mapIndexedNotNull null
+                }
+            if (converted == null) {
+                issues += rejectedOutboundCandidate(
+                    reason = ImportIssueReason.UNSUPPORTED_OPTION,
+                    sourceIndex = index,
+                    detectedType = type,
+                    message = "Mihomo proxy uses an unsupported option",
+                )
+                return@mapIndexedNotNull null
+            }
+            runCatching {
+                SingBoxOutboundImporter.parsePreparedOutbounds(listOf(converted))
+                    .single()
+                    .copy(sourceIndex = index)
+            }.getOrElse {
+                issues += rejectedOutboundCandidate(
+                    reason = ImportIssueReason.INVALID_ENTRY,
+                    sourceIndex = index,
+                    detectedType = type,
+                    message = "Mihomo proxy could not be normalized",
+                )
+                null
+            }
+        }
+        return ImportOutcome(
+            format = OutboundImportFormat.YAML,
+            detectedCount = proxies.size,
+            accepted = accepted,
+            issues = issues,
+        )
     }
 
     private fun Map<*, *>.toSingBoxOutbound(): JsonObject? {
@@ -650,35 +793,98 @@ private object MihomoYamlOutboundParser {
 
 private object ProxyUrlOutboundParser {
     private val urlPattern = Regex(
-        """(?i)(?:socks4a?|socks5?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2|hy2|anytls|snell|ssh|tor|naive(?:\+(?:https|quic))?|wireguard)://[^\s<>"']+""",
+        """(?i)(?:socks4a?|socks5?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2|hy2|anytls|snell|ssh|tor|naive(?:\+(?:https|quic))?|wg|wireguard|awg|warp)://[^\s<>"']+""",
     )
 
     fun parse(content: String): List<ImportedSingBoxOutbound> {
-        val links = content.lineSequence()
-            .flatMap { line -> urlPattern.findAll(line).map(MatchResult::value) }
-            .map { it.trim().trimEnd(',', ';') }
-            .distinct()
-            .toList()
-        if (links.isEmpty()) throw IllegalArgumentException("No proxy URLs found")
-        val failures = mutableListOf<Throwable>()
-        val objects = links.mapIndexedNotNull { index, link ->
-            runCatching { parseLink(link, index) }
-                .onFailure(failures::add)
-                .getOrNull()
-        }
-        if (objects.isEmpty() && failures.isNotEmpty()) {
-            val cause = failures.last()
+        val outcome = parseOutcomeOrNull(content)
+            ?: throw IllegalArgumentException("No proxy URLs found")
+        if (outcome.accepted.isEmpty()) {
             throw IllegalArgumentException(
-                cause.message ?: "No supported proxy outbounds found",
-                cause,
+                outcome.issues.firstOrNull()?.message ?: "No supported proxy outbounds found",
             )
         }
-        return normalizeImportedObjects(objects)
+        return outcome.accepted
+    }
+
+    fun parseOutcomeOrNull(content: String): ImportOutcome<ImportedSingBoxOutbound>? {
+        val links = buildList {
+            content.lineSequence().forEachIndexed { lineIndex, line ->
+                urlPattern.findAll(line).forEach { match ->
+                    add(
+                        IndexedProxyLink(
+                            sourceIndex = lineIndex,
+                            value = match.value.trim().trimEnd(',', ';'),
+                        ),
+                    )
+                }
+            }
+        }
+        if (links.isEmpty()) return null
+        try {
+            requireImportCandidateCount(links.size)
+        } catch (_: ImportLimitException) {
+            return tooManyOutboundCandidates(
+                format = OutboundImportFormat.URL,
+                detectedCount = links.size,
+            )
+        }
+        val issues = mutableListOf<ImportIssue>()
+        val accepted = links.mapIndexedNotNull { candidateIndex, indexedLink ->
+            val scheme = indexedLink.value.substringBefore("://").lowercase()
+            if (scheme in RejectedOutboundUrlSchemes) {
+                issues += rejectedOutboundCandidate(
+                    reason = ImportIssueReason.UNSUPPORTED_TYPE,
+                    sourceIndex = indexedLink.sourceIndex,
+                    detectedType = scheme,
+                    message = "This URL scheme is not supported for outbound import",
+                )
+                return@mapIndexedNotNull null
+            }
+            val converted = runCatching {
+                parseLink(indexedLink.value, candidateIndex)
+            }.getOrElse {
+                issues += rejectedOutboundCandidate(
+                    reason = ImportIssueReason.INVALID_FIELD,
+                    sourceIndex = indexedLink.sourceIndex,
+                    detectedType = scheme,
+                    message = "Proxy URL fields are invalid",
+                )
+                return@mapIndexedNotNull null
+            }
+            if (converted == null) {
+                issues += rejectedOutboundCandidate(
+                    reason = ImportIssueReason.UNSUPPORTED_OPTION,
+                    sourceIndex = indexedLink.sourceIndex,
+                    detectedType = scheme,
+                    message = "Proxy URL uses an unsupported option",
+                )
+                return@mapIndexedNotNull null
+            }
+            runCatching {
+                SingBoxOutboundImporter.parsePreparedOutbounds(listOf(converted))
+                    .single()
+                    .copy(sourceIndex = indexedLink.sourceIndex)
+            }.getOrElse {
+                issues += rejectedOutboundCandidate(
+                    reason = ImportIssueReason.INVALID_ENTRY,
+                    sourceIndex = indexedLink.sourceIndex,
+                    detectedType = scheme,
+                    message = "Proxy URL could not be normalized",
+                )
+                null
+            }
+        }
+        return ImportOutcome(
+            format = OutboundImportFormat.URL,
+            detectedCount = links.size,
+            accepted = accepted,
+            issues = issues,
+        )
     }
 
     private fun parseLink(link: String, index: Int): JsonObject? {
         val scheme = link.substringBefore("://").lowercase()
-        if (scheme in setOf("tor", "wireguard")) return null
         if (scheme == "vmess" && '@' !in link.substringAfter("://").substringBefore('#')) {
             return parseLegacyVmess(link, index)
         }
@@ -1238,17 +1444,36 @@ private object ProxyUrlOutboundParser {
     }
 }
 
-private fun normalizeImportedObjects(objects: List<JsonObject>): List<ImportedSingBoxOutbound> {
-    if (objects.isEmpty()) throw IllegalArgumentException("No supported proxy outbounds found")
-    return SingBoxOutboundImporter.parsePreparedOutbounds(objects)
-}
-
 private fun decodeBase64Payload(content: String): String? {
     val compact = content.trim().filterNot(Char::isWhitespace)
     if (compact.length < 16 || !compact.matches(Regex("""[A-Za-z0-9_+/=-]+"""))) return null
-    return decodeBase64(compact)?.takeIf { decoded ->
+    return decodeBase64ImportPayload(compact)?.takeIf { decoded ->
         decoded.isNotBlank() && decoded.count(Char::isISOControl) <= decoded.length / 20
     }
+}
+
+private val MihomoProxiesHeader = Regex("""(?m)^\s*proxies\s*:""", RegexOption.IGNORE_CASE)
+
+internal fun decodeBase64ImportPayload(
+    value: String,
+    maxDecodedBytes: Int = MaxImportBytes,
+): String? {
+    val compact = value.trim().filterNot(Char::isWhitespace)
+    val padded = compact + "=".repeat((4 - compact.length % 4) % 4)
+    return sequenceOf(Base64.UrlSafe, Base64.Default)
+        .mapNotNull { decoder ->
+            runCatching { decoder.decode(padded) }.getOrNull()
+        }
+        .firstOrNull()
+        ?.let { decoded ->
+            if (decoded.size > maxDecodedBytes) {
+                throw ImportLimitException(
+                    reason = ImportIssueReason.INPUT_TOO_LARGE,
+                    message = "Decoded import content exceeds the allowed size",
+                )
+            }
+            decoded.decodeToString()
+        }
 }
 
 private fun decodeBase64(value: String): String? {
@@ -1262,6 +1487,45 @@ private fun decodeBase64(value: String): String? {
         }
         .firstOrNull()
 }
+
+private data class IndexedProxyLink(
+    val sourceIndex: Int,
+    val value: String,
+)
+
+private val RejectedOutboundUrlSchemes =
+    setOf("tor", "wg", "wireguard", "awg", "warp")
+
+private fun rejectedOutboundCandidate(
+    reason: ImportIssueReason,
+    sourceIndex: Int,
+    message: String,
+    detectedType: String? = null,
+): ImportIssue = ImportIssue(
+    reason = reason,
+    severity = ImportIssueSeverity.ERROR,
+    stage = ImportStage.PARSE,
+    sourceIndex = sourceIndex,
+    detectedType = detectedType,
+    message = message,
+)
+
+private fun tooManyOutboundCandidates(
+    format: OutboundImportFormat,
+    detectedCount: Int,
+): ImportOutcome<ImportedSingBoxOutbound> = ImportOutcome(
+    format = format,
+    detectedCount = detectedCount,
+    accepted = emptyList(),
+    issues = listOf(
+        ImportIssue(
+            reason = ImportIssueReason.TOO_MANY_CANDIDATES,
+            severity = ImportIssueSeverity.ERROR,
+            stage = ImportStage.PARSE,
+            message = "Import contains too many outbound candidates",
+        ),
+    ),
+)
 
 private fun parseQuery(rawQuery: String?): Map<String, List<String>> {
     if (rawQuery.isNullOrBlank()) return emptyMap()
