@@ -55,6 +55,7 @@ internal fun SettingsTextField(
     label: String,
     errorText: String?,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
     sanitizeInput: (String) -> String = { it },
 ) {
@@ -67,6 +68,7 @@ internal fun SettingsTextField(
             .padding(bottom = if (errorText == null) 12.dp else 4.dp),
         keyboardOptions = keyboardOptions,
         sanitizeInput = sanitizeInput,
+        enabled = enabled,
     )
     errorText?.let {
         StringListStatusText(

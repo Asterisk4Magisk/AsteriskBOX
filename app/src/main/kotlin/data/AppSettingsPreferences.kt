@@ -54,6 +54,34 @@ internal class AppSettingsPreferences(
                 KeySelectorSelections,
                 defaults.selectorSelections,
             ),
+            routeAutoDetectInterface = preferences.getBoolean(
+                KeyRouteAutoDetectInterface,
+                defaults.routeAutoDetectInterface,
+            ),
+            routeOverrideAndroidVpn = preferences.getBoolean(
+                KeyRouteOverrideAndroidVpn,
+                defaults.routeOverrideAndroidVpn,
+            ),
+            routeDefaultNetworkStrategy = preferences.getString(
+                KeyRouteDefaultNetworkStrategy,
+                defaults.routeDefaultNetworkStrategy,
+            ) ?: defaults.routeDefaultNetworkStrategy,
+            routeDefaultNetworkTypes = preferences.getStringList(
+                KeyRouteDefaultNetworkTypes,
+                defaults.routeDefaultNetworkTypes,
+            ),
+            routeDefaultFallbackNetworkTypes = preferences.getStringList(
+                KeyRouteDefaultFallbackNetworkTypes,
+                defaults.routeDefaultFallbackNetworkTypes,
+            ),
+            routeDefaultFallbackDelay = preferences.getString(
+                KeyRouteDefaultFallbackDelay,
+                defaults.routeDefaultFallbackDelay,
+            ) ?: defaults.routeDefaultFallbackDelay,
+            routeFindProcess = preferences.getBoolean(
+                KeyRouteFindProcess,
+                defaults.routeFindProcess,
+            ),
             routeFinal = preferences.getString(KeyRouteFinal, defaults.routeFinal)
                 ?: defaults.routeFinal,
             runMode = preferences.getInt(KeyRunMode, defaults.runMode),
@@ -233,6 +261,16 @@ internal class AppSettingsPreferences(
             putInt(KeyOutboundListLayout, state.outboundListLayout)
             putInt(KeyOutboundListSort, state.outboundListSort)
             putStringMap(KeySelectorSelections, state.selectorSelections)
+            putBoolean(KeyRouteAutoDetectInterface, state.routeAutoDetectInterface)
+            putBoolean(KeyRouteOverrideAndroidVpn, state.routeOverrideAndroidVpn)
+            putString(KeyRouteDefaultNetworkStrategy, state.routeDefaultNetworkStrategy)
+            putStringList(KeyRouteDefaultNetworkTypes, state.routeDefaultNetworkTypes)
+            putStringList(
+                KeyRouteDefaultFallbackNetworkTypes,
+                state.routeDefaultFallbackNetworkTypes,
+            )
+            putString(KeyRouteDefaultFallbackDelay, state.routeDefaultFallbackDelay)
+            putBoolean(KeyRouteFindProcess, state.routeFindProcess)
             putString(KeyRouteFinal, state.routeFinal)
             putInt(KeyRunMode, state.runMode)
             putInt(KeySingBoxMode, state.singBoxMode)
@@ -342,6 +380,13 @@ private const val KeySubscriptionHwid = "subscription_hwid"
 private const val KeyOutboundListLayout = "outbound_list_layout"
 private const val KeyOutboundListSort = "outbound_list_sort"
 private const val KeySelectorSelections = "selector_selections"
+private const val KeyRouteAutoDetectInterface = "route_auto_detect_interface"
+private const val KeyRouteOverrideAndroidVpn = "route_override_android_vpn"
+private const val KeyRouteDefaultNetworkStrategy = "route_default_network_strategy"
+private const val KeyRouteDefaultNetworkTypes = "route_default_network_types"
+private const val KeyRouteDefaultFallbackNetworkTypes = "route_default_fallback_network_types"
+private const val KeyRouteDefaultFallbackDelay = "route_default_fallback_delay"
+private const val KeyRouteFindProcess = "route_find_process"
 private const val KeyRouteFinal = "route_final"
 private const val KeyRunMode = "run_mode"
 private const val KeySingBoxMode = "sing_box_mode"

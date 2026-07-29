@@ -5,6 +5,8 @@ package engine.singbox.config
 
 import android.content.Context
 import app.AppState
+import app.SingBoxRouteNetworkStrategies
+import app.SingBoxRouteNetworkTypes
 import app.SingBoxRouteRuleActionReject
 import app.SingBoxRouteRuleLogicalModeOr
 import app.SingBoxRouteRuleState
@@ -26,6 +28,7 @@ import app.withUnavailableManagedRuleSetsDisabled
 import engine.network.toPortOrNull
 import engine.proxy.LocalProxyLoopbackAddress
 import engine.proxy.toLocalProxyOptions
+import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.singBoxControlConfig
 import engine.tproxy.DefaultTproxyPort
 import engine.tun.SingBoxTunDevice
@@ -582,6 +585,15 @@ internal fun compileRoute(
     defaultDomainResolver: String?,
 ): JsonObject {
     val finalOutbound = appState.routeFinal.trim().ifBlank { APP_GLOBAL_SELECTOR }
+    val networkStrategy = appState.routeDefaultNetworkStrategy
+        .trim()
+        .lowercase()
+        .takeIf(SingBoxRouteNetworkStrategies::contains)
+        .orEmpty()
+    val networkTypes = appState.routeDefaultNetworkTypes.sanitizedRouteNetworkTypes()
+    val fallbackNetworkTypes =
+        appState.routeDefaultFallbackNetworkTypes.sanitizedRouteNetworkTypes()
+    val fallbackDelay = appState.routeDefaultFallbackDelay.trim()
     val existingRules = (sourceRoute?.get("rules") as? JsonArray)
         .orEmptyObjects()
     val managedRules = appState.routeRules
@@ -652,14 +664,60 @@ internal fun compileRoute(
     }
     return JsonObject(
         buildMap {
-            sourceRoute?.let(::putAll)
+            sourceRoute
+                ?.filterKeys { key -> key !in ManagedRouteSettingKeys }
+                ?.let(::putAll)
             put("rules", JsonArray(injectedRules + managedRules + existingRules + ruleModeFallback))
             put("final", JsonPrimitive(finalOutbound))
             if (defaultDomainResolver != null) {
                 put("default_domain_resolver", JsonPrimitive(defaultDomainResolver))
             }
+            if (appState.routeAutoDetectInterface) {
+                put("auto_detect_interface", JsonPrimitive(true))
+                if (appState.routeOverrideAndroidVpn) {
+                    put("override_android_vpn", JsonPrimitive(true))
+                }
+                if (networkStrategy.isNotEmpty()) {
+                    put("default_network_strategy", JsonPrimitive(networkStrategy))
+                }
+                if (networkTypes.isNotEmpty()) {
+                    put("default_network_type", JsonArray(networkTypes.map(::JsonPrimitive)))
+                }
+                if (networkStrategy == "fallback") {
+                    if (fallbackNetworkTypes.isNotEmpty()) {
+                        put(
+                            "default_fallback_network_type",
+                            JsonArray(fallbackNetworkTypes.map(::JsonPrimitive)),
+                        )
+                    }
+                    if (
+                        fallbackDelay.isNotEmpty() &&
+                        isNonNegativeSingBoxDuration(fallbackDelay)
+                    ) {
+                        put("default_fallback_delay", JsonPrimitive(fallbackDelay))
+                    }
+                }
+            }
+            if (appState.routeFindProcess) {
+                put("find_process", JsonPrimitive(true))
+            }
         },
     )
+}
+
+private val ManagedRouteSettingKeys = setOf(
+    "auto_detect_interface",
+    "override_android_vpn",
+    "default_network_strategy",
+    "default_network_type",
+    "default_fallback_network_type",
+    "default_fallback_delay",
+    "find_process",
+)
+
+private fun List<String>.sanitizedRouteNetworkTypes(): List<String> {
+    val selected = map { value -> value.trim().lowercase() }.toSet()
+    return SingBoxRouteNetworkTypes.filter(selected::contains)
 }
 
 internal fun compileManagedRouteRule(rule: SingBoxRouteRuleState): JsonObject =

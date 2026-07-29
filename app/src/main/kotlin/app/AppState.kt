@@ -46,6 +46,13 @@ data class AppState(
     val selectors: List<SingBoxSelectorState> = emptyList(),
     val nextSelectorId: Int = 1,
     val selectorSelections: Map<String, String> = emptyMap(),
+    val routeAutoDetectInterface: Boolean = false,
+    val routeOverrideAndroidVpn: Boolean = false,
+    val routeDefaultNetworkStrategy: String = "",
+    val routeDefaultNetworkTypes: List<String> = emptyList(),
+    val routeDefaultFallbackNetworkTypes: List<String> = emptyList(),
+    val routeDefaultFallbackDelay: String = "",
+    val routeFindProcess: Boolean = false,
     val routeFinal: String = "",
     val routeRules: List<SingBoxRouteRuleState> = DefaultSingBoxRouteRules,
     val nextRouteRuleId: Int =

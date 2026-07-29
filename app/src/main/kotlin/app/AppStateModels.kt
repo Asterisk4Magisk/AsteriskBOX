@@ -117,6 +117,8 @@ const val SingBoxRouteRuleTypeLogical = "logical"
 const val SingBoxRouteRuleLogicalModeAnd = "and"
 const val SingBoxRouteRuleLogicalModeOr = "or"
 val SingBoxRouteRuleClashModes = listOf("Rule", "Global", "Direct")
+val SingBoxRouteNetworkStrategies = listOf("default", "hybrid", "fallback")
+val SingBoxRouteNetworkTypes = listOf("wifi", "cellular", "ethernet", "other")
 
 @Stable
 @Serializable

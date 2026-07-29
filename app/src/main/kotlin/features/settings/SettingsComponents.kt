@@ -193,6 +193,7 @@ internal fun SettingsDropdownRow(
     onSelectedIndexChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
     summary: String = "",
+    enabled: Boolean = true,
 ) {
     if (items.isEmpty()) return
     val safeIndex = selectedIndex.coerceIn(items.indices)
@@ -210,7 +211,9 @@ internal fun SettingsDropdownRow(
             icon = icon,
             summary = summary,
             value = value,
-            modifier = Modifier.clickable(role = Role.DropdownList) { expanded = !expanded },
+            modifier = Modifier.clickable(enabled = enabled, role = Role.DropdownList) {
+                expanded = !expanded
+            },
             trailing = {
                 Icon(
                     imageVector = Icons.Rounded.ExpandMore,
@@ -227,7 +230,7 @@ internal fun SettingsDropdownRow(
                 .size(1.dp),
         ) {
             DropdownMenu(
-                expanded = expanded,
+                expanded = expanded && enabled,
                 onDismissRequest = { expanded = false },
                 modifier = Modifier.widthIn(min = 180.dp, max = 280.dp),
             ) {

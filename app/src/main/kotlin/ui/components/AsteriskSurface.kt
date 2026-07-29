@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,17 +73,27 @@ internal fun AsteriskModalBottomSheet(
     show: Boolean,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    dismissEnabled: Boolean = true,
     title: String? = null,
     startAction: @Composable () -> Unit = EmptySheetAction,
     endAction: @Composable () -> Unit = EmptySheetAction,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val currentShow by rememberUpdatedState(show)
+    val currentDismissEnabled by rememberUpdatedState(dismissEnabled)
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(
             SheetValue.Hidden,
             SheetValue.Expanded,
         ),
+        confirmValueChange = { targetValue ->
+            shouldAllowSheetStateChange(
+                targetValue = targetValue,
+                show = currentShow,
+                dismissEnabled = currentDismissEnabled,
+            )
+        },
     )
     var renderSheet by remember { mutableStateOf(show) }
     val contentScrollConnection = remember {
@@ -104,7 +115,7 @@ internal fun AsteriskModalBottomSheet(
         onDismissRequest = onDismissRequest,
         modifier = modifier,
         sheetState = sheetState,
-        sheetGesturesEnabled = true,
+        sheetGesturesEnabled = dismissEnabled,
         shape = AsteriskShapeTokens.Sheet,
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         dragHandle = { BottomSheetDefaults.DragHandle() },
@@ -153,6 +164,14 @@ internal fun AsteriskModalBottomSheet(
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+internal fun shouldAllowSheetStateChange(
+    targetValue: SheetValue,
+    show: Boolean,
+    dismissEnabled: Boolean,
+): Boolean =
+    targetValue != SheetValue.Hidden || !show || dismissEnabled
 
 internal class SheetGestureHandoffGuard {
     private var gestureActive = false

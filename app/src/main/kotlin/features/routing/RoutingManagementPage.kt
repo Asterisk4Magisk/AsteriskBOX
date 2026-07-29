@@ -137,9 +137,12 @@ internal fun RoutingManagementPage(
     val scope = rememberCoroutineScope()
     val isWideScreen = LocalIsWideScreen.current
     var editingRule by remember { mutableStateOf<SingBoxRouteRuleState?>(null) }
+    var editingRouteSettings by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<SingBoxRouteRuleState?>(null) }
     var savingRule by remember { mutableStateOf(false) }
+    var savingRouteSettings by remember { mutableStateOf(false) }
     val saveFailedMessage = stringResource(R.string.routing_save_failed)
+    val settingsSaveFailedMessage = stringResource(R.string.routing_settings_save_failed)
     val outboundChoices = managedOutboundChoices(appState)
     val outboundLabels = outboundChoices.associate { choice -> choice.value to choice.label }
     val unavailableLabel = stringResource(R.string.common_unavailable)
@@ -216,6 +219,7 @@ internal fun RoutingManagementPage(
             referenceLabels = ruleReferenceLabels,
             unavailableLabel = unavailableLabel,
             globalLabel = globalLabel,
+            onOpenRouteSettings = { editingRouteSettings = true },
             onFinalOutboundChange = { outbound ->
                 updateAppState { state -> state.copy(routeFinal = outbound) }
             },
@@ -237,6 +241,53 @@ internal fun RoutingManagementPage(
             onDelete = { pendingDelete = it },
         )
     }
+
+    RoutingSettingsSheet(
+        show = editingRouteSettings,
+        initialDraft = appState.toRoutingSettingsDraft(),
+        saving = savingRouteSettings,
+        onDismiss = { editingRouteSettings = false },
+        onSave = { saved ->
+            if (!savingRouteSettings) {
+                val baseState = appState
+                val candidateState = baseState.withRoutingSettings(saved)
+                savingRouteSettings = true
+                scope.launch {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            validateSingBoxRuntimeConfiguration(context, candidateState)
+                        }
+                        var committed = false
+                        updateAppState { current ->
+                            if (current === baseState) {
+                                committed = true
+                                candidateState
+                            } else {
+                                current
+                            }
+                        }
+                        if (committed) {
+                            editingRouteSettings = false
+                        } else {
+                            tipNotifier.show(settingsSaveFailedMessage)
+                        }
+                    } catch (error: Throwable) {
+                        if (error is CancellationException) throw error
+                        reportFailure(
+                            context = FailureLogContext(
+                                operation = "save_route_settings",
+                                stage = "validate",
+                            ),
+                            error = error,
+                        )
+                        tipNotifier.show(settingsSaveFailedMessage)
+                    } finally {
+                        savingRouteSettings = false
+                    }
+                }
+            }
+        },
+    )
 
     RouteRuleEditorSheet(
         rule = editingRule,
@@ -343,6 +394,7 @@ private fun RoutingRuleGrid(
     referenceLabels: Map<String, String>,
     unavailableLabel: String,
     globalLabel: String,
+    onOpenRouteSettings: () -> Unit,
     onFinalOutboundChange: (String) -> Unit,
     onMove: (Int, Int) -> Unit,
     onEnabledChange: (SingBoxRouteRuleState, Boolean) -> Unit,
@@ -353,7 +405,7 @@ private fun RoutingRuleGrid(
     val reorderableState = rememberAsteriskReorderableLazyGridState(
         lazyGridState = gridState,
         itemCount = rules.size,
-        indexOffset = 1,
+        indexOffset = 2,
         scrollThresholdPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
         onMove = onMove,
     )
@@ -365,6 +417,9 @@ private fun RoutingRuleGrid(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        item(key = "route-settings", span = { GridItemSpan(maxLineSpan) }) {
+            RoutingSettingsEntryCard(onClick = onOpenRouteSettings)
+        }
         item(key = "final-outbound", span = { GridItemSpan(maxLineSpan) }) {
             RouteChoiceCard(
                 title = stringResource(R.string.routing_default_outbound),
