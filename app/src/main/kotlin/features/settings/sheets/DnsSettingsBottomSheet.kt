@@ -88,8 +88,6 @@ private val DnsNetworks = listOf("", "tcp", "udp")
 private val DnsNetworkTypes = listOf("wifi", "cellular", "ethernet", "other")
 private val DnsRejectMethods = listOf("default", "drop")
 
-internal fun dnsSettingsSheetDismissEnabled(saving: Boolean): Boolean = !saving
-
 private val DnsResponseCodes = listOf(
     "",
     "NOERROR",
@@ -193,7 +191,6 @@ internal fun DnsSettingsBottomSheet(
 
     SettingsModalBottomSheet(
         show = show,
-        dismissEnabled = dnsSettingsSheetDismissEnabled(saving),
         title = stringResource(R.string.settings_dns),
         startAction = {
             TextButton(

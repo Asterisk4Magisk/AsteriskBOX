@@ -76,10 +76,7 @@ internal fun RoutingSettingsSheet(
     val fallbackDelayValid = draft.hasValidFallbackDelay()
     AsteriskModalBottomSheet(
         show = show,
-        onDismissRequest = {
-            if (!saving) onDismiss()
-        },
-        dismissEnabled = !saving,
+        onDismissRequest = onDismiss,
         title = stringResource(R.string.routing_settings_title),
         startAction = {
             AsteriskActionButton(
@@ -115,7 +112,6 @@ internal fun RoutingSettingsSheet(
                     ),
                     icon = Icons.Rounded.SettingsInputComponent,
                     checked = draft.routeAutoDetectInterface,
-                    enabled = !saving,
                     onCheckedChange = { checked ->
                         draft = draft.copy(routeAutoDetectInterface = checked)
                     },
@@ -130,7 +126,7 @@ internal fun RoutingSettingsSheet(
                     ),
                     icon = Icons.Rounded.VpnLock,
                     checked = draft.routeOverrideAndroidVpn,
-                    enabled = draft.routeAutoDetectInterface && !saving,
+                    enabled = draft.routeAutoDetectInterface,
                     onCheckedChange = { checked ->
                         draft = draft.copy(routeOverrideAndroidVpn = checked)
                     },
@@ -177,7 +173,6 @@ internal fun RoutingSettingsSheet(
                             selectedIndex = strategyValues
                                 .indexOf(draft.routeDefaultNetworkStrategy)
                                 .coerceAtLeast(0),
-                            enabled = !saving,
                             onSelectedIndexChange = { index ->
                                 draft = draft.copy(
                                     routeDefaultNetworkStrategy = strategyValues[index],
@@ -193,7 +188,6 @@ internal fun RoutingSettingsSheet(
                                 R.string.routing_settings_default_network_type_summary,
                             ),
                             selected = draft.routeDefaultNetworkTypes,
-                            enabled = !saving,
                             onSelectedChange = { selected ->
                                 draft = draft.copy(routeDefaultNetworkTypes = selected)
                             },
@@ -222,7 +216,6 @@ internal fun RoutingSettingsSheet(
                                             .routing_settings_default_fallback_network_type_summary,
                                     ),
                                     selected = draft.routeDefaultFallbackNetworkTypes,
-                                    enabled = !saving,
                                     onSelectedChange = { selected ->
                                         draft = draft.copy(
                                             routeDefaultFallbackNetworkTypes = selected,
@@ -245,7 +238,6 @@ internal fun RoutingSettingsSheet(
                                             R.string.routing_settings_duration_invalid,
                                         )
                                     },
-                                    enabled = !saving,
                                 )
                                 Text(
                                     text = stringResource(
@@ -280,7 +272,6 @@ internal fun RoutingSettingsSheet(
                     summary = stringResource(R.string.routing_settings_find_process_summary),
                     icon = Icons.Rounded.TravelExplore,
                     checked = draft.routeFindProcess,
-                    enabled = !saving,
                     onCheckedChange = { checked ->
                         draft = draft.copy(routeFindProcess = checked)
                     },
@@ -308,7 +299,6 @@ private fun RoutingNetworkTypesField(
     title: String,
     summary: String,
     selected: List<String>,
-    enabled: Boolean,
     onSelectedChange: (List<String>) -> Unit,
 ) {
     Card(
@@ -353,7 +343,6 @@ private fun RoutingNetworkTypesField(
                             stringResource(networkTypeLabelResource(value)),
                             value,
                         ),
-                        enabled = enabled,
                     )
                 }
             }

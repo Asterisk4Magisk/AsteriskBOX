@@ -343,11 +343,7 @@ internal fun DnsManagementPage(
             "openvpn" to selectableDnsEndpoints(appState, "openvpn"),
         ),
         onDraftChange = { dnsSettingsDraft = it },
-        onDismissRequest = {
-            if (!savingDnsSettings) {
-                showDnsSettings = false
-            }
-        },
+        onDismissRequest = { showDnsSettings = false },
         onSave = { savedDraft ->
             if (!savingDnsSettings) {
                 val baseState = appState
