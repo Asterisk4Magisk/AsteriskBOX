@@ -11,10 +11,10 @@ import org.gradle.api.tasks.TaskAction
 object ProjectConfig {
     const val JVM_VERSION = 26
     const val PROJECT_NAME = "AsteriskBOX"
-    const val VERSION_NAME = "1.0.1"
+    const val VERSION_NAME = "1.0.2-dev"
     const val PACKAGE_NAME = "org.asterisk.zcc.abox"
-    const val ASTERISKD_VERSION = "v1.0.0"
-    const val BPF2SOCKS_VERSION = "v1.0.1"
+    const val ASTERISKD_VERSION = "v1.0.1"
+    const val BPF2SOCKS_VERSION = "v1.0.2"
     const val BPF_MATCHER_VERSION = "v1.0.0"
     const val SETUIDGID_VERSION = "v1.0.0"
     const val SING_BOX_VERSION = "v1.14.0-beta.3"
