@@ -92,13 +92,13 @@ internal fun settingsTopLevelSearchItems(
         ),
         SettingsSearchItem(
             SettingsSectionId.Core,
-            stringResource(R.string.settings_selector_management),
-            stringResource(R.string.settings_selector_management_summary),
+            stringResource(R.string.settings_endpoint_management),
+            stringResource(R.string.settings_endpoint_management_summary),
         ),
         SettingsSearchItem(
             SettingsSectionId.Core,
-            stringResource(R.string.settings_endpoint_management),
-            stringResource(R.string.settings_endpoint_management_summary),
+            stringResource(R.string.settings_selector_management),
+            stringResource(R.string.settings_selector_management_summary),
         ),
         SettingsSearchItem(
             SettingsSectionId.Core,

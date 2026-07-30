@@ -29,8 +29,8 @@ internal val SettingsCoreItems = listOf(
     SettingsCoreItem.DnsManagement,
     SettingsCoreItem.Sniffer,
     SettingsCoreItem.Outbounds,
-    SettingsCoreItem.Selectors,
     SettingsCoreItem.Endpoints,
+    SettingsCoreItem.Selectors,
     SettingsCoreItem.Routing,
     SettingsCoreItem.LogLevel,
 )
