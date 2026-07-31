@@ -15,7 +15,7 @@
         },
         {
             "uniqueId": "com.github.asterisk4magisk:libbox",
-            "artifactVersion": "v1.14.0-beta.3",
+            "artifactVersion": "v1.14.0-beta.4",
             "name": "AndroidLibBoxLite",
             "description": "Pinned Android JNI and command API bindings for sing-box.",
             "website": "https://github.com/Asterisk4Magisk/AndroidLibBoxLite",
@@ -327,7 +327,7 @@
         },
         {
             "uniqueId": "github:SagerNet/sing-box",
-            "artifactVersion": "v1.14.0-beta.3",
+            "artifactVersion": "v1.14.0-beta.4",
             "name": "sing-box",
             "description": "An open platform for proxy and anti-censorship networking.",
             "website": "https://github.com/SagerNet/sing-box",
