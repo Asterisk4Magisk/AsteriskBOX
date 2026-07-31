@@ -76,19 +76,25 @@ val DefaultSingBoxDnsRules = listOf(
 val DefaultSingBoxRouteRules = listOf(
     SingBoxRouteRuleState(
         id = 1,
+        remarks = "private_ip",
+        ipIsPrivate = true,
+        outbound = APP_DIRECT_OUTBOUND,
+    ),
+    SingBoxRouteRuleState(
+        id = 2,
         remarks = "block_udp_443",
         network = listOf("udp"),
         port = listOf("443"),
         action = SingBoxRouteRuleActionReject,
     ),
     SingBoxRouteRuleState(
-        id = 2,
+        id = 3,
         remarks = "google",
         ruleSet = listOf(managedBundledRuleSetTag(ResourceFileKind.GeositeGoogle)),
         outbound = APP_GLOBAL_SELECTOR,
     ),
     SingBoxRouteRuleState(
-        id = 3,
+        id = 4,
         remarks = "china_ip_site",
         ruleSet = listOf(
             managedBundledRuleSetTag(ResourceFileKind.GeositeCn),
