@@ -7,15 +7,12 @@ import app.ResourceFileKind
 import app.SingBoxDnsRuleMatchState
 import app.SingBoxDnsRuleState
 import app.SingBoxDnsServerState
+import app.SingBoxRouteRuleActionReject
 import app.SingBoxRouteRuleState
 import app.managedBundledRuleSetTag
 import app.managedDnsServerTag
 import engine.singbox.config.APP_DIRECT_OUTBOUND
 import engine.singbox.config.APP_GLOBAL_SELECTOR
-
-const val SingBoxSnifferProtocolOverrideFollowGlobal = 0
-const val SingBoxSnifferProtocolOverrideEnabled = 1
-const val SingBoxSnifferProtocolOverrideDisabled = 2
 
 const val DefaultSingBoxDnsFakeIpRange = "198.18.0.1/16"
 val DefaultSingBoxDnsFinal = managedDnsServerTag(2)
@@ -50,7 +47,7 @@ val DefaultSingBoxDnsRules = listOf(
                 ),
             ),
         ),
-        action = "reject",
+        action = SingBoxRouteRuleActionReject,
         server = managedDnsServerTag(2),
     ),
     SingBoxDnsRuleState(
@@ -79,12 +76,19 @@ val DefaultSingBoxDnsRules = listOf(
 val DefaultSingBoxRouteRules = listOf(
     SingBoxRouteRuleState(
         id = 1,
+        remarks = "block_udp_443",
+        network = listOf("udp"),
+        port = listOf("443"),
+        action = SingBoxRouteRuleActionReject,
+    ),
+    SingBoxRouteRuleState(
+        id = 2,
         remarks = "google",
         ruleSet = listOf(managedBundledRuleSetTag(ResourceFileKind.GeositeGoogle)),
         outbound = APP_GLOBAL_SELECTOR,
     ),
     SingBoxRouteRuleState(
-        id = 2,
+        id = 3,
         remarks = "china_ip_site",
         ruleSet = listOf(
             managedBundledRuleSetTag(ResourceFileKind.GeositeCn),
