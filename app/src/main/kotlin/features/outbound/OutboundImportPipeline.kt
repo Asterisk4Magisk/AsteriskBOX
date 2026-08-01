@@ -939,7 +939,7 @@ private object ProxyUrlOutboundParser {
                 .any { key -> query.first(key).isNotBlank() }
         ) return null
         if (
-            listOf("pinSHA256", "pcs", "vcn", "pqv", "spx", "fm")
+            listOf("pinSHA256", "pcs", "vcn", "pqv", "fm")
                 .any { key -> query.first(key).isNotBlank() }
         ) return null
         if (type == "naive") validateNaiveUrlOptions(query)
