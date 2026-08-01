@@ -5,6 +5,7 @@ package engine.proxy
 
 import app.AppState
 import app.modes.RunModeBpf2Socks
+import app.modes.RunModeEbpf
 import app.modes.RunModeTun2Socks
 import app.modes.RunModeTproxy
 import engine.network.findAvailableTcpPort
@@ -81,7 +82,7 @@ private fun AppState.localProxyListenAddress(): String {
     }
 }
 
-private fun AppState.localProxyExcludedPorts(): Set<Int> {
+internal fun AppState.localProxyExcludedPorts(): Set<Int> {
     return buildSet {
         if (runMode == RunModeTproxy) {
             add(transparentProxyPort.toPortOrNull() ?: DefaultTproxyPort)
@@ -91,6 +92,8 @@ private fun AppState.localProxyExcludedPorts(): Set<Int> {
         }
         if (runMode == RunModeBpf2Socks) {
             add(socks5ProxyPort.toPortOrNull() ?: DefaultTun2SocksProxyPort)
+        }
+        if (runMode == RunModeBpf2Socks || runMode == RunModeEbpf) {
             add(bpf2SocksBridgePort.toPortOrNull() ?: RootBpf2SocksDefaultBridgePort)
         }
     }

@@ -18,9 +18,11 @@ import ui.icons.AsteriskIcons as Icons
 internal fun LocalProxySettingsBottomSheet(
     show: Boolean,
     saving: Boolean,
+    showBridgeOrEbpfPort: Boolean,
     showInboundProxyPort: Boolean,
     useTun2SocksProxyPort: Boolean,
     useBpf2SocksProxyPort: Boolean,
+    useEbpfListenPort: Boolean,
     lockInboundProxyPort: Boolean,
     inboundProxyPort: String,
     bpf2SocksBridgePort: String,
@@ -39,7 +41,7 @@ internal fun LocalProxySettingsBottomSheet(
     onDismissRequest: () -> Unit,
     onSave: (String, String, String, Boolean, Boolean, String, String) -> Unit,
 ) {
-    val bridgePortError = if (useBpf2SocksProxyPort && !lockInboundProxyPort && !isPort(bpf2SocksBridgePort)) {
+    val bridgePortError = if (showBridgeOrEbpfPort && !lockInboundProxyPort && !isPort(bpf2SocksBridgePort)) {
         stringResource(R.string.settings_local_proxy_port_invalid)
     } else {
         null
@@ -87,18 +89,31 @@ internal fun LocalProxySettingsBottomSheet(
         },
         onDismissRequest = onDismissRequest,
     ) {
-        key(show, showInboundProxyPort, useTun2SocksProxyPort, useBpf2SocksProxyPort) {
+        key(
+            show,
+            showBridgeOrEbpfPort,
+            showInboundProxyPort,
+            useTun2SocksProxyPort,
+            useBpf2SocksProxyPort,
+            useEbpfListenPort,
+        ) {
             SettingsSheetContent {
+                if (showBridgeOrEbpfPort) {
+                    InboundProxyPortTextField(
+                        value = bpf2SocksBridgePort,
+                        onValueChange = onBpf2SocksBridgePortChange,
+                        label = stringResource(
+                            if (useEbpfListenPort) {
+                                R.string.settings_ebpf_listen_port
+                            } else {
+                                R.string.settings_bpf2socks_bridge_port
+                            },
+                        ),
+                        errorText = bridgePortError,
+                        enabled = !lockInboundProxyPort,
+                    )
+                }
                 if (showInboundProxyPort) {
-                    if (useBpf2SocksProxyPort) {
-                        InboundProxyPortTextField(
-                            value = bpf2SocksBridgePort,
-                            onValueChange = onBpf2SocksBridgePortChange,
-                            label = stringResource(R.string.settings_bpf2socks_bridge_port),
-                            errorText = bridgePortError,
-                            enabled = !lockInboundProxyPort,
-                        )
-                    }
                     InboundProxyPortTextField(
                         value = inboundProxyPort,
                         onValueChange = onInboundProxyPortChange,

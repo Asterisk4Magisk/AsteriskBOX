@@ -49,7 +49,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
@@ -64,18 +63,18 @@ import app.LocalAppStateStore
 import app.LocalIsWideScreen
 import app.LocalNavigator
 import app.LocalUpdateAppState
-import org.asterisk.zcc.abox.R
 import app.collectAppState
-import app.modes.SingBoxModeDirect
-import app.modes.SingBoxModeGlobal
-import app.modes.SingBoxModeRule
 import app.modes.RunModeBpf2Socks
+import app.modes.RunModeEbpf
 import app.modes.RunModeTproxy
 import app.modes.RunModeTun
 import app.modes.RunModeTun2Socks
+import app.modes.SingBoxModeDirect
+import app.modes.SingBoxModeGlobal
+import app.modes.SingBoxModeRule
+import engine.proxy.ProxyServiceResult
 import engine.singbox.runtime.SingBoxTrafficSample
 import engine.singbox.runtime.SingBoxTrafficState
-import engine.proxy.ProxyServiceResult
 import features.home.HomeControllerState
 import features.home.HomeMonitoringOverviewState
 import features.home.HomeNetworkActivityState
@@ -93,6 +92,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
+import org.asterisk.zcc.abox.R
 import ui.components.AsteriskExpressiveCard
 import ui.components.AsteriskFocusSurface
 import ui.components.AsteriskPageCard
@@ -626,6 +626,7 @@ private fun runModeLabel(runMode: Int): String {
             RunModeTun -> R.string.settings_run_mode_tun
             RunModeTun2Socks -> R.string.settings_run_mode_tun2socks
             RunModeBpf2Socks -> R.string.settings_run_mode_bpf2socks
+            RunModeEbpf -> R.string.settings_run_mode_ebpf
             else -> R.string.settings_run_mode_vpn_service
         },
     )

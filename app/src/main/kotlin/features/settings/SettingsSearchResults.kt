@@ -30,6 +30,7 @@ internal fun filterSettingsSearchEntries(
 
 @Composable
 internal fun settingsTopLevelSearchItems(
+    useEbpfSharedNetwork: Boolean,
     colorModeOptions: List<String>,
     colorMode: Int,
     keyColorOptions: List<String>,
@@ -50,7 +51,7 @@ internal fun settingsTopLevelSearchItems(
         options.getOrNull(index).orEmpty()
 
     val coreLogLevelLabels = settingsCoreLogLevelLabels()
-    return listOf(
+    return listOfNotNull(
         SettingsSearchItem(
             SettingsSectionId.Theme,
             stringResource(R.string.settings_color_mode),
@@ -154,24 +155,60 @@ internal fun settingsTopLevelSearchItems(
             stringResource(R.string.settings_root_boot_script),
             stringResource(R.string.settings_root_boot_script_summary),
         ),
-        SettingsSearchItem(
-            SettingsSectionId.Tproxy,
-            stringResource(R.string.settings_root_ebpf_matcher),
-            stringResource(R.string.settings_root_ebpf_matcher_summary),
-        ),
+        if (useEbpfSharedNetwork) {
+            null
+        } else {
+            SettingsSearchItem(
+                SettingsSectionId.Tproxy,
+                stringResource(R.string.settings_root_ebpf_matcher),
+                stringResource(R.string.settings_root_ebpf_matcher_summary),
+            )
+        },
         SettingsSearchItem(
             SettingsSectionId.Tproxy,
             stringResource(R.string.settings_root_ebpf_bypass_direct_cidrs),
-            stringResource(R.string.settings_root_ebpf_bypass_direct_cidrs_summary),
+            stringResource(
+                if (useEbpfSharedNetwork) {
+                    R.string.settings_ebpf_bypass_direct_rule_sets_summary
+                } else {
+                    R.string.settings_root_ebpf_bypass_direct_cidrs_summary
+                },
+            ),
         ),
         SettingsSearchItem(
             SettingsSectionId.Tproxy,
             stringResource(R.string.settings_root_ipv6_disabler),
             stringResource(R.string.settings_root_ipv6_disabler_summary),
         ),
-        SettingsSearchItem(SettingsSectionId.Tproxy, stringResource(R.string.settings_external_interfaces), externalInterfacesSummary),
-        SettingsSearchItem(SettingsSectionId.Tproxy, stringResource(R.string.settings_ignored_interfaces), ignoredInterfacesSummary),
-        SettingsSearchItem(SettingsSectionId.Tproxy, stringResource(R.string.settings_private_addresses), privateAddressesSummary),
+        SettingsSearchItem(
+            SettingsSectionId.Tproxy,
+            stringResource(
+                if (useEbpfSharedNetwork) {
+                    R.string.settings_ebpf_shared_network
+                } else {
+                    R.string.settings_external_interfaces
+                },
+            ),
+            externalInterfacesSummary,
+        ),
+        if (useEbpfSharedNetwork) {
+            null
+        } else {
+            SettingsSearchItem(
+                SettingsSectionId.Tproxy,
+                stringResource(R.string.settings_ignored_interfaces),
+                ignoredInterfacesSummary,
+            )
+        },
+        if (useEbpfSharedNetwork) {
+            null
+        } else {
+            SettingsSearchItem(
+                SettingsSectionId.Tproxy,
+                stringResource(R.string.settings_private_addresses),
+                privateAddressesSummary,
+            )
+        },
         SettingsSearchItem(SettingsSectionId.Logs, stringResource(R.string.settings_core_logs)),
         SettingsSearchItem(SettingsSectionId.Logs, stringResource(R.string.settings_logcat)),
         SettingsSearchItem(SettingsSectionId.About, stringResource(R.string.settings_about_project)),
@@ -206,6 +243,7 @@ internal fun SettingsNestedSearchResults(
 
 @Composable
 internal fun settingsNestedSearchEntries(
+    useEbpfSharedNetwork: Boolean,
     onOpenDns: () -> Unit,
     onOpenSniffer: () -> Unit,
     onOpenLocalProxy: () -> Unit,
@@ -218,7 +256,13 @@ internal fun settingsNestedSearchEntries(
     val sniffer = stringResource(R.string.settings_sniffer)
     val localProxy = stringResource(R.string.settings_local_proxy)
     val tun = stringResource(R.string.settings_tun)
-    val externalInterfaces = stringResource(R.string.settings_external_interfaces)
+    val externalInterfaces = stringResource(
+        if (useEbpfSharedNetwork) {
+            R.string.settings_ebpf_shared_network
+        } else {
+            R.string.settings_external_interfaces
+        },
+    )
     val ignoredInterfaces = stringResource(R.string.settings_ignored_interfaces)
     val privateAddresses = stringResource(R.string.settings_private_addresses)
 
@@ -252,12 +296,19 @@ internal fun settingsNestedSearchEntries(
         stringResource(R.string.settings_tun_ipv4_cidr),
         stringResource(R.string.settings_tun_ipv6_cidr),
     )
-    val externalItems = listOf(
-        stringResource(R.string.settings_external_interfaces_wifi),
-        stringResource(R.string.settings_external_interfaces_usb),
-        stringResource(R.string.settings_external_interfaces_bluetooth),
-        stringResource(R.string.settings_external_interfaces_ethernet),
-    )
+    val externalItems = if (useEbpfSharedNetwork) {
+        listOf(
+            stringResource(R.string.settings_ebpf_shared_network_input),
+            stringResource(R.string.settings_ebpf_shared_network_description),
+        )
+    } else {
+        listOf(
+            stringResource(R.string.settings_external_interfaces_wifi),
+            stringResource(R.string.settings_external_interfaces_usb),
+            stringResource(R.string.settings_external_interfaces_bluetooth),
+            stringResource(R.string.settings_external_interfaces_ethernet),
+        )
+    }
 
     return buildList {
         dnsItems.forEach { add(SettingsSearchEntry(it, dns, Icons.Rounded.Dns, onOpenDns)) }
@@ -265,7 +316,9 @@ internal fun settingsNestedSearchEntries(
         localProxyItems.forEach { add(SettingsSearchEntry(it, localProxy, Icons.Rounded.Router, onOpenLocalProxy)) }
         tunItems.forEach { add(SettingsSearchEntry(it, tun, Icons.Rounded.SettingsInputComponent, onOpenTun)) }
         externalItems.forEach { add(SettingsSearchEntry(it, externalInterfaces, Icons.Rounded.Cable, onOpenExternalInterfaces)) }
-        add(SettingsSearchEntry(ignoredInterfaces, ignoredInterfaces, Icons.Rounded.Block, onOpenIgnoredInterfaces))
-        add(SettingsSearchEntry(privateAddresses, privateAddresses, Icons.Rounded.HomeWork, onOpenPrivateAddresses))
+        if (!useEbpfSharedNetwork) {
+            add(SettingsSearchEntry(ignoredInterfaces, ignoredInterfaces, Icons.Rounded.Block, onOpenIgnoredInterfaces))
+            add(SettingsSearchEntry(privateAddresses, privateAddresses, Icons.Rounded.HomeWork, onOpenPrivateAddresses))
+        }
     }
 }

@@ -36,6 +36,7 @@ import org.asterisk.zcc.abox.R
 import app.collectAppState
 import app.withPrunedManagedInboundReferences
 import app.modes.RunModeBpf2Socks
+import app.modes.RunModeEbpf
 import app.modes.RunModeTproxy
 import app.modes.RunModeTun
 import app.modes.RunModeTun2Socks
@@ -44,6 +45,7 @@ import app.modes.isRootRunMode
 import app.navigation.Route
 import engine.proxy.withResolvedDynamicLocalProxyPort
 import features.settings.sheets.externalInterfacesSummary
+import features.settings.sheets.ebpfSharedNetworkInterfacesSummary
 import features.settings.sheets.ignoredInterfacesSummary
 import features.settings.sheets.privateAddressCidrsSummary
 import features.settings.sheets.snifferSettingsSummary
@@ -142,6 +144,7 @@ private fun SettingsContent(
         RunModeVpnService to stringResource(R.string.settings_run_mode_vpn_service),
         RunModeTproxy to stringResource(R.string.settings_run_mode_tproxy),
         RunModeTun to stringResource(R.string.settings_run_mode_tun),
+        RunModeEbpf to stringResource(R.string.settings_run_mode_ebpf),
         RunModeTun2Socks to stringResource(R.string.settings_run_mode_tun2socks),
         RunModeBpf2Socks to stringResource(R.string.settings_run_mode_bpf2socks),
     )
@@ -179,7 +182,11 @@ private fun SettingsContent(
         bpf2SocksBridgePort = appState.bpf2SocksBridgePort,
         socks5ProxyPort = appState.socks5ProxyPort,
     )
-    val externalInterfacesSummary = externalInterfacesSummary(appState.externalInterfaces)
+    val externalInterfacesSummary = if (appState.runMode == RunModeEbpf) {
+        ebpfSharedNetworkInterfacesSummary(appState.ebpfSharedNetworkInterfaces)
+    } else {
+        externalInterfacesSummary(appState.externalInterfaces)
+    }
     val ignoredInterfacesSummary = ignoredInterfacesSummary(appState.ignoredInterfaces)
     val privateAddressCidrsSummary = privateAddressCidrsSummary(appState.privateAddressCidrs)
     val snifferSummary = snifferSettingsSummary(
@@ -198,13 +205,20 @@ private fun SettingsContent(
     )
     val sheetState = rememberSettingsSheetState(updateAppState)
     val nestedSearchEntries = settingsNestedSearchEntries(
+        useEbpfSharedNetwork = appState.runMode == RunModeEbpf,
         onOpenDns = {
             navigator.push(Route.DnsManagement(openSettings = true))
         },
         onOpenSniffer = { sheetState.openSnifferSettings(appState) },
         onOpenLocalProxy = { sheetState.openLocalProxySettings(appState) },
         onOpenTun = { sheetState.openTunSettings(appState) },
-        onOpenExternalInterfaces = { sheetState.openExternalInterfaces(appState) },
+        onOpenExternalInterfaces = {
+            if (appState.runMode == RunModeEbpf) {
+                sheetState.openEbpfSharedNetwork(appState)
+            } else {
+                sheetState.openExternalInterfaces(appState)
+            }
+        },
         onOpenIgnoredInterfaces = {
             sheetState.openIgnoredInterfaces(appState)
             scope.launch {
@@ -218,6 +232,7 @@ private fun SettingsContent(
         onOpenPrivateAddresses = { sheetState.openPrivateAddresses(appState) },
     )
     val topLevelSearchItems = settingsTopLevelSearchItems(
+        useEbpfSharedNetwork = appState.runMode == RunModeEbpf,
         colorModeOptions = colorModeOptions,
         colorMode = appState.colorMode,
         keyColorOptions = keyColorOptions,
@@ -482,7 +497,13 @@ private fun SettingsContent(
                     onEnableRootIpv6DisablerChange = { enabled ->
                         updateAppState { state -> state.copy(enableRootIpv6Disabler = enabled) }
                     },
-                    onOpenExternalInterfaces = { sheetState.openExternalInterfaces(appState) },
+                    onOpenExternalInterfaces = {
+                        if (appState.runMode == RunModeEbpf) {
+                            sheetState.openEbpfSharedNetwork(appState)
+                        } else {
+                            sheetState.openExternalInterfaces(appState)
+                        }
+                    },
                     onOpenIgnoredInterfaces = {
                         sheetState.openIgnoredInterfaces(appState)
                         scope.launch {

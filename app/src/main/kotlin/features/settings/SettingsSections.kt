@@ -4,6 +4,7 @@
 package features.settings
 
 import app.modes.RunModeBpf2Socks
+import app.modes.RunModeEbpf
 import app.modes.RunModeTun
 import app.modes.RunModeTun2Socks
 import app.modes.RunModeVpnService
@@ -298,6 +299,7 @@ internal fun SettingsProxyModeSections(
                 text = stringResource(
                     when (runMode) {
                         RunModeTun -> R.string.settings_proxy_tun
+                        RunModeEbpf -> R.string.settings_proxy_ebpf
                         RunModeTun2Socks -> R.string.settings_proxy_tun2socks
                         RunModeBpf2Socks -> R.string.settings_proxy_bpf2socks
                         else -> R.string.settings_proxy_tproxy
@@ -319,7 +321,7 @@ internal fun SettingsProxyModeSections(
                     )
                 }
                 AnimatedVisibility(
-                    visible = runMode != RunModeBpf2Socks,
+                    visible = runMode != RunModeBpf2Socks && runMode != RunModeEbpf,
             enter = AsteriskMotion.contentEnter(),
             exit = AsteriskMotion.contentExit(),
                 ) {
@@ -332,14 +334,22 @@ internal fun SettingsProxyModeSections(
                     )
                 }
                 AnimatedVisibility(
-                    visible = enableRootEbpfRules || runMode == RunModeBpf2Socks,
+                    visible = enableRootEbpfRules ||
+                        runMode == RunModeBpf2Socks ||
+                        runMode == RunModeEbpf,
             enter = AsteriskMotion.contentEnter(),
             exit = AsteriskMotion.contentExit(),
                 ) {
                     SwitchPreference(
                         title = stringResource(R.string.settings_root_ebpf_bypass_direct_cidrs),
                         icon = Icons.Rounded.Route,
-                        summary = stringResource(R.string.settings_root_ebpf_bypass_direct_cidrs_summary),
+                        summary = stringResource(
+                            if (runMode == RunModeEbpf) {
+                                R.string.settings_ebpf_bypass_direct_rule_sets_summary
+                            } else {
+                                R.string.settings_root_ebpf_bypass_direct_cidrs_summary
+                            },
+                        ),
                         checked = enableRootEbpfDirectCidrBypass,
                         onCheckedChange = onEnableRootEbpfDirectCidrBypassChange,
                     )
@@ -375,24 +385,54 @@ internal fun SettingsProxyModeSections(
                         onClick = onOpenTunSettings,
                     )
                 }
-                ArrowPreference(
-                    title = stringResource(R.string.settings_external_interfaces),
-                    icon = Icons.Rounded.Cable,
-                    summary = externalInterfacesSummary,
-                    onClick = onOpenExternalInterfaces,
-                )
-                ArrowPreference(
-                    title = stringResource(R.string.settings_ignored_interfaces),
-                    icon = Icons.Rounded.Block,
-                    summary = ignoredInterfacesSummary,
-                    onClick = onOpenIgnoredInterfaces,
-                )
-                ArrowPreference(
-                    title = stringResource(R.string.settings_private_addresses),
-                    icon = Icons.Rounded.HomeWork,
-                    summary = privateAddressCidrsSummary,
-                    onClick = onOpenPrivateAddresses,
-                )
+                AnimatedVisibility(
+                    visible = runMode == RunModeEbpf,
+                    enter = AsteriskMotion.contentEnter(),
+                    exit = AsteriskMotion.contentExit(),
+                ) {
+                    ArrowPreference(
+                        title = stringResource(R.string.settings_ebpf_shared_network),
+                        icon = Icons.Rounded.Cable,
+                        summary = externalInterfacesSummary,
+                        onClick = onOpenExternalInterfaces,
+                    )
+                }
+                AnimatedVisibility(
+                    visible = runMode != RunModeEbpf,
+                    enter = AsteriskMotion.contentEnter(),
+                    exit = AsteriskMotion.contentExit(),
+                ) {
+                    ArrowPreference(
+                        title = stringResource(R.string.settings_external_interfaces),
+                        icon = Icons.Rounded.Cable,
+                        summary = externalInterfacesSummary,
+                        onClick = onOpenExternalInterfaces,
+                    )
+                }
+                AnimatedVisibility(
+                    visible = runMode != RunModeEbpf,
+                    enter = AsteriskMotion.contentEnter(),
+                    exit = AsteriskMotion.contentExit(),
+                ) {
+                    ArrowPreference(
+                        title = stringResource(R.string.settings_ignored_interfaces),
+                        icon = Icons.Rounded.Block,
+                        summary = ignoredInterfacesSummary,
+                        onClick = onOpenIgnoredInterfaces,
+                    )
+                }
+                AnimatedVisibility(
+                    visible = runMode != RunModeEbpf,
+                    enter = AsteriskMotion.contentEnter(),
+                    exit = AsteriskMotion.contentExit(),
+                ) {
+                    ArrowPreference(
+                        title = stringResource(R.string.settings_private_addresses),
+                        icon = Icons.Rounded.HomeWork,
+                        summary = privateAddressCidrsSummary,
+                        onClick = onOpenPrivateAddresses,
+                    )
+                }
             }
         }
     }

@@ -14,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import app.AppState
 import app.LocalAppServices
 import features.settings.sheets.ExternalInterfacesBottomSheet
+import features.settings.sheets.EbpfSharedNetworkBottomSheet
 import features.settings.sheets.IgnoredInterfacesBottomSheet
 import features.settings.sheets.LocalProxySettingsBottomSheet
 import features.settings.sheets.PrivateAddressBottomSheet
@@ -23,10 +24,12 @@ import features.settings.sheets.orderedBy
 import features.settings.sheets.sanitizeExternalInterfaces
 import features.settings.sheets.sanitizePrivateAddressCidrs
 import app.modes.RunModeBpf2Socks
+import app.modes.RunModeEbpf
 import app.modes.RunModeTun2Socks
 import app.modes.RunModeTproxy
 import app.modes.RunModeVpnService
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
+import features.settings.sheets.sanitizeEbpfSharedNetworkInterfaces
 import features.logs.FailureLogContext
 import features.logs.reportFailure
 import kotlinx.coroutines.CancellationException
@@ -95,14 +98,18 @@ internal fun SettingsBottomSheetsHost(
     LocalProxySettingsBottomSheet(
         show = sheetState.showLocalProxySettings,
         saving = validating,
+        showBridgeOrEbpfPort = appState.runMode == RunModeBpf2Socks ||
+            appState.runMode == RunModeEbpf,
         showInboundProxyPort = appState.runMode == RunModeTproxy ||
             appState.runMode == RunModeTun2Socks ||
             appState.runMode == RunModeBpf2Socks,
         useTun2SocksProxyPort = appState.runMode == RunModeTun2Socks,
         useBpf2SocksProxyPort = appState.runMode == RunModeBpf2Socks,
+        useEbpfListenPort = appState.runMode == RunModeEbpf,
         lockInboundProxyPort = (appState.runMode == RunModeTproxy ||
             appState.runMode == RunModeTun2Socks ||
-            appState.runMode == RunModeBpf2Socks) &&
+            appState.runMode == RunModeBpf2Socks ||
+            appState.runMode == RunModeEbpf) &&
             appState.proxyRunning,
         inboundProxyPort = if (appState.runMode == RunModeTun2Socks) {
             sheetState.localProxySettingsDraft.socks5ProxyPort
@@ -153,7 +160,8 @@ internal fun SettingsBottomSheetsHost(
                 transform = { state ->
                     val lockInboundProxyPort = (state.runMode == RunModeTproxy ||
                         state.runMode == RunModeTun2Socks ||
-                        state.runMode == RunModeBpf2Socks) &&
+                        state.runMode == RunModeBpf2Socks ||
+                        state.runMode == RunModeEbpf) &&
                         state.proxyRunning
                     state.copy(
                         transparentProxyPort = when {
@@ -169,7 +177,8 @@ internal fun SettingsBottomSheetsHost(
                         },
                         bpf2SocksBridgePort = when {
                             lockInboundProxyPort -> state.bpf2SocksBridgePort
-                            state.runMode == RunModeBpf2Socks -> bpf2SocksBridgePort
+                            state.runMode == RunModeBpf2Socks ||
+                                state.runMode == RunModeEbpf -> bpf2SocksBridgePort
                             else -> state.bpf2SocksBridgePort
                         },
                         localProxyPort = port,
@@ -277,6 +286,23 @@ internal fun SettingsBottomSheetsHost(
         onSave = { cidrs ->
             updateAppState { state -> state.copy(privateAddressCidrs = cidrs.sanitizePrivateAddressCidrs()) }
             sheetState.showPrivateAddresses = false
+        },
+    )
+    EbpfSharedNetworkBottomSheet(
+        show = sheetState.showEbpfSharedNetwork,
+        interfaces = sheetState.ebpfSharedNetworkInterfacesDraft,
+        onInterfacesChange = { interfaces ->
+            sheetState.ebpfSharedNetworkInterfacesDraft =
+                interfaces.sanitizeEbpfSharedNetworkInterfaces()
+        },
+        onDismissRequest = { sheetState.showEbpfSharedNetwork = false },
+        onSave = { interfaces ->
+            updateAppState { state ->
+                state.copy(
+                    ebpfSharedNetworkInterfaces = interfaces.sanitizeEbpfSharedNetworkInterfaces(),
+                )
+            }
+            sheetState.showEbpfSharedNetwork = false
         },
     )
 }

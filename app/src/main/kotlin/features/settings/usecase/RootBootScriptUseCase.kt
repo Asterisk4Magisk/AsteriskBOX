@@ -6,6 +6,7 @@ package features.settings.usecase
 import android.content.Context
 import app.AppState
 import app.modes.RunModeBpf2Socks
+import app.modes.RunModeEbpf
 import app.modes.RunModeTun
 import app.modes.RunModeTproxy
 import app.modes.RunModeTun2Socks
@@ -15,6 +16,8 @@ import engine.root.prepareRootConfigBuildContext
 import engine.root.prepareRootRuntimeLayout
 import engine.bpf2socks.Bpf2SocksRootRunner
 import engine.bpf2socks.buildBpf2SocksStartConfig
+import engine.ebpf.EbpfRootRunner
+import engine.ebpf.buildEbpfStartConfig
 import engine.root.removeRootBootScript
 import engine.singbox.prepareSingBoxCoreLogPaths
 import engine.tun.TunRootRunner
@@ -35,6 +38,7 @@ internal class RootBootScriptUseCase(
     private val tunRootRunner = TunRootRunner(rootAccess)
     private val tun2SocksRootRunner = Tun2SocksRootRunner(rootAccess)
     private val bpf2SocksRootRunner = Bpf2SocksRootRunner(rootAccess)
+    private val ebpfRootRunner = EbpfRootRunner(rootAccess)
 
     suspend fun setEnabled(
         state: AppState,
@@ -98,6 +102,7 @@ internal class RootBootScriptUseCase(
             RunModeTun -> tunRootRunner.installBootScript(rootContext.buildTunStartConfig())
             RunModeTun2Socks -> tun2SocksRootRunner.installBootScript(rootContext.buildTun2SocksStartConfig())
             RunModeBpf2Socks -> bpf2SocksRootRunner.installBootScript(rootContext.buildBpf2SocksStartConfig())
+            RunModeEbpf -> ebpfRootRunner.installBootScript(rootContext.buildEbpfStartConfig())
         }
     }
 }

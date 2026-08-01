@@ -122,6 +122,7 @@ data class AppState(
     val bpf2SocksBridgePort: String = RootBpf2SocksDefaultBridgePort.toString(),
 
     val externalInterfaces: List<String> = emptyList(),
+    val ebpfSharedNetworkInterfaces: List<String> = emptyList(),
     val ignoredInterfaces: List<String> = emptyList(),
     val privateAddressCidrs: List<String> = emptyList(),
 

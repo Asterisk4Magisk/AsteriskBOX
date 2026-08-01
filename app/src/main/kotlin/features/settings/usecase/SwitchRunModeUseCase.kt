@@ -5,12 +5,9 @@ package features.settings.usecase
 
 import android.content.Context
 import app.AppState
-import app.modes.RunModeBpf2Socks
-import app.modes.RunModeTun
 import app.modes.RunModeTun2Socks
-import app.modes.RunModeTproxy
-import app.modes.RunModeVpnService
 import app.modes.isRootRunMode
+import app.modes.normalizeRunMode
 import engine.hevtun.deleteHevSocks5TunnelLogFile
 import engine.proxy.AndroidProxyEngine
 import engine.root.deleteAsteriskdLogFile
@@ -39,13 +36,7 @@ internal class SwitchRunModeUseCase(
         currentState: AppState,
         targetRunMode: Int,
     ): SwitchRunModeResult {
-        val normalizedTargetMode = when (targetRunMode) {
-            RunModeTproxy -> RunModeTproxy
-            RunModeTun -> RunModeTun
-            RunModeTun2Socks -> RunModeTun2Socks
-            RunModeBpf2Socks -> RunModeBpf2Socks
-            else -> RunModeVpnService
-        }
+        val normalizedTargetMode = normalizeRunMode(targetRunMode)
         if (currentState.runMode == normalizedTargetMode) {
             return SwitchRunModeResult.Success(
                 runMode = currentState.runMode,

@@ -10,7 +10,7 @@ An Android sing-box GUI client. VPN Service mode uses [AndroidLibBoxLite](https:
 
 ## Features
 
-- VPN Service, TPROXY(ROOT), TUN(ROOT), TUN2SOCKS(ROOT), and BPF2SOCKS(ROOT) run modes
+- VPN Service, TPROXY(ROOT), TUN(ROOT), eBPF(ROOT), TUN2SOCKS(ROOT), and BPF2SOCKS(ROOT) run modes
 - Strict sing-box JSON configurations from QR code, local file, or URL subscription
 - Official sing-box command API for status, traffic, connections, modes, proxy selection, and delay tests
 - ROOT start-on-boot script generation through Magisk `service.d`
@@ -35,6 +35,14 @@ An Android sing-box GUI client. VPN Service mode uses [AndroidLibBoxLite](https:
 - Keeps sing-box `auto_route` disabled and applies app-managed iptables and policy routing rules.
 - Supports the System, gVisor, and Mixed TUN stacks.
 
+### eBPF(ROOT)
+
+- Uses the reF1nd sing-box eBPF inbound to attach cgroup socket-address programs directly.
+- Does not use a TUN device, TProxy, iptables, policy routing, a Bridge helper, or a local SOCKS5 intermediary.
+- The direct-bypass switch copies rule sets routed to the direct outbound into `bypass_rule_set`.
+- Optional shared-network TC uses exact downstream interface names. Wildcards and interface prefixes are not supported.
+- Availability depends on device kernel, cgroup v2, and eBPF support.
+
 ### TUN2SOCKS(ROOT)
 
 - Uses `hev-socks5-tunnel` to create `asterisk0`.
@@ -47,7 +55,7 @@ An Android sing-box GUI client. VPN Service mode uses [AndroidLibBoxLite](https:
 
 ### ROOT address monitor
 
-All ROOT modes use the native `asteriskd` monitor to maintain local-address bypass rules and optional IPv6 state. Runtime binaries, configuration, PID files, helpers, and logs remain in the app-private `files/sing-box` directory. Only the boot entry script is installed outside it at `/data/adb/service.d/asteriskbox_start.sh`.
+ROOT modes use the native `asteriskd` monitor to maintain local-address bypass rules and optional IPv6 state. Runtime binaries, configuration, PID files, helpers, and logs remain in the app-private `files/sing-box` directory. Only the boot entry script is installed outside it at `/data/adb/service.d/asteriskbox_start.sh`.
 
 ## Resource Files
 

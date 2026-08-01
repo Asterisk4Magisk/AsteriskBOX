@@ -15,6 +15,8 @@
     <string name="error_tun2socks_start_failed">Failed to start TUN2SOCKS mode: %1$s</string>
     <string name="error_bpf2socks_root_required">ROOT access is required for BPF2SOCKS mode</string>
     <string name="error_bpf2socks_start_failed">Failed to start BPF2SOCKS mode: %1$s</string>
+    <string name="error_ebpf_root_required">ROOT access is required for eBPF mode</string>
+    <string name="error_ebpf_start_failed">Failed to start eBPF mode: %1$s</string>
     <string name="error_vpn_permission_launcher_missing">VPN permission launcher is not registered</string>
     <string name="error_resource_file_picker_missing">Resource file picker is not registered</string>
     <string name="error_log_export_launcher_missing">Log export launcher is not registered</string>
@@ -254,11 +256,13 @@
     <string name="settings_run_mode_tun">TUN (ROOT)</string>
     <string name="settings_run_mode_tun2socks">TUN2SOCKS (ROOT)</string>
     <string name="settings_run_mode_bpf2socks">BPF2SOCKS (ROOT)</string>
+    <string name="settings_run_mode_ebpf">eBPF (ROOT)</string>
     <string name="settings_root_required">No ROOT access detected!</string>
     <string name="settings_proxy_tproxy">Proxy settings (TPROXY)</string>
     <string name="settings_proxy_tun">Proxy settings (TUN)</string>
     <string name="settings_proxy_tun2socks">Proxy settings (TUN2SOCKS)</string>
     <string name="settings_proxy_bpf2socks">Proxy settings (BPF2SOCKS)</string>
+    <string name="settings_proxy_ebpf">Proxy settings (eBPF)</string>
     <string name="settings_proxy_vpn_service">Proxy settings (VPN Service)</string>
     <string name="settings_root_boot_script">Start on boot</string>
     <string name="settings_root_boot_script_summary">Generate service.d startup script</string>
@@ -267,6 +271,7 @@
     <string name="settings_root_ebpf_matcher_summary">Improve performance for large app lists and support address filtering</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs">Bypass direct addresses</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs_summary">Uses China address lists by default; adjust them in Resource Management</string>
+    <string name="settings_ebpf_bypass_direct_rule_sets_summary">When enabled, rule sets routed to the direct outbound are added to bypass_rule_set; when disabled, it stays empty</string>
     <string name="settings_root_ebpf_matcher_failed">Failed to probe eBPF matcher support</string>
     <string name="settings_root_ebpf_matcher_unsupported">This device does not support eBPF matcher</string>
     <string name="settings_root_ebpf_selinux_policy_warning_title">Enable eBPF matcher?</string>
@@ -290,6 +295,7 @@
     <string name="settings_local_proxy_summary_tproxy">Transparent proxy port {port}</string>
     <string name="settings_local_proxy_summary_tun2socks">TUN2SOCKS SOCKS5 port {port}</string>
     <string name="settings_local_proxy_summary_bpf2socks">Bridge port {bridgePort}, SOCKS5 port {socksPort}</string>
+    <string name="settings_local_proxy_summary_ebpf">eBPF listen port {port}</string>
     <string name="settings_vpn_append_http_proxy">Append HTTP proxy</string>
     <string name="settings_vpn_append_http_proxy_summary">Supported apps use HTTP proxy directly</string>
     <string name="settings_vpn_hev_tun">Use Hev TUN</string>
@@ -314,6 +320,12 @@
     <string name="settings_external_interfaces_usb">USB tethering</string>
     <string name="settings_external_interfaces_bluetooth">Bluetooth tethering</string>
     <string name="settings_external_interfaces_ethernet">Ethernet tethering</string>
+    <string name="settings_ebpf_shared_network_input">Downstream interface names</string>
+    <string name="settings_ebpf_shared_network">Tethering sharing</string>
+    <string name="settings_ebpf_shared_network_description">Enter one exact downstream interface name per item, such as ap0 or rndis0. Wildcard prefixes such as wlan+ are not supported. Do not enter lo, upstream network interfaces, TUN, WireGuard, PPP, IPIP, or other layer-3-only interfaces.</string>
+    <string name="settings_ebpf_shared_network_empty">No downstream interfaces configured</string>
+    <string name="settings_ebpf_shared_network_none">Not enabled</string>
+    <string name="settings_ebpf_shared_network_selected">Configured interfaces: {count}</string>
     <string name="settings_ignored_interfaces">Ignored interfaces</string>
     <string name="settings_ignored_interfaces_summary">Ignore traffic on selected interfaces to keep it out of the proxy core</string>
     <string name="settings_ignored_interfaces_none">Not selected</string>
@@ -498,6 +510,7 @@
     <string name="settings_transparent_proxy_port">Transparent proxy port</string>
     <string name="settings_tun2socks_socks5_port">TUN2SOCKS SOCKS5 port</string>
     <string name="settings_bpf2socks_bridge_port">BPF2SOCKS bridge port</string>
+    <string name="settings_ebpf_listen_port">eBPF listen port</string>
     <string name="settings_bpf2socks_socks5_port">SOCKS5 port</string>
     <string name="settings_dns_hosts_invalid">Invalid DNS hosts entry</string>
 

@@ -13,6 +13,7 @@ import features.settings.sheets.orderedBy
 import features.settings.sheets.outletInterfaceOptions
 import features.settings.sheets.sanitizeExternalInterfaces
 import features.settings.sheets.sanitizePrivateAddressCidrs
+import features.settings.sheets.sanitizeEbpfSharedNetworkInterfaces
 import system.AndroidNetworkInterfaceProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -41,6 +42,9 @@ internal class SettingsSheetState(
 
     var showPrivateAddresses by mutableStateOf(false)
     var privateAddressCidrsDraft by mutableStateOf(emptyList<String>())
+
+    var showEbpfSharedNetwork by mutableStateOf(false)
+    var ebpfSharedNetworkInterfacesDraft by mutableStateOf(emptyList<String>())
 
     fun openLocalProxySettings(appState: AppState) {
         localProxySettingsDraft = appState.toLocalProxySettingsDraft()
@@ -120,6 +124,12 @@ internal class SettingsSheetState(
             updateAppState { state -> state.copy(privateAddressCidrs = sanitizedCidrs) }
         }
         showPrivateAddresses = true
+    }
+
+    fun openEbpfSharedNetwork(appState: AppState) {
+        ebpfSharedNetworkInterfacesDraft =
+            appState.ebpfSharedNetworkInterfaces.sanitizeEbpfSharedNetworkInterfaces()
+        showEbpfSharedNetwork = true
     }
 }
 

@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import org.asterisk.zcc.abox.R
 import app.modes.RunModeBpf2Socks
+import app.modes.RunModeEbpf
 import app.modes.RunModeTun
 import app.modes.RunModeTun2Socks
 import app.modes.RunModeTproxy
@@ -15,6 +16,8 @@ import engine.proxy.mode.AndroidModeProxyEngine
 import engine.root.RootModeEngine
 import engine.bpf2socks.Bpf2SocksRootRunner
 import engine.bpf2socks.buildBpf2SocksStartConfig
+import engine.ebpf.EbpfRootRunner
+import engine.ebpf.buildEbpfStartConfig
 import engine.stats.SingBoxTrafficStatsNotificationService
 import engine.stats.toSingBoxTrafficStatsRuntime
 import engine.singbox.withResolvedSingBoxControlPort
@@ -83,6 +86,17 @@ internal class AndroidProxyEngine(
         logTag = "Bpf2SocksEngine",
         buildConfig = { rootContext -> rootContext.buildBpf2SocksStartConfig() },
     )
+    private val ebpfEngine = RootModeEngine(
+        context = appContext,
+        rootAccess = rootAccess,
+        runner = EbpfRootRunner(rootAccess),
+        runMode = RunModeEbpf,
+        rootRequiredErrorResId = R.string.error_ebpf_root_required,
+        startFailedErrorResId = R.string.error_ebpf_start_failed,
+        modeName = "eBPF",
+        logTag = "EbpfEngine",
+        buildConfig = { rootContext -> rootContext.buildEbpfStartConfig() },
+    )
     private val operationMutex = Mutex()
     private var activeEngine: AndroidModeProxyEngine? = null
 
@@ -125,6 +139,7 @@ internal class AndroidProxyEngine(
             RunModeTun -> tunEngine
             RunModeTun2Socks -> tun2SocksEngine
             RunModeBpf2Socks -> bpf2SocksEngine
+            RunModeEbpf -> ebpfEngine
             else -> vpnSingBoxEngine
         }
         val currentEngine = activeEngine ?: findEngineToStop(resolvedRequest.appState.runMode)
@@ -181,11 +196,13 @@ internal class AndroidProxyEngine(
             ?: tunEngine.takeIf { it.status().running }
             ?: tun2SocksEngine.takeIf { it.status().running }
             ?: bpf2SocksEngine.takeIf { it.status().running }
+            ?: ebpfEngine.takeIf { it.status().running }
             ?: vpnSingBoxEngine.takeIf { it.status().running }
             ?: tproxyEngine.takeIf { it.ownsRuntime() }
             ?: tunEngine.takeIf { it.ownsRuntime() }
             ?: tun2SocksEngine.takeIf { it.ownsRuntime() }
             ?: bpf2SocksEngine.takeIf { it.ownsRuntime() }
+            ?: ebpfEngine.takeIf { it.ownsRuntime() }
     }
 
     private suspend fun statusUnlocked(
@@ -209,7 +226,7 @@ internal class AndroidProxyEngine(
             fallbackStatus = preferredStatus
         }
 
-        listOf(tproxyEngine, tunEngine, tun2SocksEngine, bpf2SocksEngine, vpnSingBoxEngine)
+        listOf(tproxyEngine, tunEngine, tun2SocksEngine, bpf2SocksEngine, ebpfEngine, vpnSingBoxEngine)
             .filterNot { engine -> engine.runMode == preferredRunMode }
             .forEach { engine ->
                 val status = engine.status()
@@ -231,6 +248,7 @@ internal class AndroidProxyEngine(
             RunModeTun -> tunEngine
             RunModeTun2Socks -> tun2SocksEngine
             RunModeBpf2Socks -> bpf2SocksEngine
+            RunModeEbpf -> ebpfEngine
             else -> vpnSingBoxEngine
         }
     }

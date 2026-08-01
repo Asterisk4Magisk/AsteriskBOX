@@ -10,7 +10,7 @@
 
 ## 功能
 
-- VPN Service、TPROXY(ROOT)、TUN(ROOT)、TUN2SOCKS(ROOT) 和 BPF2SOCKS(ROOT) 运行模式
+- VPN Service、TPROXY(ROOT)、TUN(ROOT)、eBPF(ROOT)、TUN2SOCKS(ROOT) 和 BPF2SOCKS(ROOT) 运行模式
 - 通过二维码、本地文件或 URL 订阅导入严格的 sing-box JSON 配置
 - 通过 sing-box 官方命令 API 获取状态、流量、连接、模式、代理选择和延迟测试
 - 通过 Magisk `service.d` 脚本支持 ROOT 模式开机自启
@@ -35,6 +35,14 @@
 - 不启用 sing-box `auto_route`，使用应用托管的 iptables 和策略路由规则。
 - 支持 System、gVisor 和 Mixed TUN 栈。
 
+### eBPF(ROOT)
+
+- 使用 reF1nd sing-box eBPF 入站直接挂载 cgroup socket-address 程序。
+- 不使用 TUN、TProxy、iptables、策略路由、Bridge 辅助程序或本地 SOCKS5 中间层。
+- “绕过直连地址”开关会把路由到直连出站的 Rule Set 写入 `bypass_rule_set`。
+- 可选热点共享 TC 仅接受输入下游接口的完整名称，不支持通配符或接口前缀。
+- 是否可用取决于设备内核、cgroup v2 与 eBPF 支持情况。
+
 ### TUN2SOCKS(ROOT)
 
 - 使用 `hev-socks5-tunnel` 创建 `asterisk0`。
@@ -47,7 +55,7 @@
 
 ### ROOT 地址监控
 
-所有 ROOT 模式使用 native `asteriskd` 维护本地地址绕过规则和可选 IPv6 状态。运行二进制、配置、PID、辅助程序和日志统一保存在应用私有 `files/sing-box` 目录；只有开机入口脚本写入 `/data/adb/service.d/asteriskbox_start.sh`。
+ROOT 模式使用 native `asteriskd` 维护本地地址绕过规则和可选 IPv6 状态。运行二进制、配置、PID、辅助程序和日志统一保存在应用私有 `files/sing-box` 目录；只有开机入口脚本写入 `/data/adb/service.d/asteriskbox_start.sh`。
 
 ## 资源文件
 

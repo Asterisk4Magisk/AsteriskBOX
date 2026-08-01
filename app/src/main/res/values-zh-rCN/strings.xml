@@ -15,6 +15,8 @@
     <string name="error_tun2socks_start_failed">TUN2SOCKS 模式启动失败：%1$s</string>
     <string name="error_bpf2socks_root_required">ROOT 权限不可用，无法启动 BPF2SOCKS 模式</string>
     <string name="error_bpf2socks_start_failed">BPF2SOCKS 模式启动失败：%1$s</string>
+    <string name="error_ebpf_root_required">ROOT 权限不可用，无法启动 eBPF 模式</string>
+    <string name="error_ebpf_start_failed">eBPF 模式启动失败：%1$s</string>
     <string name="error_vpn_permission_launcher_missing">VPN 权限请求器未注册</string>
     <string name="error_resource_file_picker_missing">资源文件选择器未注册</string>
     <string name="error_log_export_launcher_missing">日志导出请求器未注册</string>
@@ -251,11 +253,13 @@
     <string name="settings_run_mode_tun">TUN（ROOT）</string>
     <string name="settings_run_mode_tun2socks">TUN2SOCKS（ROOT）</string>
     <string name="settings_run_mode_bpf2socks">BPF2SOCKS（ROOT）</string>
+    <string name="settings_run_mode_ebpf">eBPF（ROOT）</string>
     <string name="settings_root_required">获取ROOT权限失败！</string>
     <string name="settings_proxy_tproxy">代理设置（TPROXY）</string>
     <string name="settings_proxy_tun">代理设置（TUN）</string>
     <string name="settings_proxy_tun2socks">代理设置（TUN2SOCKS）</string>
     <string name="settings_proxy_bpf2socks">代理设置（BPF2SOCKS）</string>
+    <string name="settings_proxy_ebpf">代理设置（eBPF）</string>
     <string name="settings_proxy_vpn_service">代理设置（VPN Service）</string>
     <string name="settings_root_boot_script">开机自启</string>
     <string name="settings_root_boot_script_summary">生成 service.d 启动脚本</string>
@@ -264,6 +268,7 @@
     <string name="settings_root_ebpf_matcher_summary">提高大应用清单性能，并提供地址过滤支持</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs">绕过直连地址</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs_summary">默认为中国地址列表，可在资源管理中调整</string>
+    <string name="settings_ebpf_bypass_direct_rule_sets_summary">开启后，将路由规则中指向直连出站的规则集写入 bypass_rule_set；关闭时保持为空</string>
     <string name="settings_root_ebpf_matcher_failed">eBPF 匹配器支持探测失败</string>
     <string name="settings_root_ebpf_matcher_unsupported">当前设备不支持 eBPF 匹配器</string>
     <string name="settings_root_ebpf_selinux_policy_warning_title">启用 eBPF 匹配器？</string>
@@ -287,6 +292,7 @@
     <string name="settings_local_proxy_summary_tproxy">透明代理端口 {port}</string>
     <string name="settings_local_proxy_summary_tun2socks">TUN2SOCKS SOCKS5 端口 {port}</string>
     <string name="settings_local_proxy_summary_bpf2socks">Bridge 端口 {bridgePort}，SOCKS5 端口 {socksPort}</string>
+    <string name="settings_local_proxy_summary_ebpf">eBPF 监听端口 {port}</string>
     <string name="settings_vpn_append_http_proxy">追加 HTTP 代理</string>
     <string name="settings_vpn_append_http_proxy_summary">让受支持的应用直接使用 HTTP 代理</string>
     <string name="settings_vpn_hev_tun">使用 Hev TUN</string>
@@ -311,6 +317,12 @@
     <string name="settings_external_interfaces_usb">USB 热点共享</string>
     <string name="settings_external_interfaces_bluetooth">蓝牙热点共享</string>
     <string name="settings_external_interfaces_ethernet">以太网热点共享</string>
+    <string name="settings_ebpf_shared_network_input">下游接口名称</string>
+    <string name="settings_ebpf_shared_network">热点共享设置</string>
+    <string name="settings_ebpf_shared_network_description">每项填写一个实际的下游接口名，例如 ap0 或 rndis0。不支持 wlan+ 等通配前缀；不要填写 lo、上游网络接口、TUN、WireGuard、PPP、IPIP 等纯三层接口。</string>
+    <string name="settings_ebpf_shared_network_empty">尚未配置下游接口</string>
+    <string name="settings_ebpf_shared_network_none">未启用</string>
+    <string name="settings_ebpf_shared_network_selected">已配置 {count} 个接口</string>
     <string name="settings_ignored_interfaces">忽略接口设置</string>
     <string name="settings_ignored_interfaces_summary">忽略所选接口的流量，避免进入代理核心</string>
     <string name="settings_ignored_interfaces_none">未选择</string>
@@ -493,6 +505,7 @@
     <string name="settings_transparent_proxy_port">透明代理端口</string>
     <string name="settings_tun2socks_socks5_port">TUN2SOCKS SOCKS5 端口</string>
     <string name="settings_bpf2socks_bridge_port">BPF2SOCKS bridge 端口</string>
+    <string name="settings_ebpf_listen_port">eBPF 监听端口</string>
     <string name="settings_bpf2socks_socks5_port">SOCKS5 端口</string>
     <string name="settings_dns_hosts_invalid">无效 DNS hosts 条目</string>
 

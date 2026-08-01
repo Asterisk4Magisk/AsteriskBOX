@@ -13,6 +13,7 @@ internal enum class AsteriskdMode(
     Tun("tun"),
     Tun2Socks("tun2socks"),
     Bpf2Socks("bpf2socks"),
+    Ebpf("ebpf"),
 }
 
 @Serializable
