@@ -555,7 +555,6 @@ internal fun CustomResourceFileEditorSheet(
     urlState: TextFieldState,
     reservedNames: Set<String>,
     onDismissRequest: () -> Unit,
-    onValidationError: (CustomResourceDraftError) -> Unit,
     onSave: (name: String, url: String) -> Boolean,
 ) {
     var error by remember { mutableStateOf<CustomResourceDraftError?>(null) }
@@ -581,7 +580,6 @@ internal fun CustomResourceFileEditorSheet(
                         reservedNames = reservedNames,
                     )
                     error = validation.error
-                    validation.error?.let(onValidationError)
                     if (validation.valid && onSave(validation.name, validation.url)) {
                         onDismissRequest()
                     }

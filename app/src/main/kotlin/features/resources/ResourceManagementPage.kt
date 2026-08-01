@@ -94,16 +94,6 @@ fun ResourceManagementPage(
     val resourceFileActionFailedMessage = stringResource(
         R.string.settings_resource_files_action_failed,
     )
-    val customResourceFileNameInvalidMessage = stringResource(
-        R.string.settings_resource_files_custom_name_invalid,
-    )
-    val customResourceFileNameSrsRequiredMessage = stringResource(
-        R.string.settings_resource_files_custom_name_srs_required,
-    )
-    val customResourceFileNameDuplicateMessage = stringResource(
-        R.string.settings_resource_files_custom_name_duplicate,
-    )
-
     fun runResourceFileAction(
         action: suspend () -> ResourceFilesStatus?,
         successMessage: String?,
@@ -142,12 +132,6 @@ fun ResourceManagementPage(
             } finally {
                 updating = false
             }
-        }
-    }
-
-    fun showResourceFileEditorError(message: String) {
-        services.appScope.launch {
-            tipNotifier.show(message)
         }
     }
 
@@ -190,23 +174,10 @@ fun ResourceManagementPage(
     }
 
     fun validatedCustomResourceFileName(name: String, reservedNames: Set<String>): String? {
-        val fileName = customResourceFileNameOrNull(name)
-        if (fileName == null) {
-            showResourceFileEditorError(customResourceFileNameInvalidMessage)
-            return null
-        }
-        if (!fileName.hasSingBoxRuleSetExtension()) {
-            showResourceFileEditorError(customResourceFileNameSrsRequiredMessage)
-            return null
-        }
-        if (fileName.dropLast(".srs".length).isBlank()) {
-            showResourceFileEditorError(customResourceFileNameInvalidMessage)
-            return null
-        }
-        if (reservedNames.any { reserved -> reserved.equals(fileName, ignoreCase = true) }) {
-            showResourceFileEditorError(customResourceFileNameDuplicateMessage)
-            return null
-        }
+        val fileName = customResourceFileNameOrNull(name) ?: return null
+        if (!fileName.hasSingBoxRuleSetExtension()) return null
+        if (fileName.dropLast(".srs".length).isBlank()) return null
+        if (reservedNames.any { reserved -> reserved.equals(fileName, ignoreCase = true) }) return null
         return fileName
     }
 
@@ -492,11 +463,6 @@ fun ResourceManagementPage(
             urlState = customResourceFileUrlState,
             reservedNames = customResourceFileReservedNames(),
             onDismissRequest = { showCustomResourceFileDialog.value = false },
-            onValidationError = { error ->
-                if (error == CustomResourceDraftError.InvalidSrsExtension) {
-                    showResourceFileEditorError(customResourceFileNameSrsRequiredMessage)
-                }
-            },
             onSave = ::addCustomResourceFile,
         )
         CustomResourceFileEditorSheet(
@@ -505,11 +471,6 @@ fun ResourceManagementPage(
             urlState = editCustomResourceFileUrlState,
             reservedNames = customResourceFileReservedNames(editingCustomResourceFile?.id),
             onDismissRequest = { editingCustomResourceFile = null },
-            onValidationError = { error ->
-                if (error == CustomResourceDraftError.InvalidSrsExtension) {
-                    showResourceFileEditorError(customResourceFileNameSrsRequiredMessage)
-                }
-            },
             onSave = { name, url ->
                 editingCustomResourceFile?.let { file -> editCustomResourceFile(file, name, url) } ?: false
             },

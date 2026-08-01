@@ -106,7 +106,7 @@ internal fun validateCustomResourceDraft(
     if (fileName.dropLast(SingBoxRuleSetFileExtension.length).isBlank()) {
         return CustomResourceDraftValidation(fileName, cleanUrl, CustomResourceDraftError.InvalidName)
     }
-    if (fileName in reservedNames) {
+    if (reservedNames.any { reserved -> reserved.equals(fileName, ignoreCase = true) }) {
         return CustomResourceDraftValidation(fileName, cleanUrl, CustomResourceDraftError.DuplicateName)
     }
     if (cleanUrl.isNotEmpty() && !cleanUrl.isValidHttpResourceUrl()) {
