@@ -2,7 +2,7 @@
 
 # AsteriskBOX
 
-一个 Android sing-box GUI 客户端。VPN Service 模式使用 [AndroidLibBoxLite](https://github.com/Asterisk4Magisk/AndroidLibBoxLite)，ROOT 模式运行官方 [sing-box](https://github.com/SagerNet/sing-box) Android 二进制文件。
+一个 Android sing-box GUI 客户端。VPN Service 模式使用 [AndroidLibBoxLite](https://github.com/Asterisk4Magisk/AndroidLibBoxLite)，ROOT 模式运行 [reF1nd sing-box](https://github.com/reF1nd/sing-box-releases)构建的 Android 二进制文件。
 
 ## Telegram 频道
 
@@ -26,12 +26,12 @@
 
 ### TPROXY(ROOT)
 
-- 运行官方 sing-box Android 二进制文件和 TPROXY 入站。
+- 运行内置 sing-box Android 二进制文件和 TPROXY 入站。
 - 使用 iptables 和策略路由处理透明代理流量。
 
 ### TUN(ROOT)
 
-- 运行官方 sing-box Android 二进制文件并创建固定 TUN 设备 `asterisk0`。
+- 运行内置 sing-box Android 二进制文件并创建固定 TUN 设备 `asterisk0`。
 - 不启用 sing-box `auto_route`，使用应用托管的 iptables 和策略路由规则。
 - 支持 System、gVisor 和 Mixed TUN 栈。
 
@@ -51,7 +51,7 @@
 
 ## 资源文件
 
-- 内置 ROOT 核心为 `ProjectConfig.SING_BOX_VERSION` 选择的官方 sing-box Android 二进制文件，并可在资源页面手动替换。
+- 内置 ROOT 核心为 `ProjectConfig.SING_BOX_VERSION` 选择的 reF1nd sing-box Android 二进制文件，并可在资源页面手动替换。
 - Direct CIDR IPv4/IPv6 和自定义资源文件可手动替换或通过配置 URL 更新。
 - Rule Set 保持在 sing-box JSON 配置中。
 
@@ -69,7 +69,7 @@ git submodule update --init --recursive
 .\gradlew.bat assembleDebug
 ```
 
-构建会解析 `ProjectConfig.ANDROID_LIB_BOX_LITE_VERSION` 配置的 AndroidLibBoxLite 版本，为全部支持 ABI 下载 `ProjectConfig.SING_BOX_VERSION` 配置的官方 sing-box 版本，构建 native helper submodule，并生成 ABI split APK 和 universal APK。
+构建会解析 `ProjectConfig.ANDROID_LIB_BOX_LITE_VERSION` 配置的 AndroidLibBoxLite 版本，为全部支持 ABI 下载 `ProjectConfig.SING_BOX_VERSION` 配置的 reF1nd ROOT 核心，构建 native helper submodule，并生成 ABI split APK 和 universal APK。
 
 如果 Gradle 找不到 Android NDK，请在 `local.properties` 中设置 `ndk.dir`，设置 `ANDROID_NDK_HOME`，或在 Android SDK 下安装 NDK。
 
@@ -86,6 +86,7 @@ appops set org.asterisk.zcc.abox ACTIVATE_VPN allow
 ## 致谢
 
 - [@SagerNet/sing-box](https://github.com/SagerNet/sing-box)
+- [@reF1nd/sing-box-releases](https://github.com/reF1nd/sing-box-releases)
 - [@Asterisk4Magisk/AndroidLibBoxLite](https://github.com/Asterisk4Magisk/AndroidLibBoxLite)
 - [@heiher/hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel)
 - [@topjohnwu/libsu](https://github.com/topjohnwu/libsu)

@@ -112,12 +112,12 @@ abstract class GenerateAboutLibrariesJsonTask : DefaultTask() {
                 listOf("GPL-3.0"),
             ),
             library(
-                "github:SagerNet/sing-box",
+                "github:reF1nd/sing-box-releases",
                 ProjectConfig.SING_BOX_VERSION,
-                "sing-box",
-                "An open platform for proxy and anti-censorship networking.",
-                "https://github.com/SagerNet/sing-box",
-                "https://github.com/SagerNet/sing-box",
+                "sing-box reF1nd build",
+                "A reF1nd build of the sing-box proxy platform used by AsteriskBOX ROOT modes.",
+                "https://github.com/reF1nd/sing-box-releases",
+                "https://github.com/reF1nd/sing-box-releases",
                 listOf("GPL-3.0"),
             ),
             library(

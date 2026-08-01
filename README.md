@@ -2,7 +2,7 @@ English | [简体中文](README_zh_CN.md)
 
 # AsteriskBOX
 
-An Android sing-box GUI client. VPN Service mode uses [AndroidLibBoxLite](https://github.com/Asterisk4Magisk/AndroidLibBoxLite); ROOT modes execute the official [sing-box](https://github.com/SagerNet/sing-box) Android binary.
+An Android sing-box GUI client. VPN Service mode uses [AndroidLibBoxLite](https://github.com/Asterisk4Magisk/AndroidLibBoxLite); ROOT modes execute the [reF1nd sing-box](https://github.com/reF1nd/sing-box-releases) build for Android.
 
 ## Telegram Channel
 
@@ -26,12 +26,12 @@ An Android sing-box GUI client. VPN Service mode uses [AndroidLibBoxLite](https:
 
 ### TPROXY(ROOT)
 
-- Runs the official sing-box Android binary with a TPROXY inbound.
+- Runs the bundled sing-box Android binary with a TPROXY inbound.
 - Uses iptables and policy routing for transparent proxy traffic.
 
 ### TUN(ROOT)
 
-- Runs the official sing-box Android binary with the fixed TUN device `asterisk0`.
+- Runs the bundled sing-box Android binary with the fixed TUN device `asterisk0`.
 - Keeps sing-box `auto_route` disabled and applies app-managed iptables and policy routing rules.
 - Supports the System, gVisor, and Mixed TUN stacks.
 
@@ -51,7 +51,7 @@ All ROOT modes use the native `asteriskd` monitor to maintain local-address bypa
 
 ## Resource Files
 
-- The bundled ROOT core is the official sing-box Android binary selected by `ProjectConfig.SING_BOX_VERSION` and may be manually replaced from the resource page.
+- The bundled ROOT core is the reF1nd sing-box Android binary selected by `ProjectConfig.SING_BOX_VERSION` and may be manually replaced from the resource page.
 - Direct CIDR IPv4/IPv6 files and custom resource files can be replaced or updated from configured URLs.
 - Rule sets remain part of the sing-box JSON configuration.
 
@@ -69,7 +69,7 @@ Build with Android Studio or the Gradle wrapper:
 .\gradlew.bat assembleDebug
 ```
 
-The build resolves the AndroidLibBoxLite version configured by `ProjectConfig.ANDROID_LIB_BOX_LITE_VERSION`, downloads the official sing-box version configured by `ProjectConfig.SING_BOX_VERSION` for all supported ABIs, builds the native helper submodules, and produces ABI split APKs plus a universal APK.
+The build resolves the AndroidLibBoxLite version configured by `ProjectConfig.ANDROID_LIB_BOX_LITE_VERSION`, downloads the reF1nd ROOT core version configured by `ProjectConfig.SING_BOX_VERSION` for all supported ABIs, builds the native helper submodules, and produces ABI split APKs plus a universal APK.
 
 If Gradle cannot find Android NDK, set `ndk.dir` in `local.properties`, set `ANDROID_NDK_HOME`, or install an NDK under the Android SDK.
 
@@ -86,6 +86,7 @@ appops set org.asterisk.zcc.abox ACTIVATE_VPN allow
 ## Credits
 
 - [@SagerNet/sing-box](https://github.com/SagerNet/sing-box)
+- [@reF1nd/sing-box-releases](https://github.com/reF1nd/sing-box-releases)
 - [@Asterisk4Magisk/AndroidLibBoxLite](https://github.com/Asterisk4Magisk/AndroidLibBoxLite)
 - [@heiher/hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel)
 - [@topjohnwu/libsu](https://github.com/topjohnwu/libsu)

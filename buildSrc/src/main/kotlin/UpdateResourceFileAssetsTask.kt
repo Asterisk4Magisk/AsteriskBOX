@@ -58,7 +58,7 @@ abstract class UpdateResourceFileAssetsTask : DefaultTask() {
             val version = singBoxVersion.get()
             val rawVersion = version.removePrefix("v")
             val releaseName = "sing-box-$rawVersion-android-${asset.releaseArch}.tar.gz"
-            val url = "https://github.com/SagerNet/sing-box/releases/download/$version/$releaseName"
+            val url = "https://github.com/reF1nd/sing-box-releases/releases/download/$version/$releaseName"
             downloadToFile(url, archive)
             extractTarGzipEntry(
                 archive = archive,
@@ -200,7 +200,7 @@ private fun InputStream.skipExactly(byteCount: Long) {
 private fun ByteArray.tarString(offset: Int, length: Int): String {
     val end = (offset until offset + length)
         .firstOrNull { index -> this[index] == 0.toByte() }
-        ?: offset + length
+        ?: (offset + length)
     return copyOfRange(offset, end).toString(Charsets.UTF_8)
 }
 
