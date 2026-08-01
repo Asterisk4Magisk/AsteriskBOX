@@ -803,52 +803,16 @@ private fun OutboundGroupCard(
                         group.updateInterval.takeIf(String::isNotBlank)?.let {
                             add(stringResource(R.string.outbound_group_update_interval_value, it))
                         }
-                        if (group.lastUpdatedAtMillis > 0L) {
-                            add(
-                                stringResource(
-                                    R.string.outbound_group_last_updated,
-                                    group.lastUpdatedAtMillis.toReadableDateTimeOrDash(),
-                                ),
-                            )
-                        }
                     }
                     Text(
                         text = details.joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                     if (group.url.isNotBlank()) {
                         val status = group.subscriptionStatusPresentation()
-                        val statusLabel = stringResource(
-                            when (status.status) {
-                                OutboundGroupUpdateStatus.NEVER ->
-                                    R.string.outbound_group_status_never
-                                OutboundGroupUpdateStatus.SUCCESS ->
-                                    R.string.outbound_group_status_success
-                                OutboundGroupUpdateStatus.PARTIAL ->
-                                    R.string.outbound_group_status_partial
-                                OutboundGroupUpdateStatus.NOT_MODIFIED ->
-                                    R.string.outbound_group_status_not_modified
-                                OutboundGroupUpdateStatus.FAILED ->
-                                    R.string.outbound_group_status_failed
-                            },
-                        )
-                        val statusText = if (
-                            status.status == OutboundGroupUpdateStatus.NEVER ||
-                            status.attemptAtMillis <= 0L
-                        ) {
-                            statusLabel
-                        } else {
-                            stringResource(
-                                R.string.outbound_group_status_details,
-                                statusLabel,
-                                status.attemptAtMillis.toReadableDateTimeOrDash(),
-                                status.importedCount,
-                                status.skippedCount,
-                                status.duplicateCount,
-                            )
-                        }
                         val statusColor = when (status.status) {
                             OutboundGroupUpdateStatus.FAILED ->
                                 MaterialTheme.colorScheme.error
@@ -856,13 +820,43 @@ private fun OutboundGroupCard(
                                 MaterialTheme.colorScheme.tertiary
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
-                        Text(
-                            text = statusText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = statusColor,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        status.line?.let { line ->
+                            val formattedTime = line.timestampMillis.toReadableDateTimeOrDash()
+                            val statusText = when (line.kind) {
+                                OutboundGroupStatusLineKind.UPDATED -> stringResource(
+                                    R.string.outbound_group_status_updated,
+                                    formattedTime,
+                                    line.importedCount,
+                                    line.skippedCount,
+                                    line.duplicateCount,
+                                )
+                                OutboundGroupStatusLineKind.PARTIALLY_UPDATED -> stringResource(
+                                    R.string.outbound_group_status_labeled_updated,
+                                    stringResource(R.string.outbound_group_status_partial),
+                                    formattedTime,
+                                    line.importedCount,
+                                    line.skippedCount,
+                                    line.duplicateCount,
+                                )
+                                OutboundGroupStatusLineKind.NOT_MODIFIED -> stringResource(
+                                    R.string.outbound_group_status_checked,
+                                    stringResource(R.string.outbound_group_status_not_modified),
+                                    formattedTime,
+                                )
+                                OutboundGroupStatusLineKind.FAILED -> stringResource(
+                                    R.string.outbound_group_status_checked,
+                                    stringResource(R.string.outbound_group_status_failed),
+                                    formattedTime,
+                                )
+                            }
+                            Text(
+                                text = statusText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = statusColor,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                         if (status.summary.isNotBlank()) {
                             Text(
                                 text = status.summary,

@@ -589,7 +589,6 @@
         <item quantity="other">%1$d groups</item>
     </plurals>
     <string name="outbound_group_local">Local group</string>
-    <string name="outbound_group_last_updated">Updated %1$s</string>
     <string name="outbound_group_add">Add group</string>
     <string name="outbound_group_empty">No outbound groups</string>
     <string name="outbound_group_empty_summary">Create a group before importing or adding outbounds.</string>
@@ -611,12 +610,12 @@
     <string name="outbound_group_strict_import">Strict import</string>
     <string name="outbound_group_strict_import_summary">Keep existing nodes if any subscription entry is invalid</string>
     <string name="outbound_group_age_secret_key">Mihomo Age secret key</string>
-    <string name="outbound_group_status_never">Never checked</string>
-    <string name="outbound_group_status_success">Success</string>
     <string name="outbound_group_status_partial">Partial</string>
     <string name="outbound_group_status_not_modified">Not modified</string>
     <string name="outbound_group_status_failed">Failed</string>
-    <string name="outbound_group_status_details">%1$s · Checked %2$s · Imported %3$d, skipped %4$d, duplicate %5$d</string>
+    <string name="outbound_group_status_updated">Updated %1$s · Imported %2$d, skipped %3$d, duplicate %4$d</string>
+    <string name="outbound_group_status_labeled_updated">%1$s · Updated %2$s · Imported %3$d, skipped %4$d, duplicate %5$d</string>
+    <string name="outbound_group_status_checked">%1$s · Checked %2$s</string>
     <string name="outbound_group_http_warning">This subscription uses unencrypted HTTP. HTTPS is recommended.</string>
     <string name="outbound_group_delete_title">Delete group?</string>
     <string name="outbound_group_delete_message">The group “%1$s” and all of its outbounds will be permanently deleted.</string>

@@ -582,7 +582,6 @@
         <item quantity="other">%1$d 个分组</item>
     </plurals>
     <string name="outbound_group_local">本地分组</string>
-    <string name="outbound_group_last_updated">更新于 %1$s</string>
     <string name="outbound_group_add">添加分组</string>
     <string name="outbound_group_empty">暂无出站分组</string>
     <string name="outbound_group_empty_summary">请先创建分组，再导入或添加出站。</string>
@@ -604,12 +603,12 @@
     <string name="outbound_group_strict_import">严格导入</string>
     <string name="outbound_group_strict_import_summary">订阅中任一条目无效时保留现有节点</string>
     <string name="outbound_group_age_secret_key">Mihomo Age 私钥</string>
-    <string name="outbound_group_status_never">尚未检查</string>
-    <string name="outbound_group_status_success">成功</string>
     <string name="outbound_group_status_partial">部分成功</string>
     <string name="outbound_group_status_not_modified">未修改</string>
     <string name="outbound_group_status_failed">失败</string>
-    <string name="outbound_group_status_details">%1$s · 检查于 %2$s · 导入 %3$d，跳过 %4$d，重复 %5$d</string>
+    <string name="outbound_group_status_updated">更新于 %1$s · 导入 %2$d，跳过 %3$d，重复 %4$d</string>
+    <string name="outbound_group_status_labeled_updated">%1$s · 更新于 %2$s · 导入 %3$d，跳过 %4$d，重复 %5$d</string>
+    <string name="outbound_group_status_checked">%1$s · 检查于 %2$s</string>
     <string name="outbound_group_http_warning">该订阅使用未加密的 HTTP，建议改用 HTTPS。</string>
     <string name="outbound_group_delete_title">删除分组？</string>
     <string name="outbound_group_delete_message">分组“%1$s”及其中的所有出站将被永久删除。</string>
