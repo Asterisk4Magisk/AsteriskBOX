@@ -822,21 +822,15 @@ private fun OutboundGroupCard(
                         }
                         status.line?.let { line ->
                             val formattedTime = line.timestampMillis.toReadableDateTimeOrDash()
-                            val statusText = when (line.kind) {
+                            val statusHeaderText = when (line.kind) {
                                 OutboundGroupStatusLineKind.UPDATED -> stringResource(
                                     R.string.outbound_group_status_updated,
                                     formattedTime,
-                                    line.importedCount,
-                                    line.skippedCount,
-                                    line.duplicateCount,
                                 )
                                 OutboundGroupStatusLineKind.PARTIALLY_UPDATED -> stringResource(
                                     R.string.outbound_group_status_labeled_updated,
                                     stringResource(R.string.outbound_group_status_partial),
                                     formattedTime,
-                                    line.importedCount,
-                                    line.skippedCount,
-                                    line.duplicateCount,
                                 )
                                 OutboundGroupStatusLineKind.NOT_MODIFIED -> stringResource(
                                     R.string.outbound_group_status_checked,
@@ -849,13 +843,35 @@ private fun OutboundGroupCard(
                                     formattedTime,
                                 )
                             }
+                            val importCountsText = when (line.kind) {
+                                OutboundGroupStatusLineKind.UPDATED,
+                                OutboundGroupStatusLineKind.PARTIALLY_UPDATED,
+                                -> stringResource(
+                                    R.string.outbound_group_status_import_counts,
+                                    line.importedCount,
+                                    line.skippedCount,
+                                    line.duplicateCount,
+                                )
+                                OutboundGroupStatusLineKind.NOT_MODIFIED,
+                                OutboundGroupStatusLineKind.FAILED,
+                                -> null
+                            }
                             Text(
-                                text = statusText,
+                                text = statusHeaderText,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = statusColor,
-                                maxLines = 2,
+                                maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                            importCountsText?.let {
+                                Text(
+                                    text = it,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = statusColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                         if (status.summary.isNotBlank()) {
                             Text(

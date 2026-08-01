@@ -626,8 +626,9 @@
     <string name="outbound_group_status_partial">Partial</string>
     <string name="outbound_group_status_not_modified">Not modified</string>
     <string name="outbound_group_status_failed">Failed</string>
-    <string name="outbound_group_status_updated">Updated %1$s · Imported %2$d, skipped %3$d, duplicate %4$d</string>
-    <string name="outbound_group_status_labeled_updated">%1$s · Updated %2$s · Imported %3$d, skipped %4$d, duplicate %5$d</string>
+    <string name="outbound_group_status_updated">Updated %1$s</string>
+    <string name="outbound_group_status_labeled_updated">%1$s · Updated %2$s</string>
+    <string name="outbound_group_status_import_counts">Imported %1$d, skipped %2$d, duplicate %3$d</string>
     <string name="outbound_group_status_checked">%1$s · Checked %2$s</string>
     <string name="outbound_group_http_warning">This subscription uses unencrypted HTTP. HTTPS is recommended.</string>
     <string name="outbound_group_delete_title">Delete group?</string>

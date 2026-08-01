@@ -619,8 +619,9 @@
     <string name="outbound_group_status_partial">部分成功</string>
     <string name="outbound_group_status_not_modified">未修改</string>
     <string name="outbound_group_status_failed">失败</string>
-    <string name="outbound_group_status_updated">更新于 %1$s · 导入 %2$d，跳过 %3$d，重复 %4$d</string>
-    <string name="outbound_group_status_labeled_updated">%1$s · 更新于 %2$s · 导入 %3$d，跳过 %4$d，重复 %5$d</string>
+    <string name="outbound_group_status_updated">更新于 %1$s</string>
+    <string name="outbound_group_status_labeled_updated">%1$s · 更新于 %2$s</string>
+    <string name="outbound_group_status_import_counts">导入 %1$d，跳过 %2$d，重复 %3$d</string>
     <string name="outbound_group_status_checked">%1$s · 检查于 %2$s</string>
     <string name="outbound_group_http_warning">该订阅使用未加密的 HTTP，建议改用 HTTPS。</string>
     <string name="outbound_group_delete_title">删除分组？</string>
