@@ -27,6 +27,7 @@ import engine.singbox.runtime.SingBoxRuntimeRepository
 import engine.singbox.runtime.SingBoxTrafficSample
 import features.logs.AndroidAppLogger
 import io.nekohasekai.libbox.StatusMessage
+import java.math.BigInteger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -316,28 +317,47 @@ class SingBoxTrafficStatsNotificationService : Service() {
     }
 }
 
-private data class TrafficStatsSnapshot(
+internal data class TrafficStatsSnapshot(
     val upSpeed: Long = 0L,
     val downSpeed: Long = 0L,
     val totalUp: Long = 0L,
     val totalDown: Long = 0L,
 )
 
-private class TrafficStatsAccumulator {
+private data class TrafficSpeedSample(
+    val up: Long,
+    val down: Long,
+)
+
+internal class TrafficStatsAccumulator {
     private var totalUp = 0L
     private var totalDown = 0L
+    private val speedSamples = ArrayDeque<TrafficSpeedSample>(TrafficSpeedWindowSamples)
 
     fun accept(sample: SingBoxTrafficSample): TrafficStatsSnapshot {
         totalUp = sample.totalUp ?: (totalUp + sample.up)
         totalDown = sample.totalDown ?: (totalDown + sample.down)
+        if (speedSamples.size == TrafficSpeedWindowSamples) speedSamples.removeFirst()
+        speedSamples.addLast(TrafficSpeedSample(up = sample.up, down = sample.down))
         return TrafficStatsSnapshot(
-            upSpeed = sample.up,
-            downSpeed = sample.down,
+            upSpeed = speedSamples.averageOf(TrafficSpeedSample::up),
+            downSpeed = speedSamples.averageOf(TrafficSpeedSample::down),
             totalUp = totalUp,
             totalDown = totalDown,
         )
     }
+
+    private fun ArrayDeque<TrafficSpeedSample>.averageOf(
+        value: (TrafficSpeedSample) -> Long,
+    ): Long {
+        val sum = fold(BigInteger.ZERO) { total, sample ->
+            total.add(BigInteger.valueOf(value(sample)))
+        }
+        return sum.divide(BigInteger.valueOf(size.toLong())).toLong()
+    }
 }
+
+private const val TrafficSpeedWindowSamples = 3
 
 private fun Intent.putRuntime(runtime: SingBoxTrafficStatsRuntime) {
     putExtra(ExtraHost, runtime.control.host)
