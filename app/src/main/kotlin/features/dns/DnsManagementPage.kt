@@ -101,6 +101,7 @@ import ui.components.rememberAsteriskReorderableLazyGridState
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
+import ui.theme.AsteriskShapeTokens
 import ui.icons.AsteriskIcons as Icons
 
 @Composable
@@ -621,8 +622,10 @@ private fun DnsRuleCard(
             .draggedCardShadow(
                 alpha = shadowAlpha,
                 color = MaterialTheme.colorScheme.primary,
+                cornerRadius = AsteriskShapeTokens.ListCardRadius,
             )
             .alpha(if (rule.enabled) 1f else 0.68f),
+        shape = AsteriskShapeTokens.ListCard,
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         Row(

@@ -7,6 +7,8 @@ package features.outbound
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -48,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
@@ -56,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import app.DefaultOutboundSubscriptionUserAgent
 import app.LocalAppServices
 import app.LocalAppStateStore
@@ -95,9 +100,13 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.asterisk.zcc.abox.R
+import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskModalBottomSheet
 import ui.components.WarningConfirmDialog
+import ui.components.draggedCardShadow
+import ui.components.longPressReorderDragHandle
+import ui.components.rememberAsteriskReorderableLazyListState
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
@@ -423,8 +432,28 @@ internal fun OutboundGroupListPage(
             outerPadding = padding,
             isWideScreen = isWideScreen,
         )
+        val listContentPadding = pageListPadding(contentPadding)
+        val listState = rememberLazyListState()
+        val reorderableState = rememberAsteriskReorderableLazyListState(
+            lazyListState = listState,
+            itemCount = appState.outboundGroups.size,
+            scrollThresholdPadding = PaddingValues(
+                bottom = listContentPadding.calculateBottomPadding(),
+            ),
+            onMove = { fromIndex, toIndex ->
+                updateAppState { state ->
+                    state.copy(
+                        outboundGroups = state.outboundGroups.moveOutboundGroup(
+                            fromIndex,
+                            toIndex,
+                        ),
+                    )
+                }
+            },
+        )
         LazyColumn(
-            contentPadding = pageListPadding(contentPadding),
+            state = listState,
+            contentPadding = listContentPadding,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (appState.outboundGroups.isEmpty()) {
@@ -443,35 +472,55 @@ internal fun OutboundGroupListPage(
                 key = OutboundGroupState::id,
                 contentType = { "outbound-group" },
             ) { group ->
-                OutboundGroupCard(
-                    group = group,
-                    outboundCount = appState.outbounds.count { outbound -> outbound.groupId == group.id },
-                    syncing = group.id in syncingGroupIds,
-                    onEnabledChange = { enabled ->
-                        updateAppState { state ->
-                            val groupTags = state.outbounds
-                                .filter { outbound -> outbound.groupId == group.id }
-                                .mapTo(mutableSetOf()) { outbound -> outbound.tag }
-                                .apply { add(managedOutboundGroupSelectorTag(group.id)) }
-                            state.copy(
-                                outboundGroups = state.outboundGroups.map { item ->
-                                    if (item.id == group.id) item.copy(enabled = enabled) else item
-                                },
-                            ).let { updated ->
-                                if (enabled) updated
-                                else updated.withRemovedManagedOutboundTags(groupTags)
+                ReorderableItem(
+                    state = reorderableState.reorderableState,
+                    key = group.id,
+                    modifier = Modifier.fillMaxWidth(),
+                    animateItemModifier = Modifier.animateItem(),
+                ) { isDragging ->
+                    OutboundGroupCard(
+                        group = group,
+                        outboundCount = appState.outbounds.count { outbound ->
+                            outbound.groupId == group.id
+                        },
+                        syncing = group.id in syncingGroupIds,
+                        isDragging = isDragging,
+                        onEnabledChange = { enabled ->
+                            updateAppState { state ->
+                                val groupTags = state.outbounds
+                                    .filter { outbound -> outbound.groupId == group.id }
+                                    .mapTo(mutableSetOf()) { outbound -> outbound.tag }
+                                    .apply { add(managedOutboundGroupSelectorTag(group.id)) }
+                                state.copy(
+                                    outboundGroups = state.outboundGroups.map { item ->
+                                        if (item.id == group.id) {
+                                            item.copy(enabled = enabled)
+                                        } else {
+                                            item
+                                        }
+                                    },
+                                ).let { updated ->
+                                    if (enabled) updated
+                                    else updated.withRemovedManagedOutboundTags(groupTags)
+                                }
                             }
-                        }
-                    },
-                    onSync = { syncGroup(group) },
-                    onEdit = {
-                        editorGroup = group
-                        groupEditorSession += 1
-                        showGroupEditor = true
-                    },
-                    onDelete = { pendingDelete = group },
-                    modifier = Modifier.animateItem(),
-                )
+                        },
+                        onSync = { syncGroup(group) },
+                        onEdit = {
+                            editorGroup = group
+                            groupEditorSession += 1
+                            showGroupEditor = true
+                        },
+                        onDelete = { pendingDelete = group },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .longPressReorderDragHandle(
+                                scope = this,
+                                enabled = appState.outboundGroups.size > 1,
+                                state = reorderableState,
+                            ),
+                    )
+                }
             }
         }
     }
@@ -754,19 +803,50 @@ private fun OutboundGroupCard(
     group: OutboundGroupState,
     outboundCount: Int,
     syncing: Boolean,
+    isDragging: Boolean,
     onEnabledChange: (Boolean) -> Unit,
     onSync: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val containerColor by animateColorAsState(
+        targetValue = if (isDragging) {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        },
+        animationSpec = AsteriskMotion.effects(),
+        label = "outbound-group-card-color",
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isDragging) 1.025f else 1f,
+        animationSpec = AsteriskMotion.fastSpatial(),
+        label = "outbound-group-card-scale",
+    )
+    val shadowAlpha by animateFloatAsState(
+        targetValue = if (isDragging) 1f else 0f,
+        animationSpec = AsteriskMotion.fastEffects(),
+        label = "outbound-group-card-shadow",
+    )
     Card(
         onClick = onEdit,
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 128.dp)
+            .zIndex(if (isDragging) 1f else 0f)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .draggedCardShadow(
+                alpha = shadowAlpha,
+                color = MaterialTheme.colorScheme.primary,
+                cornerRadius = AsteriskShapeTokens.ListCardRadius,
+            )
             .animateContentSize(animationSpec = AsteriskMotion.contentSpatial()),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        shape = AsteriskShapeTokens.ListCard,
+        colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         Column(Modifier.fillMaxWidth()) {
             Row(

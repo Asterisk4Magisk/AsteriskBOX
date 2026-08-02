@@ -135,6 +135,7 @@ import ui.components.singBoxOptionLabel
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
+import ui.theme.AsteriskShapeTokens
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import ui.icons.AsteriskIcons as Icons
 
@@ -892,6 +893,7 @@ private fun OutboundCard(
             .draggedCardShadow(
                 alpha = shadowAlpha,
                 color = MaterialTheme.colorScheme.primary,
+                cornerRadius = AsteriskShapeTokens.PageCardRadius,
             )
             .animateContentSize(animationSpec = AsteriskMotion.contentSpatial()),
         containerColor = containerColor,

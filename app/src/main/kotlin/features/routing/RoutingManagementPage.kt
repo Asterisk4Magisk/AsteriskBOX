@@ -119,6 +119,7 @@ import ui.icons.AsteriskIcons as Icons
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
+import ui.theme.AsteriskShapeTokens
 
 private data class RouteChoice(
     val value: String,
@@ -544,8 +545,10 @@ private fun RouteRuleCard(
             .draggedCardShadow(
                 alpha = shadowAlpha,
                 color = MaterialTheme.colorScheme.primary,
+                cornerRadius = AsteriskShapeTokens.ListCardRadius,
             )
             .alpha(if (rule.enabled) 1f else 0.68f),
+        shape = AsteriskShapeTokens.ListCard,
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         Row(
