@@ -23,7 +23,10 @@ import engine.proxy.ProxyServiceUseCase
 import features.logs.AndroidCoreLogRepository
 import features.logs.AndroidLogcatRepository
 import features.monitoring.MonitoringRepository
+import features.resources.ResourceFileUpdateCoordinator
+import features.resources.ResourceFileUpdateRequest
 import features.resources.ResourceFileUseCase
+import features.resources.runtime.AndroidResourceFileDownloadCancellation
 import features.settings.locale.ProvideAppLanguage
 import features.settings.usecase.RootBootScriptUseCase
 import features.settings.usecase.RootEbpfProbeUseCase
@@ -72,6 +75,32 @@ fun App(
             resourceFilePicker = resourceFilePicker,
         )
     }
+    val resourceFileUpdateCoordinator = remember(appScope, resourceFileUseCase) {
+        ResourceFileUpdateCoordinator(
+            scope = appScope,
+            execute = { request ->
+                when (request) {
+                    is ResourceFileUpdateRequest.BuiltIn -> resourceFileUseCase.update(
+                        kind = request.kind,
+                        source = request.source,
+                        options = request.options,
+                        customResourceFiles = request.customResourceFiles,
+                    )
+                    is ResourceFileUpdateRequest.Custom -> resourceFileUseCase.updateCustom(
+                        customFile = request.file,
+                        options = request.options,
+                        customResourceFiles = request.customResourceFiles,
+                    )
+                    is ResourceFileUpdateRequest.All -> resourceFileUseCase.update(
+                        source = request.source,
+                        options = request.options,
+                        customResourceFiles = request.customResourceFiles,
+                    )
+                }
+            },
+            cancelRunning = AndroidResourceFileDownloadCancellation::cancel,
+        )
+    }
     val outboundSubscriptionUpdater =
         remember(application) { application.outboundSubscriptionUpdater }
     val singBoxRuntime = application.singBoxRuntime
@@ -117,6 +146,7 @@ fun App(
         packageCatalog,
         networkInterfaces,
         resourceFileUseCase,
+        resourceFileUpdateCoordinator,
         outboundSubscriptionUpdater,
         qrCodeScanner,
         resourceFilePicker,
@@ -137,6 +167,7 @@ fun App(
             packageCatalog = packageCatalog,
             networkInterfaces = networkInterfaces,
             resourceFileUseCase = resourceFileUseCase,
+            resourceFileUpdateCoordinator = resourceFileUpdateCoordinator,
             outboundSubscriptionUpdater = outboundSubscriptionUpdater,
             qrCodeScanner = qrCodeScanner,
             importFilePicker = resourceFilePicker,

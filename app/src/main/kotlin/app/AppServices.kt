@@ -10,6 +10,7 @@ import engine.proxy.ProxyServiceUseCase
 import engine.singbox.runtime.SingBoxRuntimeRepository
 import features.logs.CoreLogRepository
 import features.monitoring.MonitoringRepository
+import features.resources.ResourceFileUpdateCoordinator
 import features.resources.ResourceFileUseCase
 import features.settings.usecase.SwitchRunModeUseCase
 import features.settings.usecase.RootBootScriptUseCase
@@ -30,6 +31,7 @@ internal data class AppServices(
     val packageCatalog: AndroidPackageProvider,
     val networkInterfaces: AndroidNetworkInterfaceProvider,
     val resourceFileUseCase: ResourceFileUseCase,
+    val resourceFileUpdateCoordinator: ResourceFileUpdateCoordinator,
     val outboundSubscriptionUpdater: OutboundSubscriptionUpdater,
     val qrCodeScanner: suspend () -> String?,
     val importFilePicker: suspend () -> Uri?,

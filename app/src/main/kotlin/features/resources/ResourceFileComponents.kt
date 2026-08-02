@@ -49,6 +49,8 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -87,6 +89,7 @@ internal fun ResourceOverviewCard(
     onUpdate: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    actionsEnabled: Boolean = true,
 ) {
     var sourceMenuExpanded by remember { mutableStateOf(false) }
     val safeSource = selectedSource.coerceIn(sourceOptions.indices)
@@ -122,6 +125,7 @@ internal fun ResourceOverviewCard(
                         text = stringResource(R.string.settings_resource_files_update),
                         icon = Icons.Rounded.Refresh,
                         onClick = onUpdate,
+                        enabled = actionsEnabled,
                     )
                 }
             }
@@ -162,7 +166,10 @@ internal fun ResourceOverviewCard(
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
         Box(modifier = Modifier.align(Alignment.End)) {
-            TextButton(onClick = { sourceMenuExpanded = true }, enabled = !updating) {
+            TextButton(
+                onClick = { sourceMenuExpanded = true },
+                enabled = actionsEnabled && !updating,
+            ) {
                 Text(stringResource(R.string.settings_resource_files_source))
                 Spacer(Modifier.width(4.dp))
                 Icon(
@@ -333,12 +340,13 @@ private fun ResourceUrlField(
 internal fun ResourceFileCard(
     fileName: String,
     status: ResourceFileStatus,
-    updating: Boolean,
+    updateState: ResourceFileUpdateDisplayState = ResourceFileUpdateDisplayState.Idle,
     onReplace: () -> Unit,
     modifier: Modifier = Modifier,
     onUpdate: (() -> Unit)? = null,
     onRestore: (() -> Unit)? = null,
     description: String? = null,
+    actionsEnabled: Boolean = true,
 ) {
     val actions = buildList {
         onUpdate?.let { add(ResourceMenuEntry(ResourceDisplayAction.Update, it)) }
@@ -350,7 +358,8 @@ internal fun ResourceFileCard(
         status = status,
         modifier = modifier,
         description = description,
-        updating = updating,
+        updateState = updateState,
+        actionsEnabled = actionsEnabled,
         actions = actions,
     )
 }
@@ -358,12 +367,13 @@ internal fun ResourceFileCard(
 @Composable
 internal fun CustomResourceFileCard(
     fileStatus: CustomResourceFileStatus,
-    updating: Boolean,
+    updateState: ResourceFileUpdateDisplayState = ResourceFileUpdateDisplayState.Idle,
     onUpdate: (CustomResourceFileState) -> Unit,
     onReplace: (CustomResourceFileState) -> Unit,
     onEdit: (CustomResourceFileState) -> Unit,
     onDelete: (CustomResourceFileState) -> Unit,
     modifier: Modifier = Modifier,
+    actionsEnabled: Boolean = true,
 ) {
     val file = fileStatus.file
     val callbacks = mapOf(
@@ -377,7 +387,8 @@ internal fun CustomResourceFileCard(
         status = fileStatus.status,
         description = file.url.ifBlank { stringResource(R.string.settings_resource_files_local_only) },
         modifier = modifier,
-        updating = updating,
+        updateState = updateState,
+        actionsEnabled = actionsEnabled,
         actions = customResourceDisplayActions(file).mapNotNull { action ->
             callbacks[action]?.let { callback -> ResourceMenuEntry(action, callback) }
         },
@@ -393,12 +404,14 @@ private data class ResourceMenuEntry(
 private fun ResourceFileCardSurface(
     fileName: String,
     status: ResourceFileStatus,
-    updating: Boolean,
+    updateState: ResourceFileUpdateDisplayState,
+    actionsEnabled: Boolean,
     actions: List<ResourceMenuEntry>,
     modifier: Modifier = Modifier,
     description: String? = null,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    val updatingDescription = stringResource(R.string.settings_resource_file_updating)
     Card(
         modifier = modifier.fillMaxWidth().heightIn(min = 84.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -475,13 +488,38 @@ private fun ResourceFileCardSurface(
                 ready = status.exists,
             )
             Box {
-                IconButton(onClick = { menuExpanded = true }, enabled = !updating) {
-                    if (updating) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else {
+                when (updateState) {
+                    ResourceFileUpdateDisplayState.Idle -> IconButton(
+                        onClick = { menuExpanded = true },
+                        enabled = actionsEnabled,
+                    ) {
                         Icon(
                             imageVector = Icons.Rounded.MoreVert,
                             contentDescription = stringResource(R.string.common_more_actions),
+                        )
+                    }
+
+                    ResourceFileUpdateDisplayState.Queued -> IconButton(
+                        onClick = {},
+                        enabled = false,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Timer,
+                            contentDescription = stringResource(
+                                R.string.settings_resource_file_update_queued,
+                            ),
+                        )
+                    }
+
+                    ResourceFileUpdateDisplayState.Running -> IconButton(
+                        onClick = {},
+                        enabled = false,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .semantics { contentDescription = updatingDescription },
+                            strokeWidth = 2.dp,
                         )
                     }
                 }
