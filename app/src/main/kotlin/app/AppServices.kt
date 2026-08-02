@@ -5,6 +5,7 @@ package app
 
 import androidx.compose.runtime.staticCompositionLocalOf
 import android.net.Uri
+import data.backup.AppBackupUseCase
 import engine.proxy.AndroidProxyEngine
 import engine.proxy.ProxyServiceUseCase
 import engine.singbox.runtime.SingBoxRuntimeRepository
@@ -32,6 +33,7 @@ internal data class AppServices(
     val networkInterfaces: AndroidNetworkInterfaceProvider,
     val resourceFileUseCase: ResourceFileUseCase,
     val resourceFileUpdateCoordinator: ResourceFileUpdateCoordinator,
+    val appBackupUseCase: AppBackupUseCase,
     val outboundSubscriptionUpdater: OutboundSubscriptionUpdater,
     val qrCodeScanner: suspend () -> String?,
     val importFilePicker: suspend () -> Uri?,

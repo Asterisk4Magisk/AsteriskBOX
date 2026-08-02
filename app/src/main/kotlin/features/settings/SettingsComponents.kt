@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -64,7 +65,14 @@ internal fun ArrowPreference(
     onClick: () -> Unit,
     summary: String = "",
     icon: ImageVector = Icons.Rounded.Tune,
-) = SettingsActionRow(title = title, summary = summary, icon = icon, onClick = onClick)
+    enabled: Boolean = true,
+) = SettingsActionRow(
+    title = title,
+    summary = summary,
+    icon = icon,
+    onClick = onClick,
+    enabled = enabled,
+)
 
 @Composable
 internal fun SwitchPreference(
@@ -139,14 +147,22 @@ internal fun SettingsActionRow(
     modifier: Modifier = Modifier,
     summary: String = "",
     value: String = "",
+    enabled: Boolean = true,
 ) {
     if (!settingsRowMatchesQuery(title, summary, value)) return
+    val rowAlpha by animateFloatAsState(
+        targetValue = if (enabled) 1f else 0.38f,
+        animationSpec = AsteriskMotion.fastEffects(),
+        label = "settings-action-enabled",
+    )
     SettingsRow(
         title = title,
         icon = icon,
         summary = summary,
         value = value,
-        modifier = modifier.clickable(role = Role.Button, onClick = onClick),
+        modifier = modifier
+            .graphicsLayer { alpha = rowAlpha }
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
         trailing = {
             Icon(
                 imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,

@@ -37,7 +37,14 @@ internal fun RootBootScriptSynchronizer(
                 if (!state.enableRootBootScript || !state.runMode.isRootRunMode()) {
                     return@collect
                 }
-                when (val result = rootBootScriptUseCase.refresh(state)) {
+                when (
+                    val result = rootBootScriptUseCase.refresh(state) {
+                        val currentState = stateStore.state.value
+                        currentState.enableRootBootScript &&
+                            currentState.runMode.isRootRunMode() &&
+                            currentState.toRootBootScriptRefresh().signature == refresh.signature
+                    }
+                ) {
                     RootBootScriptResult.Success -> Unit
                     RootBootScriptResult.RootUnavailable -> AndroidAppLogger.warn(
                         LogTag,

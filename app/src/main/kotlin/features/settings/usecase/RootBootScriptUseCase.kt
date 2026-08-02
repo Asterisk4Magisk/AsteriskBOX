@@ -32,6 +32,7 @@ import system.AndroidRootShellGateway
 internal class RootBootScriptUseCase(
     context: Context,
     private val rootAccess: AndroidRootShellGateway,
+    private val operationGate: RootBootScriptOperationGate = RootBootScriptOperationGate(),
 ) {
     private val appContext = context.applicationContext
     private val tproxyRootRunner = TproxyRootRunner(rootAccess)
@@ -43,32 +44,54 @@ internal class RootBootScriptUseCase(
     suspend fun setEnabled(
         state: AppState,
         enabled: Boolean,
-    ): RootBootScriptResult {
+    ): RootBootScriptResult = operationGate.exclusive {
         if (!rootAccess.hasRootAccess()) {
-            return RootBootScriptResult.RootUnavailable
+            return@exclusive RootBootScriptResult.RootUnavailable
         }
-        return if (enabled) {
+        if (enabled) {
             install(state)
         } else {
-            uninstall(rootAccessVerified = true)
+            uninstallUnlocked()
         }
     }
 
-    suspend fun refresh(state: AppState): RootBootScriptResult {
-        if (!state.enableRootBootScript) {
-            return RootBootScriptResult.Success
+    suspend fun refresh(
+        state: AppState,
+        isStillCurrent: () -> Boolean = { true },
+    ): RootBootScriptResult = operationGate.exclusive {
+        if (!isStillCurrent() || !state.enableRootBootScript) {
+            return@exclusive RootBootScriptResult.Success
         }
         if (!rootAccess.hasRootAccess()) {
-            return RootBootScriptResult.RootUnavailable
+            return@exclusive RootBootScriptResult.RootUnavailable
         }
-        return install(state)
+        install(state)
     }
 
-    suspend fun uninstall(rootAccessVerified: Boolean = false): RootBootScriptResult {
-        if (!rootAccessVerified && !rootAccess.hasRootAccess()) {
-            return RootBootScriptResult.RootUnavailable
+    suspend fun uninstall(rootAccessVerified: Boolean = false): RootBootScriptResult =
+        operationGate.exclusive {
+            if (!rootAccessVerified && !rootAccess.hasRootAccess()) {
+                return@exclusive RootBootScriptResult.RootUnavailable
+            }
+            uninstallUnlocked()
         }
-        return runCatching {
+
+    suspend fun uninstallAndThen(
+        rootAccessVerified: Boolean = false,
+        afterUninstall: suspend () -> Unit,
+    ): RootBootScriptResult = operationGate.exclusive {
+        if (!rootAccessVerified && !rootAccess.hasRootAccess()) {
+            return@exclusive RootBootScriptResult.RootUnavailable
+        }
+        val result = uninstallUnlocked()
+        if (result == RootBootScriptResult.Success) {
+            afterUninstall()
+        }
+        result
+    }
+
+    private suspend fun uninstallUnlocked(): RootBootScriptResult =
+        runCatching {
             rootAccess.removeRootBootScript(
                 runtimeLayout = appContext.prepareRootRuntimeLayout(),
                 coreLogPaths = appContext.prepareSingBoxCoreLogPaths(),
@@ -78,7 +101,6 @@ internal class RootBootScriptUseCase(
             onSuccess = { RootBootScriptResult.Success },
             onFailure = { error -> error.toRootBootScriptFailure() },
         )
-    }
 
     private suspend fun install(state: AppState): RootBootScriptResult {
         return runCatching {

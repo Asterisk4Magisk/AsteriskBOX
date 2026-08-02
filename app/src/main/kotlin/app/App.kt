@@ -18,6 +18,8 @@ import app.effects.RootBootScriptSynchronizer
 import app.effects.SingBoxRuntimeSynchronizer
 import app.effects.TrafficStatsNotificationSynchronizer
 import app.effects.Tun2SocksRuntimeFileSynchronizer
+import data.backup.AndroidAppBackupDocumentGateway
+import data.backup.AppBackupUseCase
 import engine.proxy.AndroidProxyEngine
 import engine.proxy.ProxyServiceUseCase
 import features.logs.AndroidCoreLogRepository
@@ -44,6 +46,8 @@ fun App(
     padding: PaddingValues = PaddingValues(0.dp),
     qrCodeScanner: suspend () -> String?,
     resourceFilePicker: suspend () -> Uri?,
+    backupFilePicker: suspend () -> Uri?,
+    backupFileCreator: suspend (String) -> Uri?,
     logFileCreator: suspend (String) -> Uri?,
     requestVpnPermission: suspend (Intent) -> Boolean,
 ) {
@@ -73,6 +77,15 @@ fun App(
         ResourceFileUseCase(
             context = appContext,
             resourceFilePicker = resourceFilePicker,
+        )
+    }
+    val appBackupUseCase = remember(appContext, backupFilePicker, backupFileCreator) {
+        AppBackupUseCase(
+            gateway = AndroidAppBackupDocumentGateway(
+                context = appContext,
+                filePicker = backupFilePicker,
+                fileCreator = backupFileCreator,
+            ),
         )
     }
     val resourceFileUpdateCoordinator = remember(appScope, resourceFileUseCase) {
@@ -147,6 +160,7 @@ fun App(
         networkInterfaces,
         resourceFileUseCase,
         resourceFileUpdateCoordinator,
+        appBackupUseCase,
         outboundSubscriptionUpdater,
         qrCodeScanner,
         resourceFilePicker,
@@ -168,6 +182,7 @@ fun App(
             networkInterfaces = networkInterfaces,
             resourceFileUseCase = resourceFileUseCase,
             resourceFileUpdateCoordinator = resourceFileUpdateCoordinator,
+            appBackupUseCase = appBackupUseCase,
             outboundSubscriptionUpdater = outboundSubscriptionUpdater,
             qrCodeScanner = qrCodeScanner,
             importFilePicker = resourceFilePicker,

@@ -14,6 +14,7 @@ internal enum class SettingsSectionId {
     Tun2Socks,
     Bpf2Socks,
     Logs,
+    BackupRestore,
     About,
 }
 

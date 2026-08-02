@@ -8,8 +8,11 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import app.AppState
 import features.logs.AndroidAppLogger
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
@@ -30,6 +34,7 @@ class AndroidAppStateStore private constructor(
     private val settingsPreferences = AppSettingsPreferences(appContext)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val updateLock = Any()
+    private val deferredUpdates = DeferredStateUpdates<AppState>()
     private val saveMutex = Mutex()
     private val saveRevision = AtomicLong(0)
     private val hasPersistedState = AtomicBoolean(false)
@@ -45,39 +50,82 @@ class AndroidAppStateStore private constructor(
 
     fun update(transform: (AppState) -> AppState) {
         val pendingSave = synchronized(updateLock) {
-            val previousState = mutableState.value
-            val nextState = transform(previousState)
-            if (nextState === previousState || nextState.isCheapNoopUpdate(previousState)) {
-                null
-            } else {
-                mutableState.value = nextState
-                if (
-                    nextState.languageMode != previousState.languageMode ||
-                    nextState.colorMode != previousState.colorMode
-                ) {
-                    settingsPreferences.save(nextState)
-                }
-                PendingStateSave(
-                    nextState = nextState,
-                    revision = saveRevision.incrementAndGet(),
-                )
-            }
+            if (deferredUpdates.deferIfReplacing(transform)) return
+            applyImmediateUpdateLocked(transform)
         } ?: return
 
         persist(pendingSave.nextState, pendingSave.revision)
     }
 
-    fun compareAndSet(expected: AppState, updated: AppState): Boolean {
-        var committed = false
-        update { current ->
-            if (current === expected) {
-                committed = true
-                updated
+    suspend fun replaceAllAndAwaitPersistence(nextState: AppState) {
+        lateinit var previousState: AppState
+        val replacementRevision = synchronized(updateLock) {
+            previousState = mutableState.value
+            if (nextState == previousState) return
+            deferredUpdates.beginReplacement()
+            saveRevision.incrementAndGet()
+        }
+        val completion = CompletableDeferred<Result<Unit>>()
+        persist(nextState, replacementRevision, completion)
+        var cancellation: CancellationException? = null
+        val result = try {
+            completion.await()
+        } catch (error: CancellationException) {
+            cancellation = error
+            withContext(NonCancellable) { completion.await() }
+        }
+
+        val followUpSave = synchronized(updateLock) {
+            val replacementBase = if (result.isSuccess) nextState else previousState
+            val finalState = deferredUpdates.finishReplacement(replacementBase) { error ->
+                AndroidAppLogger.error(
+                    LogTag,
+                    "Discarded an invalid app state update deferred during replacement; continuing",
+                    error,
+                )
+            }
+            mutableState.value = finalState
+            if (result.isFailure || finalState != replacementBase) {
+                PendingStateSave(
+                    nextState = finalState,
+                    revision = saveRevision.incrementAndGet(),
+                )
             } else {
-                current
+                null
             }
         }
-        return committed
+        followUpSave?.let { save -> persist(save.nextState, save.revision) }
+        cancellation?.let { error -> throw error }
+        result.getOrThrow()
+    }
+
+    fun compareAndSet(expected: AppState, updated: AppState): Boolean {
+        val pendingSave = synchronized(updateLock) {
+            if (deferredUpdates.mustRejectSynchronousMutation()) return false
+            if (mutableState.value !== expected) return false
+            applyImmediateUpdateLocked { updated }
+        }
+        pendingSave?.let { save -> persist(save.nextState, save.revision) }
+        return true
+    }
+
+    private fun applyImmediateUpdateLocked(
+        transform: (AppState) -> AppState,
+    ): PendingStateSave? {
+        val previousState = mutableState.value
+        val nextState = transform(previousState)
+        if (nextState === previousState || nextState.isCheapNoopUpdate(previousState)) return null
+        mutableState.value = nextState
+        if (
+            nextState.languageMode != previousState.languageMode ||
+            nextState.colorMode != previousState.colorMode
+        ) {
+            settingsPreferences.save(nextState)
+        }
+        return PendingStateSave(
+            nextState = nextState,
+            revision = saveRevision.incrementAndGet(),
+        )
     }
 
     private fun loadInitialState(): LoadedAppState {
@@ -104,27 +152,38 @@ class AndroidAppStateStore private constructor(
         }
     }
 
-    private fun persist(nextState: AppState, revision: Long) {
+    private fun persist(
+        nextState: AppState,
+        revision: Long,
+        completion: CompletableDeferred<Result<Unit>>? = null,
+    ) {
         scope.launch {
-            saveMutex.withLock {
-                if (revision != saveRevision.get()) {
-                    return@withLock
-                }
-                val plan = persistenceTracker.plan(
-                    nextState = nextState,
-                    hasPersistedRoomState = hasPersistedState.get(),
-                )
-                runCatching {
-                    settingsPreferences.save(plan.nextState)
-                    dao.saveState(
-                        previousState = plan.previousState,
-                        nextState = plan.nextState,
-                        replaceAll = plan.replaceAll,
+            val result = try {
+                saveMutex.withLock {
+                    if (revision != saveRevision.get()) {
+                        return@withLock Result.failure(StatePersistenceSupersededException())
+                    }
+                    val plan = persistenceTracker.plan(
+                        nextState = nextState,
+                        hasPersistedRoomState = hasPersistedState.get(),
                     )
-                    hasPersistedState.set(true)
-                    persistenceTracker.markPersisted(plan.nextState)
-                }.onFailure { error ->
-                    AndroidAppLogger.error(LogTag, "Failed to persist app state", error)
+                    val firstAttempt = runCatching {
+                        settingsPreferences.save(plan.nextState)
+                        dao.saveState(
+                            previousState = plan.previousState,
+                            nextState = plan.nextState,
+                            replaceAll = plan.replaceAll,
+                        )
+                        hasPersistedState.set(true)
+                        persistenceTracker.markPersisted(plan.nextState)
+                    }
+                    if (firstAttempt.isSuccess) return@withLock firstAttempt
+
+                    AndroidAppLogger.error(
+                        LogTag,
+                        "Failed to persist app state",
+                        firstAttempt.exceptionOrNull(),
+                    )
                     resetDatabase()
                     runCatching {
                         settingsPreferences.save(nextState)
@@ -136,10 +195,20 @@ class AndroidAppStateStore private constructor(
                         hasPersistedState.set(true)
                         persistenceTracker.markPersisted(nextState)
                     }.onFailure { retryError ->
-                        AndroidAppLogger.error(LogTag, "Failed to persist app state after database reset", retryError)
+                        AndroidAppLogger.error(
+                            LogTag,
+                            "Failed to persist app state after database reset",
+                            retryError,
+                        )
                     }
                 }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                AndroidAppLogger.error(LogTag, "Failed to prepare app state persistence", error)
+                Result.failure(error)
             }
+            completion?.complete(result)
         }
     }
 
@@ -180,6 +249,10 @@ class AndroidAppStateStore private constructor(
         }
     }
 }
+
+private class StatePersistenceSupersededException : IllegalStateException(
+    "App state persistence was superseded by a newer update",
+)
 
 private fun AppState.isCheapNoopUpdate(previous: AppState): Boolean {
     return outboundGroups === previous.outboundGroups &&
