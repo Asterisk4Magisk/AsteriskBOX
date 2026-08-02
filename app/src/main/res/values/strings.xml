@@ -42,6 +42,7 @@
     <string name="common_cancel">Cancel</string>
     <string name="common_clear">Clear</string>
     <string name="common_copy">Copy</string>
+    <string name="common_share">Share</string>
     <string name="common_default">Default</string>
     <string name="common_not_specified">Not specified</string>
     <string name="common_unavailable">Unavailable</string>
@@ -657,6 +658,10 @@
     <string name="outbound_empty">No outbounds in this group</string>
     <string name="outbound_import">Import outbound</string>
     <string name="outbound_import_qr">Scan QR code</string>
+    <string name="outbound_share_qr">Generate QR code</string>
+    <string name="outbound_share_url">Copy URL</string>
+    <string name="outbound_share_json">Copy JSON</string>
+    <string name="outbound_qr_generate_failed">Unable to generate QR code</string>
     <string name="outbound_import_clipboard">Import from clipboard</string>
     <string name="outbound_import_file">Import file</string>
     <string name="outbound_import_manual">Add manually</string>

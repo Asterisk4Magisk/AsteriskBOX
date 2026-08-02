@@ -42,6 +42,7 @@
     <string name="common_cancel">取消</string>
     <string name="common_clear">清除</string>
     <string name="common_copy">复制</string>
+    <string name="common_share">分享</string>
     <string name="common_default">默认</string>
     <string name="common_not_specified">不指定</string>
     <string name="common_unavailable">不可用</string>
@@ -649,6 +650,10 @@
     <string name="outbound_empty">当前分组暂无出站</string>
     <string name="outbound_import">导入出站</string>
     <string name="outbound_import_qr">扫描二维码</string>
+    <string name="outbound_share_qr">生成二维码</string>
+    <string name="outbound_share_url">复制 URL</string>
+    <string name="outbound_share_json">复制 JSON</string>
+    <string name="outbound_qr_generate_failed">无法生成二维码</string>
     <string name="outbound_import_clipboard">从剪切板导入</string>
     <string name="outbound_import_file">从文件导入</string>
     <string name="outbound_import_manual">手动添加</string>

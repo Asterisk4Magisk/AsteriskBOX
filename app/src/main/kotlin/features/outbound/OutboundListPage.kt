@@ -150,6 +150,16 @@ private enum class OutboundOptionsMenuLevel {
     SORT,
 }
 
+private enum class OutboundCardMenuLevel {
+    MAIN,
+    SHARE,
+}
+
+private data class OutboundQrDialogState(
+    val title: String,
+    val url: String,
+)
+
 @Composable
 internal fun OutboundListPage(
     padding: PaddingValues,
@@ -175,6 +185,7 @@ internal fun OutboundListPage(
     }
     var query by rememberSaveable { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<OutboundState?>(null) }
+    var qrCodeDialogState by remember { mutableStateOf<OutboundQrDialogState?>(null) }
     var importResultPresentation by remember {
         mutableStateOf<ImportResultPresentation?>(null)
     }
@@ -703,10 +714,34 @@ internal fun OutboundListPage(
                         ),
                     )
                 },
-                onCopy = { outbound ->
-                    scope.launch {
-                        clipboard.setPlainText(outboundJsonWithoutManagedIdentity(outbound.json))
-                        services.tipNotifier.show(copiedMessage)
+                onShare = { outbound, action, shareUrlResult ->
+                    when (action) {
+                        OutboundShareAction.QR_CODE -> {
+                            outboundShareUrlPayload(action, shareUrlResult)?.let { url ->
+                                qrCodeDialogState = OutboundQrDialogState(
+                                    title = outbound.remarks.ifBlank { outbound.type },
+                                    url = url,
+                                )
+                            }
+                        }
+
+                        OutboundShareAction.URL -> {
+                            outboundShareUrlPayload(action, shareUrlResult)?.let { url ->
+                                scope.launch {
+                                    clipboard.setPlainText(url)
+                                    services.tipNotifier.show(copiedMessage)
+                                }
+                            }
+                        }
+
+                        OutboundShareAction.JSON -> {
+                            scope.launch {
+                                clipboard.setPlainText(
+                                    outboundJsonWithoutManagedIdentity(outbound.json),
+                                )
+                                services.tipNotifier.show(copiedMessage)
+                            }
+                        }
                     }
                 },
                 onPing = { outbound ->
@@ -735,6 +770,14 @@ internal fun OutboundListPage(
         },
     )
 
+    qrCodeDialogState?.let { state ->
+        OutboundQrCodeDialog(
+            title = state.title,
+            url = state.url,
+            onDismissRequest = { qrCodeDialogState = null },
+        )
+    }
+
     importResultPresentation?.let { presentation ->
         ImportResultDialog(
             presentation = presentation,
@@ -754,7 +797,7 @@ private fun OutboundPage(
     pingingOutboundIds: Set<Int>,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
     onEdit: (OutboundState) -> Unit,
-    onCopy: (OutboundState) -> Unit,
+    onShare: (OutboundState, OutboundShareAction, OutboundShareUrlResult) -> Unit,
     onPing: (OutboundState) -> Unit,
     onDelete: (OutboundState) -> Unit,
 ) {
@@ -832,7 +875,7 @@ private fun OutboundPage(
                         pinging = outbound.id in pingingOutboundIds,
                         isDragging = isDragging && reorderEnabled,
                         onEdit = { onEdit(outbound) },
-                        onCopy = { onCopy(outbound) },
+                        onShare = { action, result -> onShare(outbound, action, result) },
                         onPing = { onPing(outbound) },
                         onDelete = { onDelete(outbound) },
                         modifier = Modifier
@@ -856,11 +899,14 @@ private fun OutboundCard(
     pinging: Boolean,
     isDragging: Boolean,
     onEdit: () -> Unit,
-    onCopy: () -> Unit,
+    onShare: (OutboundShareAction, OutboundShareUrlResult) -> Unit,
     onPing: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val shareUrlResult = remember(outbound.json, outbound.remarks) {
+        encodeOutboundShareUrl(outbound.json, outbound.remarks)
+    }
     val containerColor by animateColorAsState(
         targetValue = if (isDragging) {
             MaterialTheme.colorScheme.surfaceContainerHigh
@@ -936,8 +982,9 @@ private fun OutboundCard(
                 }
                 OutboundCardMenu(
                     pingEnabled = outbound.pingHostOrNull() != null && !pinging,
+                    shareUrlResult = shareUrlResult,
                     onEdit = onEdit,
-                    onCopy = onCopy,
+                    onShare = onShare,
                     onPing = onPing,
                     onDelete = onDelete,
                 )
@@ -968,12 +1015,21 @@ private fun OutboundCard(
 @Composable
 private fun OutboundCardMenu(
     pingEnabled: Boolean,
+    shareUrlResult: OutboundShareUrlResult,
     onEdit: () -> Unit,
-    onCopy: () -> Unit,
+    onShare: (OutboundShareAction, OutboundShareUrlResult) -> Unit,
     onPing: () -> Unit,
     onDelete: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
+    var level by remember { mutableStateOf(OutboundCardMenuLevel.MAIN) }
+    val dismissMenu = {
+        menuExpanded = false
+        level = OutboundCardMenuLevel.MAIN
+    }
+    val menuSpatialMotion = AsteriskMotion.fastSpatial<IntOffset>()
+    val menuSizeMotion = AsteriskMotion.fastSpatial<IntSize>()
+    val menuEffectsMotion = AsteriskMotion.fastEffects<Float>()
     Box(
         modifier = Modifier.offset(
             x = OutboundCardMenuIconOffset.x.dp,
@@ -988,42 +1044,105 @@ private fun OutboundCardMenu(
         }
         DropdownMenu(
             expanded = menuExpanded,
-            onDismissRequest = { menuExpanded = false },
+            onDismissRequest = dismissMenu,
+            modifier = Modifier.width(OutboundCardMenuWidth),
         ) {
-            OutboundMenuItem(
-                text = stringResource(R.string.outbound_ping),
-                icon = Icons.Rounded.Speed,
-                enabled = pingEnabled,
-                onClick = {
-                    menuExpanded = false
-                    onPing()
+            AnimatedContent(
+                targetState = level,
+                modifier = Modifier.fillMaxWidth(),
+                transitionSpec = {
+                    val direction = if (targetState == OutboundCardMenuLevel.MAIN) -1 else 1
+                    (
+                        slideInHorizontally(
+                            animationSpec = menuSpatialMotion,
+                            initialOffsetX = { width -> direction * width / 5 },
+                        ) + fadeIn(animationSpec = menuEffectsMotion)
+                        ).togetherWith(
+                        slideOutHorizontally(
+                            animationSpec = menuSpatialMotion,
+                            targetOffsetX = { width -> -direction * width / 5 },
+                        ) + fadeOut(animationSpec = menuEffectsMotion),
+                    ).using(
+                        SizeTransform(sizeAnimationSpec = { _, _ -> menuSizeMotion }),
+                    )
                 },
-            )
-            HorizontalDivider()
-            OutboundMenuItem(
-                text = stringResource(R.string.common_edit),
-                icon = Icons.Rounded.Edit,
-                onClick = {
-                    menuExpanded = false
-                    onEdit()
-                },
-            )
-            OutboundMenuItem(
-                text = stringResource(R.string.common_copy),
-                icon = Icons.Rounded.ContentCopy,
-                onClick = {
-                    menuExpanded = false
-                    onCopy()
-                },
-            )
-            OutboundMenuItem(
-                text = stringResource(R.string.common_delete),
-                icon = Icons.Rounded.Delete,
-                onClick = {
-                    menuExpanded = false
-                    onDelete()
-                },
-            )
+                contentAlignment = Alignment.TopStart,
+                label = "outbound-card-menu-level",
+            ) { currentLevel ->
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    when (currentLevel) {
+                        OutboundCardMenuLevel.MAIN -> {
+                            OutboundMenuItem(
+                                text = stringResource(R.string.outbound_ping),
+                                icon = Icons.Rounded.Speed,
+                                enabled = pingEnabled,
+                                onClick = {
+                                    dismissMenu()
+                                    onPing()
+                                },
+                            )
+                            HorizontalDivider()
+                            OutboundMenuItem(
+                                text = stringResource(R.string.common_edit),
+                                icon = Icons.Rounded.Edit,
+                                onClick = {
+                                    dismissMenu()
+                                    onEdit()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.common_share)) },
+                                leadingIcon = {
+                                    Icon(Icons.Rounded.Link, contentDescription = null)
+                                },
+                                trailingIcon = {
+                                    Icon(Icons.Rounded.ChevronRight, contentDescription = null)
+                                },
+                                onClick = { level = OutboundCardMenuLevel.SHARE },
+                            )
+                            OutboundMenuItem(
+                                text = stringResource(R.string.common_delete),
+                                icon = Icons.Rounded.Delete,
+                                onClick = {
+                                    dismissMenu()
+                                    onDelete()
+                                },
+                            )
+                        }
+
+                        OutboundCardMenuLevel.SHARE -> {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.common_share)) },
+                                leadingIcon = {
+                                    Icon(Icons.Rounded.ChevronLeft, contentDescription = null)
+                                },
+                                onClick = { level = OutboundCardMenuLevel.MAIN },
+                            )
+                            HorizontalDivider()
+                            outboundShareActions(shareUrlResult).forEach { action ->
+                                val label = when (action) {
+                                    OutboundShareAction.QR_CODE -> R.string.outbound_share_qr
+                                    OutboundShareAction.URL -> R.string.outbound_share_url
+                                    OutboundShareAction.JSON -> R.string.outbound_share_json
+                                }
+                                val icon = when (action) {
+                                    OutboundShareAction.QR_CODE -> Icons.Rounded.QrCodeScanner
+                                    OutboundShareAction.URL -> Icons.Rounded.Link
+                                    OutboundShareAction.JSON -> Icons.Rounded.ContentCopy
+                                }
+                                OutboundMenuItem(
+                                    text = stringResource(label),
+                                    icon = icon,
+                                    onClick = {
+                                        dismissMenu()
+                                        onShare(action, shareUrlResult)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1322,6 +1441,7 @@ private fun OutboundMenuItem(
 
 private val OutboundImportMenuWidth = 224.dp
 private val OutboundOptionsMenuWidth = 224.dp
+private val OutboundCardMenuWidth = 224.dp
 private val OutboundGridSpacing = OutboundGridSpacingDp.dp
 private val OutboundCardHeight = OutboundCardHeightDp.dp
 private val OutboundCardPadding =
