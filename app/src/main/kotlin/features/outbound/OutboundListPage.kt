@@ -591,9 +591,7 @@ internal fun OutboundListPage(
                                                                     descriptor.title,
                                                                     descriptor.type,
                                                                 ),
-                                                                icon = outboundTypeIcon(
-                                                                    descriptor.type,
-                                                                ),
+                                                                icon = null,
                                                                 onClick = {
                                                                     importMenuExpanded = false
                                                                     selectedGroup?.let { group ->
@@ -1410,30 +1408,20 @@ private fun OutboundOptionsMenu(
     }
 }
 
-private fun outboundTypeIcon(type: String): ImageVector = when (type) {
-    "socks" -> Icons.Rounded.Lan
-    "http", "naive" -> Icons.Rounded.Http
-    "shadowsocks" -> Icons.Rounded.Security
-    "vmess" -> Icons.Rounded.Hub
-    "trojan" -> Icons.Rounded.VpnLock
-    "hysteria", "hysteria2", "tuic" -> Icons.Rounded.Speed
-    "vless" -> Icons.Rounded.Route
-    "shadowtls", "anytls" -> Icons.Rounded.Lock
-    "snell" -> Icons.Rounded.Cable
-    "ssh" -> Icons.Rounded.Terminal
-    else -> Icons.Rounded.Router
-}
-
 @Composable
 private fun OutboundMenuItem(
     text: String,
-    icon: ImageVector,
+    icon: ImageVector?,
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     DropdownMenuItem(
         text = { Text(text) },
-        leadingIcon = { Icon(icon, contentDescription = null) },
+        leadingIcon = if (icon == null) {
+            null
+        } else {
+            { Icon(icon, contentDescription = null) }
+        },
         enabled = enabled,
         onClick = onClick,
     )
