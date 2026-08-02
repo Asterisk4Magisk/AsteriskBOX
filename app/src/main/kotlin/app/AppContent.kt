@@ -75,11 +75,14 @@ import features.outbound.OutboundListPage
 import features.endpoint.EndpointEditorPage
 import features.endpoint.EndpointListPage
 import features.dns.DnsManagementPage
+import features.dns.DnsRuleEditorPage
 import features.selector.SelectorManagementPage
+import features.selector.SelectorEditorPage
 import features.singbox.SingBoxDashboardPage
 import features.singbox.SingBoxProxyPage
 import features.proxy.app.ProxyAppListPage
 import features.resources.ResourceManagementPage
+import features.routing.RouteRuleEditorPage
 import features.routing.RoutingManagementPage
 import features.settings.SettingsPage
 import ui.layout.pageWindowPadding
@@ -175,17 +178,44 @@ fun AppContent(
                 entry<Route.SelectorManagement> {
                     SelectorManagementPage(padding = padding)
                 }
+                entry<Route.SelectorEdit> { route ->
+                    key(route.selectorId) {
+                        SelectorEditorPage(
+                            padding = padding,
+                            selectorId = route.selectorId,
+                        )
+                    }
+                }
                 entry<Route.EndpointList> {
                     EndpointListPage(padding = padding)
                 }
                 entry<Route.RoutingManagement> {
                     RoutingManagementPage(padding = padding)
                 }
+                entry<Route.RouteRuleEdit> { route ->
+                    key(route.ruleId, route.initialDraft, route.resultKey, route.nested) {
+                        RouteRuleEditorPage(
+                            padding = padding,
+                            ruleId = route.ruleId,
+                            initialDraft = route.initialDraft,
+                            resultKey = route.resultKey,
+                            nested = route.nested,
+                        )
+                    }
+                }
                 entry<Route.DnsManagement> { route ->
                     DnsManagementPage(
                         padding = padding,
                         initiallyOpenDnsSettings = route.openSettings,
                     )
+                }
+                entry<Route.DnsRuleEdit> { route ->
+                    key(route.ruleId) {
+                        DnsRuleEditorPage(
+                            padding = padding,
+                            ruleId = route.ruleId,
+                        )
+                    }
                 }
                 entry<Route.OutboundEdit> { route ->
                     key(route.outboundId, route.groupId, route.type) {

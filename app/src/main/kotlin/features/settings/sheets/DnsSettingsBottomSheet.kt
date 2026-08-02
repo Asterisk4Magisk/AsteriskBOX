@@ -26,10 +26,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -79,6 +82,8 @@ import ui.components.StringListEditor
 import ui.components.localizedLabel
 import ui.components.singBoxOptionLabel
 import ui.components.singBoxProtocolChoices
+import ui.layout.pageContentPaddingWithCutout
+import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 import ui.icons.AsteriskIcons as Icons
@@ -808,8 +813,9 @@ private fun DnsDialFields(
 }
 
 @Composable
-internal fun DnsRuleEditorSheet(
-    show: Boolean,
+internal fun DnsRuleEditorScaffold(
+    outerPadding: PaddingValues,
+    isWideScreen: Boolean,
     editor: DnsRuleEditorState,
     serverChoices: List<Pair<String, String>>,
     inboundChoices: List<Pair<String, String>>,
@@ -883,34 +889,57 @@ internal fun DnsRuleEditorSheet(
     val actionSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
     val actionEffectsMotion = AsteriskMotion.effects<Float>()
 
-    SettingsModalBottomSheet(
-        show = show,
-        title = stringResource(
-            if (editor.index == null) R.string.settings_dns_add_rule else R.string.settings_dns_edit_rule,
-        ),
-        startAction = {
-            TextButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
-                enabled = !saving,
-                onClick = onDismissRequest,
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        stringResource(
+                            if (editor.index == null) {
+                                R.string.settings_dns_add_rule
+                            } else {
+                                R.string.settings_dns_edit_rule
+                            },
+                        ),
+                    )
+                },
+                navigationIcon = {
+                    IconButton(
+                        enabled = !saving,
+                        onClick = onDismissRequest,
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            stringResource(R.string.common_back),
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        enabled = canSave && !saving,
+                        onClick = { onSave(rule.sanitized()) },
+                    ) {
+                        if (saving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(Icons.Rounded.Save, stringResource(R.string.common_save))
+                        }
+                    }
+                },
             )
         },
-        endAction = {
-            TextButton(
-                text = stringResource(R.string.common_save),
-                icon = Icons.Rounded.Save,
-                enabled = canSave && !saving,
-                onClick = { onSave(rule.sanitized()) },
-            )
-        },
-        onDismissRequest = {
-            if (!saving) onDismissRequest()
-        },
-    ) {
+    ) { innerPadding ->
+        val contentPadding = pageContentPaddingWithCutout(
+            innerPadding = innerPadding,
+            outerPadding = outerPadding,
+            isWideScreen = isWideScreen,
+        )
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = PaddingValues(bottom = 28.dp),
+            contentPadding = pageListPadding(contentPadding, bottomExtra = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item(key = "basic-title") {

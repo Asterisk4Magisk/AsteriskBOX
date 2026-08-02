@@ -6,7 +6,9 @@ package features.dns
 import app.AppState
 import app.SingBoxDnsRuleMatchState
 import app.SingBoxDnsRuleState
+import app.nextAvailableDnsRuleId
 import app.visibleManagedReference
+import app.withPrunedDnsEvaluationReferences
 
 internal val DnsRuleMatcherGroups = listOf(
     listOf(
@@ -74,6 +76,28 @@ internal fun AppState.withDnsRuleEnabled(
         if (rule.id == ruleId) rule.copy(enabled = enabled) else rule
     },
 )
+
+internal fun AppState.withSavedDnsRule(
+    rule: SingBoxDnsRuleState,
+    isNew: Boolean,
+): AppState {
+    val savedRule = if (isNew) {
+        rule.copy(id = nextAvailableDnsRuleId())
+    } else {
+        rule
+    }
+    val exists = !isNew && dnsRules.any { current -> current.id == savedRule.id }
+    return copy(
+        dnsRules = if (exists) {
+            dnsRules.map { current ->
+                if (current.id == savedRule.id) savedRule else current
+            }
+        } else {
+            dnsRules + savedRule
+        },
+        nextDnsRuleId = maxOf(nextDnsRuleId, savedRule.id + 1),
+    ).withPrunedDnsEvaluationReferences()
+}
 
 internal fun SingBoxDnsRuleState.withDnsRuleMatchValues(
     field: String,

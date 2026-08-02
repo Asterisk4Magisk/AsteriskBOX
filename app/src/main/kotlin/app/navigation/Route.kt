@@ -4,6 +4,7 @@
 package app.navigation
 
 import androidx.navigation3.runtime.NavKey
+import app.SingBoxRouteRuleState
 import kotlinx.serialization.Serializable
 
 /**
@@ -47,6 +48,24 @@ sealed interface Route : NavKey {
     @Serializable
     data class DnsManagement(
         val openSettings: Boolean = false,
+    ) : Route
+
+    @Serializable
+    data class DnsRuleEdit(
+        val ruleId: Int = 0,
+    ) : Route
+
+    @Serializable
+    data class SelectorEdit(
+        val selectorId: Int = 0,
+    ) : Route
+
+    @Serializable
+    data class RouteRuleEdit(
+        val ruleId: Int = 0,
+        val initialDraft: SingBoxRouteRuleState? = null,
+        val resultKey: String = "",
+        val nested: Boolean = false,
     ) : Route
 
     @Serializable

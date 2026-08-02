@@ -4,7 +4,6 @@
 package app.navigation
 
 import androidx.navigation3.runtime.NavKey
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 
@@ -16,6 +15,7 @@ class Navigator(
     val backStack: MutableList<NavKey>,
 ) {
     private val resultBus = mutableMapOf<String, MutableSharedFlow<Any>>()
+    private val pendingResultRoutes = mutableMapOf<String, Route>()
 
     /**
      * Push a key onto the back stack.
@@ -29,6 +29,7 @@ class Navigator(
      */
     fun replace(key: NavKey) {
         if (backStack.isNotEmpty()) {
+            clearPendingResultsFor(backStack.last())
             backStack[backStack.lastIndex] = key
         } else {
             backStack.add(key)
@@ -40,6 +41,7 @@ class Navigator(
      */
     fun pop() {
         if (backStack.size > 1) {
+            clearPendingResultsFor(backStack.last())
             backStack.removeLastOrNull()
         }
     }
@@ -49,7 +51,7 @@ class Navigator(
      */
     fun popUntil(predicate: (NavKey) -> Boolean) {
         while (backStack.size > 1 && !predicate(backStack.last())) {
-            backStack.removeAt(backStack.lastIndex)
+            pop()
         }
     }
 
@@ -58,6 +60,7 @@ class Navigator(
      */
     fun navigateForResult(route: Route, requestKey: String) {
         ensureChannel(requestKey)
+        pendingResultRoutes[requestKey] = route
         push(route)
     }
 
@@ -65,6 +68,9 @@ class Navigator(
      * Set a result for the given request and then pop.
      */
     fun <T : Any> setResult(requestKey: String, value: T) {
+        val pendingRoute = pendingResultRoutes[requestKey] ?: return
+        if (current() !== pendingRoute) return
+        pendingResultRoutes.remove(requestKey)
         ensureChannel(requestKey).tryEmit(value)
         pop()
     }
@@ -78,14 +84,28 @@ class Navigator(
     /**
      * Clear the last emitted result for the request key.
      */
-    @OptIn(ExperimentalCoroutinesApi::class)
     fun clearResult(requestKey: String) {
-        ensureChannel(requestKey).resetReplayCache()
+        pendingResultRoutes.remove(requestKey)
+        resultBus.remove(requestKey)
     }
+
+    fun hasResultRequest(requestKey: String): Boolean =
+        requestKey in pendingResultRoutes || requestKey in resultBus
 
     fun current() = backStack.lastOrNull()
 
     fun backStackSize() = backStack.size
 
     private fun ensureChannel(key: String): MutableSharedFlow<Any> = resultBus.getOrPut(key) { MutableSharedFlow(replay = 1, extraBufferCapacity = 0) }
+
+    private fun clearPendingResultsFor(route: NavKey) {
+        val requestKeys = pendingResultRoutes
+            .filterValues { pendingRoute -> pendingRoute === route }
+            .keys
+            .toList()
+        requestKeys.forEach { requestKey ->
+            pendingResultRoutes.remove(requestKey)
+            resultBus.remove(requestKey)
+        }
+    }
 }

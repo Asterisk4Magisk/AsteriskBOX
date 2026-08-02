@@ -12,6 +12,7 @@ import app.SingBoxSelectorTypeSelector
 import app.SingBoxSelectorTypeUrlTest
 import app.SingBoxSelectorState
 import app.SupportedSingBoxSelectorTypes
+import app.nextAvailableSelectorId
 import app.selectableManagedOutbounds
 import engine.singbox.SingBoxUnsigned16Max
 import engine.singbox.isNonNegativeSingBoxDuration
@@ -42,6 +43,32 @@ internal fun selectorDefaultMemberIndex(
     members: List<String>,
     default: String,
 ): Int = members.indexOf(default).coerceAtLeast(0)
+
+internal fun AppState.withSavedSelector(
+    draft: SingBoxSelectorState,
+): AppState {
+    val normalized = validateSelectorDraft(this, draft)
+    val original = selectors.firstOrNull { selector -> selector.id == normalized.id }
+    val saved = if (original == null) {
+        normalized.copy(id = nextAvailableSelectorId())
+    } else {
+        normalized
+    }
+    return copy(
+        selectors = if (original == null) {
+            selectors + saved
+        } else {
+            selectors.map { selector ->
+                if (selector.id == saved.id) saved else selector
+            }
+        },
+        nextSelectorId = if (original == null) {
+            maxOf(nextSelectorId, saved.id + 1)
+        } else {
+            nextSelectorId
+        },
+    )
+}
 
 internal fun validateSelectorDraft(
     state: AppState,

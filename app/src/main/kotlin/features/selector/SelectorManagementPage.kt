@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,6 +37,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -49,7 +49,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -82,7 +81,6 @@ import app.SingBoxSelectorTypeSelector
 import app.SingBoxSelectorTypeUrlTest
 import app.SupportedSingBoxSelectorTypes
 import app.collectAppState
-import app.nextAvailableSelectorId
 import app.selectableManagedOutbounds
 import app.withRemovedManagedOutboundTags
 import engine.singbox.SingBoxUnsigned16Max
@@ -98,9 +96,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.asterisk.zcc.abox.R
-import ui.components.AsteriskActionButton
 import ui.components.AsteriskInfoChip
-import ui.components.AsteriskModalBottomSheet
 import ui.components.WarningConfirmDialog
 import ui.components.singBoxOptionLabel
 import ui.icons.AsteriskIcons as Icons
@@ -119,9 +115,6 @@ internal fun SelectorManagementPage(padding: PaddingValues) {
     val isWideScreen = LocalIsWideScreen.current
     val scope = rememberCoroutineScope()
     var query by rememberSaveable { mutableStateOf("") }
-    var editingSelector by remember { mutableStateOf<SingBoxSelectorState?>(null) }
-    var editorSession by remember { mutableIntStateOf(0) }
-    var showEditor by remember { mutableStateOf(false) }
     var saving by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<SingBoxSelectorState?>(null) }
     val normalizedQuery = query.trim()
@@ -177,86 +170,11 @@ internal fun SelectorManagementPage(padding: PaddingValues) {
     }
     val targetTags = outboundChoices.map(ManagedOutboundChoice::tag)
     val count = managedGroups.size + customSelectors.size
-    val savedMessage = stringResource(R.string.selector_saved)
     val saveFailedMessage = stringResource(R.string.selector_save_failed)
-    val newSelectorRemarks = stringResource(R.string.selector_default_remarks)
     val countMotion = AsteriskMotion.fastEffects<Float>()
 
     fun openEditor(selector: SingBoxSelectorState?) {
-        editingSelector = selector ?: SingBoxSelectorState(
-            id = 0,
-            remarks = newSelectorRemarks,
-            outbounds = emptyList(),
-        )
-        editorSession += 1
-        showEditor = true
-    }
-
-    fun saveSelector(draft: SingBoxSelectorState) {
-        if (saving) return
-        saving = true
-        scope.launch {
-            try {
-                val normalized = validateSelectorDraft(appState, draft)
-                val original = appState.selectors.firstOrNull { selector ->
-                    selector.id == normalized.id
-                }
-                val saved = if (original == null) {
-                    val id = appState.nextAvailableSelectorId()
-                    normalized.copy(id = id)
-                } else {
-                    normalized
-                }
-                val candidateState = appState.copy(
-                    selectors = if (original == null) {
-                        appState.selectors + saved
-                    } else {
-                        appState.selectors.map { selector ->
-                            if (selector.id == saved.id) saved else selector
-                        }
-                    },
-                    nextSelectorId = if (original == null) {
-                        saved.id + 1
-                    } else {
-                        appState.nextSelectorId
-                    },
-                )
-                withContext(Dispatchers.IO) {
-                    validateSingBoxRuntimeConfiguration(context, candidateState)
-                }
-                var committed = false
-                updateAppState { state ->
-                    if (state !== appState) {
-                        state
-                    } else {
-                        committed = true
-                        candidateState
-                    }
-                }
-                if (committed) {
-                    showEditor = false
-                    services.tipNotifier.show(savedMessage)
-                } else {
-                    reportFailure(
-                        FailureLogContext(
-                            operation = "selector_save",
-                            stage = "commit",
-                        ),
-                    )
-                    services.tipNotifier.show(saveFailedMessage)
-                }
-            } catch (error: CancellationException) {
-                throw error
-            } catch (error: Throwable) {
-                services.tipNotifier.showError(
-                    error,
-                    saveFailedMessage,
-                    FailureLogContext(operation = "selector_save"),
-                )
-            } finally {
-                saving = false
-            }
-        }
+        navigator.push(app.navigation.Route.SelectorEdit(selector?.id ?: 0))
     }
 
     fun deleteSelector(selector: SingBoxSelectorState) {
@@ -423,15 +341,6 @@ internal fun SelectorManagementPage(padding: PaddingValues) {
         }
     }
 
-    SelectorEditorSheet(
-        show = showEditor,
-        selector = editingSelector,
-        editorSession = editorSession,
-        state = appState,
-        saving = saving,
-        onDismissRequest = { if (!saving) showEditor = false },
-        onSave = ::saveSelector,
-    )
     WarningConfirmDialog(
         show = pendingDelete != null,
         title = stringResource(R.string.selector_delete_title),
@@ -695,41 +604,41 @@ private enum class SelectorTargetKind {
 }
 
 @Composable
-private fun SelectorEditorSheet(
-    show: Boolean,
+internal fun SelectorEditorScaffold(
+    outerPadding: PaddingValues,
+    isWideScreen: Boolean,
     selector: SingBoxSelectorState?,
-    editorSession: Int,
     state: AppState,
     saving: Boolean,
     onDismissRequest: () -> Unit,
     onSave: (SingBoxSelectorState) -> Unit,
 ) {
-    var type by remember(editorSession) {
+    var type by remember(selector?.id) {
         mutableStateOf(selector?.type ?: SingBoxSelectorTypeSelector)
     }
-    var remarks by remember(editorSession) { mutableStateOf(selector?.remarks.orEmpty()) }
-    var members by remember(editorSession) {
+    var remarks by remember(selector?.id) { mutableStateOf(selector?.remarks.orEmpty()) }
+    var members by remember(selector?.id) {
         mutableStateOf(selector?.outbounds.orEmpty())
     }
-    var default by remember(editorSession) { mutableStateOf(selector?.default.orEmpty()) }
-    var url by remember(editorSession) {
+    var default by remember(selector?.id) { mutableStateOf(selector?.default.orEmpty()) }
+    var url by remember(selector?.id) {
         mutableStateOf(selector?.url ?: DefaultSingBoxUrlTestUrl)
     }
-    var interval by remember(editorSession) {
+    var interval by remember(selector?.id) {
         mutableStateOf(selector?.interval ?: DefaultSingBoxUrlTestInterval)
     }
-    var tolerance by remember(editorSession) {
+    var tolerance by remember(selector?.id) {
         mutableStateOf(
             (selector?.tolerance ?: DefaultSingBoxUrlTestTolerance).toString(),
         )
     }
-    var idleTimeout by remember(editorSession) {
+    var idleTimeout by remember(selector?.id) {
         mutableStateOf(selector?.idleTimeout ?: DefaultSingBoxUrlTestIdleTimeout)
     }
-    var interrupt by remember(editorSession) {
+    var interrupt by remember(selector?.id) {
         mutableStateOf(selector?.interruptExistConnections ?: true)
     }
-    var query by remember(editorSession) { mutableStateOf("") }
+    var query by remember(selector?.id) { mutableStateOf("") }
     val normalizedRemarks = remarks.trim()
     val targets = remember(
         state.outboundGroups,
@@ -821,34 +730,57 @@ private fun SelectorEditorSheet(
         if (default !in members) default = members.firstOrNull().orEmpty()
     }
 
-    AsteriskModalBottomSheet(
-        show = show,
-        title = stringResource(
-            if (selector?.id == 0) R.string.selector_editor_add else R.string.selector_editor_edit,
-        ),
-        onDismissRequest = onDismissRequest,
-        startAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
-                enabled = !saving,
-                onClick = onDismissRequest,
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        stringResource(
+                            if (selector?.id == 0) {
+                                R.string.selector_editor_add
+                            } else {
+                                R.string.selector_editor_edit
+                            },
+                        ),
+                    )
+                },
+                navigationIcon = {
+                    IconButton(
+                        enabled = !saving,
+                        onClick = onDismissRequest,
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            stringResource(R.string.common_back),
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        enabled = canSave,
+                        onClick = { onSave(draft) },
+                    ) {
+                        if (saving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(Icons.Rounded.Save, stringResource(R.string.common_save))
+                        }
+                    }
+                },
             )
         },
-        endAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_save),
-                icon = Icons.Rounded.Save,
-                enabled = canSave,
-                onClick = { onSave(draft) },
-            )
-        },
-    ) {
+    ) { innerPadding ->
+        val contentPadding = pageContentPaddingWithCutout(
+            innerPadding = innerPadding,
+            outerPadding = outerPadding,
+            isWideScreen = isWideScreen,
+        )
         LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 720.dp),
-            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 24.dp),
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = pageListPadding(contentPadding, bottomExtra = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item(key = "remarks") {

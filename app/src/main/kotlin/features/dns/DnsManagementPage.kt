@@ -67,20 +67,16 @@ import app.collectAppState
 import app.managedInboundTags
 import app.managedReferenceRemarks
 import app.managedRuleSetChoices
-import app.nextAvailableDnsRuleId
 import app.selectableDetourOutbounds
 import app.selectableDnsEndpoints
 import app.selectablePreferredByDnsServers
 import app.withPrunedDnsEvaluationReferences
-import engine.singbox.config.sanitized
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.logs.FailureLogContext
 import features.logs.reportFailure
 import features.resources.runtime.singBoxRuleSetFiles
 import features.settings.SettingsActionRow
 import features.settings.SettingsSectionCard
-import features.settings.sheets.DnsRuleEditorSheet
-import features.settings.sheets.DnsRuleEditorState
 import features.settings.sheets.DnsSettingsBottomSheet
 import features.settings.sheets.dnsRuleActionLabel
 import features.settings.sheets.dnsRuleSummary
@@ -116,27 +112,16 @@ internal fun DnsManagementPage(
     val tipNotifier = LocalAppServices.current.tipNotifier
     val scope = rememberCoroutineScope()
     val isWideScreen = LocalIsWideScreen.current
-    var editor by remember {
-        mutableStateOf(
-            DnsRuleEditorState(
-                index = null,
-                rule = SingBoxDnsRuleState(),
-            ),
-        )
-    }
-    var showEditor by remember { mutableStateOf(false) }
     var showDnsSettings by remember { mutableStateOf(initiallyOpenDnsSettings) }
     var dnsSettingsDraft by remember { mutableStateOf(appState.toDnsSettingsDraft()) }
     var pendingDelete by remember { mutableStateOf<SingBoxDnsRuleState?>(null) }
     var savingRule by remember { mutableStateOf(false) }
     var savingDnsSettings by remember { mutableStateOf(false) }
-    val saveFailedMessage = stringResource(R.string.dns_rule_save_failed)
     val enableFailedMessage = stringResource(R.string.dns_rule_enable_failed)
     val validationFailedMessage = stringResource(R.string.settings_sing_box_validation_failed)
     val serverChoices = appState.dnsServers.map { server ->
         server.tag to server.remarks.ifBlank { dnsServerTypeLabel(server.type) }
     }
-    val serverTags = serverChoices.map { choice -> choice.first }
     val ruleSetChoices = remember(appState.customResourceFiles) {
         appState.managedRuleSetChoices(
             context.singBoxRuleSetFiles(appState.customResourceFiles).map { file -> file.name },
@@ -154,7 +139,7 @@ internal fun DnsManagementPage(
         }
     val matchResponseChoices = selectableDnsMatchResponseValues(
         rules = appState.dnsRules,
-        currentIndex = editor.index,
+        currentIndex = null,
     ).mapIndexed { index, choice ->
         choice to choice.remarks.ifBlank {
             stringResource(R.string.dns_rule_evaluation_fallback, index + 1)
@@ -259,18 +244,7 @@ internal fun DnsManagementPage(
                 actions = {
                     IconButton(
                         enabled = !savingRule,
-                        onClick = {
-                            editor = DnsRuleEditorState(
-                                index = null,
-                                rule = SingBoxDnsRuleState(
-                                    id = appState.nextAvailableDnsRuleId(),
-                                    server = appState.dnsFinal
-                                        .takeIf { final -> final in serverTags }
-                                        ?: serverTags.firstOrNull().orEmpty(),
-                                ),
-                            )
-                            showEditor = true
-                        },
+                        onClick = { navigator.push(app.navigation.Route.DnsRuleEdit()) },
                     ) {
                         Icon(Icons.Rounded.Add, stringResource(R.string.settings_dns_add_rule))
                     }
@@ -319,11 +293,7 @@ internal fun DnsManagementPage(
                 }
             },
             onEdit = { rule ->
-                editor = DnsRuleEditorState(
-                    index = appState.dnsRules.indexOfFirst { current -> current.id == rule.id },
-                    rule = rule,
-                )
-                showEditor = true
+                navigator.push(app.navigation.Route.DnsRuleEdit(rule.id))
             },
             onDelete = { pendingDelete = it },
         )
@@ -383,43 +353,6 @@ internal fun DnsManagementPage(
                         savingDnsSettings = false
                     }
                 }
-            }
-        },
-    )
-
-    DnsRuleEditorSheet(
-        show = showEditor,
-        editor = editor,
-        serverChoices = serverChoices,
-        inboundChoices = inboundChoices,
-        preferredByChoices = preferredByChoices,
-        matchResponseChoices = matchResponseChoices,
-        ruleSetChoices = ruleSetChoices,
-        saving = savingRule,
-        onEditorChange = { rule -> editor = editor.copy(rule = rule) },
-        onDismissRequest = { showEditor = false },
-        onSave = { saved ->
-            if (!savingRule) {
-                val baseState = appState
-                val normalized = saved.sanitized()
-                val exists = baseState.dnsRules.any { rule -> rule.id == normalized.id }
-                val candidateState = baseState.copy(
-                    dnsRules = if (exists) {
-                        baseState.dnsRules.map { current ->
-                            if (current.id == normalized.id) normalized else current
-                        }
-                    } else {
-                        baseState.dnsRules + normalized
-                    },
-                    nextDnsRuleId = maxOf(baseState.nextDnsRuleId, normalized.id + 1),
-                ).withPrunedDnsEvaluationReferences()
-                validateAndCommitChange(
-                    baseState = baseState,
-                    candidateState = candidateState,
-                    operation = "save_dns_rule",
-                    failureMessage = saveFailedMessage,
-                    onCommitted = { showEditor = false },
-                )
             }
         },
     )

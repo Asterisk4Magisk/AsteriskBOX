@@ -37,6 +37,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -85,7 +86,6 @@ import app.SingBoxRouteRuleTypeLogical
 import app.collectAppState
 import app.managedInboundTags
 import app.managedRuleSetChoices
-import app.nextAvailableRouteRuleId
 import app.selectableManagedOutbounds
 import engine.network.isCidrAddress
 import engine.singbox.config.APP_GLOBAL_SELECTOR
@@ -100,12 +100,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.asterisk.zcc.abox.R
 import sh.calvin.reorderable.ReorderableItem
-import ui.components.AsteriskActionButton
 import ui.components.AsteriskExpressiveCard
 import ui.components.localizedLabel
 import ui.components.AsteriskFilterChip
 import ui.components.AsteriskInfoChip
-import ui.components.AsteriskModalBottomSheet
 import ui.components.ReferenceSelectionCard
 import ui.components.StringListEditor
 import ui.components.WarningConfirmDialog
@@ -121,7 +119,7 @@ import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 
-private data class RouteChoice(
+internal data class RouteChoice(
     val value: String,
     val label: String,
 )
@@ -137,12 +135,9 @@ internal fun RoutingManagementPage(
     val tipNotifier = LocalAppServices.current.tipNotifier
     val scope = rememberCoroutineScope()
     val isWideScreen = LocalIsWideScreen.current
-    var editingRule by remember { mutableStateOf<SingBoxRouteRuleState?>(null) }
     var editingRouteSettings by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<SingBoxRouteRuleState?>(null) }
-    var savingRule by remember { mutableStateOf(false) }
     var savingRouteSettings by remember { mutableStateOf(false) }
-    val saveFailedMessage = stringResource(R.string.routing_save_failed)
     val settingsSaveFailedMessage = stringResource(R.string.routing_settings_save_failed)
     val outboundChoices = managedOutboundChoices(appState)
     val outboundLabels = outboundChoices.associate { choice -> choice.value to choice.label }
@@ -193,12 +188,7 @@ internal fun RoutingManagementPage(
                 },
                 actions = {
                     IconButton(
-                        onClick = {
-                            editingRule = SingBoxRouteRuleState(
-                                id = appState.nextAvailableRouteRuleId(),
-                                outbound = APP_GLOBAL_SELECTOR,
-                            )
-                        },
+                        onClick = { navigator.push(app.navigation.Route.RouteRuleEdit()) },
                     ) {
                         Icon(Icons.Rounded.Add, stringResource(R.string.routing_add_rule))
                     }
@@ -238,7 +228,9 @@ internal fun RoutingManagementPage(
                     )
                 }
             },
-            onEdit = { editingRule = it },
+            onEdit = { rule ->
+                navigator.push(app.navigation.Route.RouteRuleEdit(ruleId = rule.id))
+            },
             onDelete = { pendingDelete = it },
         )
     }
@@ -290,66 +282,6 @@ internal fun RoutingManagementPage(
         },
     )
 
-    RouteRuleEditorSheet(
-        rule = editingRule,
-        outboundChoices = outboundChoices,
-        inboundChoices = inboundChoices,
-        ruleSetChoices = ruleSetChoices,
-        saving = savingRule,
-        onDismiss = { editingRule = null },
-        onSave = { saved ->
-            if (!savingRule) {
-                val baseState = appState
-                val normalized = saved.sanitized()
-                val exists = baseState.routeRules.any { rule -> rule.id == normalized.id }
-                val candidateState = baseState.copy(
-                    routeRules = if (exists) {
-                        baseState.routeRules.map { current ->
-                            if (current.id == normalized.id) normalized else current
-                        }
-                    } else {
-                        baseState.routeRules + normalized
-                    },
-                    nextRouteRuleId = maxOf(baseState.nextRouteRuleId, normalized.id + 1),
-                )
-                savingRule = true
-                scope.launch {
-                    try {
-                        withContext(Dispatchers.IO) {
-                            validateSingBoxRuntimeConfiguration(context, candidateState)
-                        }
-                        var committed = false
-                        updateAppState { current ->
-                            if (current === baseState) {
-                                committed = true
-                                candidateState
-                            } else {
-                                current
-                            }
-                        }
-                        if (committed) {
-                            editingRule = null
-                        } else {
-                            tipNotifier.show(saveFailedMessage)
-                        }
-                    } catch (error: Throwable) {
-                        if (error is CancellationException) throw error
-                        reportFailure(
-                            context = FailureLogContext(
-                                operation = "save_route_rule",
-                                stage = "validate",
-                            ),
-                            error = error,
-                        )
-                        tipNotifier.show(saveFailedMessage)
-                    } finally {
-                        savingRule = false
-                    }
-                }
-            }
-        },
-    )
-
     WarningConfirmDialog(
         show = pendingDelete != null,
         title = stringResource(R.string.routing_delete_title),
@@ -374,7 +306,7 @@ internal fun RoutingManagementPage(
 }
 
 @Composable
-private fun managedOutboundChoices(appState: AppState): List<RouteChoice> {
+internal fun managedOutboundChoices(appState: AppState): List<RouteChoice> {
     return selectableManagedOutbounds(appState)
         .map { choice ->
             RouteChoice(
@@ -752,61 +684,82 @@ private fun RouteChoiceCard(
 }
 
 @Composable
-private fun RouteRuleEditorSheet(
-    rule: SingBoxRouteRuleState?,
+internal fun RouteRuleEditorScaffold(
+    outerPadding: PaddingValues,
+    isWideScreen: Boolean,
+    rule: SingBoxRouteRuleState,
     outboundChoices: List<RouteChoice>,
     inboundChoices: List<Pair<String, String>>,
     ruleSetChoices: List<Pair<String, String>>,
     saving: Boolean = false,
     onDismiss: () -> Unit,
     onSave: (SingBoxRouteRuleState) -> Unit,
+    onEditChild: (SingBoxRouteRuleState, SingBoxRouteRuleState) -> Unit,
     nested: Boolean = false,
 ) {
-    var draft by remember { mutableStateOf(rule) }
-    var retainedChildRule by remember { mutableStateOf<SingBoxRouteRuleState?>(null) }
-    var childEditorVisible by remember { mutableStateOf(false) }
+    var draft by remember(rule.id) { mutableStateOf<SingBoxRouteRuleState?>(rule) }
     var pendingChildDelete by remember { mutableStateOf<SingBoxRouteRuleState?>(null) }
     LaunchedEffect(rule) {
-        if (rule != null) {
-            draft = rule
-            childEditorVisible = false
-            pendingChildDelete = null
-        }
+        draft = rule
+        pendingChildDelete = null
     }
     val fieldEffectsMotion = AsteriskMotion.effects<Float>()
     val fieldSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
-    AsteriskModalBottomSheet(
-        show = rule != null,
-        onDismissRequest = onDismiss,
-        title = stringResource(
-            when {
-                nested && draft?.remarks?.isNotBlank() == true -> R.string.routing_edit_condition
-                nested -> R.string.routing_new_condition
-                draft?.remarks?.isNotBlank() == true -> R.string.routing_edit_rule
-                else -> R.string.routing_new_rule
-            },
-        ),
-        startAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
-                enabled = !saving,
-                onClick = onDismiss,
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        stringResource(
+                            when {
+                                nested && draft?.remarks?.isNotBlank() == true -> {
+                                    R.string.routing_edit_condition
+                                }
+                                nested -> R.string.routing_new_condition
+                                draft?.remarks?.isNotBlank() == true -> R.string.routing_edit_rule
+                                else -> R.string.routing_new_rule
+                            },
+                        ),
+                    )
+                },
+                navigationIcon = {
+                    IconButton(
+                        enabled = !saving,
+                        onClick = onDismiss,
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.ArrowBack,
+                            stringResource(R.string.common_back),
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        enabled = draft != null && !saving,
+                        onClick = { draft?.let(onSave) },
+                    ) {
+                        if (saving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Icon(Icons.Rounded.Save, stringResource(R.string.common_save))
+                        }
+                    }
+                },
             )
         },
-        endAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_save),
-                icon = Icons.Rounded.Check,
-                enabled = draft != null && !saving,
-                onClick = { draft?.let(onSave) },
-            )
-        },
-    ) {
+    ) { innerPadding ->
+        val contentPadding = pageContentPaddingWithCutout(
+            innerPadding = innerPadding,
+            outerPadding = outerPadding,
+            isWideScreen = isWideScreen,
+        )
         draft?.let { current ->
             AnimatedContent(
                 targetState = current.type,
-                modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
+                modifier = Modifier.fillMaxWidth(),
                 transitionSpec = {
                     fadeIn(animationSpec = fieldEffectsMotion)
                         .togetherWith(fadeOut(animationSpec = fieldEffectsMotion))
@@ -821,7 +774,7 @@ private fun RouteRuleEditorSheet(
             ) { visibleType ->
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding = PaddingValues(bottom = 28.dp),
+                    contentPadding = pageListPadding(contentPadding, bottomExtra = 28.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                 item(key = "basic-title") {
@@ -1027,14 +980,15 @@ private fun RouteRuleEditorSheet(
                         RouteLogicalChildrenCard(
                             rules = current.logicalRules,
                             onAdd = {
-                                retainedChildRule = SingBoxRouteRuleState(
-                                    id = current.nextLogicalRouteRuleId(),
+                                onEditChild(
+                                    current,
+                                    SingBoxRouteRuleState(
+                                        id = current.nextLogicalRouteRuleId(),
+                                    ),
                                 )
-                                childEditorVisible = true
                             },
                             onEdit = { child ->
-                                retainedChildRule = child
-                                childEditorVisible = true
+                                onEditChild(current, child)
                             },
                             onEnabledChange = { child, enabled ->
                                 draft = current.copy(
@@ -1332,32 +1286,6 @@ private fun RouteRuleEditorSheet(
             }
         }
     }
-    }
-
-    retainedChildRule?.let { child ->
-        RouteRuleEditorSheet(
-            rule = child.takeIf { childEditorVisible },
-            outboundChoices = outboundChoices,
-            inboundChoices = inboundChoices,
-            ruleSetChoices = ruleSetChoices,
-            onDismiss = { childEditorVisible = false },
-            onSave = { saved ->
-                draft?.let { parent ->
-                    val exists = parent.logicalRules.any { candidate -> candidate.id == saved.id }
-                    draft = parent.copy(
-                        logicalRules = if (exists) {
-                            parent.logicalRules.map { candidate ->
-                                if (candidate.id == saved.id) saved.sanitized() else candidate
-                            }
-                        } else {
-                            parent.logicalRules + saved.sanitized()
-                        },
-                    )
-                }
-                childEditorVisible = false
-            },
-            nested = true,
-        )
     }
 
     WarningConfirmDialog(
@@ -1810,47 +1738,3 @@ private fun SingBoxRouteRuleState.matcherCount(): Int =
 
 private fun <T> List<T>.toggle(value: T): List<T> =
     if (value in this) filterNot { item -> item == value } else this + value
-
-private fun SingBoxRouteRuleState.sanitized(): SingBoxRouteRuleState {
-    val sanitizedRejectMethod = rejectMethod.takeIf {
-        it in setOf("default", "drop", "reply")
-    } ?: "default"
-    return copy(
-        remarks = remarks.trim(),
-        type = type.takeIf {
-            it == SingBoxRouteRuleTypeDefault || it == SingBoxRouteRuleTypeLogical
-        } ?: SingBoxRouteRuleTypeDefault,
-        logicalMode = logicalMode.takeIf {
-            it == SingBoxRouteRuleLogicalModeAnd || it == SingBoxRouteRuleLogicalModeOr
-        } ?: SingBoxRouteRuleLogicalModeAnd,
-        logicalRules = logicalRules.map(SingBoxRouteRuleState::sanitized),
-        inbound = inbound.normalized(),
-        clashMode = clashMode.takeIf(SingBoxRouteRuleClashModes::contains).orEmpty(),
-        network = network.normalized(),
-        protocol = protocol.normalized(),
-        domain = domain.normalized(),
-        domainSuffix = domainSuffix.normalized(),
-        domainKeyword = domainKeyword.normalized(),
-        domainRegex = domainRegex.normalized(),
-        sourceIpCidr = sourceIpCidr.normalized(),
-        ipCidr = ipCidr.normalized(),
-        sourcePort = sourcePort.normalized(),
-        sourcePortRange = sourcePortRange.normalized(),
-        port = port.normalized(),
-        portRange = portRange.normalized(),
-        packageName = packageName.normalized(),
-        networkType = networkType.normalized(),
-        wifiSsid = wifiSsid.normalized(),
-        wifiBssid = wifiBssid.normalized(),
-        ruleSet = ruleSet.normalized(),
-        action = action.takeIf {
-            it == SingBoxRouteRuleActionRoute || it == SingBoxRouteRuleActionReject
-        } ?: SingBoxRouteRuleActionRoute,
-        outbound = outbound.trim().ifBlank { APP_GLOBAL_SELECTOR },
-        rejectMethod = sanitizedRejectMethod,
-        rejectNoDrop = rejectNoDrop && sanitizedRejectMethod != "drop",
-    )
-}
-
-private fun List<String>.normalized(): List<String> =
-    map(String::trim).filter(String::isNotEmpty).distinct()
