@@ -48,6 +48,7 @@ import app.resourceFileUpdateSource
 import app.statusOf
 import app.withRemovedManagedRuleSets
 import engine.network.toPortOrNull
+import features.resources.runtime.ResourceFileBatchDownloadFailedException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import org.asterisk.zcc.abox.R
@@ -74,6 +75,15 @@ fun ResourceManagementPage(
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf(ResourceFilesStatus()) }
     var resourceActionRunning by remember { mutableStateOf(false) }
+    var showResourceAddSourceSheet by remember { mutableStateOf(false) }
+    var pendingResourceAddHandoff by remember { mutableStateOf<ResourceAddHandoff?>(null) }
+    var showResourceCatalogSheet by remember { mutableStateOf(false) }
+    var resourceCatalogSource by remember { mutableStateOf(ResourceCatalogSource.SingGeosite) }
+    var resourceCatalogLoadState by remember {
+        mutableStateOf<ResourceCatalogLoadState>(ResourceCatalogLoadState.Loading)
+    }
+    var resourceCatalogReloadRevision by remember { mutableStateOf(0) }
+    var returnToSourceAfterCatalogHidden by remember { mutableStateOf(false) }
     val showCustomResourceFileDialog = remember { mutableStateOf(false) }
     var editingCustomResourceFile by remember { mutableStateOf<CustomResourceFileState?>(null) }
     val customResourceFileNameState = rememberTextFieldState()
@@ -92,6 +102,11 @@ fun ResourceManagementPage(
     val replacedMessage = stringResource(R.string.settings_resource_files_replaced)
     val restoredMessage = stringResource(R.string.settings_resource_files_restored)
     val deletedMessage = stringResource(R.string.settings_resource_files_deleted)
+    val catalogAddedMessage = stringResource(R.string.settings_resource_files_catalog_added)
+    val catalogPartialMessage = stringResource(R.string.settings_resource_files_catalog_partial)
+    val catalogConflictsSkippedMessage = stringResource(
+        R.string.settings_resource_files_catalog_conflicts_skipped,
+    )
     val resourceFileActionFailedMessage = stringResource(
         R.string.settings_resource_files_action_failed,
     )
@@ -151,6 +166,30 @@ fun ResourceManagementPage(
         )
     }
 
+    fun runCustomResourceSaveFollowUp(
+        followUp: CustomResourceSaveFollowUp,
+        file: CustomResourceFileState,
+        customResourceFiles: List<CustomResourceFileState>,
+    ) {
+        when (followUp) {
+            is CustomResourceSaveFollowUp.EnqueueDownload -> {
+                resourceFileUpdateCoordinator.enqueue(followUp.request)
+            }
+            CustomResourceSaveFollowUp.SelectLocalFile -> {
+                runResourceFileAction(
+                    action = {
+                        resourceFileUseCase.replaceCustom(
+                            customFile = file,
+                            customResourceFiles = customResourceFiles,
+                        )
+                    },
+                    successMessage = replacedMessage.formatTemplate("name" to file.name),
+                )
+            }
+            CustomResourceSaveFollowUp.None -> Unit
+        }
+    }
+
     fun customResourceFileReservedNames(editingFileId: Int? = null): Set<String> {
         return ResourceFileKind.entries.map { kind -> kind.fileName }.toSet() +
             appState.customResourceFiles
@@ -188,18 +227,56 @@ fun ResourceManagementPage(
                 nextCustomResourceFileId = fileId + 1,
             )
         }
-        addedFile?.takeIf { file -> file.url.isBlank() }?.let { file ->
-            runResourceFileAction(
-                action = {
-                    resourceFileUseCase.replaceCustom(
-                        customFile = file,
-                        customResourceFiles = nextCustomResourceFiles,
-                    )
-                },
-                successMessage = replacedMessage.formatTemplate("name" to file.name),
+        val file = addedFile ?: return false
+        runCustomResourceSaveFollowUp(
+            followUp = planCustomResourceSaveFollowUp(
+                file = file,
+                isNew = true,
+                options = appState.resourceFileUpdateOptions(),
+                customResourceFiles = nextCustomResourceFiles,
+            ),
+            file = file,
+            customResourceFiles = nextCustomResourceFiles,
+        )
+        return true
+    }
+
+    fun addCatalogResourceFiles(selectedEntries: List<ResourceCatalogEntry>) {
+        var additionPlan: CatalogResourceAdditionPlan? = null
+        var nextCustomResourceFiles = emptyList<CustomResourceFileState>()
+        updateAppState { state ->
+            val plan = planCatalogResourceAddition(
+                customFiles = state.customResourceFiles,
+                nextCustomResourceFileId = state.nextCustomResourceFileId,
+                selectedEntries = selectedEntries,
+            )
+            additionPlan = plan
+            nextCustomResourceFiles = state.customResourceFiles + plan.added
+            state.copy(
+                customResourceFiles = nextCustomResourceFiles,
+                nextCustomResourceFileId = plan.nextCustomResourceFileId,
             )
         }
-        return true
+        val plan = additionPlan ?: return
+        showResourceCatalogSheet = false
+        if (plan.skipped.isNotEmpty()) {
+            scope.launch {
+                tipNotifier.show(
+                    catalogConflictsSkippedMessage.formatTemplate(
+                        "count" to plan.skipped.size,
+                    ),
+                )
+            }
+        }
+        if (plan.added.isNotEmpty()) {
+            resourceFileUpdateCoordinator.enqueue(
+                ResourceFileUpdateRequest.CustomBatch(
+                    files = plan.added,
+                    options = appState.resourceFileUpdateOptions(),
+                    customResourceFiles = nextCustomResourceFiles,
+                ),
+            )
+        }
     }
 
     fun editCustomResourceFile(file: CustomResourceFileState, name: String, url: String): Boolean {
@@ -224,13 +301,23 @@ fun ResourceManagementPage(
             },
             successMessage = null,
             onSuccess = {
+                var savedCustomResourceFiles = nextCustomResourceFiles
                 updateAppState { state ->
-                    state.copy(
-                        customResourceFiles = state.customResourceFiles.map { customFile ->
-                            if (customFile.id == file.id) nextCustomFile else customFile
-                        },
-                    )
+                    savedCustomResourceFiles = state.customResourceFiles.map { customFile ->
+                        if (customFile.id == file.id) nextCustomFile else customFile
+                    }
+                    state.copy(customResourceFiles = savedCustomResourceFiles)
                 }
+                runCustomResourceSaveFollowUp(
+                    followUp = planCustomResourceSaveFollowUp(
+                        file = nextCustomFile,
+                        isNew = false,
+                        options = appState.resourceFileUpdateOptions(),
+                        customResourceFiles = savedCustomResourceFiles,
+                    ),
+                    file = nextCustomFile,
+                    customResourceFiles = savedCustomResourceFiles,
+                )
             },
         )
         return true
@@ -264,6 +351,28 @@ fun ResourceManagementPage(
     LaunchedEffect(appState.customResourceFiles, updateQueueState.completionRevision) {
         status = resourceFileUseCase.status(appState.customResourceFiles)
     }
+    val resourceCatalogUpdateOptions = appState.resourceFileUpdateOptions()
+    LaunchedEffect(
+        showResourceCatalogSheet,
+        resourceCatalogSource,
+        resourceCatalogReloadRevision,
+        resourceCatalogUpdateOptions,
+    ) {
+        if (!showResourceCatalogSheet) return@LaunchedEffect
+        resourceCatalogLoadState = ResourceCatalogLoadState.Loading
+        resourceCatalogLoadState = try {
+            ResourceCatalogLoadState.Loaded(
+                resourceFileUseCase.loadCatalog(
+                    source = resourceCatalogSource,
+                    options = resourceCatalogUpdateOptions,
+                ),
+            )
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            ResourceCatalogLoadState.Failed(error)
+        }
+    }
     LaunchedEffect(
         resourceFileUpdateCoordinator,
         updatedMessage,
@@ -273,7 +382,8 @@ fun ResourceManagementPage(
         resourceFileUpdateCoordinator.results.collect { result ->
             when (result) {
                 is ResourceFileUpdateResult.Success -> {
-                    val message = when (val request = result.request) {
+                    val request = result.request
+                    val message = when (request) {
                         is ResourceFileUpdateRequest.All -> updatedMessage
                         is ResourceFileUpdateRequest.BuiltIn -> updatedOneMessage.formatTemplate(
                             "name" to request.kind.displayName,
@@ -281,11 +391,31 @@ fun ResourceManagementPage(
                         is ResourceFileUpdateRequest.Custom -> updatedOneMessage.formatTemplate(
                             "name" to request.file.name,
                         )
+                        is ResourceFileUpdateRequest.CustomBatch -> updatedMessage
                     }
-                    tipNotifier.show(message)
+                    if (request is ResourceFileUpdateRequest.CustomBatch) {
+                        tipNotifier.show(
+                            catalogAddedMessage.formatTemplate(
+                                "count" to request.files.size,
+                            ),
+                        )
+                    } else {
+                        tipNotifier.show(message)
+                    }
                 }
                 is ResourceFileUpdateResult.Failure -> {
-                    tipNotifier.showError(result.error, resourceFileActionFailedMessage)
+                    val batchError = result.error as? ResourceFileBatchDownloadFailedException
+                    if (batchError == null) {
+                        tipNotifier.showError(result.error, resourceFileActionFailedMessage)
+                    } else {
+                        tipNotifier.showError(
+                            error = batchError,
+                            fallbackMessage = catalogPartialMessage.formatTemplate(
+                                "success" to batchError.succeededFileNames.size,
+                                "failed" to batchError.failures.size,
+                            ),
+                        )
+                    }
                 }
                 is ResourceFileUpdateResult.Cancelled -> Unit
             }
@@ -313,15 +443,14 @@ fun ResourceManagementPage(
                 actions = {
                     IconButton(
                         onClick = {
-                            customResourceFileNameState.clearText()
-                            customResourceFileUrlState.clearText()
-                            showCustomResourceFileDialog.value = true
+                            pendingResourceAddHandoff = null
+                            showResourceAddSourceSheet = true
                         },
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.Add,
                             contentDescription = stringResource(
-                                R.string.settings_resource_files_add_custom,
+                                R.string.settings_resource_files_add,
                             ),
                         )
                     }
@@ -474,6 +603,59 @@ fun ResourceManagementPage(
                 }
             }
         }
+        ResourceAddSourceSheet(
+            show = showResourceAddSourceSheet,
+            onDismissRequest = {
+                pendingResourceAddHandoff = null
+                showResourceAddSourceSheet = false
+            },
+            onHidden = {
+                when (val handoff = pendingResourceAddHandoff) {
+                    is ResourceAddHandoff.Catalog -> {
+                        resourceCatalogSource = handoff.source
+                        resourceCatalogLoadState = ResourceCatalogLoadState.Loading
+                        showResourceCatalogSheet = true
+                    }
+                    ResourceAddHandoff.Custom -> {
+                        customResourceFileNameState.clearText()
+                        customResourceFileUrlState.clearText()
+                        showCustomResourceFileDialog.value = true
+                    }
+                    null -> Unit
+                }
+                pendingResourceAddHandoff = null
+            },
+            onCatalogSelected = { source ->
+                pendingResourceAddHandoff = ResourceAddHandoff.Catalog(source)
+                showResourceAddSourceSheet = false
+            },
+            onCustomSelected = {
+                pendingResourceAddHandoff = ResourceAddHandoff.Custom
+                showResourceAddSourceSheet = false
+            },
+        )
+        ResourceCatalogSheet(
+            show = showResourceCatalogSheet,
+            source = resourceCatalogSource,
+            loadState = resourceCatalogLoadState,
+            existingNames = customResourceFileReservedNames(),
+            onDismissRequest = {
+                returnToSourceAfterCatalogHidden = false
+                showResourceCatalogSheet = false
+            },
+            onHidden = {
+                if (returnToSourceAfterCatalogHidden) {
+                    returnToSourceAfterCatalogHidden = false
+                    showResourceAddSourceSheet = true
+                }
+            },
+            onBack = {
+                returnToSourceAfterCatalogHidden = true
+                showResourceCatalogSheet = false
+            },
+            onRetry = { resourceCatalogReloadRevision += 1 },
+            onSave = ::addCatalogResourceFiles,
+        )
         CustomResourceFileEditorSheet(
             show = showCustomResourceFileDialog.value,
             nameState = customResourceFileNameState,
@@ -518,6 +700,14 @@ fun ResourceManagementPage(
             },
         )
     }
+}
+
+private sealed interface ResourceAddHandoff {
+    data class Catalog(
+        val source: ResourceCatalogSource,
+    ) : ResourceAddHandoff
+
+    data object Custom : ResourceAddHandoff
 }
 
 @Composable

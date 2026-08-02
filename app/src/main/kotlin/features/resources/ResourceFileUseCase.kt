@@ -10,12 +10,21 @@ import app.ResourceFileKind
 import app.ResourceFileUpdateSource
 import app.ResourceFilesStatus
 import features.resources.runtime.AndroidResourceFileRepository
+import features.resources.runtime.AndroidResourceCatalogRepository
 
 class ResourceFileUseCase(
     context: Context,
     private val resourceFilePicker: suspend () -> Uri?,
 ) {
     private val repository = AndroidResourceFileRepository(context.applicationContext)
+    private val catalogRepository = AndroidResourceCatalogRepository()
+
+    internal suspend fun loadCatalog(
+        source: ResourceCatalogSource,
+        options: ResourceFileUpdateOptions = ResourceFileUpdateOptions(),
+    ): List<ResourceCatalogEntry> {
+        return catalogRepository.load(source, options)
+    }
 
     suspend fun status(customResourceFiles: List<CustomResourceFileState> = emptyList()): ResourceFilesStatus {
         return repository.status(customResourceFiles)
@@ -48,6 +57,14 @@ class ResourceFileUseCase(
         customResourceFiles: List<CustomResourceFileState> = emptyList(),
     ): ResourceFilesStatus {
         return repository.updateCustom(customFile, options, customResourceFiles)
+    }
+
+    internal suspend fun updateCustomBatch(
+        customFiles: List<CustomResourceFileState>,
+        options: ResourceFileUpdateOptions = ResourceFileUpdateOptions(),
+        allCustomResourceFiles: List<CustomResourceFileState> = emptyList(),
+    ): ResourceFilesStatus {
+        return repository.updateCustomBatch(customFiles, options, allCustomResourceFiles)
     }
 
     suspend fun renameCustom(

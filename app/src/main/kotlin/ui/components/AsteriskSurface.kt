@@ -74,6 +74,7 @@ internal fun AsteriskModalBottomSheet(
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
     dismissEnabled: Boolean = true,
+    onHidden: () -> Unit = {},
     title: String? = null,
     startAction: @Composable () -> Unit = EmptySheetAction,
     endAction: @Composable () -> Unit = EmptySheetAction,
@@ -81,6 +82,7 @@ internal fun AsteriskModalBottomSheet(
 ) {
     val currentShow by rememberUpdatedState(show)
     val currentDismissEnabled by rememberUpdatedState(dismissEnabled)
+    val currentOnHidden by rememberUpdatedState(onHidden)
     val sheetState = rememberBottomSheetState(
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(
@@ -106,7 +108,10 @@ internal fun AsteriskModalBottomSheet(
             if (sheetState.isVisible) sheetState.show()
         } else if (renderSheet) {
             sheetState.hide()
-            if (!sheetState.isVisible) renderSheet = false
+            if (!sheetState.isVisible) {
+                renderSheet = false
+                currentOnHidden()
+            }
         }
     }
 

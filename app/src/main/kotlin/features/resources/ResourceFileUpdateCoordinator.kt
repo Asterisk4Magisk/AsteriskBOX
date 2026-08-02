@@ -48,6 +48,17 @@ internal sealed interface ResourceFileUpdateRequest {
         override val targets = setOf(ResourceFileUpdateTarget.Custom(file.id))
     }
 
+    class CustomBatch(
+        files: List<CustomResourceFileState>,
+        val options: ResourceFileUpdateOptions,
+        customResourceFiles: List<CustomResourceFileState>,
+    ) : ResourceFileUpdateRequest {
+        val files = files.toList()
+        val customResourceFiles = customResourceFiles.toList()
+        override val targets = this.files
+            .mapTo(linkedSetOf()) { file -> ResourceFileUpdateTarget.Custom(file.id) }
+    }
+
     class All(
         val source: ResourceFileUpdateSource,
         val options: ResourceFileUpdateOptions,

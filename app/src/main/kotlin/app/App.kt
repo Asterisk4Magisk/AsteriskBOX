@@ -104,6 +104,11 @@ fun App(
                         options = request.options,
                         customResourceFiles = request.customResourceFiles,
                     )
+                    is ResourceFileUpdateRequest.CustomBatch -> resourceFileUseCase.updateCustomBatch(
+                        customFiles = request.files,
+                        options = request.options,
+                        allCustomResourceFiles = request.customResourceFiles,
+                    )
                     is ResourceFileUpdateRequest.All -> resourceFileUseCase.update(
                         source = request.source,
                         options = request.options,
