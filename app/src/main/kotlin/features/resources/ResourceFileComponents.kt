@@ -340,9 +340,9 @@ private fun ResourceUrlField(
 internal fun ResourceFileCard(
     fileName: String,
     status: ResourceFileStatus,
-    updateState: ResourceFileUpdateDisplayState = ResourceFileUpdateDisplayState.Idle,
     onReplace: () -> Unit,
     modifier: Modifier = Modifier,
+    updateState: ResourceFileUpdateDisplayState = ResourceFileUpdateDisplayState.Idle,
     onUpdate: (() -> Unit)? = null,
     onRestore: (() -> Unit)? = null,
     description: String? = null,
@@ -367,12 +367,12 @@ internal fun ResourceFileCard(
 @Composable
 internal fun CustomResourceFileCard(
     fileStatus: CustomResourceFileStatus,
-    updateState: ResourceFileUpdateDisplayState = ResourceFileUpdateDisplayState.Idle,
     onUpdate: (CustomResourceFileState) -> Unit,
     onReplace: (CustomResourceFileState) -> Unit,
     onEdit: (CustomResourceFileState) -> Unit,
     onDelete: (CustomResourceFileState) -> Unit,
     modifier: Modifier = Modifier,
+    updateState: ResourceFileUpdateDisplayState = ResourceFileUpdateDisplayState.Idle,
     actionsEnabled: Boolean = true,
 ) {
     val file = fileStatus.file

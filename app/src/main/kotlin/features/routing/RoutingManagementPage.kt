@@ -643,9 +643,9 @@ private fun RouteChoiceCard(
     summary: String,
     choices: List<RouteChoice>,
     selectedValue: String,
-    unavailableLabel: String = stringResource(R.string.common_unavailable),
     onSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
+    unavailableLabel: String = stringResource(R.string.common_unavailable),
 ) {
     var expanded by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(

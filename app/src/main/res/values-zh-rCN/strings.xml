@@ -46,8 +46,6 @@
     <string name="common_default">默认</string>
     <string name="common_not_specified">不指定</string>
     <string name="common_unavailable">不可用</string>
-    <string name="common_true">是</string>
-    <string name="common_false">否</string>
     <string name="common_search">搜索</string>
     <string name="common_retry">重试</string>
     <string name="common_close">关闭</string>
@@ -69,7 +67,6 @@
     <string name="common_update">更新</string>
     <string name="common_restore">恢复</string>
     <string name="common_more">更多</string>
-    <string name="common_enabled">启用</string>
     <string name="string_list_item_empty">条目不能为空</string>
     <string name="string_list_line_error">第 %1$d 行：%2$s</string>
     <string name="string_list_pending_value">请先完成当前值的添加或编辑，再保存</string>
@@ -213,7 +210,6 @@
     <string name="sing_box_proxies_service_stopped_summary">请先在主页启动服务，启动后即可查看代理选择器。</string>
     <string name="sing_box_proxies_search">搜索代理</string>
     <string name="sing_box_proxies_group_test">整组测试</string>
-    <string name="sing_box_proxies_delay_timeout">超时</string>
     <string name="sing_box_proxies_delay_not_tested">未测试</string>
     <string name="sing_box_proxies_delay_testing">测试中</string>
     <string name="sing_box_proxies_delay_status_failed">失败</string>
@@ -375,7 +371,6 @@
     <string name="settings_resource_files_missing">缺失</string>
     <string name="settings_resource_files_updated_at">更新时间 {time}</string>
     <string name="settings_resource_files_size">大小 {size}</string>
-    <string name="settings_resource_files_updating">正在更新资源文件…</string>
     <string name="settings_resource_file_update_queued">等待更新</string>
     <string name="settings_resource_file_updating">正在更新资源文件</string>
     <string name="settings_resource_files_updated">资源文件已更新</string>
