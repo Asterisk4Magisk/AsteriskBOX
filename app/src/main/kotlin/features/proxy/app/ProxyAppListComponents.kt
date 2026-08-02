@@ -128,7 +128,7 @@ internal fun ProxyAppListMoreActionsMenu(
                     expanded = false
                     onAction(ProxyAppListMoreAction.ImportClipboard)
                 },
-                leadingIcon = { Icon(Icons.Rounded.FileDownload, contentDescription = null) },
+                leadingIcon = { Icon(Icons.Rounded.ContentPaste, contentDescription = null) },
             )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.common_export_to_clipboard)) },

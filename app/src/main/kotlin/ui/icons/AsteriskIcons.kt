@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DataObject
 import androidx.compose.material.icons.rounded.DataUsage
@@ -122,6 +123,7 @@ internal object AsteriskIcons {
         val CloudSync: ImageVector = MaterialIcons.Rounded.CloudSync
         val Code: ImageVector = MaterialIcons.Rounded.Code
         val ContentCopy: ImageVector = MaterialIcons.Rounded.ContentCopy
+        val ContentPaste: ImageVector = MaterialIcons.Rounded.ContentPaste
         val DarkMode: ImageVector = MaterialIcons.Rounded.DarkMode
         val DataObject: ImageVector = MaterialIcons.Rounded.DataObject
         val DataUsage: ImageVector = MaterialIcons.Rounded.DataUsage

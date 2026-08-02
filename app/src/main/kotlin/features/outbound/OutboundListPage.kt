@@ -512,7 +512,7 @@ internal fun OutboundListPage(
                                                 )
                                                 OutboundMenuItem(
                                                     text = stringResource(R.string.outbound_import_clipboard),
-                                                    icon = Icons.Rounded.ContentCopy,
+                                                    icon = Icons.Rounded.ContentPaste,
                                                     onClick = {
                                                         importMenuExpanded = false
                                                         importClipboard()
@@ -520,7 +520,7 @@ internal fun OutboundListPage(
                                                 )
                                                 OutboundMenuItem(
                                                     text = stringResource(R.string.outbound_import_file),
-                                                    icon = Icons.Rounded.FileUpload,
+                                                    icon = Icons.Rounded.FileDownload,
                                                     onClick = {
                                                         importMenuExpanded = false
                                                         importFile()

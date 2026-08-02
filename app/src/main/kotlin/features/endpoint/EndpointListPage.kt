@@ -331,7 +331,7 @@ internal fun EndpointListPage(padding: PaddingValues) {
                                         }
                                     },
                                     leadingIcon = {
-                                        Icon(Icons.Rounded.ContentCopy, contentDescription = null)
+                                        Icon(Icons.Rounded.ContentPaste, contentDescription = null)
                                     },
                                     onClick = {
                                         addMenuExpanded = false
@@ -352,7 +352,7 @@ internal fun EndpointListPage(padding: PaddingValues) {
                                         }
                                     },
                                     leadingIcon = {
-                                        Icon(Icons.Rounded.FileUpload, contentDescription = null)
+                                        Icon(Icons.Rounded.FileDownload, contentDescription = null)
                                     },
                                     onClick = {
                                         addMenuExpanded = false
