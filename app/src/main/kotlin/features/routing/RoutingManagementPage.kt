@@ -37,7 +37,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -101,6 +100,7 @@ import kotlinx.coroutines.withContext
 import org.asterisk.zcc.abox.R
 import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskExpressiveCard
+import ui.components.EditorPageScaffold
 import ui.components.localizedLabel
 import ui.components.AsteriskFilterChip
 import ui.components.AsteriskInfoChip
@@ -705,57 +705,28 @@ internal fun RouteRuleEditorScaffold(
     }
     val fieldEffectsMotion = AsteriskMotion.effects<Float>()
     val fieldSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(
-                            when {
-                                nested && draft?.remarks?.isNotBlank() == true -> {
-                                    R.string.routing_edit_condition
-                                }
-                                nested -> R.string.routing_new_condition
-                                draft?.remarks?.isNotBlank() == true -> R.string.routing_edit_rule
-                                else -> R.string.routing_new_rule
-                            },
-                        ),
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        enabled = !saving,
-                        onClick = onDismiss,
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            stringResource(R.string.common_back),
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        enabled = draft != null && !saving,
-                        onClick = { draft?.let(onSave) },
-                    ) {
-                        if (saving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Icon(Icons.Rounded.Save, stringResource(R.string.common_save))
+    EditorPageScaffold(
+        outerPadding = outerPadding,
+        isWideScreen = isWideScreen,
+        title = {
+            Text(
+                stringResource(
+                    when {
+                        nested && draft?.remarks?.isNotBlank() == true -> {
+                            R.string.routing_edit_condition
                         }
-                    }
-                },
+                        nested -> R.string.routing_new_condition
+                        draft?.remarks?.isNotBlank() == true -> R.string.routing_edit_rule
+                        else -> R.string.routing_new_rule
+                    },
+                ),
             )
         },
-    ) { innerPadding ->
-        val contentPadding = pageContentPaddingWithCutout(
-            innerPadding = innerPadding,
-            outerPadding = outerPadding,
-            isWideScreen = isWideScreen,
-        )
+        saving = saving,
+        saveEnabled = draft != null,
+        onBack = onDismiss,
+        onSave = { draft?.let(onSave) },
+    ) { contentPadding ->
         draft?.let { current ->
             AnimatedContent(
                 targetState = current.type,
@@ -774,8 +745,8 @@ internal fun RouteRuleEditorScaffold(
             ) { visibleType ->
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth(),
-                    contentPadding = pageListPadding(contentPadding, bottomExtra = 28.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = contentPadding,
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                 item(key = "basic-title") {
                     RouteEditorSectionTitle(stringResource(R.string.routing_section_basic))
@@ -784,7 +755,7 @@ internal fun RouteRuleEditorScaffold(
                     OutlinedTextField(
                         value = current.remarks,
                         onValueChange = { draft = current.copy(remarks = it) },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         label = {
                             Text(
                                 stringResource(
@@ -821,7 +792,6 @@ internal fun RouteRuleEditorScaffold(
                         ),
                         selectedValue = current.type,
                         onSelected = { value -> draft = current.copy(type = value) },
-                        modifier = Modifier.padding(horizontal = 16.dp),
                     )
                 }
                 if (!nested) {
@@ -847,7 +817,6 @@ internal fun RouteRuleEditorScaffold(
                             ),
                             selectedValue = current.action,
                             onSelected = { value -> draft = current.copy(action = value) },
-                            modifier = Modifier.padding(horizontal = 16.dp),
                         )
                     }
                     item(key = "action-fields") {
@@ -881,7 +850,6 @@ internal fun RouteRuleEditorScaffold(
                                         onSelected = { value ->
                                             draft = current.copy(outbound = value)
                                         },
-                                        modifier = Modifier.padding(horizontal = 16.dp),
                                     )
                                 } else {
                                     RouteChoiceCard(
@@ -918,7 +886,6 @@ internal fun RouteRuleEditorScaffold(
                                                     current.rejectNoDrop && value != "drop",
                                             )
                                         },
-                                        modifier = Modifier.padding(horizontal = 16.dp),
                                     )
                                     AnimatedVisibility(
                                         visible = current.rejectMethod != "drop",
@@ -973,7 +940,6 @@ internal fun RouteRuleEditorScaffold(
                             onSelectedIndexChange = { index ->
                                 draft = current.copy(logicalMode = modes[index])
                             },
-                            modifier = Modifier.padding(horizontal = 16.dp),
                         )
                     }
                     item(key = "logic-conditions") {
@@ -1032,7 +998,6 @@ internal fun RouteRuleEditorScaffold(
                         onSelectedIndexChange = { index ->
                             draft = current.copy(clashMode = modes[index])
                         },
-                        modifier = Modifier.padding(horizontal = 16.dp),
                     )
                 }
                 item(key = "ip-version") {
@@ -1055,7 +1020,6 @@ internal fun RouteRuleEditorScaffold(
                         onSelectedIndexChange = { index ->
                             draft = current.copy(ipVersion = versions[index])
                         },
-                        modifier = Modifier.padding(horizontal = 16.dp),
                     )
                 }
                 item(key = "network") {
@@ -1090,7 +1054,6 @@ internal fun RouteRuleEditorScaffold(
                         onToggle = { value ->
                             draft = current.copy(inbound = current.inbound.toggle(value))
                         },
-                        modifier = Modifier.padding(horizontal = 16.dp),
                     )
                 }
                 item(key = "protocol") {
@@ -1102,7 +1065,6 @@ internal fun RouteRuleEditorScaffold(
                         onToggle = { value ->
                             draft = current.copy(protocol = current.protocol.toggle(value))
                         },
-                        modifier = Modifier.padding(horizontal = 16.dp),
                     )
                 }
                 item(key = "destination-title") {
@@ -1322,7 +1284,7 @@ private fun RouteLogicalChildrenCard(
     onDelete: (SingBoxRouteRuleState) -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
@@ -1481,7 +1443,7 @@ private fun RouteLogicalChildCard(
 private fun RouteEditorSectionTitle(text: String) {
     Text(
         text = text,
-        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 10.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 10.dp),
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.SemiBold,
@@ -1496,7 +1458,7 @@ private fun RouteSwitchCard(
 ) {
     AsteriskExpressiveCard(
         onClick = { onCheckedChange(!checked) },
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        modifier = Modifier.fillMaxWidth(),
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
@@ -1523,7 +1485,7 @@ private fun <T> RouteChipGroupCard(
     onToggle: (T) -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
@@ -1562,7 +1524,6 @@ private fun RouteRuleSetCard(
         choices = choices,
         selected = selected,
         onToggle = onToggle,
-        modifier = Modifier.padding(horizontal = 16.dp),
     )
 }
 
@@ -1581,6 +1542,7 @@ private fun RouteStringList(
         onValuesChange = onChange,
         emptyText = stringResource(R.string.routing_list_empty),
         validateInput = validate,
+        horizontalPadding = 0.dp,
     )
 }
 

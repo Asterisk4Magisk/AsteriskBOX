@@ -37,7 +37,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -97,6 +96,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.asterisk.zcc.abox.R
 import ui.components.AsteriskInfoChip
+import ui.components.EditorPageScaffold
 import ui.components.WarningConfirmDialog
 import ui.components.singBoxOptionLabel
 import ui.icons.AsteriskIcons as Icons
@@ -730,58 +730,29 @@ internal fun SelectorEditorScaffold(
         if (default !in members) default = members.firstOrNull().orEmpty()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(
-                            if (selector?.id == 0) {
-                                R.string.selector_editor_add
-                            } else {
-                                R.string.selector_editor_edit
-                            },
-                        ),
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        enabled = !saving,
-                        onClick = onDismissRequest,
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            stringResource(R.string.common_back),
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        enabled = canSave,
-                        onClick = { onSave(draft) },
-                    ) {
-                        if (saving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Icon(Icons.Rounded.Save, stringResource(R.string.common_save))
-                        }
-                    }
-                },
+    EditorPageScaffold(
+        outerPadding = outerPadding,
+        isWideScreen = isWideScreen,
+        title = {
+            Text(
+                stringResource(
+                    if (selector?.id == 0) {
+                        R.string.selector_editor_add
+                    } else {
+                        R.string.selector_editor_edit
+                    },
+                ),
             )
         },
-    ) { innerPadding ->
-        val contentPadding = pageContentPaddingWithCutout(
-            innerPadding = innerPadding,
-            outerPadding = outerPadding,
-            isWideScreen = isWideScreen,
-        )
+        saving = saving,
+        saveEnabled = canSave,
+        onBack = onDismissRequest,
+        onSave = { onSave(draft) },
+    ) { contentPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = pageListPadding(contentPadding, bottomExtra = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item(key = "remarks") {
                 OutlinedTextField(

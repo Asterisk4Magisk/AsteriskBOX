@@ -5,12 +5,8 @@
 
 package features.endpoint
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,13 +23,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,9 +62,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.asterisk.zcc.abox.R
 import ui.clipboard.setPlainText
+import ui.components.EditorPageScaffold
 import ui.components.localizedLabel
 import ui.icons.AsteriskIcons as Icons
-import ui.layout.pageContentPaddingWithCutout
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 
@@ -130,7 +123,6 @@ internal fun EndpointEditorPage(
     val formatJsonContentDescription = stringResource(R.string.endpoint_editor_format_json)
     val copiedMessage = stringResource(R.string.endpoint_editor_copied)
     val editorSpatialMotion = AsteriskMotion.contentSpatial<androidx.compose.ui.unit.IntSize>()
-    val errorEffectsMotion = AsteriskMotion.fastEffects<Float>()
     val density = LocalDensity.current
     val showProperties = endpointEditorShowsProperties(
         editorFocused = editorState.isFocused,
@@ -226,74 +218,45 @@ internal fun EndpointEditorPage(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            stringResource(
-                                if (editing == null) {
-                                    R.string.endpoint_editor_add
-                                } else {
-                                    R.string.endpoint_editor_edit
-                                },
-                            ),
-                        )
-                        Text(
-                            endpointTypeTitle(type),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = navigator::pop) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            stringResource(R.string.common_back),
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                clipboard.setPlainText(editorState.snapshotText())
-                                services.tipNotifier.show(copiedMessage)
-                            }
+    EditorPageScaffold(
+        outerPadding = padding,
+        isWideScreen = isWideScreen,
+        title = {
+            Column {
+                Text(
+                    stringResource(
+                        if (editing == null) {
+                            R.string.endpoint_editor_add
+                        } else {
+                            R.string.endpoint_editor_edit
                         },
-                        enabled = !missing,
-                    ) {
-                        Icon(Icons.Rounded.ContentCopy, stringResource(R.string.common_copy))
-                    }
-                    IconButton(onClick = ::save, enabled = !missing && !saving) {
-                        AnimatedContent(
-                            targetState = saving,
-                            transitionSpec = {
-                                fadeIn(errorEffectsMotion).togetherWith(fadeOut(errorEffectsMotion))
-                            },
-                            label = "endpoint-save-progress",
-                        ) { inProgress ->
-                            if (inProgress) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                )
-                            } else {
-                                Icon(Icons.Rounded.Save, stringResource(R.string.common_save))
-                            }
-                        }
+                    ),
+                )
+                Text(
+                    endpointTypeTitle(type),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        saving = saving,
+        saveEnabled = !missing,
+        onBack = navigator::pop,
+        onSave = ::save,
+        actions = {
+            IconButton(
+                onClick = {
+                    scope.launch {
+                        clipboard.setPlainText(editorState.snapshotText())
+                        services.tipNotifier.show(copiedMessage)
                     }
                 },
-            )
+                enabled = !missing,
+            ) {
+                Icon(Icons.Rounded.ContentCopy, stringResource(R.string.common_copy))
+            }
         },
-    ) { innerPadding ->
-        val contentPadding = pageContentPaddingWithCutout(
-            innerPadding = innerPadding,
-            outerPadding = padding,
-            isWideScreen = isWideScreen,
-        )
+    ) { contentPadding ->
         if (missing) {
             Column(
                 modifier = Modifier.fillMaxSize().padding(contentPadding),
@@ -317,7 +280,7 @@ internal fun EndpointEditorPage(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(vertical = 12.dp)
                     .animateContentSize(editorSpatialMotion),
             ) {
                 AnimatedVisibility(

@@ -51,6 +51,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.asterisk.zcc.abox.R
 import ui.theme.AsteriskShapeTokens
@@ -68,6 +69,7 @@ internal fun StringListEditor(
     description: String? = null,
     validateInput: (String) -> String? = { null },
     onPendingChange: ((Boolean) -> Unit)? = null,
+    horizontalPadding: Dp = 16.dp,
 ) {
     var input by rememberSaveable(editorKey, title) { mutableStateOf("") }
     var editingIndex by rememberSaveable(editorKey, title) { mutableIntStateOf(-1) }
@@ -86,7 +88,7 @@ internal fun StringListEditor(
     }
 
     Card(
-        modifier = modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+        modifier = modifier.padding(horizontal = horizontalPadding).fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         shape = MaterialTheme.shapes.large,
     ) {
@@ -326,7 +328,7 @@ private fun RowScope.StringListItemField(
     }
 }
 
-private fun Modifier.expandHorizontallyBy(extra: androidx.compose.ui.unit.Dp): Modifier = layout { measurable, constraints ->
+private fun Modifier.expandHorizontallyBy(extra: Dp): Modifier = layout { measurable, constraints ->
     val extraPx = extra.roundToPx()
     val placeable = measurable.measure(
         constraints.copy(

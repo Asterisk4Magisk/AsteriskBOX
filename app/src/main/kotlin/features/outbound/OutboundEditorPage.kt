@@ -3,11 +3,7 @@
 
 package features.outbound
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -16,22 +12,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -75,13 +67,12 @@ import kotlinx.serialization.json.JsonObject
 import org.asterisk.zcc.abox.R
 import ui.clipboard.setPlainText
 import ui.components.AsteriskFilterChip
+import ui.components.EditorPageScaffold
 import ui.components.localizedLabel
 import ui.components.singBoxOptionLabel
-import ui.icons.AsteriskIcons as Icons
-import ui.layout.pageContentPaddingWithCutout
-import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
+import ui.icons.AsteriskIcons as Icons
 
 @Composable
 internal fun OutboundEditorPage(
@@ -154,8 +145,6 @@ internal fun OutboundEditorPage(
     }
     val invalidMessage = stringResource(R.string.outbound_editor_invalid)
     val copiedMessage = stringResource(R.string.outbound_editor_copied)
-    val saveEffectsMotion = AsteriskMotion.fastEffects<Float>()
-
     fun save() {
         if (saving) return
         attemptedSave = true
@@ -240,74 +229,48 @@ internal fun OutboundEditorPage(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            stringResource(
-                                if (editing == null) R.string.outbound_manual_add
-                                else R.string.outbound_manual_edit,
-                            ),
-                        )
-                        Text(
-                            schema.title,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = navigator::pop, enabled = !saving) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
-                    if (editing != null) {
-                        IconButton(
-                            onClick = {
-                                scope.launch {
-                                    clipboard.setPlainText(
-                                        JsonObject(document.value - "tag").toString(),
-                                    )
-                                    services.tipNotifier.show(copiedMessage)
-                                }
-                            },
-                            enabled = !saving,
-                        ) {
-                            Icon(Icons.Rounded.ContentCopy, stringResource(R.string.common_copy))
-                        }
-                    }
-                    IconButton(onClick = ::save, enabled = !saving) {
-                        AnimatedContent(
-                            targetState = saving,
-                            transitionSpec = {
-                                fadeIn(saveEffectsMotion).togetherWith(fadeOut(saveEffectsMotion))
-                            },
-                            label = "outbound-save-progress",
-                        ) { inProgress ->
-                            if (inProgress) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                )
-                            } else {
-                                Icon(Icons.Rounded.Save, stringResource(R.string.common_save))
-                            }
-                        }
-                    }
-                },
-            )
+    EditorPageScaffold(
+        outerPadding = padding,
+        isWideScreen = isWideScreen,
+        title = {
+            Column {
+                Text(
+                    stringResource(
+                        if (editing == null) R.string.outbound_manual_add
+                        else R.string.outbound_manual_edit,
+                    ),
+                )
+                Text(
+                    schema.title,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         },
-    ) { innerPadding ->
-        val contentPadding = pageContentPaddingWithCutout(
-            innerPadding = innerPadding,
-            outerPadding = padding,
-            isWideScreen = isWideScreen,
-        )
+        saving = saving,
+        saveEnabled = true,
+        onBack = navigator::pop,
+        onSave = ::save,
+        actions = {
+            if (editing != null) {
+                IconButton(
+                    onClick = {
+                        scope.launch {
+                            clipboard.setPlainText(
+                                JsonObject(document.value - "tag").toString(),
+                            )
+                            services.tipNotifier.show(copiedMessage)
+                        }
+                    },
+                    enabled = !saving,
+                ) {
+                    Icon(Icons.Rounded.ContentCopy, stringResource(R.string.common_copy))
+                }
+            }
+        },
+    ) { contentPadding ->
         LazyColumn(
-            contentPadding = pageListPadding(contentPadding),
+            contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item(key = "identity") {

@@ -26,13 +26,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -77,13 +74,12 @@ import features.settings.DnsSettingsDraft
 import features.settings.withDnsServerTagReplacement
 import org.asterisk.zcc.abox.R
 import ui.components.AsteriskInfoChip
+import ui.components.EditorPageScaffold
 import ui.components.ReferenceSelectionCard
 import ui.components.StringListEditor
 import ui.components.localizedLabel
 import ui.components.singBoxOptionLabel
 import ui.components.singBoxProtocolChoices
-import ui.layout.pageContentPaddingWithCutout
-import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 import ui.icons.AsteriskIcons as Icons
@@ -889,58 +885,29 @@ internal fun DnsRuleEditorScaffold(
     val actionSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
     val actionEffectsMotion = AsteriskMotion.effects<Float>()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        stringResource(
-                            if (editor.index == null) {
-                                R.string.settings_dns_add_rule
-                            } else {
-                                R.string.settings_dns_edit_rule
-                            },
-                        ),
-                    )
-                },
-                navigationIcon = {
-                    IconButton(
-                        enabled = !saving,
-                        onClick = onDismissRequest,
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            stringResource(R.string.common_back),
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        enabled = canSave && !saving,
-                        onClick = { onSave(rule.sanitized()) },
-                    ) {
-                        if (saving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Icon(Icons.Rounded.Save, stringResource(R.string.common_save))
-                        }
-                    }
-                },
+    EditorPageScaffold(
+        outerPadding = outerPadding,
+        isWideScreen = isWideScreen,
+        title = {
+            Text(
+                stringResource(
+                    if (editor.index == null) {
+                        R.string.settings_dns_add_rule
+                    } else {
+                        R.string.settings_dns_edit_rule
+                    },
+                ),
             )
         },
-    ) { innerPadding ->
-        val contentPadding = pageContentPaddingWithCutout(
-            innerPadding = innerPadding,
-            outerPadding = outerPadding,
-            isWideScreen = isWideScreen,
-        )
+        saving = saving,
+        saveEnabled = canSave,
+        onBack = onDismissRequest,
+        onSave = { onSave(rule.sanitized()) },
+    ) { contentPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = pageListPadding(contentPadding, bottomExtra = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item(key = "basic-title") {
                 DnsRuleEditorSectionTitle(
@@ -953,6 +920,7 @@ internal fun DnsRuleEditorScaffold(
                     onValueChange = { onEditorChange(rule.copy(remarks = it)) },
                     label = stringResource(R.string.dns_rule_remarks),
                     errorText = null,
+                    horizontalPadding = 0.dp,
                 )
             }
             item(key = "action") {
@@ -1200,6 +1168,7 @@ private fun DnsRuleActionFields(
                         label = stringResource(R.string.settings_dns_custom_response_code),
                         errorText = rcodeError,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        horizontalPadding = 0.dp,
                     )
                 }
                 DnsRecordListEditor(
@@ -1255,7 +1224,6 @@ private fun DnsRuleMatchFieldEditor(
                     }
                     onRuleChange(rule.withDnsRuleMatchValues(matcher, nextValues))
                 },
-                modifier = Modifier.padding(horizontal = 16.dp),
             )
             onPendingChange(false)
         }
@@ -1312,7 +1280,6 @@ private fun DnsRuleMatchFieldEditor(
                     }
                     onRuleChange(rule.withDnsRuleMatchValues(matcher, nextValues))
                 },
-                modifier = Modifier.padding(horizontal = 16.dp),
             )
             onPendingChange(false)
         }
@@ -1382,6 +1349,7 @@ private fun DnsRuleMatchFieldEditor(
                             keyboardType = KeyboardType.Number,
                             imeAction = ImeAction.Next,
                         ),
+                        horizontalPadding = 0.dp,
                     )
                 }
             }
@@ -1397,7 +1365,6 @@ private fun DnsRuleMatchFieldEditor(
                     val nextValues = if (tag in values) values - tag else values + tag
                     onRuleChange(rule.withDnsRuleMatchValues(matcher, nextValues))
                 },
-                modifier = Modifier.padding(horizontal = 16.dp),
             )
             onPendingChange(false)
         }
@@ -1411,7 +1378,6 @@ private fun DnsRuleMatchFieldEditor(
                     val nextValues = if (tag in values) values - tag else values + tag
                     onRuleChange(rule.withDnsRuleMatchValues(matcher, nextValues))
                 },
-                modifier = Modifier.padding(horizontal = 16.dp),
             )
             onPendingChange(false)
         }
@@ -1425,7 +1391,6 @@ private fun DnsRuleMatchFieldEditor(
                     val nextValues = if (tag in values) values - tag else values + tag
                     onRuleChange(rule.withDnsRuleMatchValues(matcher, nextValues))
                 },
-                modifier = Modifier.padding(horizontal = 16.dp),
             )
             onPendingChange(false)
         }
@@ -1484,6 +1449,7 @@ private fun DnsRuleMatchFieldEditor(
                     dnsRuleValueError(matcher, value, invalidMessage)
                 },
                 onPendingChange = onPendingChange,
+                horizontalPadding = 0.dp,
             )
         }
     }
@@ -1498,7 +1464,7 @@ private fun DnsRuleEditorSectionTitle(title: String) {
         fontWeight = FontWeight.SemiBold,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 20.dp, top = 10.dp),
+            .padding(start = 8.dp, end = 8.dp, top = 10.dp),
     )
 }
 
@@ -1536,18 +1502,21 @@ private fun DnsRuleRouteOptions(
             keyboardType = KeyboardType.Number,
             imeAction = ImeAction.Next,
         ),
+        horizontalPadding = 0.dp,
     )
     SettingsTextField(
         value = rule.timeout,
         onValueChange = { onRuleChange(rule.copy(timeout = it)) },
         label = stringResource(R.string.settings_dns_rule_timeout),
         errorText = timeoutError,
+        horizontalPadding = 0.dp,
     )
     SettingsTextField(
         value = rule.clientSubnet,
         onValueChange = { onRuleChange(rule.copy(clientSubnet = it)) },
         label = stringResource(R.string.settings_dns_client_subnet),
         errorText = subnetError,
+        horizontalPadding = 0.dp,
     )
 }
 
@@ -1564,6 +1533,7 @@ private fun DnsRecordListEditor(
         values = values,
         onValuesChange = onValuesChange,
         emptyText = stringResource(R.string.settings_dns_list_empty),
+        horizontalPadding = 0.dp,
     )
 }
 

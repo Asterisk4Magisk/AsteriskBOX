@@ -25,6 +25,7 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ui.theme.AsteriskShapeTokens
 import engine.network.toPortOrNull
@@ -58,6 +59,7 @@ internal fun SettingsTextField(
     enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
     sanitizeInput: (String) -> String = { it },
+    horizontalPadding: Dp = SettingsSheetHorizontalPadding,
 ) {
     SheetTextField(
         value = value,
@@ -69,13 +71,14 @@ internal fun SettingsTextField(
         keyboardOptions = keyboardOptions,
         sanitizeInput = sanitizeInput,
         enabled = enabled,
+        horizontalPadding = horizontalPadding,
     )
     errorText?.let {
         StringListStatusText(
             text = it,
             error = true,
             modifier = Modifier
-                .padding(horizontal = SettingsSheetHorizontalPadding)
+                .padding(horizontal = horizontalPadding)
                 .padding(bottom = 8.dp),
         )
     }
@@ -90,6 +93,7 @@ internal fun SheetTextField(
     enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
     sanitizeInput: (String) -> String = { it },
+    horizontalPadding: Dp = SettingsSheetHorizontalPadding,
 ) {
     val latestOnValueChange by rememberUpdatedState(onValueChange)
     val latestSanitizeInput by rememberUpdatedState(sanitizeInput)
@@ -115,7 +119,7 @@ internal fun SheetTextField(
         enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = SettingsSheetHorizontalPadding),
+            .padding(horizontal = horizontalPadding),
     )
 }
 
