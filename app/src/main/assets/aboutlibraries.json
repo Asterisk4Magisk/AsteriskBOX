@@ -15,7 +15,7 @@
         },
         {
             "uniqueId": "com.github.asterisk4magisk:libbox",
-            "artifactVersion": "v1.14.0-beta.4",
+            "artifactVersion": "v1.14.0-beta.5",
             "name": "AndroidLibBoxLite",
             "description": "Pinned Android JNI and command API bindings for sing-box.",
             "website": "https://github.com/Asterisk4Magisk/AndroidLibBoxLite",
@@ -236,7 +236,7 @@
         },
         {
             "uniqueId": "io.ktor:ktor-http",
-            "artifactVersion": "3.5.1",
+            "artifactVersion": "3.5.2",
             "name": "ktor-http",
             "description": "Ktor is a framework for quickly creating web applications in Kotlin with minimal effort.",
             "website": "https://github.com/ktorio/ktor",
@@ -327,7 +327,7 @@
         },
         {
             "uniqueId": "github:reF1nd/sing-box-releases",
-            "artifactVersion": "v1.14.0-beta.4-reF1nd",
+            "artifactVersion": "v1.14.0-beta.5-reF1nd",
             "name": "sing-box reF1nd build",
             "description": "A reF1nd build of the sing-box proxy platform used by AsteriskBOX ROOT modes.",
             "website": "https://github.com/reF1nd/sing-box-releases",
