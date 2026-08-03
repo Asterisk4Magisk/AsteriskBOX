@@ -7,12 +7,6 @@ package features.singbox
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -332,8 +326,8 @@ fun SingBoxProxyPage(
                     actions = {
                         AnimatedVisibility(
                             visible = contentState != SingBoxProxyContentState.ServiceStopped,
-                            enter = fadeIn(animationSpec = contentEffectsMotion),
-                            exit = fadeOut(animationSpec = contentEffectsMotion),
+                            enter = AsteriskMotion.fadeEnter(contentEffectsMotion),
+                            exit = AsteriskMotion.fadeExit(contentEffectsMotion),
                         ) {
                             SingBoxProxyOptionsMenu(
                                 layout = appState.singBoxProxyLayout,
@@ -391,10 +385,7 @@ fun SingBoxProxyPage(
         AnimatedContent(
             targetState = contentState == SingBoxProxyContentState.ServiceStopped,
             modifier = Modifier.fillMaxSize(),
-            transitionSpec = {
-                fadeIn(animationSpec = contentEffectsMotion)
-                    .togetherWith(fadeOut(animationSpec = contentEffectsMotion))
-            },
+            transitionSpec = AsteriskMotion.fadeThrough(contentEffectsMotion),
             label = "proxy-service-availability",
         ) { serviceStopped ->
             if (serviceStopped) {
@@ -672,21 +663,12 @@ private fun SingBoxProxyOptionsMenu(
             AnimatedContent(
                 targetState = level,
                 modifier = Modifier.fillMaxWidth(),
-                transitionSpec = {
-                    val direction = if (targetState == ProxyOptionsLevel.Main) -1 else 1
-                    (
-                        slideInHorizontally(
-                            animationSpec = menuSpatialMotion,
-                            initialOffsetX = { width -> direction * width / 5 },
-                        ) + fadeIn(animationSpec = menuEffectsMotion)
-                        ).togetherWith(
-                        slideOutHorizontally(
-                            animationSpec = menuSpatialMotion,
-                            targetOffsetX = { width -> -direction * width / 5 },
-                        ) + fadeOut(animationSpec = menuEffectsMotion),
-                    ).using(
-                        SizeTransform(sizeAnimationSpec = { _, _ -> menuSizeMotion }),
-                    )
+                transitionSpec = AsteriskMotion.horizontalSlideFade(
+                    spatialSpec = menuSpatialMotion,
+                    effectsSpec = menuEffectsMotion,
+                    sizeSpec = menuSizeMotion,
+                ) {
+                    if (targetState == ProxyOptionsLevel.Main) -1 else 1
                 },
                 contentAlignment = Alignment.TopStart,
                 label = "proxy-options-level",

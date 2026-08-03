@@ -4,9 +4,6 @@
 package features.resources
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -226,9 +223,7 @@ internal fun ResourceCatalogSheet(
         val stateAnimationSpec = AsteriskMotion.effects<Float>()
         AnimatedContent(
             targetState = loadState,
-            transitionSpec = {
-                fadeIn(stateAnimationSpec) togetherWith fadeOut(stateAnimationSpec)
-            },
+            transitionSpec = AsteriskMotion.fadeThrough(stateAnimationSpec),
             label = "resource-catalog-load-state",
         ) { state ->
             when (state) {
@@ -358,9 +353,7 @@ private fun ResourceCatalogLoaded(
         AnimatedContent(
             targetState = filteredEntries.isEmpty(),
             modifier = Modifier.fillMaxWidth().weight(1f),
-            transitionSpec = {
-                fadeIn(resultsAnimationSpec) togetherWith fadeOut(resultsAnimationSpec)
-            },
+            transitionSpec = AsteriskMotion.fadeThrough(resultsAnimationSpec),
             label = "resource-catalog-results",
         ) { empty ->
             if (empty) {

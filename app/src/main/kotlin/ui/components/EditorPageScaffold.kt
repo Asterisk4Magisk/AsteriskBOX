@@ -5,9 +5,6 @@ package ui.components
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
@@ -78,10 +75,7 @@ internal fun EditorPageScaffold(
                     ) {
                         AnimatedContent(
                             targetState = saving,
-                            transitionSpec = {
-                                fadeIn(saveEffectsMotion)
-                                    .togetherWith(fadeOut(saveEffectsMotion))
-                            },
+                            transitionSpec = AsteriskMotion.fadeThrough(saveEffectsMotion),
                             label = "editor-save-progress",
                         ) { inProgress ->
                             if (inProgress) {

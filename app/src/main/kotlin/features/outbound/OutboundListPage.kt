@@ -8,15 +8,9 @@ package features.outbound
 import android.content.Context
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -430,10 +424,7 @@ internal fun OutboundListPage(
                             val countEffectsMotion = AsteriskMotion.fastEffects<Float>()
                             AnimatedContent(
                                 targetState = visibleCount,
-                                transitionSpec = {
-                                    fadeIn(animationSpec = countEffectsMotion)
-                                        .togetherWith(fadeOut(animationSpec = countEffectsMotion))
-                                },
+                                transitionSpec = AsteriskMotion.fadeThrough(countEffectsMotion),
                                 label = "outbound-count",
                             ) { count ->
                                 Text(
@@ -474,27 +465,12 @@ internal fun OutboundListPage(
                                 AnimatedContent(
                                     targetState = importMenuLevel,
                                     modifier = Modifier.fillMaxWidth(),
-                                    transitionSpec = {
-                                        val direction = if (
-                                            targetState == OutboundImportMenuLevel.MAIN
-                                        ) {
-                                            -1
-                                        } else {
-                                            1
-                                        }
-                                        (
-                                            slideInHorizontally(
-                                                animationSpec = menuSpatialMotion,
-                                                initialOffsetX = { width -> direction * width / 5 },
-                                            ) + fadeIn(animationSpec = menuEffectsMotion)
-                                            ).togetherWith(
-                                            slideOutHorizontally(
-                                                animationSpec = menuSpatialMotion,
-                                                targetOffsetX = { width -> -direction * width / 5 },
-                                            ) + fadeOut(animationSpec = menuEffectsMotion),
-                                        ).using(
-                                            SizeTransform(sizeAnimationSpec = { _, _ -> menuSizeMotion }),
-                                        )
+                                    transitionSpec = AsteriskMotion.horizontalSlideFade(
+                                        spatialSpec = menuSpatialMotion,
+                                        effectsSpec = menuEffectsMotion,
+                                        sizeSpec = menuSizeMotion,
+                                    ) {
+                                        if (targetState == OutboundImportMenuLevel.MAIN) -1 else 1
                                     },
                                     contentAlignment = Alignment.TopStart,
                                     label = "outbound-import-level",
@@ -1048,21 +1024,12 @@ private fun OutboundCardMenu(
             AnimatedContent(
                 targetState = level,
                 modifier = Modifier.fillMaxWidth(),
-                transitionSpec = {
-                    val direction = if (targetState == OutboundCardMenuLevel.MAIN) -1 else 1
-                    (
-                        slideInHorizontally(
-                            animationSpec = menuSpatialMotion,
-                            initialOffsetX = { width -> direction * width / 5 },
-                        ) + fadeIn(animationSpec = menuEffectsMotion)
-                        ).togetherWith(
-                        slideOutHorizontally(
-                            animationSpec = menuSpatialMotion,
-                            targetOffsetX = { width -> -direction * width / 5 },
-                        ) + fadeOut(animationSpec = menuEffectsMotion),
-                    ).using(
-                        SizeTransform(sizeAnimationSpec = { _, _ -> menuSizeMotion }),
-                    )
+                transitionSpec = AsteriskMotion.horizontalSlideFade(
+                    spatialSpec = menuSpatialMotion,
+                    effectsSpec = menuEffectsMotion,
+                    sizeSpec = menuSizeMotion,
+                ) {
+                    if (targetState == OutboundCardMenuLevel.MAIN) -1 else 1
                 },
                 contentAlignment = Alignment.TopStart,
                 label = "outbound-card-menu-level",
@@ -1231,21 +1198,12 @@ private fun OutboundOptionsMenu(
             AnimatedContent(
                 targetState = level,
                 modifier = Modifier.fillMaxWidth(),
-                transitionSpec = {
-                    val direction = if (targetState == OutboundOptionsMenuLevel.MAIN) -1 else 1
-                    (
-                        slideInHorizontally(
-                            animationSpec = menuSpatialMotion,
-                            initialOffsetX = { width -> direction * width / 5 },
-                        ) + fadeIn(animationSpec = menuEffectsMotion)
-                        ).togetherWith(
-                        slideOutHorizontally(
-                            animationSpec = menuSpatialMotion,
-                            targetOffsetX = { width -> -direction * width / 5 },
-                        ) + fadeOut(animationSpec = menuEffectsMotion),
-                    ).using(
-                        SizeTransform(sizeAnimationSpec = { _, _ -> menuSizeMotion }),
-                    )
+                transitionSpec = AsteriskMotion.horizontalSlideFade(
+                    spatialSpec = menuSpatialMotion,
+                    effectsSpec = menuEffectsMotion,
+                    sizeSpec = menuSizeMotion,
+                ) {
+                    if (targetState == OutboundOptionsMenuLevel.MAIN) -1 else 1
                 },
                 contentAlignment = Alignment.TopStart,
                 label = "outbound-options-level",

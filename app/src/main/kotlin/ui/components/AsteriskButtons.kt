@@ -4,9 +4,6 @@
 package ui.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
@@ -64,9 +61,7 @@ internal fun AsteriskActionButton(
     ) {
         AnimatedContent(
             targetState = loading,
-            transitionSpec = {
-                fadeIn(loadingAnimationSpec) togetherWith fadeOut(loadingAnimationSpec)
-            },
+            transitionSpec = AsteriskMotion.fadeThrough(loadingAnimationSpec),
             label = "action-button-loading",
         ) { isLoading ->
             if (isLoading) {

@@ -10,11 +10,6 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -233,10 +228,7 @@ internal fun EndpointListPage(padding: PaddingValues) {
                             Text(stringResource(R.string.endpoint_management))
                             AnimatedContent(
                                 targetState = visibleEndpoints.size,
-                                transitionSpec = {
-                                    fadeIn(countEffectsMotion)
-                                        .togetherWith(fadeOut(countEffectsMotion))
-                                },
+                                transitionSpec = AsteriskMotion.fadeThrough(countEffectsMotion),
                                 label = "endpoint-count",
                             ) { count ->
                                 Text(
@@ -263,10 +255,7 @@ internal fun EndpointListPage(padding: PaddingValues) {
                             ) {
                                 AnimatedContent(
                                     targetState = importing,
-                                    transitionSpec = {
-                                        fadeIn(countEffectsMotion)
-                                            .togetherWith(fadeOut(countEffectsMotion))
-                                    },
+                                    transitionSpec = AsteriskMotion.fadeThrough(countEffectsMotion),
                                     label = "endpoint-import-progress",
                                 ) { inProgress ->
                                     if (inProgress) {
@@ -522,8 +511,8 @@ private fun EndpointEmptyState(hasQuery: Boolean) {
     val spatialMotion = AsteriskMotion.spatial<Float>()
     AnimatedVisibility(
         visible = true,
-        enter = fadeIn(effectsMotion) + scaleIn(spatialMotion),
-        exit = fadeOut(effectsMotion) + scaleOut(spatialMotion),
+        enter = AsteriskMotion.scaleFadeEnter(effectsMotion, spatialMotion),
+        exit = AsteriskMotion.scaleFadeExit(effectsMotion, spatialMotion),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 72.dp, horizontal = 24.dp),

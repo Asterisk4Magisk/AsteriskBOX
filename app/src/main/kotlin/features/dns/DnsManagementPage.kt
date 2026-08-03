@@ -8,9 +8,6 @@ package features.dns
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -219,10 +216,7 @@ internal fun DnsManagementPage(
                         val countMotion = AsteriskMotion.fastEffects<Float>()
                         AnimatedContent(
                             targetState = appState.dnsRules.size,
-                            transitionSpec = {
-                                fadeIn(animationSpec = countMotion)
-                                    .togetherWith(fadeOut(animationSpec = countMotion))
-                            },
+                            transitionSpec = AsteriskMotion.fadeThrough(countMotion),
                             label = "dns-rule-count",
                         ) { count ->
                             Text(

@@ -10,12 +10,8 @@ package features.routing
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -164,10 +160,7 @@ internal fun RoutingManagementPage(
                         val countMotion = AsteriskMotion.fastEffects<Float>()
                         AnimatedContent(
                             targetState = appState.routeRules.size,
-                            transitionSpec = {
-                                fadeIn(animationSpec = countMotion)
-                                    .togetherWith(fadeOut(animationSpec = countMotion))
-                            },
+                            transitionSpec = AsteriskMotion.fadeThrough(countMotion),
                             label = "routing-rule-count",
                         ) { count ->
                             Text(
@@ -620,10 +613,7 @@ private fun RouteChoiceCard(
                 AnimatedContent(
                     targetState = selected.label,
                     modifier = Modifier.widthIn(max = 160.dp),
-                    transitionSpec = {
-                        fadeIn(animationSpec = labelMotion)
-                            .togetherWith(fadeOut(animationSpec = labelMotion))
-                    },
+                    transitionSpec = AsteriskMotion.fadeThrough(labelMotion),
                     label = "routing-choice-label",
                 ) { label ->
                     Text(
@@ -731,15 +721,10 @@ internal fun RouteRuleEditorScaffold(
             AnimatedContent(
                 targetState = current.type,
                 modifier = Modifier.fillMaxWidth(),
-                transitionSpec = {
-                    fadeIn(animationSpec = fieldEffectsMotion)
-                        .togetherWith(fadeOut(animationSpec = fieldEffectsMotion))
-                        .using(
-                            SizeTransform(
-                                sizeAnimationSpec = { _, _ -> fieldSizeMotion },
-                            ),
-                        )
-                },
+                transitionSpec = AsteriskMotion.fadeThrough(
+                    effectsSpec = fieldEffectsMotion,
+                    sizeSpec = fieldSizeMotion,
+                ),
                 contentAlignment = Alignment.TopStart,
                 label = "routing-rule-type-fields",
             ) { visibleType ->
@@ -823,15 +808,10 @@ internal fun RouteRuleEditorScaffold(
                         AnimatedContent(
                             targetState = current.action,
                             modifier = Modifier.fillMaxWidth(),
-                            transitionSpec = {
-                                fadeIn(animationSpec = fieldEffectsMotion)
-                                    .togetherWith(fadeOut(animationSpec = fieldEffectsMotion))
-                                    .using(
-                                        SizeTransform(
-                                            sizeAnimationSpec = { _, _ -> fieldSizeMotion },
-                                        ),
-                                    )
-                            },
+                            transitionSpec = AsteriskMotion.fadeThrough(
+                                effectsSpec = fieldEffectsMotion,
+                                sizeSpec = fieldSizeMotion,
+                            ),
                             contentAlignment = Alignment.TopStart,
                             label = "routing-action-fields",
                         ) { visibleAction ->
@@ -1323,10 +1303,7 @@ private fun RouteLogicalChildrenCard(
             val listMotion = AsteriskMotion.effects<Float>()
             AnimatedContent(
                 targetState = rules,
-                transitionSpec = {
-                    fadeIn(animationSpec = listMotion)
-                        .togetherWith(fadeOut(animationSpec = listMotion))
-                },
+                transitionSpec = AsteriskMotion.fadeThrough(listMotion),
                 label = "routing-logical-conditions",
             ) { visibleRules ->
                 if (visibleRules.isEmpty()) {

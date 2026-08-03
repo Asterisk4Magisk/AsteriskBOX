@@ -6,10 +6,6 @@ package features.settings.sheets
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -567,15 +563,10 @@ private fun DnsServerEditorSheet(
             AnimatedContent(
                 targetState = fieldLayout,
                 modifier = Modifier.fillMaxWidth(),
-                transitionSpec = {
-                    fadeIn(animationSpec = fieldEffectsMotion)
-                        .togetherWith(fadeOut(animationSpec = fieldEffectsMotion))
-                        .using(
-                            SizeTransform(
-                                sizeAnimationSpec = { _, _ -> fieldSizeMotion },
-                            ),
-                        )
-                },
+                transitionSpec = AsteriskMotion.fadeThrough(
+                    effectsSpec = fieldEffectsMotion,
+                    sizeSpec = fieldSizeMotion,
+                ),
                 contentAlignment = Alignment.TopStart,
                 label = "dns-server-type-fields",
             ) { currentLayout ->
@@ -938,15 +929,10 @@ internal fun DnsRuleEditorScaffold(
                 AnimatedContent(
                     targetState = rule.action,
                     modifier = Modifier.fillMaxWidth(),
-                    transitionSpec = {
-                        fadeIn(animationSpec = actionEffectsMotion)
-                            .togetherWith(fadeOut(animationSpec = actionEffectsMotion))
-                            .using(
-                                SizeTransform(
-                                    sizeAnimationSpec = { _, _ -> actionSizeMotion },
-                                ),
-                            )
-                    },
+                    transitionSpec = AsteriskMotion.fadeThrough(
+                        effectsSpec = actionEffectsMotion,
+                        sizeSpec = actionSizeMotion,
+                    ),
                     contentAlignment = Alignment.TopStart,
                     label = "dns-rule-action-fields",
                 ) { currentAction ->

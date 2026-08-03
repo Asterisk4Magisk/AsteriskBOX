@@ -11,11 +11,6 @@ package features.selector
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -229,9 +224,7 @@ internal fun SelectorManagementPage(padding: PaddingValues) {
                             Text(stringResource(R.string.selector_management))
                             AnimatedContent(
                                 targetState = count,
-                                transitionSpec = {
-                                    fadeIn(countMotion).togetherWith(fadeOut(countMotion))
-                                },
+                                transitionSpec = AsteriskMotion.fadeThrough(countMotion),
                                 label = "selector-count",
                             ) { visibleCount ->
                                 Text(
@@ -551,8 +544,14 @@ private fun SelectorCustomEmptyState() {
 private fun SelectorEmptyState(hasQuery: Boolean) {
     AnimatedVisibility(
         visible = true,
-        enter = fadeIn(AsteriskMotion.effects()) + scaleIn(AsteriskMotion.spatial()),
-        exit = fadeOut(AsteriskMotion.effects()) + scaleOut(AsteriskMotion.spatial()),
+        enter = AsteriskMotion.scaleFadeEnter(
+            effectsSpec = AsteriskMotion.effects(),
+            spatialSpec = AsteriskMotion.spatial(),
+        ),
+        exit = AsteriskMotion.scaleFadeExit(
+            effectsSpec = AsteriskMotion.effects(),
+            spatialSpec = AsteriskMotion.spatial(),
+        ),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(vertical = 72.dp, horizontal = 24.dp),
@@ -835,9 +834,7 @@ internal fun SelectorEditorScaffold(
             item(key = "type-fields") {
                 AnimatedContent(
                     targetState = type,
-                    transitionSpec = {
-                        fadeIn(typeEffectsMotion).togetherWith(fadeOut(typeEffectsMotion))
-                    },
+                    transitionSpec = AsteriskMotion.fadeThrough(typeEffectsMotion),
                     label = "selector-type-fields",
                 ) { selectedType ->
                     if (selectedType == SingBoxSelectorTypeUrlTest) {

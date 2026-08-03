@@ -4,9 +4,6 @@
 package features.outbound
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListScope
@@ -76,10 +73,7 @@ internal fun LazyListScope.outboundEditorSections(state: OutboundEditorContentSt
             val effectsMotion = AsteriskMotion.fastEffects<Float>()
             AnimatedContent(
                 targetState = section.fields,
-                transitionSpec = {
-                    fadeIn(animationSpec = effectsMotion)
-                        .togetherWith(fadeOut(animationSpec = effectsMotion))
-                },
+                transitionSpec = AsteriskMotion.fadeThrough(effectsMotion),
                 label = "outbound-${section.section.name.lowercase()}-fields",
             ) { fields ->
                 Column(

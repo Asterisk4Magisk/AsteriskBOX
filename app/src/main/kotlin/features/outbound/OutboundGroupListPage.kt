@@ -9,8 +9,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -765,8 +763,8 @@ private fun OutboundGroupBatchProgressDialog(
 private fun OutboundGroupEmptyState(onAdd: () -> Unit) {
     AnimatedVisibility(
         visible = true,
-        enter = fadeIn(AsteriskMotion.effects()),
-        exit = fadeOut(AsteriskMotion.effects()),
+        enter = AsteriskMotion.fadeEnter(AsteriskMotion.effects()),
+        exit = AsteriskMotion.fadeExit(AsteriskMotion.effects()),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 72.dp),

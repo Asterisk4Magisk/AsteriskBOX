@@ -8,9 +8,6 @@ package features.resources
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -108,10 +105,7 @@ internal fun ResourceOverviewCard(
         controls = {
             AnimatedContent(
                 targetState = updating,
-                transitionSpec = {
-                    fadeIn(animationSpec = statusEffectsMotion)
-                        .togetherWith(fadeOut(animationSpec = statusEffectsMotion))
-                },
+                transitionSpec = AsteriskMotion.fadeThrough(statusEffectsMotion),
                 label = "resource-update-action",
             ) { isUpdating ->
                 if (isUpdating) {
