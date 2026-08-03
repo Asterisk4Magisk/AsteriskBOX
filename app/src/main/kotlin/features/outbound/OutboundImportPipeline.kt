@@ -41,8 +41,35 @@ internal data class OutboundImportResult(
     val outbounds: List<ImportedSingBoxOutbound>,
 )
 
-private val SupportedV2RayTransportTypes =
-    setOf("tcp", "raw", "http", "h2", "ws", "quic", "grpc", "httpupgrade")
+private fun canonicalV2RayTransport(transport: String): String? =
+    when (transport.lowercase()) {
+        "", "tcp", "raw" -> "tcp"
+        "http", "h2", "http2" -> "http"
+        "ws", "websocket" -> "ws"
+        "quic" -> "quic"
+        "grpc" -> "grpc"
+        "httpupgrade", "http-upgrade", "http_upgrade" -> "httpupgrade"
+        else -> null
+    }
+
+private fun canonicalMihomoOutboundType(sourceType: String): String =
+    when (sourceType.lowercase()) {
+        "socks", "socks5" -> "socks"
+        "ss" -> "shadowsocks"
+        "hy1" -> "hysteria"
+        "hy2" -> "hysteria2"
+        else -> sourceType.lowercase()
+    }
+
+private fun canonicalProxyUrlOutboundType(scheme: String): String =
+    when (scheme.lowercase()) {
+        "http", "https" -> "http"
+        "socks", "socks4", "socks4a", "socks5", "socks5h" -> "socks"
+        "hy1" -> "hysteria"
+        "hy2" -> "hysteria2"
+        "naive", "naive+https", "naive+quic" -> "naive"
+        else -> scheme.lowercase()
+    }
 
 private val TlsCapableOutboundTypes =
     setOf(
@@ -141,7 +168,9 @@ internal object OutboundImportPipeline {
 }
 
 private fun String.isJsonDocument(): Boolean =
-    runCatching { SingBoxJson.parseToJsonElement(this) }.isSuccess ||
+    runCatching { SingBoxJson.parseToJsonElement(this) }
+        .getOrNull()
+        .let { element -> element is JsonObject || element is JsonArray } ||
         looksLikeJsonContainer()
 
 private fun String.looksLikeJsonContainer(): Boolean {
@@ -224,12 +253,7 @@ private object MihomoYamlOutboundParser {
                 return@mapIndexedNotNull null
             }
             val sourceType = proxy.string("type").lowercase()
-            val type = when (sourceType) {
-                "socks", "socks5" -> "socks"
-                "ss" -> "shadowsocks"
-                "hy2" -> "hysteria2"
-                else -> sourceType
-            }
+            val type = canonicalMihomoOutboundType(sourceType)
             if (type !in SupportedSingBoxProxyOutboundTypes) {
                 issues += rejectedOutboundCandidate(
                     reason = ImportIssueReason.UNSUPPORTED_TYPE,
@@ -282,12 +306,7 @@ private object MihomoYamlOutboundParser {
 
     private fun Map<*, *>.toSingBoxOutbound(): JsonObject? {
         val sourceType = string("type").lowercase()
-        val type = when (sourceType) {
-            "socks", "socks5" -> "socks"
-            "ss" -> "shadowsocks"
-            "hy2" -> "hysteria2"
-            else -> sourceType
-        }
+        val type = canonicalMihomoOutboundType(sourceType)
         if (type !in SupportedSingBoxProxyOutboundTypes) return null
         val server = string("server")
         val port = int("port")
@@ -298,7 +317,7 @@ private object MihomoYamlOutboundParser {
         if (type == "naive" && network.isNotBlank()) return null
         if (type in setOf("vmess", "vless", "trojan") &&
             network.isNotBlank() &&
-            network !in SupportedV2RayTransportTypes
+            canonicalV2RayTransport(network) == null
         ) return null
         val vlessEncryption = string("encryption")
         if (type == "vless" &&
@@ -684,11 +703,8 @@ private object MihomoYamlOutboundParser {
         val network = proxy.string("network")
             .ifBlank { proxy.string("transport") }
             .lowercase()
-        if (network.isBlank() || network == "tcp") return null
-        val sourceType = when (network) {
-            "h2" -> "http"
-            else -> network
-        }
+        val sourceType = canonicalV2RayTransport(network) ?: return null
+        if (sourceType == "tcp") return null
         val options = proxy.map("$network-opts").ifEmpty {
             when (sourceType) {
                 "ws" -> proxy.map("ws-opts")
@@ -793,7 +809,7 @@ private object MihomoYamlOutboundParser {
 
 private object ProxyUrlOutboundParser {
     private val urlPattern = Regex(
-        """(?i)(?:socks4a?|socks5?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2|hy2|anytls|snell|ssh|tor|naive(?:\+(?:https|quic))?|wg|wireguard|awg|warp)://[^\s<>"']+""",
+        """(?i)(?:socks(?:4a?|5h?)?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2|hy2|anytls|snell|ssh|tor|naive(?:\+(?:https|quic))?|wg|wireguard|awg|warp)://[^\s<>"']+""",
     )
 
     fun parse(content: String): List<ImportedSingBoxOutbound> {
@@ -892,14 +908,7 @@ private object ProxyUrlOutboundParser {
         val hopping = parsePortHoppingAuthority(link, scheme)
         val uri = URI(hopping?.normalizedLink ?: link)
         val query = parseQuery(uri.rawQuery)
-        val type = when (scheme) {
-            "http", "https" -> "http"
-            "socks", "socks4", "socks4a", "socks5" -> "socks"
-            "hy1" -> "hysteria"
-            "hy2" -> "hysteria2"
-            "naive", "naive+https", "naive+quic" -> "naive"
-            else -> scheme
-        }
+        val type = canonicalProxyUrlOutboundType(scheme)
         if (type !in SupportedSingBoxProxyOutboundTypes) return null
         val host = (uri.host ?: extractBracketAwareHost(uri.rawAuthority))
             ?.removeSurrounding("[", "]")
@@ -914,27 +923,28 @@ private object ProxyUrlOutboundParser {
         ) return null
         if (type == "snell" && query.int("version").takeIf { it > 0 } != 4) return null
         val transportType = query.first("type", "network").lowercase()
+        val normalizedTransportType = canonicalV2RayTransport(transportType)
         if (type in setOf("vmess", "vless", "trojan") &&
             transportType.isNotBlank() &&
-            transportType !in SupportedV2RayTransportTypes
+            normalizedTransportType == null
         ) {
             throw IllegalArgumentException("Unsupported V2Ray transport: $transportType")
         }
         if (
-            transportType in setOf("tcp", "raw") &&
+            normalizedTransportType == "tcp" &&
             query.first("headerType", "header_type").let { header ->
                 header.isNotBlank() && !header.equals("none", ignoreCase = true)
             }
         ) return null
-        if (transportType == "grpc" &&
+        if (normalizedTransportType == "grpc" &&
             (
                 query.first("authority").isNotBlank() ||
                     query.first("mode").let { mode ->
                         mode.isNotBlank() && !mode.equals("gun", ignoreCase = true)
                     }
-                )
+            )
         ) return null
-        if (transportType == "quic" &&
+        if (normalizedTransportType == "quic" &&
             listOf("quicSecurity", "key", "headerType", "header_type")
                 .any { key -> query.first(key).isNotBlank() }
         ) return null
@@ -1171,10 +1181,9 @@ private object ProxyUrlOutboundParser {
             "Unsupported VMess TLS mode"
         }
         val tlsEnabled = tlsMode in setOf("tls", "reality") || source.string("pbk").isNotBlank()
-        val transportType = source.string("net").lowercase().ifBlank { "tcp" }
-        require(
-            transportType in SupportedV2RayTransportTypes,
-        ) { "Unsupported VMess transport" }
+        val sourceTransportType = source.string("net").lowercase().ifBlank { "tcp" }
+        val transportType = canonicalV2RayTransport(sourceTransportType)
+        requireNotNull(transportType) { "Unsupported VMess transport" }
         val headerType = source.string("type")
         require(
             transportType !in setOf("tcp", "raw") ||
@@ -1395,16 +1404,8 @@ private object ProxyUrlOutboundParser {
     }
 
     private fun buildUrlTransport(query: Map<String, List<String>>): JsonObject? {
-        val transportType = query.first("type", "network").lowercase()
-        if (transportType.isBlank() || transportType in setOf("tcp", "raw")) return null
-        val type = when (transportType) {
-            "h2" -> "http"
-            else -> transportType
-        }
-        if (type !in SupportedV2RayTransportTypes.map { value ->
-                if (value == "h2") "http" else value
-            }
-        ) return null
+        val type = canonicalV2RayTransport(query.first("type", "network")) ?: return null
+        if (type == "tcp") return null
         return buildJsonObject {
             put("type", type)
             when (type) {
@@ -1830,22 +1831,21 @@ private fun Map<*, *>.headers(excludedNames: Set<String> = emptySet()): JsonObje
     }.takeIf(JsonObject::isNotEmpty)
 }
 
+private fun canonicalShadowsocksPlugin(plugin: String): String? =
+    when (plugin.lowercase()) {
+        "obfs", "obfs-local", "simple-obfs" -> "obfs-local"
+        "v2ray", "v2ray-plugin" -> "v2ray-plugin"
+        else -> null
+    }
+
 private fun isSupportedShadowsocksPlugin(plugin: String): Boolean =
-    plugin.isBlank() ||
-        plugin.equals("obfs", ignoreCase = true) ||
-        plugin.equals("obfs-local", ignoreCase = true) ||
-        plugin.equals("v2ray-plugin", ignoreCase = true)
+    plugin.isBlank() || canonicalShadowsocksPlugin(plugin) != null
 
 private fun normalizeShadowsocksPlugin(
     plugin: String,
     options: String,
 ): Pair<String, String>? {
-    val normalizedName = when {
-        plugin.equals("obfs", ignoreCase = true) -> "obfs-local"
-        plugin.equals("obfs-local", ignoreCase = true) -> "obfs-local"
-        plugin.equals("v2ray-plugin", ignoreCase = true) -> "v2ray-plugin"
-        else -> return null
-    }
+    val normalizedName = canonicalShadowsocksPlugin(plugin) ?: return null
     if (normalizedName != "obfs-local") return normalizedName to options
     val normalizedOptions = options.split(';')
         .map(String::trim)
