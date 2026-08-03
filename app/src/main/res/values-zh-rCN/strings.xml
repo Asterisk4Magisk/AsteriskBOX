@@ -267,7 +267,7 @@
     <string name="settings_root_ebpf_matcher_summary">提高大应用清单性能，并提供地址过滤支持</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs">绕过直连地址</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs_summary">默认为中国地址列表，可在资源管理中调整</string>
-    <string name="settings_ebpf_bypass_direct_rule_sets_summary">开启后，将路由规则中指向直连出站的规则集写入 bypass_rule_set；关闭时保持为空</string>
+    <string name="settings_ebpf_bypass_direct_rule_sets_summary">将路由规则中指向直连出站的规则集写入 bypass_rule_set</string>
     <string name="settings_root_ebpf_matcher_failed">eBPF 匹配器支持探测失败</string>
     <string name="settings_root_ebpf_matcher_unsupported">当前设备不支持 eBPF 匹配器</string>
     <string name="settings_root_ebpf_selinux_policy_warning_title">启用 eBPF 匹配器？</string>
@@ -490,7 +490,7 @@
     <string name="settings_dns_rule_section_process">进程与应用</string>
     <string name="settings_dns_rule_section_interface">接口与网络环境</string>
     <string name="settings_dns_rule_section_response">响应</string>
-    <string name="settings_dns_match_response_unavailable">前面没有可用的已启用评估结果</string>
+    <string name="settings_dns_match_response_unavailable">未选择评估结果</string>
     <string name="settings_dns_rule_match_all">匹配所有请求</string>
     <string name="settings_dns_rule_value_invalid">无效的匹配值</string>
     <string name="settings_dns_ip_version">IP 版本</string>

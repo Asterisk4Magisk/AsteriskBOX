@@ -270,7 +270,7 @@
     <string name="settings_root_ebpf_matcher_summary">Improve performance for large app lists and support address filtering</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs">Bypass direct addresses</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs_summary">Uses China address lists by default; adjust them in Resource Management</string>
-    <string name="settings_ebpf_bypass_direct_rule_sets_summary">When enabled, rule sets routed to the direct outbound are added to bypass_rule_set; when disabled, it stays empty</string>
+    <string name="settings_ebpf_bypass_direct_rule_sets_summary">Write rule sets referenced by routing rules targeting the direct outbound to bypass_rule_set</string>
     <string name="settings_root_ebpf_matcher_failed">Failed to probe eBPF matcher support</string>
     <string name="settings_root_ebpf_matcher_unsupported">This device does not support eBPF matcher</string>
     <string name="settings_root_ebpf_selinux_policy_warning_title">Enable eBPF matcher?</string>
@@ -495,7 +495,7 @@
     <string name="settings_dns_rule_section_process">Process and app</string>
     <string name="settings_dns_rule_section_interface">Interface and environment</string>
     <string name="settings_dns_rule_section_response">Response</string>
-    <string name="settings_dns_match_response_unavailable">No preceding enabled evaluation result is available</string>
+    <string name="settings_dns_match_response_unavailable">No evaluation result selected</string>
     <string name="settings_dns_rule_match_all">Matches all requests</string>
     <string name="settings_dns_rule_value_invalid">Invalid match value</string>
     <string name="settings_dns_ip_version">IP version</string>
