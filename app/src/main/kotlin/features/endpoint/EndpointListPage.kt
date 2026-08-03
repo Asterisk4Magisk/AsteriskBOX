@@ -118,7 +118,7 @@ internal fun EndpointListPage(padding: PaddingValues) {
     val importFailedMessage = stringResource(R.string.endpoint_import_failed)
     val stateChangedMessage = stringResource(R.string.endpoint_import_state_changed)
     val emptyClipboardMessage = stringResource(R.string.endpoint_import_empty_clipboard)
-    val copiedMessage = stringResource(R.string.endpoint_editor_copied)
+    val copiedMessage = stringResource(R.string.common_copied)
     val countEffectsMotion = AsteriskMotion.fastEffects<Float>()
 
     suspend fun importContent(

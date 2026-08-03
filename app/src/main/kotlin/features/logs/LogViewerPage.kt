@@ -51,10 +51,10 @@ import androidx.compose.ui.unit.dp
 import app.LocalAppServices
 import app.LocalIsWideScreen
 import app.LocalNavigator
-import org.asterisk.zcc.abox.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.asterisk.zcc.abox.R
 import ui.clipboard.setPlainText
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskFilterChip
@@ -123,7 +123,7 @@ private fun LogViewerPage(
     val displayedLogEntries = remember(logEntries, query, levelFilter) {
         reduceLogEntries(logEntries.asReversed(), query, levelFilter)
     }
-    val copiedMessage = stringResource(R.string.logs_copied_to_clipboard)
+    val copiedMessage = stringResource(R.string.common_copied)
     val exportedMessage = stringResource(R.string.logs_exported)
     val exportFailedMessage = stringResource(R.string.logs_export_failed)
 

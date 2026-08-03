@@ -117,7 +117,6 @@
     <string name="monitor_refresh">Refresh</string>
     <string name="monitor_retry">Retry</string>
     <string name="monitor_copy_value">Copy value</string>
-    <string name="monitor_copied">Copied</string>
     <string name="monitor_filter_all">All</string>
     <string name="monitor_filter_proxy">Proxy</string>
     <string name="monitor_filter_direct">Direct</string>
@@ -582,7 +581,6 @@
     <!-- Logs -->
     <string name="core_logs_title">Core logs</string>
     <string name="logcat_logs_title">Logcat</string>
-    <string name="logs_copied_to_clipboard">Copied to clipboard</string>
     <string name="logs_export">Export logs</string>
     <string name="logs_exported">Logs exported</string>
     <string name="logs_export_failed">Failed to export logs</string>
@@ -754,7 +752,6 @@
     <string name="outbound_delete_title">Delete outbound?</string>
     <string name="outbound_delete_message">The outbound “%1$s” will be permanently deleted.</string>
     <string name="outbound_editor_invalid">Check the highlighted fields</string>
-    <string name="outbound_editor_copied">Outbound JSON copied</string>
     <string name="outbound_editor_list_hint">One item per line; commas are also accepted</string>
     <string name="outbound_editor_key_value_empty">No entries</string>
     <string name="outbound_editor_key">Name</string>
@@ -852,7 +849,6 @@
     <string name="endpoint_editor_format_json">Format JSON</string>
     <string name="endpoint_editor_json_invalid">Enter a valid endpoint JSON object</string>
     <string name="endpoint_editor_invalid">Check the endpoint configuration</string>
-    <string name="endpoint_editor_copied">Endpoint JSON copied</string>
     <string name="endpoint_type_wireguard">WireGuard</string>
     <string name="endpoint_type_wireguard_summary">Layer 3 WireGuard tunnel endpoint</string>
     <string name="endpoint_type_tailscale">Tailscale</string>
@@ -870,13 +866,13 @@
     <string name="outbound_editor_section_protocol">Protocol</string>
     <string name="outbound_editor_section_protocol_summary">Options specific to the selected proxy protocol</string>
     <string name="outbound_editor_section_tls">TLS</string>
-    <string name="outbound_editor_section_tls_summary">Stable sing-box TLS, uTLS, and Reality client options</string>
+    <string name="outbound_editor_section_tls_summary">sing-box TLS, uTLS, and Reality client options</string>
     <string name="outbound_editor_section_transport">V2Ray transport</string>
     <string name="outbound_editor_section_transport_summary">Optional HTTP, WebSocket, QUIC, gRPC, or HTTPUpgrade transport</string>
     <string name="outbound_editor_section_multiplex">Multiplex</string>
     <string name="outbound_editor_section_multiplex_summary">Share a physical connection across multiple streams</string>
     <string name="outbound_editor_section_quic">QUIC</string>
-    <string name="outbound_editor_section_quic_summary">Stable shared QUIC connection options</string>
+    <string name="outbound_editor_section_quic_summary">Shared QUIC connection options</string>
     <string name="outbound_editor_section_dial">Dial</string>
     <string name="outbound_editor_section_dial_summary">Optional interface, resolver, timeout, and network strategy</string>
     <string name="outbound_editor_field_required">%1$s is required</string>

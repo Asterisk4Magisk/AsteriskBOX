@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import ui.icons.AsteriskIcons as Icons
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,15 +38,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.LocalAppServices
-import org.asterisk.zcc.abox.R
 import features.monitoring.MonitoringIntent
 import features.monitoring.MonitoringScaffold
 import features.monitoring.MonitoringSectionCard
 import features.monitoring.MonitoringValueRow
 import features.monitoring.ObserveMonitoring
 import kotlinx.coroutines.launch
+import org.asterisk.zcc.abox.R
 import ui.layout.rememberPageGutter
 import java.util.UUID
+import ui.icons.AsteriskIcons as Icons
 
 @Composable
 internal fun NetworkMonitorPage(padding: PaddingValues) {
@@ -58,7 +58,7 @@ internal fun NetworkMonitorPage(padding: PaddingValues) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pageSessionId = rememberSaveable { UUID.randomUUID().toString() }
-    val copiedMessage = stringResource(R.string.monitor_copied)
+    val copiedMessage = stringResource(R.string.common_copied)
     val publicIpv4Label = stringResource(R.string.monitor_network_public_ipv4)
     val publicIpv6Label = stringResource(R.string.monitor_network_public_ipv6)
     ObserveMonitoring(MonitoringIntent.Network, pageSessionId)

@@ -116,7 +116,6 @@
     <string name="monitor_refresh">刷新</string>
     <string name="monitor_retry">重试</string>
     <string name="monitor_copy_value">复制数值</string>
-    <string name="monitor_copied">已复制</string>
     <string name="monitor_filter_all">全部</string>
     <string name="monitor_filter_proxy">代理</string>
     <string name="monitor_filter_direct">直连</string>
@@ -184,7 +183,7 @@
     <string name="monitor_traffic_local_notice">流量历史仅记录在应用私有本地存储中，不会发送到探测服务或订阅源。</string>
 
     <string name="monitor_network_title">网络状态</string>
-    <string name="monitor_network_request_duration_value">请求耗时 %1$d 毫秒</string>
+    <string name="monitor_network_request_duration_value">请求耗时 %1$d ms</string>
     <string name="monitor_network_public">公网地址</string>
     <string name="monitor_network_probe_source">由探测服务返回</string>
     <string name="monitor_network_local">本地网络</string>
@@ -577,7 +576,6 @@
     <!-- Logs -->
     <string name="core_logs_title">核心日志</string>
     <string name="logcat_logs_title">Logcat</string>
-    <string name="logs_copied_to_clipboard">已复制到剪切板</string>
     <string name="logs_export">导出日志</string>
     <string name="logs_exported">日志已导出</string>
     <string name="logs_export_failed">日志导出失败</string>
@@ -743,7 +741,6 @@
     <string name="outbound_delete_title">删除出站？</string>
     <string name="outbound_delete_message">出站“%1$s”将被永久删除。</string>
     <string name="outbound_editor_invalid">请检查标记的字段</string>
-    <string name="outbound_editor_copied">已复制出站 JSON</string>
     <string name="outbound_editor_list_hint">每行一项，也可以使用逗号分隔</string>
     <string name="outbound_editor_key_value_empty">暂无条目</string>
     <string name="outbound_editor_key">名称</string>
@@ -837,7 +834,6 @@
     <string name="endpoint_editor_format_json">格式化 JSON</string>
     <string name="endpoint_editor_json_invalid">请输入有效的端点 JSON 对象</string>
     <string name="endpoint_editor_invalid">请检查端点配置</string>
-    <string name="endpoint_editor_copied">已复制端点 JSON</string>
     <string name="endpoint_type_wireguard">WireGuard</string>
     <string name="endpoint_type_wireguard_summary">三层 WireGuard 隧道端点</string>
     <string name="endpoint_type_tailscale">Tailscale</string>
@@ -855,13 +851,13 @@
     <string name="outbound_editor_section_protocol">协议</string>
     <string name="outbound_editor_section_protocol_summary">所选代理协议的专属选项</string>
     <string name="outbound_editor_section_tls">TLS</string>
-    <string name="outbound_editor_section_tls_summary">稳定的 sing-box TLS、uTLS 与 Reality 客户端选项</string>
+    <string name="outbound_editor_section_tls_summary">sing-box TLS、uTLS 与 Reality 客户端选项</string>
     <string name="outbound_editor_section_transport">V2Ray 传输层</string>
     <string name="outbound_editor_section_transport_summary">可选的 HTTP、WebSocket、QUIC、gRPC 或 HTTPUpgrade 传输</string>
     <string name="outbound_editor_section_multiplex">多路复用</string>
     <string name="outbound_editor_section_multiplex_summary">让多个数据流共用物理连接</string>
     <string name="outbound_editor_section_quic">QUIC</string>
-    <string name="outbound_editor_section_quic_summary">稳定的共享 QUIC 连接选项</string>
+    <string name="outbound_editor_section_quic_summary">共享 QUIC 连接选项</string>
     <string name="outbound_editor_section_dial">拨号</string>
     <string name="outbound_editor_section_dial_summary">可选的接口、解析器、超时和网络策略</string>
     <string name="outbound_editor_field_required">%1$s不能为空</string>

@@ -143,8 +143,8 @@ internal fun OutboundEditorPage(
     } else {
         emptyMap()
     }
-    val invalidMessage = stringResource(R.string.outbound_editor_invalid)
-    val copiedMessage = stringResource(R.string.outbound_editor_copied)
+    val invalidMessage = stringResource(R.string.common_copied)
+    val copiedMessage = stringResource(R.string.common_copied)
     fun save() {
         if (saving) return
         attemptedSave = true

@@ -56,17 +56,17 @@ import features.settings.SettingsDropdownRow
 import features.settings.sheets.dnsServerTypeLabel
 import features.singbox.JsonCodeEditor
 import features.singbox.SingBoxCodeEditorState
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.asterisk.zcc.abox.R
 import ui.clipboard.setPlainText
 import ui.components.EditorPageScaffold
 import ui.components.localizedLabel
-import ui.icons.AsteriskIcons as Icons
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
+import ui.icons.AsteriskIcons as Icons
 
 @Composable
 internal fun EndpointEditorPage(
@@ -121,7 +121,7 @@ internal fun EndpointEditorPage(
     val invalidMessage = stringResource(R.string.endpoint_editor_invalid)
     val invalidJsonMessage = stringResource(R.string.endpoint_editor_json_invalid)
     val formatJsonContentDescription = stringResource(R.string.endpoint_editor_format_json)
-    val copiedMessage = stringResource(R.string.endpoint_editor_copied)
+    val copiedMessage = stringResource(R.string.common_copied)
     val editorSpatialMotion = AsteriskMotion.contentSpatial<androidx.compose.ui.unit.IntSize>()
     val density = LocalDensity.current
     val showProperties = endpointEditorShowsProperties(

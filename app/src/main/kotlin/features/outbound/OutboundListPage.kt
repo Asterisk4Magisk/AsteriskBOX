@@ -98,8 +98,8 @@ import features.importing.ImportResultDialog
 import features.importing.ImportResultPresentation
 import features.importing.ImportSource
 import features.importing.ImportStage
-import features.importing.importFailureResultPresentation
 import features.importing.importFailureContext
+import features.importing.importFailureResultPresentation
 import features.importing.readImportUtf8WithinLimit
 import features.importing.reportImportFailure
 import features.importing.toImportResultPresentation
@@ -191,7 +191,7 @@ internal fun OutboundListPage(
     val columns = resolveOutboundListColumns(appState.outboundListLayout, isWideScreen)
     val importFailedMessage = stringResource(R.string.outbound_import_failed)
     val emptyClipboardMessage = stringResource(R.string.outbound_import_empty_clipboard)
-    val copiedMessage = stringResource(R.string.outbound_editor_copied)
+    val copiedMessage = stringResource(R.string.common_copied)
     val noPingTargetsMessage = stringResource(R.string.outbound_ping_no_targets)
     val pingFailedMessage = stringResource(R.string.outbound_ping_failed)
 
