@@ -375,7 +375,7 @@
     <string name="settings_resource_files_catalog_empty">No available resource files were returned</string>
     <string name="settings_resource_files_catalog_no_results">No matching files</string>
     <string name="settings_resource_files_catalog_existing">Existing</string>
-    <string name="settings_resource_files_catalog_status">%1$d files · %2$d selected</string>
+    <string name="settings_resource_files_catalog_status">%1$d files</string>
     <string name="settings_resource_files_catalog_add_selected">Add %1$d</string>
     <string name="settings_resource_files_catalog_added">Added and downloaded {count} resource files</string>
     <string name="settings_resource_files_catalog_partial">Downloaded {success} resource files; {failed} failed and can be retried from the list</string>

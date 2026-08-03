@@ -524,7 +524,7 @@ private fun SelectorCustomEmptyState() {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(
-            Icons.Rounded.Add,
+            Icons.Rounded.Tune,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )

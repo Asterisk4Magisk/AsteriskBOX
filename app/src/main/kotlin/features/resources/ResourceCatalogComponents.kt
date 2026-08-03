@@ -343,7 +343,6 @@ private fun ResourceCatalogLoaded(
             text = stringResource(
                 R.string.settings_resource_files_catalog_status,
                 entries.size,
-                selectedNames.size,
             ),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
