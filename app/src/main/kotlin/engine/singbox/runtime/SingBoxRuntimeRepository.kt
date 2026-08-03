@@ -378,7 +378,7 @@ internal class SingBoxRuntimeRepository(
     private suspend fun runDelayTest(
         appState: AppState,
         target: String,
-    ): Result<SingBoxDelayResult> = runCatching {
+    ): Result<SingBoxDelayResult> = runDelayTestCatching {
         delayTestRunGate.runExclusive {
             val active = requireActiveSession(appState)
             val before = state.value

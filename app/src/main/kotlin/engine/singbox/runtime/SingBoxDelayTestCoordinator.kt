@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
 internal data class SingBoxDelayTestPlan(
@@ -34,6 +35,11 @@ internal class SingBoxDelayTestRunGate {
         }
     }
 }
+
+internal inline fun <T> runDelayTestCatching(block: () -> T): Result<T> =
+    runCatching(block).onFailure { error ->
+        if (error is CancellationException) throw error
+    }
 
 internal fun buildSingBoxDelayTestPlan(
     proxies: SingBoxProxiesState,

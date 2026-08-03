@@ -311,8 +311,10 @@ fun SingBoxProxyPage(
 
     fun testGroup(group: SingBoxProxyGroup) {
         if (!requireRuntime() || testingTarget != null) return
-        scope.launch {
-            services.singBoxRuntime.testGroupDelay(appState, group.name)
+        val stateSnapshot = appState
+        val groupName = group.name
+        services.appScope.launch {
+            services.singBoxRuntime.testGroupDelay(stateSnapshot, groupName)
                 .onSuccess { tipNotifier.show(delayDoneMessage) }
                 .onFailure { error -> tipNotifier.showError(error, delayFailedMessage) }
         }
