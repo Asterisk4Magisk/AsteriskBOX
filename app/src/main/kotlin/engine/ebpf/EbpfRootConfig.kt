@@ -11,13 +11,11 @@ import engine.root.RootConfigBuildContext
 import engine.root.RootIptablesConfig
 import engine.root.RootModeStartConfig
 import engine.root.RootStartConfig
-import engine.root.bpf2SocksBridgePortValue
 import engine.root.buildAsteriskdConfig
 
 internal data class EbpfStartConfig(
     override val root: RootStartConfig,
     override val localProxyOptions: LocalProxyOptions?,
-    val listenPort: Int,
     val sharedNetworkInterfaces: List<String>,
     override val asteriskdConfig: AsteriskdConfig,
 ) : RootModeStartConfig
@@ -29,7 +27,6 @@ internal fun RootConfigBuildContext.buildEbpfStartConfig(): EbpfStartConfig {
     return EbpfStartConfig(
         root = rootStartConfig,
         localProxyOptions = appState.toLocalProxyOptions(),
-        listenPort = appState.bpf2SocksBridgePortValue(),
         sharedNetworkInterfaces = normalizeEbpfSharedNetworkInterfaces(
             appState.ebpfSharedNetworkInterfaces,
         ),

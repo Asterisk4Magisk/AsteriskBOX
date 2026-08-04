@@ -291,7 +291,6 @@
     <string name="settings_local_proxy_summary_tproxy">透明代理端口 {port}</string>
     <string name="settings_local_proxy_summary_tun2socks">TUN2SOCKS SOCKS5 端口 {port}</string>
     <string name="settings_local_proxy_summary_bpf2socks">Bridge 端口 {bridgePort}，SOCKS5 端口 {socksPort}</string>
-    <string name="settings_local_proxy_summary_ebpf">eBPF 监听端口 {port}</string>
     <string name="settings_vpn_append_http_proxy">追加 HTTP 代理</string>
     <string name="settings_vpn_append_http_proxy_summary">让受支持的应用直接使用 HTTP 代理</string>
     <string name="settings_vpn_hev_tun">使用 Hev TUN</string>
@@ -545,7 +544,6 @@
     <string name="settings_transparent_proxy_port">透明代理端口</string>
     <string name="settings_tun2socks_socks5_port">TUN2SOCKS SOCKS5 端口</string>
     <string name="settings_bpf2socks_bridge_port">BPF2SOCKS bridge 端口</string>
-    <string name="settings_ebpf_listen_port">eBPF 监听端口</string>
     <string name="settings_bpf2socks_socks5_port">SOCKS5 端口</string>
     <string name="settings_dns_hosts_invalid">无效 DNS hosts 条目</string>
 

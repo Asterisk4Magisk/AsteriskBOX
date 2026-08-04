@@ -18,11 +18,10 @@ import ui.icons.AsteriskIcons as Icons
 internal fun LocalProxySettingsBottomSheet(
     show: Boolean,
     saving: Boolean,
-    showBridgeOrEbpfPort: Boolean,
+    showBpf2SocksBridgePort: Boolean,
     showInboundProxyPort: Boolean,
     useTun2SocksProxyPort: Boolean,
     useBpf2SocksProxyPort: Boolean,
-    useEbpfListenPort: Boolean,
     lockInboundProxyPort: Boolean,
     inboundProxyPort: String,
     bpf2SocksBridgePort: String,
@@ -41,7 +40,7 @@ internal fun LocalProxySettingsBottomSheet(
     onDismissRequest: () -> Unit,
     onSave: (String, String, String, Boolean, Boolean, String, String) -> Unit,
 ) {
-    val bridgePortError = if (showBridgeOrEbpfPort && !lockInboundProxyPort && !isPort(bpf2SocksBridgePort)) {
+    val bridgePortError = if (showBpf2SocksBridgePort && !lockInboundProxyPort && !isPort(bpf2SocksBridgePort)) {
         stringResource(R.string.settings_local_proxy_port_invalid)
     } else {
         null
@@ -91,24 +90,17 @@ internal fun LocalProxySettingsBottomSheet(
     ) {
         key(
             show,
-            showBridgeOrEbpfPort,
+            showBpf2SocksBridgePort,
             showInboundProxyPort,
             useTun2SocksProxyPort,
             useBpf2SocksProxyPort,
-            useEbpfListenPort,
         ) {
             SettingsSheetContent {
-                if (showBridgeOrEbpfPort) {
+                if (showBpf2SocksBridgePort) {
                     InboundProxyPortTextField(
                         value = bpf2SocksBridgePort,
                         onValueChange = onBpf2SocksBridgePortChange,
-                        label = stringResource(
-                            if (useEbpfListenPort) {
-                                R.string.settings_ebpf_listen_port
-                            } else {
-                                R.string.settings_bpf2socks_bridge_port
-                            },
-                        ),
+                        label = stringResource(R.string.settings_bpf2socks_bridge_port),
                         errorText = bridgePortError,
                         enabled = !lockInboundProxyPort,
                     )

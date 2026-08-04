@@ -42,7 +42,6 @@ internal fun JsonObject.withLibboxCompatibleEbpfInbounds(): JsonObject {
             put("type", "socks")
             put("listen", "127.0.0.1")
             inbound["tag"]?.let { tag -> put("tag", tag) }
-            inbound["listen_port"]?.let { port -> put("listen_port", port) }
         }
     }
     if (!replaced) return this

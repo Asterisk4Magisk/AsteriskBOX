@@ -294,7 +294,6 @@
     <string name="settings_local_proxy_summary_tproxy">Transparent proxy port {port}</string>
     <string name="settings_local_proxy_summary_tun2socks">TUN2SOCKS SOCKS5 port {port}</string>
     <string name="settings_local_proxy_summary_bpf2socks">Bridge port {bridgePort}, SOCKS5 port {socksPort}</string>
-    <string name="settings_local_proxy_summary_ebpf">eBPF listen port {port}</string>
     <string name="settings_vpn_append_http_proxy">Append HTTP proxy</string>
     <string name="settings_vpn_append_http_proxy_summary">Supported apps use HTTP proxy directly</string>
     <string name="settings_vpn_hev_tun">Use Hev TUN</string>
@@ -550,7 +549,6 @@
     <string name="settings_transparent_proxy_port">Transparent proxy port</string>
     <string name="settings_tun2socks_socks5_port">TUN2SOCKS SOCKS5 port</string>
     <string name="settings_bpf2socks_bridge_port">BPF2SOCKS bridge port</string>
-    <string name="settings_ebpf_listen_port">eBPF listen port</string>
     <string name="settings_bpf2socks_socks5_port">SOCKS5 port</string>
     <string name="settings_dns_hosts_invalid">Invalid DNS hosts entry</string>
 

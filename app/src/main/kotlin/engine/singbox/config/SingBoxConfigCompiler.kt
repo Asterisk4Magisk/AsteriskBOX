@@ -35,7 +35,6 @@ import engine.ebpf.normalizeEbpfSharedNetworkInterfaces
 import engine.ebpf.resolveEbpfUidPolicy
 import engine.proxy.LocalProxyLoopbackAddress
 import engine.proxy.toLocalProxyOptions
-import engine.root.bpf2SocksBridgePortValue
 import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.singBoxControlConfig
 import engine.tproxy.DefaultTproxyPort
@@ -253,7 +252,6 @@ private fun compileEbpfInbound(
 ): JsonObject = buildJsonObject {
     put("type", "ebpf")
     put("tag", APP_ROOT_INBOUND)
-    put("listen_port", appState.bpf2SocksBridgePortValue())
     put("dns_mode", if (appState.enableLocalDns) "hijack" else "off")
     putJsonArray("redirect_address") {
         add(EbpfRedirectIpv4Prefix)

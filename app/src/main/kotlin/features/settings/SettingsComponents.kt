@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.asterisk.zcc.abox.R
 import app.modes.RunModeBpf2Socks
-import app.modes.RunModeEbpf
 import app.modes.RunModeTun2Socks
 import app.modes.RunModeTproxy
 import androidx.compose.ui.res.stringResource
@@ -392,8 +391,6 @@ internal fun localProxySettingsSummary(
             .formatTemplate("port" to socks5ProxyPort)
         RunModeBpf2Socks -> stringResource(R.string.settings_local_proxy_summary_bpf2socks)
             .formatTemplate("bridgePort" to bpf2SocksBridgePort, "socksPort" to socks5ProxyPort)
-        RunModeEbpf -> stringResource(R.string.settings_local_proxy_summary_ebpf)
-            .formatTemplate("port" to bpf2SocksBridgePort)
         else -> ""
     }
     return listOf(inboundProxySummary, localProxySummary).filter(String::isNotBlank).joinToString("，")
