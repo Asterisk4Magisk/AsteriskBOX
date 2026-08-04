@@ -177,6 +177,7 @@ private fun JsonObject.encodeAnyTlsShareUrl(remarks: String): String {
         "idle_session_check_interval",
         "idle_session_timeout",
         "min_idle_session",
+        "client_metadata",
         "tls",
     )
     val password = stringValue("password")
@@ -192,11 +193,17 @@ private fun JsonObject.encodeAnyTlsShareUrl(remarks: String): String {
     }
     val tls = readShareTls(required = true)
         .requireOnlyShareParameters("AnyTLS", "sni", "insecure")
+    val parameters = buildList {
+        stringValue("client_metadata").takeIf(String::isNotBlank)?.let {
+            add("client-metadata" to it)
+        }
+        addAll(tls.parameters)
+    }
     return buildOutboundShareUri(
         scheme = "anytls",
         endpoint = requireShareEndpoint(),
         encodedUserInfo = encodeShareComponent(password),
-        parameters = tls.parameters,
+        parameters = parameters,
         remarks = remarks,
     )
 }

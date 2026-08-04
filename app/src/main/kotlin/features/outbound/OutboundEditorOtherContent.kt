@@ -65,6 +65,7 @@ internal fun anyTlsOutboundFields() = listOf(
     outboundField("idle_session_check_interval", "Idle session check interval"),
     outboundField("idle_session_timeout", "Idle session timeout"),
     outboundField("min_idle_session", "Minimum idle sessions", OutboundFieldKind.INTEGER),
+    outboundField("client_metadata", "Client metadata"),
 )
 
 internal fun snellOutboundFields() = listOf(

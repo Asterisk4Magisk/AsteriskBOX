@@ -898,6 +898,7 @@
     <string name="outbound_field_client_certificate_path">Client certificate path</string>
     <string name="outbound_field_client_key">Client key</string>
     <string name="outbound_field_client_key_path">Client key path</string>
+    <string name="outbound_field_client_metadata">Client metadata</string>
     <string name="outbound_field_client_version">Client version</string>
     <string name="outbound_field_congestion_control">Congestion control</string>
     <string name="outbound_field_connect_timeout">Connect timeout</string>

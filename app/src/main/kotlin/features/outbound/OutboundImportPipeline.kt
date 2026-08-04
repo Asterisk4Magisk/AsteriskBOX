@@ -540,6 +540,10 @@ private object MihomoYamlOutboundParser {
                 "anytls" -> {
                     putNotBlank("password", string("password"))
                     putNotBlank(
+                        "client_metadata",
+                        string("client-metadata").ifBlank { string("client_metadata") },
+                    )
+                    putNotBlank(
                         "idle_session_check_interval",
                         secondsDuration("idle-session-check-interval"),
                     )
@@ -1135,7 +1139,13 @@ private object ProxyUrlOutboundParser {
                     putPositive("up_mbps", query.int("upmbps", "up"))
                     putPositive("down_mbps", query.int("downmbps", "down"))
                 }
-                "anytls" -> putNotBlank("password", authentication)
+                "anytls" -> {
+                    putNotBlank("password", authentication)
+                    putNotBlank(
+                        "client_metadata",
+                        query.first("client-metadata", "client_metadata"),
+                    )
+                }
                 "snell" -> {
                     putNotBlank("psk", authentication)
                     put("version", 4)

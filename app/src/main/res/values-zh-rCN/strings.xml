@@ -883,6 +883,7 @@
     <string name="outbound_field_client_certificate_path">客户端证书路径</string>
     <string name="outbound_field_client_key">客户端密钥</string>
     <string name="outbound_field_client_key_path">客户端密钥路径</string>
+    <string name="outbound_field_client_metadata">客户端元数据</string>
     <string name="outbound_field_client_version">客户端版本</string>
     <string name="outbound_field_congestion_control">拥塞控制</string>
     <string name="outbound_field_connect_timeout">连接超时</string>

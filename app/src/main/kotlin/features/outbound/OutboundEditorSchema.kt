@@ -557,6 +557,7 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Client certificate path" -> R.string.outbound_field_client_certificate_path
     "Client key" -> R.string.outbound_field_client_key
     "Client key path" -> R.string.outbound_field_client_key_path
+    "Client metadata" -> R.string.outbound_field_client_metadata
     "Client version" -> R.string.outbound_field_client_version
     "Congestion control" -> R.string.outbound_field_congestion_control
     "Connect timeout" -> R.string.outbound_field_connect_timeout
