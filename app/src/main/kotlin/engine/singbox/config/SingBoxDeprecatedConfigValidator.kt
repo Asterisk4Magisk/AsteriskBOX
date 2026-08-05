@@ -11,7 +11,7 @@ import kotlinx.serialization.json.contentOrNull
 
 internal object SingBoxDeprecatedConfigValidator {
     fun validate(root: JsonObject) {
-        rejectField(root, "experimental", "")
+        validateExperimental(root["experimental"] as? JsonObject)
         rejectField(root, "geoip", "")
         rejectField(root, "geosite", "")
 
@@ -21,6 +21,21 @@ internal object SingBoxDeprecatedConfigValidator {
         validateRoute(root["route"] as? JsonObject)
         validateRuleSets(root["route"] as? JsonObject)
         validateEveryObject(root, "")
+    }
+
+    private fun validateExperimental(experimental: JsonObject?) {
+        if (experimental == null) return
+        experimental.forEach { (name, _) ->
+            if (name != "cache_file") {
+                deprecated("/experimental/${jsonPointerToken(name)}")
+            }
+        }
+        val cacheFile = experimental["cache_file"] as? JsonObject ?: return
+        cacheFile.forEach { (name, _) ->
+            if (name !in AllowedCacheFileFields) {
+                deprecated("/experimental/cache_file/${jsonPointerToken(name)}")
+            }
+        }
     }
 
     private fun validateDns(dns: JsonObject?) {
@@ -157,6 +172,16 @@ internal object SingBoxDeprecatedConfigValidator {
         )
     }
 }
+
+private val AllowedCacheFileFields = setOf(
+    "enabled",
+    "path",
+    "cache_id",
+    "store_fakeip",
+    "store_rdrc",
+    "rdrc_timeout",
+    "store_dns",
+)
 
 private val DeprecatedInboundFields = setOf(
     "sniff",
