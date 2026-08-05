@@ -56,6 +56,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import app.AppState
 import app.DefaultSingBoxUrlTestIdleTimeout
@@ -718,7 +719,16 @@ internal fun SelectorEditorScaffold(
             SingBoxSelectorTypeUrlTest,
         ),
     )
+    val editorSections = selectorEditorSections(type)
+    val connectionOptions = editorSections
+        .filterIsInstance<SelectorEditorSection.ConnectionOptions>()
+        .single()
+    val memberHeader = editorSections
+        .filterIsInstance<SelectorEditorSection.MemberHeader>()
+        .single()
+    val defaultOptionTags = selectorDefaultOptionTags(members)
     val typeEffectsMotion = AsteriskMotion.fastEffects<Float>()
+    val typeSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
 
     fun toggleMember(target: String) {
         members = if (target in members) {
@@ -784,21 +794,193 @@ internal fun SelectorEditorScaffold(
                     },
                 )
             }
-            item(key = "interrupt") {
-                SettingsSwitchRow(
-                    title = stringResource(R.string.selector_editor_interrupt),
-                    summary = stringResource(R.string.selector_editor_interrupt_summary),
-                    icon = Icons.Rounded.Sync,
-                    checked = interrupt,
-                    onCheckedChange = { interrupt = it },
-                )
+            item(key = "connection-options") {
+                Column {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.selector_editor_interrupt),
+                        summary = stringResource(R.string.selector_editor_interrupt_summary),
+                        icon = Icons.Rounded.Sync,
+                        checked = interrupt,
+                        onCheckedChange = { interrupt = it },
+                    )
+                    AnimatedContent(
+                        targetState = connectionOptions.showUrlTestSettings,
+                        transitionSpec = AsteriskMotion.fadeThrough(
+                            effectsSpec = typeEffectsMotion,
+                            sizeSpec = typeSizeMotion,
+                        ),
+                        label = "selector-urltest-fields",
+                    ) { showUrlTestSettings ->
+                        if (showUrlTestSettings) {
+                            Column(
+                                modifier = Modifier.padding(top = 14.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Text(
+                                    stringResource(R.string.selector_editor_urltest),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                OutlinedTextField(
+                                    value = url,
+                                    onValueChange = { url = it },
+                                    label = {
+                                        Text(stringResource(R.string.selector_editor_urltest_url))
+                                    },
+                                    isError = urlInvalid,
+                                    supportingText = if (urlInvalid) {
+                                        {
+                                            Text(
+                                                stringResource(
+                                                    R.string.selector_editor_urltest_url_invalid,
+                                                ),
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Uri,
+                                    ),
+                                    singleLine = true,
+                                    shape = AsteriskShapeTokens.InnerContainer,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                OutlinedTextField(
+                                    value = interval,
+                                    onValueChange = { interval = it },
+                                    label = {
+                                        Text(
+                                            stringResource(
+                                                R.string.selector_editor_urltest_interval,
+                                            ),
+                                        )
+                                    },
+                                    isError = intervalInvalid,
+                                    supportingText = if (intervalInvalid) {
+                                        {
+                                            Text(
+                                                stringResource(
+                                                    R.string.selector_editor_urltest_duration_invalid,
+                                                ),
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                    singleLine = true,
+                                    shape = AsteriskShapeTokens.InnerContainer,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                OutlinedTextField(
+                                    value = tolerance,
+                                    onValueChange = { value ->
+                                        tolerance = value.filter(Char::isDigit)
+                                    },
+                                    label = {
+                                        Text(
+                                            stringResource(
+                                                R.string.selector_editor_urltest_tolerance,
+                                            ),
+                                        )
+                                    },
+                                    isError = toleranceInvalid,
+                                    supportingText = if (toleranceInvalid) {
+                                        {
+                                            Text(
+                                                stringResource(
+                                                    R.string.selector_editor_urltest_tolerance_invalid,
+                                                ),
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Number,
+                                    ),
+                                    singleLine = true,
+                                    shape = AsteriskShapeTokens.InnerContainer,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                OutlinedTextField(
+                                    value = idleTimeout,
+                                    onValueChange = { idleTimeout = it },
+                                    label = {
+                                        Text(
+                                            stringResource(
+                                                R.string.selector_editor_urltest_idle_timeout,
+                                            ),
+                                        )
+                                    },
+                                    isError = idleTimeoutInvalid || intervalExceedsIdleTimeout,
+                                    supportingText = if (idleTimeoutInvalid) {
+                                        {
+                                            Text(
+                                                stringResource(
+                                                    R.string.selector_editor_urltest_duration_invalid,
+                                                ),
+                                            )
+                                        }
+                                    } else if (intervalExceedsIdleTimeout) {
+                                        {
+                                            Text(
+                                                stringResource(
+                                                    R.string.selector_editor_urltest_interval_exceeds_idle,
+                                                ),
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                    singleLine = true,
+                                    shape = AsteriskShapeTokens.InnerContainer,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier)
+                        }
+                    }
+                }
             }
-            item(key = "members-title") {
-                Text(
-                    stringResource(R.string.selector_editor_members),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+            item(key = "members-header") {
+                Column {
+                    AnimatedVisibility(
+                        visible = memberHeader.showDefaultOutbound,
+                        enter = AsteriskMotion.contentEnter(),
+                        exit = AsteriskMotion.contentExit(),
+                    ) {
+                        SettingsDropdownRow(
+                            title = stringResource(R.string.selector_editor_default),
+                            icon = Icons.AutoMirrored.Rounded.AltRoute,
+                            items = defaultOptionTags.map { member ->
+                                member?.let { tag ->
+                                    targets
+                                        .firstOrNull { target -> target.tag == tag }
+                                        ?.displayLabel()
+                                } ?: stringResource(R.string.selector_target_unavailable)
+                            },
+                            selectedIndex = if (members.isEmpty()) {
+                                0
+                            } else {
+                                selectorDefaultMemberIndex(members, default)
+                            },
+                            onSelectedIndexChange = { index ->
+                                defaultOptionTags.getOrNull(index)?.let { member ->
+                                    default = member
+                                }
+                            },
+                            modifier = Modifier.padding(bottom = 14.dp),
+                            enabled = members.isNotEmpty(),
+                        )
+                    }
+                    Text(
+                        stringResource(R.string.selector_editor_members),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
             item(key = "target-search") {
                 OutlinedTextField(
@@ -830,148 +1012,6 @@ internal fun SelectorEditorScaffold(
                     selected = target.tag in members,
                     onClick = { toggleMember(target.tag) },
                 )
-            }
-            item(key = "type-fields") {
-                AnimatedContent(
-                    targetState = type,
-                    transitionSpec = AsteriskMotion.fadeThrough(typeEffectsMotion),
-                    label = "selector-type-fields",
-                ) { selectedType ->
-                    if (selectedType == SingBoxSelectorTypeUrlTest) {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                stringResource(R.string.selector_editor_urltest),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            OutlinedTextField(
-                                value = url,
-                                onValueChange = { url = it },
-                                label = { Text(stringResource(R.string.selector_editor_urltest_url)) },
-                                isError = urlInvalid,
-                                supportingText = if (urlInvalid) {
-                                    {
-                                        Text(
-                                            stringResource(
-                                                R.string.selector_editor_urltest_url_invalid,
-                                            ),
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Uri,
-                                ),
-                                singleLine = true,
-                                shape = AsteriskShapeTokens.InnerContainer,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            OutlinedTextField(
-                                value = interval,
-                                onValueChange = { interval = it },
-                                label = {
-                                    Text(stringResource(R.string.selector_editor_urltest_interval))
-                                },
-                                isError = intervalInvalid,
-                                supportingText = if (intervalInvalid) {
-                                    {
-                                        Text(
-                                            stringResource(
-                                                R.string.selector_editor_urltest_duration_invalid,
-                                            ),
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                                singleLine = true,
-                                shape = AsteriskShapeTokens.InnerContainer,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            OutlinedTextField(
-                                value = tolerance,
-                                onValueChange = { value ->
-                                    tolerance = value.filter(Char::isDigit)
-                                },
-                                label = {
-                                    Text(stringResource(R.string.selector_editor_urltest_tolerance))
-                                },
-                                isError = toleranceInvalid,
-                                supportingText = if (toleranceInvalid) {
-                                    {
-                                        Text(
-                                            stringResource(
-                                                R.string.selector_editor_urltest_tolerance_invalid,
-                                            ),
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number,
-                                ),
-                                singleLine = true,
-                                shape = AsteriskShapeTokens.InnerContainer,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            OutlinedTextField(
-                                value = idleTimeout,
-                                onValueChange = { idleTimeout = it },
-                                label = {
-                                    Text(
-                                        stringResource(
-                                            R.string.selector_editor_urltest_idle_timeout,
-                                        ),
-                                    )
-                                },
-                                isError = idleTimeoutInvalid || intervalExceedsIdleTimeout,
-                                supportingText = if (idleTimeoutInvalid) {
-                                    {
-                                        Text(
-                                            stringResource(
-                                                R.string.selector_editor_urltest_duration_invalid,
-                                            ),
-                                        )
-                                    }
-                                } else if (intervalExceedsIdleTimeout) {
-                                    {
-                                        Text(
-                                            stringResource(
-                                                R.string.selector_editor_urltest_interval_exceeds_idle,
-                                            ),
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                                singleLine = true,
-                                shape = AsteriskShapeTokens.InnerContainer,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    } else {
-                        AnimatedVisibility(
-                            visible = members.isNotEmpty(),
-                            enter = AsteriskMotion.contentEnter(),
-                            exit = AsteriskMotion.contentExit(),
-                        ) {
-                            SettingsDropdownRow(
-                                title = stringResource(R.string.selector_editor_default),
-                                icon = Icons.AutoMirrored.Rounded.AltRoute,
-                                items = members.map { member ->
-                                    targets
-                                        .firstOrNull { target -> target.tag == member }
-                                        ?.displayLabel()
-                                        ?: stringResource(R.string.selector_target_unavailable)
-                                },
-                                selectedIndex = selectorDefaultMemberIndex(members, default),
-                                onSelectedIndexChange = { index -> default = members[index] },
-                            )
-                        }
-                    }
-                }
             }
         }
     }
