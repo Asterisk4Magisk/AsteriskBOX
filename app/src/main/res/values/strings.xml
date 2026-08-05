@@ -450,6 +450,10 @@
     <string name="settings_dns_disable_cache">Disable DNS cache</string>
     <string name="settings_dns_disable_expire">Disable cache expiration</string>
     <string name="settings_dns_timeout">Default timeout</string>
+    <string name="settings_dns_store_fake_ip">Persist FakeIP mappings</string>
+    <string name="settings_dns_store_fake_ip_summary">Keep the same FakeIP address for each domain after restart</string>
+    <string name="settings_dns_store_dns">Persist DNS cache</string>
+    <string name="settings_dns_store_dns_summary">Save DNS cache to disk so it survives restarts</string>
     <string name="settings_dns_duration_invalid">Use a duration such as 10s or 500ms</string>
     <string name="settings_dns_servers_empty">No DNS servers added</string>
     <string name="settings_dns_server_required">At least one valid DNS server is required</string>

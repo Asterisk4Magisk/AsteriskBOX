@@ -19,6 +19,8 @@ internal fun AppState.withDnsSettings(draft: DnsSettingsDraft): AppState {
         dnsDisableCache = draft.dnsDisableCache,
         dnsDisableExpire = draft.dnsDisableExpire,
         dnsTimeout = draft.dnsTimeout,
+        storeFakeIp = draft.storeFakeIp,
+        storeDns = draft.storeDns,
         dnsServers = draft.dnsServers,
         nextDnsServerId = draft.nextDnsServerId,
         dnsRules = dnsRules

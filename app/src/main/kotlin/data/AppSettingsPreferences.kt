@@ -207,6 +207,8 @@ internal class AppSettingsPreferences(
             ),
             dnsTimeout = preferences.getString(KeyDnsTimeout, defaults.dnsTimeout)
                 ?: defaults.dnsTimeout,
+            storeFakeIp = preferences.getBoolean(KeyStoreFakeIp, defaults.storeFakeIp),
+            storeDns = preferences.getBoolean(KeyStoreDns, defaults.storeDns),
             transparentProxyPort = preferences.getString(
                 KeyTransparentProxyPort,
                 defaults.transparentProxyPort,
@@ -329,6 +331,8 @@ internal class AppSettingsPreferences(
             putBoolean(KeyDnsDisableCache, state.dnsDisableCache)
             putBoolean(KeyDnsDisableExpire, state.dnsDisableExpire)
             putString(KeyDnsTimeout, state.dnsTimeout)
+            putBoolean(KeyStoreFakeIp, state.storeFakeIp)
+            putBoolean(KeyStoreDns, state.storeDns)
             putString(KeyTransparentProxyPort, state.transparentProxyPort)
             putBoolean(KeyEnableRootBootScript, state.enableRootBootScript)
             putBoolean(KeyEnableRootEbpfRules, state.enableRootEbpfRules)
@@ -438,6 +442,8 @@ private const val KeyDnsOptimisticCache = "dns_optimistic_cache"
 private const val KeyDnsDisableCache = "dns_disable_cache"
 private const val KeyDnsDisableExpire = "dns_disable_expire"
 private const val KeyDnsTimeout = "dns_timeout"
+private const val KeyStoreFakeIp = "store_fake_ip"
+private const val KeyStoreDns = "store_dns"
 private const val KeyTransparentProxyPort = "transparent_proxy_port"
 private const val KeyEnableRootBootScript = "enable_root_boot_script"
 private const val KeyEnableRootEbpfRules = "enable_root_ebpf_rules"
