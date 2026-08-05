@@ -56,7 +56,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import app.AppState
 import app.DefaultSingBoxUrlTestIdleTimeout
@@ -727,8 +726,6 @@ internal fun SelectorEditorScaffold(
         .filterIsInstance<SelectorEditorSection.MemberHeader>()
         .single()
     val defaultOptionTags = selectorDefaultOptionTags(members)
-    val typeEffectsMotion = AsteriskMotion.fastEffects<Float>()
-    val typeSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
 
     fun toggleMember(target: String) {
         members = if (target in members) {
@@ -803,143 +800,136 @@ internal fun SelectorEditorScaffold(
                         checked = interrupt,
                         onCheckedChange = { interrupt = it },
                     )
-                    AnimatedContent(
-                        targetState = connectionOptions.showUrlTestSettings,
-                        transitionSpec = AsteriskMotion.fadeThrough(
-                            effectsSpec = typeEffectsMotion,
-                            sizeSpec = typeSizeMotion,
-                        ),
-                        label = "selector-urltest-fields",
-                    ) { showUrlTestSettings ->
-                        if (showUrlTestSettings) {
-                            Column(
-                                modifier = Modifier.padding(top = 14.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                Text(
-                                    stringResource(R.string.selector_editor_urltest),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                                OutlinedTextField(
-                                    value = url,
-                                    onValueChange = { url = it },
-                                    label = {
-                                        Text(stringResource(R.string.selector_editor_urltest_url))
-                                    },
-                                    isError = urlInvalid,
-                                    supportingText = if (urlInvalid) {
-                                        {
-                                            Text(
-                                                stringResource(
-                                                    R.string.selector_editor_urltest_url_invalid,
-                                                ),
-                                            )
-                                        }
-                                    } else {
-                                        null
-                                    },
-                                    keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Uri,
-                                    ),
-                                    singleLine = true,
-                                    shape = AsteriskShapeTokens.InnerContainer,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                OutlinedTextField(
-                                    value = interval,
-                                    onValueChange = { interval = it },
-                                    label = {
+                    AnimatedVisibility(
+                        visible = connectionOptions.showUrlTestSettings,
+                        enter = AsteriskMotion.contentEnter(),
+                        exit = AsteriskMotion.contentExit(),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(top = 14.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text(
+                                stringResource(R.string.selector_editor_urltest),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            OutlinedTextField(
+                                value = url,
+                                onValueChange = { url = it },
+                                label = {
+                                    Text(stringResource(R.string.selector_editor_urltest_url))
+                                },
+                                isError = urlInvalid,
+                                supportingText = if (urlInvalid) {
+                                    {
                                         Text(
                                             stringResource(
-                                                R.string.selector_editor_urltest_interval,
+                                                R.string.selector_editor_urltest_url_invalid,
                                             ),
                                         )
-                                    },
-                                    isError = intervalInvalid,
-                                    supportingText = if (intervalInvalid) {
-                                        {
-                                            Text(
-                                                stringResource(
-                                                    R.string.selector_editor_urltest_duration_invalid,
-                                                ),
-                                            )
-                                        }
-                                    } else {
-                                        null
-                                    },
-                                    singleLine = true,
-                                    shape = AsteriskShapeTokens.InnerContainer,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                OutlinedTextField(
-                                    value = tolerance,
-                                    onValueChange = { value ->
-                                        tolerance = value.filter(Char::isDigit)
-                                    },
-                                    label = {
+                                    }
+                                } else {
+                                    null
+                                },
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Uri,
+                                ),
+                                singleLine = true,
+                                shape = AsteriskShapeTokens.InnerContainer,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            OutlinedTextField(
+                                value = interval,
+                                onValueChange = { interval = it },
+                                label = {
+                                    Text(
+                                        stringResource(
+                                            R.string.selector_editor_urltest_interval,
+                                        ),
+                                    )
+                                },
+                                isError = intervalInvalid,
+                                supportingText = if (intervalInvalid) {
+                                    {
                                         Text(
                                             stringResource(
-                                                R.string.selector_editor_urltest_tolerance,
+                                                R.string.selector_editor_urltest_duration_invalid,
                                             ),
                                         )
-                                    },
-                                    isError = toleranceInvalid,
-                                    supportingText = if (toleranceInvalid) {
-                                        {
-                                            Text(
-                                                stringResource(
-                                                    R.string.selector_editor_urltest_tolerance_invalid,
-                                                ),
-                                            )
-                                        }
-                                    } else {
-                                        null
-                                    },
-                                    keyboardOptions = KeyboardOptions(
-                                        keyboardType = KeyboardType.Number,
-                                    ),
-                                    singleLine = true,
-                                    shape = AsteriskShapeTokens.InnerContainer,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                                OutlinedTextField(
-                                    value = idleTimeout,
-                                    onValueChange = { idleTimeout = it },
-                                    label = {
+                                    }
+                                } else {
+                                    null
+                                },
+                                singleLine = true,
+                                shape = AsteriskShapeTokens.InnerContainer,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            OutlinedTextField(
+                                value = tolerance,
+                                onValueChange = { value ->
+                                    tolerance = value.filter(Char::isDigit)
+                                },
+                                label = {
+                                    Text(
+                                        stringResource(
+                                            R.string.selector_editor_urltest_tolerance,
+                                        ),
+                                    )
+                                },
+                                isError = toleranceInvalid,
+                                supportingText = if (toleranceInvalid) {
+                                    {
                                         Text(
                                             stringResource(
-                                                R.string.selector_editor_urltest_idle_timeout,
+                                                R.string.selector_editor_urltest_tolerance_invalid,
                                             ),
                                         )
-                                    },
-                                    isError = idleTimeoutInvalid || intervalExceedsIdleTimeout,
-                                    supportingText = if (idleTimeoutInvalid) {
-                                        {
-                                            Text(
-                                                stringResource(
-                                                    R.string.selector_editor_urltest_duration_invalid,
-                                                ),
-                                            )
-                                        }
-                                    } else if (intervalExceedsIdleTimeout) {
-                                        {
-                                            Text(
-                                                stringResource(
-                                                    R.string.selector_editor_urltest_interval_exceeds_idle,
-                                                ),
-                                            )
-                                        }
-                                    } else {
-                                        null
-                                    },
-                                    singleLine = true,
-                                    shape = AsteriskShapeTokens.InnerContainer,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
-                        } else {
-                            Spacer(modifier = Modifier)
+                                    }
+                                } else {
+                                    null
+                                },
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                ),
+                                singleLine = true,
+                                shape = AsteriskShapeTokens.InnerContainer,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            OutlinedTextField(
+                                value = idleTimeout,
+                                onValueChange = { idleTimeout = it },
+                                label = {
+                                    Text(
+                                        stringResource(
+                                            R.string.selector_editor_urltest_idle_timeout,
+                                        ),
+                                    )
+                                },
+                                isError = idleTimeoutInvalid || intervalExceedsIdleTimeout,
+                                supportingText = if (idleTimeoutInvalid) {
+                                    {
+                                        Text(
+                                            stringResource(
+                                                R.string.selector_editor_urltest_duration_invalid,
+                                            ),
+                                        )
+                                    }
+                                } else if (intervalExceedsIdleTimeout) {
+                                    {
+                                        Text(
+                                            stringResource(
+                                                R.string.selector_editor_urltest_interval_exceeds_idle,
+                                            ),
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
+                                singleLine = true,
+                                shape = AsteriskShapeTokens.InnerContainer,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
                     }
                 }
