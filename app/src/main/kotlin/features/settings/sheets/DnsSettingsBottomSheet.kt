@@ -319,6 +319,27 @@ internal fun DnsSettingsBottomSheet(
                         label = stringResource(R.string.settings_dns_timeout),
                         errorText = timeoutError,
                     )
+                    val hasFakeIpServer = draft.dnsServers.any { it.type == "fakeip" }
+                    AnimatedVisibility(
+                        visible = hasFakeIpServer,
+                        enter = AsteriskMotion.contentEnter(),
+                        exit = AsteriskMotion.contentExit(),
+                    ) {
+                        SwitchPreference(
+                            title = stringResource(R.string.settings_dns_store_fake_ip),
+                            icon = Icons.Rounded.Storage,
+                            summary = stringResource(R.string.settings_dns_store_fake_ip_summary),
+                            checked = draft.storeFakeIp,
+                            onCheckedChange = { onDraftChange(draft.copy(storeFakeIp = it)) },
+                        )
+                    }
+                    SwitchPreference(
+                        title = stringResource(R.string.settings_dns_store_dns),
+                        icon = Icons.Rounded.History,
+                        summary = stringResource(R.string.settings_dns_store_dns_summary),
+                        checked = draft.storeDns,
+                        onCheckedChange = { onDraftChange(draft.copy(storeDns = it)) },
+                    )
                 }
 
                 DnsSheetSection(title = stringResource(R.string.settings_dns_section_servers)) {

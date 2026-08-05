@@ -106,6 +106,8 @@ data class AppState(
     val dnsDisableCache: Boolean = false,
     val dnsDisableExpire: Boolean = false,
     val dnsTimeout: String = DefaultSingBoxDnsTimeout,
+    val storeFakeIp: Boolean = false,
+    val storeDns: Boolean = false,
     val dnsServers: List<SingBoxDnsServerState> = DefaultSingBoxDnsServers,
     val nextDnsServerId: Int =
         (DefaultSingBoxDnsServers.maxOfOrNull(SingBoxDnsServerState::id) ?: 0) + 1,

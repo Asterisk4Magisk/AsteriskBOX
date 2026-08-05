@@ -445,6 +445,10 @@
     <string name="settings_dns_disable_cache">禁用 DNS 缓存</string>
     <string name="settings_dns_disable_expire">禁用 DNS 缓存过期</string>
     <string name="settings_dns_timeout">默认超时时间</string>
+    <string name="settings_dns_store_fake_ip">持久化 FakeIP 映射</string>
+    <string name="settings_dns_store_fake_ip_summary">重启后域名保持相同的 FakeIP 地址</string>
+    <string name="settings_dns_store_dns">持久化 DNS 缓存</string>
+    <string name="settings_dns_store_dns_summary">将 DNS 缓存保存到磁盘，重启后仍然有效</string>
     <string name="settings_dns_duration_invalid">请输入类似 10s 或 500ms 的时间</string>
     <string name="settings_dns_servers_empty">还没有添加 DNS 服务器</string>
     <string name="settings_dns_server_required">至少需要一个有效的 DNS 服务器</string>

@@ -59,6 +59,8 @@ internal data class DnsSettingsDraft(
     val dnsDisableCache: Boolean = false,
     val dnsDisableExpire: Boolean = false,
     val dnsTimeout: String = "",
+    val storeFakeIp: Boolean = false,
+    val storeDns: Boolean = false,
     val dnsServers: List<SingBoxDnsServerState> = emptyList(),
     val nextDnsServerId: Int = 1,
     val dnsServerTagReplacements: Map<String, String> = emptyMap(),
@@ -75,6 +77,8 @@ internal fun AppState.toDnsSettingsDraft(): DnsSettingsDraft {
         dnsDisableCache = dnsDisableCache,
         dnsDisableExpire = dnsDisableExpire,
         dnsTimeout = dnsTimeout,
+        storeFakeIp = storeFakeIp,
+        storeDns = storeDns,
         dnsServers = dnsServers,
         nextDnsServerId = nextDnsServerId,
     )

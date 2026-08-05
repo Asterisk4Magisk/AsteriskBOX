@@ -167,6 +167,10 @@ internal object SingBoxConfigCompiler {
         )
 
         SingBoxDeprecatedConfigValidator.validate(runtime)
+        runtime = runtime.updated(
+            "experimental",
+            compileExperimental(appState),
+        )
         return runtime
     }
 }
@@ -996,5 +1000,16 @@ private fun JsonArray?.orEmptyObjects(): List<JsonObject> =
 
 private fun JsonObject.hasAppTag(): Boolean =
     ((this["tag"] as? JsonPrimitive)?.contentOrNull ?: "").startsWith(APP_TAG_PREFIX)
+
+private fun compileExperimental(appState: AppState): JsonObject? {
+    if (!appState.storeFakeIp && !appState.storeDns) return null
+    return buildJsonObject {
+        putJsonObject("cache_file") {
+            put("enabled", true)
+            if (appState.storeFakeIp) put("store_fakeip", true)
+            if (appState.storeDns) put("store_dns", true)
+        }
+    }
+}
 
 private val RouteRejectMethods = setOf("default", "drop", "reply")
