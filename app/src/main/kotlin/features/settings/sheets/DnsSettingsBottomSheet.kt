@@ -526,7 +526,7 @@ private fun DnsServerEditorSheet(
         null
     }
     val existingServerTags = existingServers
-        .filter { it.type != "group" }
+        .filter { it.type != "group" && it.type != "fakeip" }
         .map { it.tag.trim() }
         .filter(String::isNotEmpty)
     val groupServerError = if (server.type == "group") {
@@ -646,7 +646,7 @@ private fun DnsServerEditorSheet(
                     }
                     DnsServerFieldKind.Group -> {
                     val groupServerChoices = existingServers
-                        .filter { it.type != "group" }
+                        .filter { it.type != "group" && it.type != "fakeip" }
                         .map { it.tag.trim() to it.remarks.ifBlank { dnsServerTypeLabel(it.type) } }
                     ReferenceSelectionCard(
                         title = stringResource(R.string.settings_dns_group_servers),
