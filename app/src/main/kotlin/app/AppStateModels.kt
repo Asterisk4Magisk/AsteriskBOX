@@ -246,6 +246,7 @@ data class SingBoxDnsServerState(
     val detour: String = "",
     val tlsServerName: String = "",
     val tlsInsecure: Boolean = false,
+    val servers: List<String> = emptyList(),
 ) {
     val tag: String
         get() = managedDnsServerTag(id)
@@ -289,6 +290,7 @@ data class SingBoxDnsRuleState(
 val SingBoxDnsServerTypes = listOf(
     "local",
     "hosts",
+    "group",
     "udp",
     "tcp",
     "tls",

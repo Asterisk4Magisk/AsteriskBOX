@@ -51,6 +51,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 internal const val APP_TAG_PREFIX = "__asteriskbox_"
 internal const val APP_GLOBAL_SELECTOR = "__asteriskbox_global__"

@@ -525,6 +525,20 @@ private fun DnsServerEditorSheet(
     } else {
         null
     }
+    val existingServerTags = existingServers
+        .filter { it.type != "group" }
+        .map { it.tag.trim() }
+        .filter(String::isNotEmpty)
+    val groupServerError = if (server.type == "group") {
+        val validServers = server.servers.filter { it in existingServerTags }
+        if (validServers.isEmpty()) {
+            stringResource(R.string.settings_dns_group_servers_required)
+        } else {
+            null
+        }
+    } else {
+        null
+    }
     val portError = server.serverPort.trim()
         .takeIf(String::isNotEmpty)
         ?.let { value ->
@@ -537,6 +551,7 @@ private fun DnsServerEditorSheet(
         endpointError,
         serviceError,
         fakeIpError,
+        groupServerError,
         portError,
     ).all { it == null }
     val fieldSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
@@ -627,6 +642,26 @@ private fun DnsServerEditorSheet(
                         validateInput = { value ->
                             dnsPredefinedHostError(value, hostsInvalidMessage)
                         },
+                    )
+                    }
+                    DnsServerFieldKind.Group -> {
+                    val groupServerChoices = existingServers
+                        .filter { it.type != "group" }
+                        .map { it.tag.trim() to it.remarks.ifBlank { dnsServerTypeLabel(it.type) } }
+                    ReferenceSelectionCard(
+                        title = stringResource(R.string.settings_dns_group_servers),
+                        emptyText = stringResource(R.string.settings_dns_group_servers_empty),
+                        choices = groupServerChoices,
+                        selected = server.servers.toSet(),
+                        onToggle = { tag ->
+                            val nextValues = if (tag in server.servers) {
+                                server.servers - tag
+                            } else {
+                                server.servers + tag
+                            }
+                            onEditorChange(server.copy(servers = nextValues))
+                        },
+                        modifier = Modifier.padding(horizontal = 16.dp),
                     )
                     }
                     DnsServerFieldKind.Network -> {
@@ -1680,6 +1715,9 @@ private fun dnsServerSummary(
                 stringResource(R.string.settings_dns_host_port, address, port)
             } ?: address
         }
+        "group" -> server.servers.takeIf(List<String>::isNotEmpty)
+            ?.joinToString(", ")
+            ?: stringResource(R.string.settings_dns_group_servers_empty)
         "fakeip" -> server.inet4Range.ifBlank { DefaultSingBoxDnsFakeIpRange }
         in EndpointDnsServerTypes ->
             visibleManagedReference(server.endpoint, endpointLabels, unavailableLabel)
@@ -1723,6 +1761,7 @@ internal fun dnsServerTypeLabel(type: String): String =
 private fun dnsServerTypeLabelResource(type: String): Int = when (type) {
     "local" -> R.string.settings_dns_server_type_local
     "hosts" -> R.string.settings_dns_server_type_hosts
+    "group" -> R.string.settings_dns_server_type_group
     "udp" -> R.string.settings_dns_server_type_udp
     "tcp" -> R.string.settings_dns_server_type_tcp
     "tls" -> R.string.settings_dns_server_type_tls

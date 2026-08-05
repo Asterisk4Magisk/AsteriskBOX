@@ -142,6 +142,7 @@ internal fun SingBoxDnsServerState.sanitized(): SingBoxDnsServerState =
         domainResolver = domainResolver.trim(),
         detour = detour.trim(),
         tlsServerName = tlsServerName.trim(),
+        servers = servers.toTrimmedNonEmptyDistinctList(),
     )
 
 internal fun SingBoxDnsRuleState.sanitized(): SingBoxDnsRuleState =
@@ -202,6 +203,9 @@ private fun SingBoxDnsServerState.toJson(): JsonObject = buildJsonObject {
                     }
                 }
             }
+        }
+        "group" -> {
+            putStringArrayIfNotEmpty("servers", servers)
         }
         "udp", "tcp" -> putNetworkServerFields(this@toJson, includeTls = false, includePath = false)
         "tls", "quic" -> putNetworkServerFields(this@toJson, includeTls = true, includePath = false)
