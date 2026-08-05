@@ -894,6 +894,7 @@
     <string name="outbound_field_connection_reuse">连接复用</string>
     <string name="outbound_field_curve_preferences">椭圆曲线偏好</string>
     <string name="outbound_field_detour_outbound">出站代理</string>
+    <string name="outbound_field_disable_chrome_quic_fingerprint_parroting">禁用 Chrome QUIC 指纹伪装</string>
     <string name="outbound_field_disable_tcp_keep_alive">禁用 TCP 保活</string>
     <string name="outbound_field_domain_resolver">域名解析器</string>
     <string name="outbound_field_download_bandwidth_mbps">下载带宽（Mbps）</string>

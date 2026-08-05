@@ -43,6 +43,14 @@ internal fun hysteria2OutboundFields() = listOf(
     outboundSelect("network", "Network", listOf("", "tcp", "udp")),
 )
 
+internal fun hysteria2QuicFields() = listOf(
+    outboundField(
+        "disable_chrome_parrot",
+        "Disable Chrome QUIC fingerprint parroting",
+        OutboundFieldKind.BOOLEAN,
+    ),
+)
+
 internal fun LazyListScope.hysteriaOutboundEditor(state: OutboundEditorContentState) {
     outboundEditorSections(state)
 }

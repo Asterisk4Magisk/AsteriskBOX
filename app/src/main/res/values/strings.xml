@@ -909,6 +909,7 @@
     <string name="outbound_field_connection_reuse">Connection reuse</string>
     <string name="outbound_field_curve_preferences">Curve preferences</string>
     <string name="outbound_field_detour_outbound">Outbound proxy</string>
+    <string name="outbound_field_disable_chrome_quic_fingerprint_parroting">Disable Chrome QUIC fingerprint parroting</string>
     <string name="outbound_field_disable_tcp_keep_alive">Disable TCP keep-alive</string>
     <string name="outbound_field_domain_resolver">Domain resolver</string>
     <string name="outbound_field_download_bandwidth_mbps">Download bandwidth (Mbps)</string>

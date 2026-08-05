@@ -160,6 +160,7 @@ internal object OutboundEditorRegistry {
             hysteria2OutboundFields(),
             tls = true,
             quic = true,
+            additionalQuicFields = hysteria2QuicFields(),
         )
         "anytls" -> schema(type, descriptor(type).title, anyTlsOutboundFields(), tls = true)
         "snell" -> schema(type, descriptor(type).title, snellOutboundFields())
@@ -176,6 +177,7 @@ internal object OutboundEditorRegistry {
         multiplex: Boolean = false,
         quic: Boolean = false,
         tlsFieldSpecs: List<OutboundFieldSpec>? = null,
+        additionalQuicFields: List<OutboundFieldSpec> = emptyList(),
     ): OutboundEditorSchema = OutboundEditorSchema(
         type = type,
         title = title,
@@ -192,7 +194,14 @@ internal object OutboundEditorRegistry {
             }
             if (transport) add(OutboundSectionSpec(OutboundEditorSection.TRANSPORT, transportFields()))
             if (multiplex) add(OutboundSectionSpec(OutboundEditorSection.MULTIPLEX, multiplexFields()))
-            if (quic) add(OutboundSectionSpec(OutboundEditorSection.QUIC, quicFields()))
+            if (quic) {
+                add(
+                    OutboundSectionSpec(
+                        OutboundEditorSection.QUIC,
+                        quicFields() + additionalQuicFields,
+                    ),
+                )
+            }
             add(OutboundSectionSpec(OutboundEditorSection.DIAL, dialFields()))
         },
     )
@@ -564,6 +573,8 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Connection reuse" -> R.string.outbound_field_connection_reuse
     "Curve preferences" -> R.string.outbound_field_curve_preferences
     "Detour outbound" -> R.string.outbound_field_detour_outbound
+    "Disable Chrome QUIC fingerprint parroting" ->
+        R.string.outbound_field_disable_chrome_quic_fingerprint_parroting
     "Disable TCP keep-alive" -> R.string.outbound_field_disable_tcp_keep_alive
     "Domain resolver" -> R.string.outbound_field_domain_resolver
     "Download bandwidth (Mbps)" -> R.string.outbound_field_download_bandwidth_mbps
