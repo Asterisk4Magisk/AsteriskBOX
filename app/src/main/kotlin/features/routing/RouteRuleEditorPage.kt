@@ -3,7 +3,6 @@
 
 package features.routing
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -170,10 +169,6 @@ internal fun RouteRuleEditorPage(
                 saving = false
             }
         }
-    }
-
-    BackHandler {
-        if (!saving) navigator.pop()
     }
 
     RouteRuleEditorScaffold(

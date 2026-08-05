@@ -3,7 +3,6 @@
 
 package features.dns
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -158,10 +157,6 @@ internal fun DnsRuleEditorPage(
                 saving = false
             }
         }
-    }
-
-    BackHandler {
-        if (!saving) navigator.pop()
     }
 
     DnsRuleEditorScaffold(
