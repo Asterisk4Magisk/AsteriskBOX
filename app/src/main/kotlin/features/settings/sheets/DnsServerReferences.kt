@@ -11,7 +11,9 @@ internal fun dnsDomainResolverChoices(
     currentIndex: Int?,
 ): List<ManagedReferenceChoice> =
     servers.withIndex()
-        .filter { (index, _) -> index != currentIndex }
+        .filter { (index, server) ->
+            index != currentIndex && server.type != "group"
+        }
         .map { (_, server) ->
             ManagedReferenceChoice(
                 tag = server.tag,
@@ -25,13 +27,21 @@ internal fun removeDnsServerAndReferences(
     index: Int,
 ): List<SingBoxDnsServerState> {
     val deletedTag = servers.getOrNull(index)?.tag?.trim() ?: return servers
-    return servers
+    val remaining = servers
         .filterIndexed { itemIndex, _ -> itemIndex != index }
         .map { server ->
-            if (server.domainResolver.trim() == deletedTag) {
-                server.copy(domainResolver = "")
-            } else {
-                server
-            }
+            server.copy(
+                domainResolver = server.domainResolver
+                    .takeUnless { it.trim() == deletedTag }
+                    .orEmpty(),
+                servers = if (server.type == "group") {
+                    server.servers.filter { member -> member != deletedTag }
+                } else {
+                    server.servers
+                },
+            )
         }
+    return remaining.filterNot { server ->
+        server.type == "group" && server.servers.isEmpty()
+    }
 }

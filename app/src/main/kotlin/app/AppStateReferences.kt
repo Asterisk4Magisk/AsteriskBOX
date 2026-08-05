@@ -451,6 +451,17 @@ internal fun AppState.withPrunedDnsServerReferences(): AppState {
         routeDefaultDomainResolver = routeDefaultDomainResolver
             .takeIf { tag -> tag.isBlank() || tag in availableTags }
             .orEmpty(),
+        dnsServers = dnsServers
+            .map { server ->
+                if (server.type == "group") {
+                    val pruned = server.servers
+                        .filter { member -> member in availableTags && member != server.tag }
+                    if (pruned == server.servers) server else server.copy(servers = pruned)
+                } else {
+                    server
+                }
+            }
+            .filterNot { server -> server.type == "group" && server.servers.isEmpty() },
         outbounds = outbounds.clearUnavailableManagedReferences(
             field = "domain_resolver",
             availableTags = availableTags,
@@ -485,16 +496,24 @@ internal fun AppState.withRemovedManagedDnsServers(
         if (dependentTags.isEmpty()) break
         unavailableTags += dependentTags
     }
-    val remainingServers = dnsServers.filterNot { server -> server.tag in unavailableTags }
+    val remainingServers = dnsServers
+        .filterNot { server -> server.tag in unavailableTags }
+        .map { server ->
+            server.copy(
+                domainResolver = server.domainResolver
+                    .takeUnless(unavailableTags::contains)
+                    .orEmpty(),
+                servers = if (server.type == "group") {
+                    server.servers.filterNot(unavailableTags::contains)
+                } else {
+                    server.servers
+                },
+            )
+        }
+        .filterNot { server -> server.type == "group" && server.servers.isEmpty() }
     if (remainingServers.size == dnsServers.size) return this
     return copy(
-        dnsServers = remainingServers.map { server ->
-            if (server.domainResolver in unavailableTags) {
-                server.copy(domainResolver = "")
-            } else {
-                server
-            }
-        },
+        dnsServers = remainingServers,
         dnsFinal = if (dnsFinal in unavailableTags) {
             remainingServers.firstOrNull()?.tag.orEmpty()
         } else {

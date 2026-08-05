@@ -7,6 +7,7 @@ internal enum class DnsServerFieldKind {
     None,
     Local,
     Hosts,
+    Group,
     Network,
     Dhcp,
     Mdns,
@@ -25,6 +26,7 @@ internal fun dnsServerFieldLayout(serverType: String): DnsServerFieldLayout =
     when (serverType) {
         "local" -> DnsServerFieldLayout(DnsServerFieldKind.Local)
         "hosts" -> DnsServerFieldLayout(DnsServerFieldKind.Hosts)
+        "group" -> DnsServerFieldLayout(DnsServerFieldKind.Group)
         "udp", "tcp" -> DnsServerFieldLayout(DnsServerFieldKind.Network)
         "tls", "quic" -> DnsServerFieldLayout(
             kind = DnsServerFieldKind.Network,

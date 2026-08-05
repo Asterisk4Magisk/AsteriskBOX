@@ -1167,6 +1167,10 @@
     <string name="proxy_app_list_shared_uid_value">SUID: %1$s</string>
     <string name="settings_dns_server_type_local">Local resolver</string>
     <string name="settings_dns_server_type_hosts">Hosts</string>
+    <string name="settings_dns_server_type_group">Group</string>
+    <string name="settings_dns_group_servers">Member servers</string>
+    <string name="settings_dns_group_servers_empty">No member servers selected</string>
+    <string name="settings_dns_group_servers_required">Select at least one server</string>
     <string name="settings_dns_server_type_udp">UDP</string>
     <string name="settings_dns_server_type_tcp">TCP</string>
     <string name="settings_dns_server_type_tls">TLS</string>

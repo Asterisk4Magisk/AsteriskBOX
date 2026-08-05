@@ -1148,6 +1148,10 @@
     <string name="proxy_app_list_shared_uid_value">SUID：%1$s</string>
     <string name="settings_dns_server_type_local">本地解析器</string>
     <string name="settings_dns_server_type_hosts">Hosts</string>
+    <string name="settings_dns_server_type_group">分组</string>
+    <string name="settings_dns_group_servers">成员服务器</string>
+    <string name="settings_dns_group_servers_empty">尚未选择成员服务器</string>
+    <string name="settings_dns_group_servers_required">请至少选择一个服务器</string>
     <string name="settings_dns_server_type_udp">UDP</string>
     <string name="settings_dns_server_type_tcp">TCP</string>
     <string name="settings_dns_server_type_tls">TLS</string>
