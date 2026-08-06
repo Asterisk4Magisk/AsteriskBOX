@@ -3,9 +3,13 @@
 
 package engine.singbox.runtime
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
@@ -23,15 +27,48 @@ internal data class SingBoxDelayCommandSubmissions(
     val failedGroupNames: Set<String>,
 )
 
-internal class SingBoxDelayTestRunGate {
-    private val mutex = Mutex()
+internal enum class SingBoxDelayAwaitCompletion {
+    Resolved,
+    SoftTimedOut,
+    HardTimedOut,
+}
 
-    suspend fun <T> runExclusive(block: suspend () -> T): T {
-        check(mutex.tryLock()) { "sing-box delay test is already running" }
-        return try {
-            block()
-        } finally {
-            mutex.unlock()
+internal data class SingBoxDelayAwaitResult(
+    val proxies: SingBoxProxiesState,
+    val completion: SingBoxDelayAwaitCompletion,
+    val freshDelays: Map<String, Int>,
+)
+
+internal class SingBoxDelayTestRunGate {
+    private val lock = Any()
+    private var owner: Any? = null
+
+    fun acquire(): SingBoxDelayTestRunLease = synchronized(lock) {
+        check(owner == null) { "sing-box delay test is already running" }
+        val token = Any()
+        owner = token
+        SingBoxDelayTestRunLease(this, token)
+    }
+
+    internal fun release(token: Any) {
+        synchronized(lock) {
+            if (owner === token) owner = null
+        }
+    }
+}
+
+internal class SingBoxDelayTestRunLease internal constructor(
+    private val gate: SingBoxDelayTestRunGate,
+    private val token: Any,
+) {
+    private val lock = Any()
+    private var released = false
+
+    fun release() {
+        synchronized(lock) {
+            if (released) return
+            released = true
+            gate.release(token)
         }
     }
 }
@@ -149,52 +186,73 @@ internal fun SingBoxDelayTestPlan.freshDelays(
         ?.let { delay -> name to delay }
 }.toMap()
 
-internal fun SingBoxDelayTestPlan.isResolved(
-    proxies: SingBoxProxiesState,
-    baselineTimes: Map<String, Long>,
-    knownFailures: Set<String>,
-): Boolean {
-    val resolvedTargets = freshDelays(proxies, baselineTimes).keys + knownFailures
-    return resolvedTargets.containsAll(targetNames)
-}
-
+@OptIn(ExperimentalCoroutinesApi::class)
 internal suspend fun awaitSingBoxDelayTestSnapshot(
     runtimeStates: Flow<SingBoxRuntimeState>,
     plan: SingBoxDelayTestPlan,
     baselineTimes: Map<String, Long>,
     knownFailures: Set<String>,
-    timeoutMillis: Long,
-): SingBoxProxiesState? = withTimeoutOrNull(timeoutMillis.milliseconds) {
-    val runtime = runtimeStates.first { state ->
-        !state.running || plan.isResolved(
-            proxies = state.proxies,
-            baselineTimes = baselineTimes,
-            knownFailures = knownFailures,
-        )
+    idleTimeoutMillis: Long,
+    hardTimeoutMillis: Long,
+): SingBoxDelayAwaitResult {
+    var latestProxies = SingBoxProxiesState()
+    var observedFreshDelays = emptyMap<String, Int>()
+    val completed = withTimeoutOrNull(hardTimeoutMillis.milliseconds) {
+        runtimeStates
+            .map { runtime ->
+                check(runtime.running) { "sing-box API disconnected during delay test" }
+                latestProxies = runtime.proxies
+                observedFreshDelays = observedFreshDelays +
+                    plan.freshDelays(runtime.proxies, baselineTimes)
+                SingBoxDelayObservation(
+                    proxies = runtime.proxies,
+                    freshDelays = observedFreshDelays,
+                )
+            }
+            .distinctUntilChangedBy { observation -> observation.freshDelays.keys }
+            .transformLatest { observation ->
+                val resolvedTargets = observation.freshDelays.keys + knownFailures
+                if (resolvedTargets.containsAll(plan.targetNames)) {
+                    emit(
+                        SingBoxDelayAwaitResult(
+                            proxies = observation.proxies,
+                            completion = SingBoxDelayAwaitCompletion.Resolved,
+                            freshDelays = observation.freshDelays,
+                        ),
+                    )
+                } else {
+                    delay(idleTimeoutMillis.milliseconds)
+                    emit(
+                        SingBoxDelayAwaitResult(
+                            proxies = observation.proxies,
+                            completion = SingBoxDelayAwaitCompletion.SoftTimedOut,
+                            freshDelays = observation.freshDelays,
+                        ),
+                    )
+                }
+            }
+            .first()
     }
-    check(runtime.running) { "sing-box API disconnected during delay test" }
-    runtime.proxies
+    return completed
+        ?.copy(proxies = latestProxies, freshDelays = observedFreshDelays)
+        ?: SingBoxDelayAwaitResult(
+            proxies = latestProxies,
+            completion = SingBoxDelayAwaitCompletion.HardTimedOut,
+            freshDelays = observedFreshDelays,
+        )
 }
+
+private data class SingBoxDelayObservation(
+    val proxies: SingBoxProxiesState,
+    val freshDelays: Map<String, Int>,
+)
 
 internal fun SingBoxDelayTestPlan.finish(
-    proxies: SingBoxProxiesState,
-    baselineTimes: Map<String, Long>,
-): SingBoxDelayResult {
-    val delays = freshDelays(proxies, baselineTimes)
-    return SingBoxDelayResult(
-        delays = delays,
-        failedTargets = targetNames - delays.keys,
-    )
-}
-
-internal fun retainUnresolvedSingBoxDelayFailures(
-    failedTargetBaselines: Map<String, Long>,
-    proxies: SingBoxProxiesState,
-): Map<String, Long> = failedTargetBaselines.filterTo(linkedMapOf()) { (name, baseline) ->
-    val node = proxies.nodeByName[name]
-    node?.delay?.let { delay -> delay >= 0 } != true ||
-        node.delayUpdatedAtEpochSeconds?.let { updatedAt -> updatedAt > baseline } != true
-}
+    delays: Map<String, Int>,
+): SingBoxDelayResult = SingBoxDelayResult(
+    delays = delays,
+    failedTargets = targetNames - delays.keys,
+)
 
 internal fun mergeSingBoxDelayFailures(
     currentFailureBaselines: Map<String, Long>,
