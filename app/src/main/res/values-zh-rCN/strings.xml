@@ -777,6 +777,11 @@
     <string name="selector_editor_type_summary">选择手动切换或自动延迟测试</string>
     <string name="selector_editor_members">出站成员</string>
     <string name="selector_editor_search_targets">搜索可用出站</string>
+    <string name="selector_editor_regex_enable">启用正则表达式搜索</string>
+    <string name="selector_editor_regex_disable">关闭正则表达式搜索</string>
+    <string name="selector_editor_regex_invalid">正则表达式无效</string>
+    <string name="selector_editor_select_all_matches">全选匹配的出站</string>
+    <string name="selector_editor_clear_all_matches">取消选择匹配的出站</string>
     <string name="selector_editor_members_required">请至少选择一个出站</string>
     <string name="selector_editor_default">默认出站</string>
     <string name="selector_editor_urltest">URLTest 设置</string>

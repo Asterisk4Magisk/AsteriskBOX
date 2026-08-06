@@ -790,6 +790,11 @@
     <string name="selector_editor_type_summary">Choose manual selection or automatic latency testing</string>
     <string name="selector_editor_members">Outbound members</string>
     <string name="selector_editor_search_targets">Search available outbounds</string>
+    <string name="selector_editor_regex_enable">Enable regular expression search</string>
+    <string name="selector_editor_regex_disable">Disable regular expression search</string>
+    <string name="selector_editor_regex_invalid">Invalid regular expression</string>
+    <string name="selector_editor_select_all_matches">Select all matching outbounds</string>
+    <string name="selector_editor_clear_all_matches">Clear all matching outbounds</string>
     <string name="selector_editor_members_required">Select at least one outbound</string>
     <string name="selector_editor_default">Default outbound</string>
     <string name="selector_editor_urltest">URLTest settings</string>

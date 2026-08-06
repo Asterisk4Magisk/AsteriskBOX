@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,11 +37,14 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +57,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -638,6 +645,7 @@ internal fun SelectorEditorScaffold(
         mutableStateOf(selector?.interruptExistConnections ?: true)
     }
     var query by remember(selector?.id) { mutableStateOf("") }
+    var regexEnabled by remember(selector?.id) { mutableStateOf(false) }
     val normalizedRemarks = remarks.trim()
     val targets = remember(
         state.outboundGroups,
@@ -662,18 +670,26 @@ internal fun SelectorEditorScaffold(
                 )
             }
     }
-    val visibleTargets = remember(targets, query) {
-        val normalized = query.trim()
-        if (normalized.isEmpty()) {
-            targets
-        } else {
-            targets.filter { target ->
-                target.tag.contains(normalized, ignoreCase = true) ||
-                    target.label.contains(normalized, ignoreCase = true) ||
-                    target.groupName?.contains(normalized, ignoreCase = true) == true
-            }
-        }
+    val searchResult = remember(targets, query, regexEnabled) {
+        filterSelectorTargets(
+            targets = targets.map { target ->
+                SelectorTargetSearchCandidate(
+                    tag = target.tag,
+                    label = target.label,
+                    groupName = target.groupName,
+                )
+            },
+            query = query,
+            regexEnabled = regexEnabled,
+        )
     }
+    val visibleTargetTags = searchResult.matchedTags
+    val visibleTargets = remember(targets, visibleTargetTags) {
+        val visibleTargetTagSet = visibleTargetTags.toSet()
+        targets.filter { target -> target.tag in visibleTargetTagSet }
+    }
+    val searchInvalid = searchResult is SelectorTargetSearchResult.InvalidRegex
+    val selectionState = selectorTargetSelectionState(members, visibleTargetTags)
     val urlInvalid = url.isNotBlank() && !isValidUrlTestUrl(url)
     val intervalInvalid = interval.isNotBlank() && !isValidSingBoxDuration(interval)
     val toleranceValue = tolerance.toIntOrNull()
@@ -726,6 +742,25 @@ internal fun SelectorEditorScaffold(
         .filterIsInstance<SelectorEditorSection.MemberHeader>()
         .single()
     val defaultOptionTags = selectorDefaultOptionTags(members)
+    val toggleableState = when (selectionState) {
+        SelectorTargetSelectionState.None -> ToggleableState.Off
+        SelectorTargetSelectionState.Partial -> ToggleableState.Indeterminate
+        SelectorTargetSelectionState.All -> ToggleableState.On
+    }
+    val regexToggleDescription = stringResource(
+        if (regexEnabled) {
+            R.string.selector_editor_regex_disable
+        } else {
+            R.string.selector_editor_regex_enable
+        },
+    )
+    val bulkSelectionDescription = stringResource(
+        if (selectionState == SelectorTargetSelectionState.All) {
+            R.string.selector_editor_clear_all_matches
+        } else {
+            R.string.selector_editor_select_all_matches
+        },
+    )
 
     fun toggleMember(target: String) {
         members = if (target in members) {
@@ -733,6 +768,15 @@ internal fun SelectorEditorScaffold(
         } else {
             members + target
         }
+        if (default !in members) default = members.firstOrNull().orEmpty()
+    }
+
+    fun toggleVisibleMembers() {
+        members = updateSelectorMembersForMatches(
+            members = members,
+            matchedTags = visibleTargetTags,
+            select = selectionState != SelectorTargetSelectionState.All,
+        )
         if (default !in members) default = members.firstOrNull().orEmpty()
     }
 
@@ -973,15 +1017,65 @@ internal fun SelectorEditorScaffold(
                 }
             }
             item(key = "target-search") {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    label = { Text(stringResource(R.string.selector_editor_search_targets)) },
-                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                    singleLine = true,
-                    shape = AsteriskShapeTokens.InnerContainer,
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                )
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = {
+                            Text(stringResource(R.string.selector_editor_search_targets))
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Rounded.Search, contentDescription = null)
+                        },
+                        trailingIcon = {
+                            IconToggleButton(
+                                checked = regexEnabled,
+                                onCheckedChange = { regexEnabled = it },
+                                colors = IconButtonDefaults.iconToggleButtonColors(
+                                    checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
+                                modifier = Modifier.semantics {
+                                    contentDescription = regexToggleDescription
+                                },
+                            ) {
+                                Text(
+                                    text = ".*",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        },
+                        isError = searchInvalid,
+                        supportingText = if (searchInvalid) {
+                            {
+                                Text(stringResource(R.string.selector_editor_regex_invalid))
+                            }
+                        } else {
+                            null
+                        },
+                        singleLine = true,
+                        shape = AsteriskShapeTokens.InnerContainer,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Box(
+                        modifier = Modifier.width(48.dp).height(56.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        TriStateCheckbox(
+                            state = toggleableState,
+                            onClick = ::toggleVisibleMembers,
+                            enabled = !searchInvalid && visibleTargetTags.isNotEmpty(),
+                            modifier = Modifier.semantics {
+                                contentDescription = bulkSelectionDescription
+                            },
+                        )
+                    }
+                }
             }
             item(key = "members-required") {
                 AnimatedVisibility(
