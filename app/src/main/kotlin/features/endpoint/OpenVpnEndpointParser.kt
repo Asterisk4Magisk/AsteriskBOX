@@ -8,7 +8,6 @@ import features.importing.ImportIssue
 import features.importing.ImportIssueReason
 import features.importing.ImportIssueSeverity
 import features.importing.ImportMutation
-import features.importing.ImportMutationCode
 import features.importing.ImportOutcome
 import features.importing.ImportStage
 import kotlinx.serialization.json.JsonArray
@@ -52,24 +51,16 @@ private fun parseOpenVpn(content: String): ImportOutcome<ImportedSingBoxEndpoint
     val parsed = tokenizeOpenVpn(content)
     val directives = parsed.directives
     val mutations = mutableListOf<ImportMutation>()
-    val noOps = directives.filter { it.name in OpenVpnProcessOnlyDirectives }
-    noOps.forEach {
-        mutations += ImportMutation(
-            code = ImportMutationCode.IGNORED_FIELD,
-            message = "Ignored harmless OpenVPN process directive: ${it.name}",
-        )
-    }
-    val unknown = directives.firstOrNull {
-        it.name !in OpenVpnSupportedDirectives &&
-            it.name !in OpenVpnProcessOnlyDirectives
-    }
-    require(unknown == null) {
-        "Unsupported OpenVPN directive: ${unknown?.name}"
-    }
     val unsafe = directives.firstOrNull { it.name in OpenVpnUnsafeDirectives }
     require(unsafe == null) {
         "Unsafe OpenVPN directive is not supported: ${unsafe?.name}"
     }
+    mutations += ignoredEndpointOptionMutations(
+        profile = "OpenVPN",
+        optionNames = directives
+            .filter { it.name !in OpenVpnSupportedDirectives }
+            .map(OpenVpnDirective::name),
+    )
     parsed.blocks.keys.forEach { name ->
         require(name in OpenVpnInlineBlocks) { "Unsupported OpenVPN inline block" }
     }
@@ -298,9 +289,8 @@ private fun parseOpenVpn(content: String): ImportOutcome<ImportedSingBoxEndpoint
             }
             put(
                 "explicit_exit_notify",
-                item.arguments.singleOrNull()?.let { value ->
-                    value.toIntIn("OpenVPN explicit-exit-notify", 0, Int.MAX_VALUE)
-                } ?: 1,
+                item.arguments.singleOrNull()?.toIntIn("OpenVPN explicit-exit-notify", 0, Int.MAX_VALUE)
+                    ?: 1,
             )
         }
     }
@@ -423,10 +413,6 @@ private val OpenVpnToken = Regex("""[^\s"']+|"[^"]*"|'[^']*'""")
 private val OpenVpnInlineMarkers = setOf("[inline]", "inline")
 private val OpenVpnInlineBlocks = setOf(
     "ca", "cert", "key", "tls-auth", "tls-crypt", "tls-crypt-v2", "auth-user-pass",
-)
-private val OpenVpnProcessOnlyDirectives = setOf(
-    "client", "nobind", "persist-key", "persist-tun", "resolv-retry", "verb", "mute",
-    "pull", "tls-client", "dev", "dev-type",
 )
 private val OpenVpnUnsafeDirectives = setOf(
     "plugin", "up", "down", "route-up", "route-pre-down", "ipchange",

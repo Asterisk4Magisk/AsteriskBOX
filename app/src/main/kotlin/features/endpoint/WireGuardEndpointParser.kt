@@ -9,7 +9,6 @@ import features.importing.ImportIssueReason
 import features.importing.ImportIssueSeverity
 import features.importing.ImportLimitException
 import features.importing.ImportMutation
-import features.importing.ImportMutationCode
 import features.importing.ImportOutcome
 import features.importing.ImportStage
 import features.importing.MaxImportBytes
@@ -148,6 +147,7 @@ internal object WireGuardEndpointParser {
         val interfaceValues = linkedMapOf<String, MutableList<String>>()
         val peerValues = mutableListOf<MutableMap<String, MutableList<String>>>()
         val mutations = mutableListOf<ImportMutation>()
+        val ignoredOptions = linkedSetOf<String>()
         var section: String? = null
         var interfaceCount = 0
         content.lineSequence().forEach { rawLine ->
@@ -177,13 +177,10 @@ internal object WireGuardEndpointParser {
                     when (key) {
                         "address", "privatekey", "listenport", "mtu" ->
                             interfaceValues.getOrPut(key) { mutableListOf() } += value
-                        "dns" -> mutations += ImportMutation(
-                            code = ImportMutationCode.IGNORED_FIELD,
-                            message = "Ignored WireGuard DNS because endpoint imports do not change DNS settings",
-                        )
-                        "table", "preup", "postup", "predown", "postdown", "saveconfig" ->
+                        "dns", "table", "saveconfig" -> ignoredOptions += key
+                        "preup", "postup", "predown", "postdown" ->
                             error("Unsafe WireGuard interface directive is not supported")
-                        else -> error("Unsupported WireGuard interface directive")
+                        else -> ignoredOptions += key
                     }
                 }
                 "peer" -> {
@@ -192,7 +189,7 @@ internal object WireGuardEndpointParser {
                         "endpoint", "publickey", "presharedkey", "allowedips",
                         "persistentkeepalive", "reserved",
                         -> peerValues.last().getOrPut(key) { mutableListOf() } += value
-                        else -> error("Unsupported WireGuard peer directive")
+                        else -> ignoredOptions += key
                     }
                 }
                 else -> error("WireGuard option appears before a section")
@@ -227,6 +224,7 @@ internal object WireGuardEndpointParser {
                 reserved = values.optionalSingleValue("reserved")?.let(::parseReservedBytes),
             )
         }
+        mutations += ignoredEndpointOptionMutations("WireGuard", ignoredOptions)
         return singleWireGuardOutcome(
             format = EndpointImportFormat.WIREGUARD_CONFIG,
             remarks = "wireguard",

@@ -7,6 +7,8 @@ import features.importing.ImportFormat
 import features.importing.ImportIssue
 import features.importing.ImportIssueReason
 import features.importing.ImportIssueSeverity
+import features.importing.ImportMutation
+import features.importing.ImportMutationCode
 import features.importing.ImportOutcome
 import features.importing.ImportStage
 import features.importing.requireImportTextWithinLimit
@@ -26,6 +28,24 @@ internal data class RecognizedEndpointImport(
 )
 
 internal object EndpointImportPipeline {
+    fun parseFileOutcome(
+        content: String,
+        fileName: String?,
+    ): ImportOutcome<ImportedSingBoxEndpoint> {
+        val outcome = parseOutcome(content)
+        val remarks = endpointImportRemarksFromFileName(fileName)
+        if (remarks.isBlank() || outcome.accepted.size != 1) return outcome
+        return ImportOutcome(
+            format = outcome.format,
+            detectedCount = outcome.detectedCount,
+            accepted = listOf(outcome.accepted.single().copy(remarks = remarks)),
+            duplicateCount = outcome.duplicateCount,
+            issues = outcome.issues,
+            mutations = outcome.mutations,
+            priorOmittedDetailCount = outcome.omittedDetailCount,
+        )
+    }
+
     fun parseOutcome(content: String): ImportOutcome<ImportedSingBoxEndpoint> {
         require(content.isNotBlank()) { "Endpoint import content is empty" }
         val candidate = requireImportTextWithinLimit(content).trim().removePrefix("\uFEFF")
@@ -55,6 +75,31 @@ internal object EndpointImportPipeline {
         throw IllegalArgumentException("No supported endpoint format found")
     }
 }
+
+internal fun endpointImportRemarksFromFileName(fileName: String?): String {
+    val simpleName = fileName.orEmpty()
+        .substringAfterLast('/')
+        .substringAfterLast('\\')
+        .trim()
+    if (simpleName.isBlank()) return ""
+    val extensionSeparator = simpleName.lastIndexOf('.')
+    if (extensionSeparator <= 0) return simpleName
+    return simpleName.substring(0, extensionSeparator).trim().ifBlank { simpleName }
+}
+
+internal fun ignoredEndpointOptionMutations(
+    profile: String,
+    optionNames: Iterable<String>,
+): List<ImportMutation> = optionNames
+    .map { it.trim().lowercase() }
+    .filter(String::isNotBlank)
+    .distinct()
+    .map { option ->
+        ImportMutation(
+            code = ImportMutationCode.IGNORED_FIELD,
+            message = "Ignored unsupported $profile option: $option",
+        )
+    }
 
 private fun String.looksLikeJsonDocument(): Boolean {
     if (firstOrNull() == '{') return true

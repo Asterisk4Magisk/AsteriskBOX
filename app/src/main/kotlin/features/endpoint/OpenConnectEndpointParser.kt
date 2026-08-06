@@ -67,13 +67,12 @@ private fun parseOpenConnect(content: String): ImportOutcome<ImportedSingBoxEndp
     require(unsafe == null) {
         "Unsafe OpenConnect option is not supported: ${unsafe?.first}"
     }
-    val unknown = options.firstOrNull {
-        it.first !in OpenConnectSupportedOptions &&
-            it.first !in OpenConnectUnsafeOptions
-    }
-    require(unknown == null) {
-        "Unsupported OpenConnect option: ${unknown?.first}"
-    }
+    val mutations = ignoredEndpointOptionMutations(
+        profile = "OpenConnect",
+        optionNames = options
+            .filter { it.first !in OpenConnectSupportedOptions }
+            .map { it.first },
+    )
     fun last(vararg names: String): String? =
         options.lastOrNull { it.first in names }?.second?.takeIf(String::isNotBlank)
     fun present(vararg names: String): Boolean =
@@ -143,6 +142,7 @@ private fun parseOpenConnect(content: String): ImportOutcome<ImportedSingBoxEndp
                 json = SingBoxJson.encodeToString(JsonObject.serializer(), json),
             ),
         ),
+        mutations = mutations,
     )
 }
 

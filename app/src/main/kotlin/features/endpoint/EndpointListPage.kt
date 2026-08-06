@@ -7,6 +7,7 @@ package features.endpoint
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -124,6 +125,7 @@ internal fun EndpointListPage(padding: PaddingValues) {
     suspend fun importContent(
         content: String,
         source: ImportSource,
+        fileName: String? = null,
     ) {
         if (importing) return
         importing = true
@@ -131,7 +133,11 @@ internal fun EndpointListPage(padding: PaddingValues) {
         try {
             val snapshot = stateStore.state.value
             val parsed = withContext(Dispatchers.Default) {
-                EndpointImportPipeline.parseOutcome(content)
+                if (fileName == null) {
+                    EndpointImportPipeline.parseOutcome(content)
+                } else {
+                    EndpointImportPipeline.parseFileOutcome(content, fileName)
+                }
             }
             val plan = snapshot.planEndpointImport(parsed)
             if (!plan.committed) {
@@ -202,8 +208,8 @@ internal fun EndpointListPage(padding: PaddingValues) {
         scope.launch {
             try {
                 val uri = services.importFilePicker() ?: return@launch
-                val content = withContext(Dispatchers.IO) { context.readEndpointImportFile(uri) }
-                importContent(content, ImportSource.FILE)
+                val file = withContext(Dispatchers.IO) { context.readEndpointImportFile(uri) }
+                importContent(file.content, ImportSource.FILE, file.displayName)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -584,7 +590,28 @@ private fun SingBoxEndpointState.matchesQuery(query: String, localizedType: Stri
         localizedType.contains(normalized, ignoreCase = true)
 }
 
-private fun Context.readEndpointImportFile(uri: Uri): String =
-    contentResolver.openInputStream(uri)?.use { input ->
+private data class EndpointImportFile(
+    val content: String,
+    val displayName: String?,
+)
+
+private fun Context.readEndpointImportFile(uri: Uri): EndpointImportFile {
+    val displayName = runCatching {
+        contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            val column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (column >= 0 && cursor.moveToFirst()) cursor.getString(column) else null
+        }
+    }.getOrNull()
+        ?.takeIf(String::isNotBlank)
+        ?: uri.lastPathSegment
+    val content = contentResolver.openInputStream(uri)?.use { input ->
         input.readImportUtf8WithinLimit()
     } ?: throw IllegalArgumentException()
+    return EndpointImportFile(content, displayName)
+}
