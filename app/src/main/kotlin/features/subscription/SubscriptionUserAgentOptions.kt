@@ -5,7 +5,7 @@ package features.subscription
 
 import app.DefaultOutboundSubscriptionUserAgent
 
-internal const val V2rayNgSubscriptionUserAgent = "v2rayNG/2.2.6"
+internal const val V2rayNgSubscriptionUserAgent = "v2rayNG/2.3.2"
 internal const val ClashMetaSubscriptionUserAgent = "clash.meta"
 
 internal enum class SubscriptionUserAgentOption {
