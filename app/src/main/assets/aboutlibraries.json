@@ -15,7 +15,7 @@
         },
         {
             "uniqueId": "com.github.asterisk4magisk:libbox",
-            "artifactVersion": "v1.14.0-beta.7-reF1nd",
+            "artifactVersion": "v1.14.0-beta.8-reF1nd",
             "name": "AndroidLibBoxLite",
             "description": "Pinned Android JNI and command API bindings for sing-box.",
             "website": "https://github.com/Asterisk4Magisk/AndroidLibBoxLite",
@@ -327,7 +327,7 @@
         },
         {
             "uniqueId": "github:reF1nd/sing-box-releases",
-            "artifactVersion": "v1.14.0-beta.7-reF1nd",
+            "artifactVersion": "v1.14.0-beta.8-reF1nd",
             "name": "sing-box reF1nd build",
             "description": "A reF1nd build of the sing-box proxy platform used by AsteriskBOX ROOT modes.",
             "website": "https://github.com/reF1nd/sing-box-releases",
@@ -340,12 +340,12 @@
         },
         {
             "uniqueId": "org.snakeyaml:snakeyaml-engine",
-            "artifactVersion": "3.0.1",
+            "artifactVersion": "3.1",
             "name": "SnakeYAML Engine",
             "description": "Core YAML 1.2 parser and emitter for Java",
-            "website": "https://bitbucket.org/snakeyaml/snakeyaml-engine",
+            "website": "https://codeberg.org/snakeyaml/snakeyaml-engine",
             "scm": {
-                "url": "https://bitbucket.org/snakeyaml/snakeyaml-engine/src"
+                "url": "https://codeberg.org/snakeyaml/snakeyaml-engine/src"
             },
             "licenses": [
                 "Apache-2.0"

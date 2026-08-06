@@ -133,7 +133,9 @@ dependencies {
     implementation(libs.material.kolor)
     implementation(libs.reorderable)
     implementation(libs.sora.editor)
-    implementation(libs.snakeyaml.engine)
+    implementation(libs.snakeyaml.engine) {
+        exclude(group = "org.junit.jupiter", module = "junit-jupiter-api")
+    }
     implementation(libs.zxing.android.embedded)
     ksp(libs.androidx.room.compiler)
 }
