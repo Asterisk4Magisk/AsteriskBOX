@@ -15,8 +15,8 @@ import engine.singbox.config.APP_DIRECT_OUTBOUND
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 
 const val DefaultSingBoxDnsFakeIpRange = "198.18.0.1/16"
-val DefaultSingBoxDnsFinal = managedDnsServerTag(2)
-val DefaultSingBoxRouteDefaultDomainResolver = managedDnsServerTag(1)
+val DefaultSingBoxDnsFinal = managedDnsServerTag(2, "proxy")
+val DefaultSingBoxRouteDefaultDomainResolver = managedDnsServerTag(1, "direct")
 const val DefaultSingBoxDnsCacheCapacity = ""
 const val DefaultSingBoxDnsTimeout = "10s"
 val DefaultSingBoxDnsServers = listOf(
@@ -48,7 +48,7 @@ val DefaultSingBoxDnsRules = listOf(
             ),
         ),
         action = SingBoxRouteRuleActionReject,
-        server = managedDnsServerTag(2),
+        server = managedDnsServerTag(2, "proxy"),
     ),
     SingBoxDnsRuleState(
         id = 2,
@@ -59,7 +59,7 @@ val DefaultSingBoxDnsRules = listOf(
                 values = listOf(managedBundledRuleSetTag(ResourceFileKind.GeositeGoogle)),
             ),
         ),
-        server = managedDnsServerTag(2),
+        server = managedDnsServerTag(2, "proxy"),
     ),
     SingBoxDnsRuleState(
         id = 3,
@@ -70,7 +70,7 @@ val DefaultSingBoxDnsRules = listOf(
                 values = listOf(managedBundledRuleSetTag(ResourceFileKind.GeositeCn)),
             ),
         ),
-        server = managedDnsServerTag(1),
+        server = managedDnsServerTag(1, "direct"),
     ),
 )
 val DefaultSingBoxRouteRules = listOf(

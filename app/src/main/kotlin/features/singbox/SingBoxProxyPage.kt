@@ -80,9 +80,9 @@ import app.LocalAppServices
 import app.LocalAppStateStore
 import app.LocalIsWideScreen
 import app.LocalUpdateAppState
-import app.ManagedSingBoxTagPrefix
 import org.asterisk.zcc.abox.R
 import app.collectAppState
+import app.isManagedSingBoxTag
 import app.managedOutboundGroupSelectorTag
 import app.selectableManagedOutbounds
 import app.withSelectorSelection
@@ -183,7 +183,7 @@ fun SingBoxProxyPage(
         choice.tag to choice.localizedLabel(includeGroupName = false)
     }
     val managedGroupNames = appState.outboundGroups.associate { group ->
-        managedOutboundGroupSelectorTag(group.id) to group.name
+        managedOutboundGroupSelectorTag(group.id, group.name) to group.name
     }
     val visibleProxies = remember(
         proxies,
@@ -933,7 +933,7 @@ private fun ProtocolDelayLine(
 }
 
 private fun String.visibleRuntimeName(unavailableLabel: String): String {
-    return if (startsWith(ManagedSingBoxTagPrefix)) {
+    return if (isManagedSingBoxTag(this)) {
         unavailableLabel
     } else {
         this

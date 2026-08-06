@@ -5,14 +5,15 @@ package data.backup
 
 import app.AppState
 import app.CustomResourceFileState
-import app.ManagedSingBoxTagPrefix
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
 import app.OutboundState
 import app.SingBoxEndpointState
 import app.SingBoxRouteRuleState
 import app.SingBoxSelectorState
+import app.isManagedSingBoxTag
 import app.selectableManagedOutbounds
+import app.withCanonicalManagedTagReferences
 import app.modes.RunModeVpnService
 
 internal fun AppState.toAppBackupFile(
@@ -282,7 +283,7 @@ private fun AppBackupData.toAppState(): AppState {
         privateAddressCidrs = settings.privateAddressCidrs,
         proxyAppListMode = settings.proxyAppListMode,
         proxyAppListSelectedApps = proxyAppListSelectedApps,
-    )
+    ).withCanonicalManagedTagReferences()
 }
 
 private fun AppBackupOutboundGroup.toState(): OutboundGroupState =
@@ -401,7 +402,7 @@ private fun SingBoxRouteRuleState.outboundReferences(): List<String> =
 private fun Iterable<String>.countMissingManagedReferences(availableTags: Set<String>): Int =
     count { reference ->
         val normalized = reference.trim()
-        normalized.startsWith(ManagedSingBoxTagPrefix) && normalized !in availableTags
+        isManagedSingBoxTag(normalized) && normalized !in availableTags
     }
 
 private fun nextId(defaultValue: Int, ids: List<Int>): Int =

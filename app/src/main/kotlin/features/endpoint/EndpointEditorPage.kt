@@ -170,6 +170,7 @@ internal fun EndpointEditorPage(
                                     json = endpointJsonForStorage(
                                         endpointId = endpoint.id,
                                         type = imported.type,
+                                        remarks = imported.remarks,
                                         json = imported.json,
                                         detour = detour,
                                         domainResolver = domainResolver,

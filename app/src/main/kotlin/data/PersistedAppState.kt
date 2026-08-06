@@ -4,6 +4,7 @@
 package data
 
 import app.AppState
+import app.withCanonicalManagedTagReferences
 
 internal data class PersistedAppState(
     val metadata: AppStateMetadataEntity? = null,
@@ -72,6 +73,6 @@ internal data class PersistedAppState(
             ),
             proxyRunning = false,
             proxyAppListSelectedApps = proxyAppListSelectedApps.map { app -> app.packageKey },
-        )
+        ).withCanonicalManagedTagReferences()
     }
 }

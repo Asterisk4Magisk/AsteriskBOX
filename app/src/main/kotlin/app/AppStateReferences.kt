@@ -45,7 +45,7 @@ internal data class ManagedReferenceChoice(
 
 internal fun AppState.managedReferenceRemarks(): Map<String, String> = buildMap {
     outboundGroups.forEach { group ->
-        putVisibleRemarks(managedOutboundGroupSelectorTag(group.id), group.name)
+        putVisibleRemarks(managedOutboundGroupSelectorTag(group.id, group.name), group.name)
     }
     outbounds.forEach { outbound ->
         putVisibleRemarks(outbound.tag, outbound.remarks)
@@ -65,7 +65,7 @@ internal fun AppState.managedReferenceRemarks(): Map<String, String> = buildMap 
             putVisibleRemarks(rule.evaluationTag, rule.remarks)
         }
     customResourceFiles.forEach { file ->
-        putVisibleRemarks(managedCustomRuleSetTag(file.id), file.name)
+        putVisibleRemarks(managedCustomRuleSetTag(file.id, file.name), file.name)
     }
     ResourceFileKind.entries
         .filter { kind -> kind.fileName.endsWith(SingBoxRuleSetExtension, ignoreCase = true) }
@@ -84,7 +84,7 @@ internal fun visibleManagedReference(
         ?.trim()
         ?.takeIf(String::isNotEmpty)
         ?: normalized.takeUnless { reference ->
-            reference.startsWith(ManagedSingBoxTagPrefix)
+            isManagedSingBoxTag(reference)
         }
         ?: unavailableLabel
 }
@@ -106,10 +106,14 @@ internal fun selectableManagedOutbounds(
         .orEmpty()
     val excludedTargets = setOf(excludedTag.trim(), originalExcludedTag.trim())
         .filterTo(mutableSetOf(), String::isNotEmpty)
+    val excludedManagedGroupTag = state.outboundGroups
+        .firstOrNull { group -> group.id == excludedManagedGroupId }
+        ?.let { group -> managedOutboundGroupSelectorTag(group.id, group.name) }
+        .orEmpty()
     return buildList {
         enabledGroups.forEach { group ->
             if (state.outbounds.any { outbound -> outbound.groupId == group.id }) {
-                val tag = managedOutboundGroupSelectorTag(group.id)
+                val tag = managedOutboundGroupSelectorTag(group.id, group.name)
                 add(
                     ManagedOutboundChoice(
                         tag = tag,
@@ -190,7 +194,7 @@ internal fun selectableManagedOutbounds(
         .filterNot { choice ->
             (
                 excludedManagedGroupId != 0 &&
-                    choice.tag == managedOutboundGroupSelectorTag(excludedManagedGroupId)
+                    choice.tag == excludedManagedGroupTag
                 ) ||
                 choice.tag in excludedTargets ||
                 excludedTargets.any { target ->
@@ -199,18 +203,6 @@ internal fun selectableManagedOutbounds(
         }
         .sortedBy { choice -> choice.kind.priority }
 }
-
-internal fun selectableDetourOutboundTags(
-    state: AppState,
-    excludedTag: String,
-    excludedManagedGroupId: Int = 0,
-    includeGlobalSelector: Boolean = true,
-): List<String> = selectableDetourOutbounds(
-    state = state,
-    excludedTag = excludedTag,
-    excludedManagedGroupId = excludedManagedGroupId,
-    includeGlobalSelector = includeGlobalSelector,
-).map(ManagedOutboundChoice::tag)
 
 internal fun selectableDetourOutbounds(
     state: AppState,
@@ -235,10 +227,155 @@ internal fun selectableDetourOutbounds(
     }
 }
 
-internal fun selectableDnsEndpointTags(
-    state: AppState,
-    dnsServerType: String,
-): List<String> = selectableDnsEndpoints(state, dnsServerType).map(ManagedReferenceChoice::tag)
+internal fun AppState.withCanonicalManagedTagReferences(): AppState {
+    val tagsByIdentity = currentManagedTagsByIdentity()
+    val resolve: (String) -> String = { value ->
+        managedTagIdentityOrNull(value)
+            ?.let(tagsByIdentity::get)
+            ?: value
+    }
+    val canonical = copy(
+        outbounds = outbounds.map { outbound ->
+            outbound.withCanonicalManagedReferences(resolve)
+        },
+        endpoints = endpoints.map { endpoint ->
+            endpoint.withCanonicalManagedReferences(resolve)
+        },
+        selectors = selectors.map { selector ->
+            selector.copy(
+                outbounds = selector.outbounds.map(resolve),
+                default = resolve(selector.default),
+            )
+        },
+        selectorSelections = buildMap {
+            this@withCanonicalManagedTagReferences.selectorSelections.forEach { (selector, target) ->
+                put(resolve(selector), resolve(target))
+            }
+        },
+        routeFinal = resolve(routeFinal),
+        routeRules = routeRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
+        dnsFinal = resolve(dnsFinal),
+        routeDefaultDomainResolver = resolve(routeDefaultDomainResolver),
+        dnsServers = dnsServers.map { server ->
+            server.copy(
+                endpoint = resolve(server.endpoint),
+                detour = resolve(server.detour),
+                domainResolver = resolve(server.domainResolver),
+                servers = server.servers.map(resolve),
+            )
+        },
+        dnsRules = dnsRules.map { rule ->
+            rule.copy(
+                server = resolve(rule.server),
+                matches = rule.matches.map { match ->
+                    if (match.field in CanonicalDnsReferenceFields) {
+                        match.copy(values = match.values.map(resolve))
+                    } else {
+                        match
+                    }
+                },
+            )
+        },
+    )
+    return if (canonical == this) this else canonical
+}
+
+private fun AppState.currentManagedTagsByIdentity(): Map<ManagedTagIdentity, String> = buildMap {
+    fun add(tag: String) {
+        managedTagIdentityOrNull(tag)?.let { identity -> put(identity, tag) }
+    }
+    add(APP_DIRECT_OUTBOUND)
+    add(APP_GLOBAL_SELECTOR)
+    add(APP_LOCAL_INBOUND)
+    add(APP_TUN_INBOUND)
+    add(APP_ROOT_INBOUND)
+    add(ManagedApiServiceTag)
+    outboundGroups.forEach { group ->
+        add(managedOutboundGroupSelectorTag(group.id, group.name))
+    }
+    outbounds.forEach { outbound -> add(outbound.tag) }
+    endpoints.forEach { endpoint -> add(endpoint.tag) }
+    selectors.forEach { selector -> add(selector.tag) }
+    dnsServers.forEach { server -> add(server.tag) }
+    dnsRules
+        .filter { rule -> rule.action == SingBoxDnsEvaluateAction }
+        .forEach { rule -> add(rule.evaluationTag) }
+    customResourceFiles.forEach { file ->
+        add(managedCustomRuleSetTag(file.id, file.name))
+    }
+    ResourceFileKind.entries
+        .filter { kind -> kind.fileName.endsWith(SingBoxRuleSetExtension, ignoreCase = true) }
+        .forEach { kind -> add(managedBundledRuleSetTag(kind)) }
+}
+
+private fun SingBoxRouteRuleState.withCanonicalManagedReferences(
+    resolve: (String) -> String,
+): SingBoxRouteRuleState = copy(
+    logicalRules = logicalRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
+    inbound = inbound.map(resolve),
+    ruleSet = ruleSet.map(resolve),
+    outbound = resolve(outbound),
+)
+
+private fun OutboundState.withCanonicalManagedReferences(
+    resolve: (String) -> String,
+): OutboundState {
+    val root = jsonObject() ?: return this
+    return copy(
+        json = root.withCanonicalManagedReferences(
+            tag = tag,
+            resolve = resolve,
+            includeSelectorFields = type in CanonicalJsonSelectorTypes,
+        ).encoded(),
+    )
+}
+
+private fun SingBoxEndpointState.withCanonicalManagedReferences(
+    resolve: (String) -> String,
+): SingBoxEndpointState {
+    val root = jsonObject() ?: return this
+    return copy(
+        json = root.withCanonicalManagedReferences(
+            tag = tag,
+            resolve = resolve,
+            includeSelectorFields = false,
+        ).encoded(),
+    )
+}
+
+private fun JsonObject.withCanonicalManagedReferences(
+    tag: String,
+    resolve: (String) -> String,
+    includeSelectorFields: Boolean,
+): JsonObject = JsonObject(
+    toMutableMap().apply {
+        put("tag", JsonPrimitive(tag))
+        CanonicalJsonReferenceFields.forEach { field ->
+            val value = (get(field) as? JsonPrimitive)?.contentOrNull ?: return@forEach
+            put(field, JsonPrimitive(resolve(value)))
+        }
+        if (includeSelectorFields) {
+            val default = (get("default") as? JsonPrimitive)
+                ?.takeIf(JsonPrimitive::isString)
+                ?.content
+            if (default != null) put("default", JsonPrimitive(resolve(default)))
+            val outbounds = get("outbounds") as? JsonArray
+            if (outbounds != null) {
+                put(
+                    "outbounds",
+                    JsonArray(
+                        outbounds.map { element ->
+                            val value = (element as? JsonPrimitive)
+                                ?.takeIf(JsonPrimitive::isString)
+                                ?.content
+                            if (value == null) element else JsonPrimitive(resolve(value))
+                        },
+                    ),
+                )
+            }
+        }
+    },
+)
 
 internal fun selectableDnsEndpoints(
     state: AppState,
@@ -332,7 +469,7 @@ internal fun AppState.managedRuleSetChoices(
             }
             ?.let { fileName ->
                 ManagedRuleSetChoice(
-                    tag = managedCustomRuleSetTag(file.id),
+                    tag = managedCustomRuleSetTag(file.id, fileName),
                     remarks = fileName,
                     fileName = fileName,
                 )
@@ -347,7 +484,7 @@ internal fun AppState.withRemovedManagedRuleSets(
     val normalizedNames = fileNames.mapTo(mutableSetOf()) { name -> name.lowercase() }
     val removedTags = customResourceFiles
         .filter { file -> file.name.lowercase() in normalizedNames }
-        .mapTo(mutableSetOf()) { file -> managedCustomRuleSetTag(file.id) }
+        .mapTo(mutableSetOf()) { file -> managedCustomRuleSetTag(file.id, file.name) }
     if (removedTags.isEmpty()) return this
     return copy(
         routeRules = routeRules.map { rule ->
@@ -381,8 +518,8 @@ internal fun AppState.withPrunedDnsEvaluationReferences(): AppState {
     val taggedResponses = mutableSetOf<String>()
     val updatedRules = dnsRules.map { rule ->
         var lostEvaluationReference = false
-        val updatedMatches = rule.matches.mapNotNull { match ->
-            if (match.field != SingBoxMatchResponseField) return@mapNotNull match
+        val updatedMatches = rule.matches.map { match ->
+            if (match.field != SingBoxMatchResponseField) return@map match
             val value = match.values.firstOrNull().orEmpty()
             val available = match.encodeAsString && value in taggedResponses
             if (!available) lostEvaluationReference = true
@@ -568,7 +705,7 @@ private fun AppState.outboundDependsOn(
                 .mapTo(mutableSetOf(), OutboundState::groupId)
             outboundGroups
                 .filter { group -> group.enabled && group.id in validManagedGroupIds }
-                .map { group -> managedOutboundGroupSelectorTag(group.id) } +
+                .map { group -> managedOutboundGroupSelectorTag(group.id, group.name) } +
                 endpoints
                     .filter { endpoint ->
                         endpoint.type in SupportedSingBoxEndpointTypes &&
@@ -578,9 +715,11 @@ private fun AppState.outboundDependsOn(
         }
         selectors.any { selector -> selector.tag == tag } ->
             selectors.first { selector -> selector.tag == tag }.outbounds
-        outboundGroups.any { group -> managedOutboundGroupSelectorTag(group.id) == tag } -> {
+        outboundGroups.any { group ->
+            managedOutboundGroupSelectorTag(group.id, group.name) == tag
+        } -> {
             val groupId = outboundGroups.first { group ->
-                managedOutboundGroupSelectorTag(group.id) == tag
+                managedOutboundGroupSelectorTag(group.id, group.name) == tag
             }.id
             outbounds
                 .filter { outbound -> outbound.groupId == groupId }
@@ -744,6 +883,13 @@ private const val SingBoxRuleSetField = "rule_set"
 private const val SingBoxInboundField = "inbound"
 private const val SingBoxMatchResponseField = "match_response"
 private const val SingBoxDnsEvaluateAction = "evaluate"
+private val CanonicalJsonReferenceFields = setOf("detour", "domain_resolver")
+private val CanonicalJsonSelectorTypes = setOf(
+    SingBoxSelectorTypeSelector,
+    SingBoxSelectorTypeUrlTest,
+)
+private val CanonicalDnsReferenceFields =
+    setOf(SingBoxInboundField, SingBoxRuleSetField, "preferred_by", SingBoxMatchResponseField)
 private val DnsActionsWithManagedServer = setOf("route", "evaluate")
 private val NetworkDnsServerTypesWithDomainResolver =
     setOf("udp", "tcp", "tls", "quic", "https", "h3")

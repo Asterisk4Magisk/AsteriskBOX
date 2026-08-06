@@ -68,6 +68,7 @@ internal fun endpointJsonWithManagedReferences(
 internal fun endpointJsonForStorage(
     endpointId: Int,
     type: String,
+    remarks: String,
     json: String,
     detour: String,
     domainResolver: String,
@@ -80,7 +81,7 @@ internal fun endpointJsonForStorage(
         JsonObject(
             endpoint.toMutableMap().apply {
                 put("type", JsonPrimitive(type))
-                put("tag", JsonPrimitive(managedEndpointTag(endpointId)))
+                put("tag", JsonPrimitive(managedEndpointTag(endpointId, remarks)))
             },
         ),
     )

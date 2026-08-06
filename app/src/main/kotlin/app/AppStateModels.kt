@@ -28,13 +28,7 @@ data class SubscriptionInfo(
     val downloadBytes: Long = 0L,
     val totalBytes: Long = 0L,
     val expireAtSeconds: Long = 0L,
-) {
-    val usedBytes: Long
-        get() = uploadBytes + downloadBytes
-
-    val hasTraffic: Boolean
-        get() = totalBytes > 0L
-}
+)
 
 @Stable
 enum class OutboundGroupUpdateStatus {
@@ -79,7 +73,7 @@ data class OutboundState(
     val pingMillis: Long? = null,
 ) {
     val tag: String
-        get() = managedOutboundTag(id)
+        get() = managedOutboundTag(id, remarks)
 }
 
 val SupportedSingBoxEndpointTypes = listOf(
@@ -97,7 +91,7 @@ data class SingBoxEndpointState(
     val json: String,
 ) {
     val tag: String
-        get() = managedEndpointTag(id)
+        get() = managedEndpointTag(id, remarks)
 }
 
 const val SingBoxSelectorTypeSelector = "selector"
@@ -126,7 +120,7 @@ data class SingBoxSelectorState(
     val interruptExistConnections: Boolean = true,
 ) {
     val tag: String
-        get() = managedSelectorTag(id)
+        get() = managedSelectorTag(id, remarks)
 }
 
 const val SingBoxRouteRuleActionRoute = "route"
@@ -178,9 +172,6 @@ data class SingBoxRouteRuleState(
 )
 
 const val DefaultOutboundSubscriptionUserAgent = "sing-box"
-
-fun managedOutboundGroupSelectorTag(groupId: Int): String =
-    "__asteriskbox_selector_group_${groupId}__"
 
 enum class ResourceFileKind(
     val fileName: String,
@@ -249,7 +240,7 @@ data class SingBoxDnsServerState(
     val servers: List<String> = emptyList(),
 ) {
     val tag: String
-        get() = managedDnsServerTag(id)
+        get() = managedDnsServerTag(id, remarks)
 }
 
 @Stable
@@ -284,7 +275,7 @@ data class SingBoxDnsRuleState(
     val extra: List<String> = emptyList(),
 ) {
     val evaluationTag: String
-        get() = managedDnsEvaluationTag(id)
+        get() = managedDnsEvaluationTag(id, remarks)
 }
 
 val SingBoxDnsServerTypes = listOf(
@@ -411,13 +402,6 @@ fun AppState.nextAvailableDnsRuleId(): Int {
     return candidate
 }
 
-fun AppState.nextAvailableDnsServerId(): Int {
-    val usedIds = dnsServers.mapTo(mutableSetOf()) { server -> server.id }
-    var candidate = nextDnsServerId.coerceAtLeast(1)
-    while (candidate in usedIds) candidate += 1
-    return candidate
-}
-
 fun AppState.nextAvailableSelectorId(): Int {
     val usedIds = selectors.mapTo(mutableSetOf()) { selector -> selector.id }
     var candidate = nextSelectorId.coerceAtLeast(1)
@@ -532,7 +516,11 @@ fun AppState.withRemovedManagedOutbound(outboundId: Int): AppState {
     val remaining = outbounds.filterNot { outbound -> outbound.id == outboundId }
     val removedTags = mutableSetOf(removed.tag)
     if (remaining.none { outbound -> outbound.groupId == removed.groupId }) {
-        removedTags += managedOutboundGroupSelectorTag(removed.groupId)
+        outboundGroups
+            .firstOrNull { group -> group.id == removed.groupId }
+            ?.let { group ->
+                removedTags += managedOutboundGroupSelectorTag(group.id, group.name)
+            }
     }
     return copy(outbounds = remaining).withRemovedManagedOutboundTags(removedTags)
 }

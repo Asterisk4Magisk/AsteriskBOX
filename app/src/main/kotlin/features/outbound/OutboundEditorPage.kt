@@ -100,7 +100,7 @@ internal fun OutboundEditorPage(
                 ?.let(::OutboundEditorDocument)
                 ?: OutboundEditorDocument.create(
                     type,
-                    managedOutboundTag(appState.nextOutboundId),
+                    managedOutboundTag(appState.nextOutboundId, ""),
                 ),
         )
     }

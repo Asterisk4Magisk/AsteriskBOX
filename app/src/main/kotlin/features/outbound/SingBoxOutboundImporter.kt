@@ -4,8 +4,8 @@
 package features.outbound
 
 import app.AppState
-import app.ManagedSingBoxTagPrefix
 import app.OutboundState
+import app.isManagedSingBoxTag
 import app.managedOutboundGroupSelectorTag
 import app.managedOutboundTag
 import app.withRemovedManagedOutboundTags
@@ -17,11 +17,11 @@ import engine.singbox.config.parseSingBoxJson
 import features.importing.ImportIssue
 import features.importing.ImportIssueReason
 import features.importing.ImportIssueSeverity
-import features.importing.IndexedImportCandidate
 import features.importing.ImportMutation
 import features.importing.ImportMutationCode
 import features.importing.ImportOutcome
 import features.importing.ImportStage
+import features.importing.IndexedImportCandidate
 import features.importing.deduplicateImportCandidates
 import features.importing.importFingerprint
 import features.importing.requireImportCandidateCount
@@ -31,7 +31,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.put
 
 internal data class ImportedSingBoxOutbound(
     val sourceIndex: Int? = null,
@@ -47,29 +46,6 @@ private data class RawOutboundImportCandidate(
 )
 
 internal object SingBoxOutboundImporter {
-    fun parseConfiguration(
-        content: String,
-        formatter: SingBoxOutboundConfigFormatter = LibboxSingBoxOutboundConfigFormatter,
-    ): List<ImportedSingBoxOutbound> {
-        val root = parseSingBoxJson(content)
-        val outbounds = root["outbounds"] as? JsonArray
-            ?: throw IllegalArgumentException("sing-box configuration must contain an outbounds array")
-        return parseRawOutboundArray(outbounds, formatter)
-    }
-
-    fun parseImport(
-        content: String,
-        formatter: SingBoxOutboundConfigFormatter = LibboxSingBoxOutboundConfigFormatter,
-    ): List<ImportedSingBoxOutbound> {
-        val outcome = parseImportOutcome(content, formatter)
-        if (outcome.accepted.isEmpty()) {
-            throw IllegalArgumentException(
-                outcome.issues.firstOrNull()?.message ?: "No supported proxy outbounds found",
-            )
-        }
-        return outcome.accepted
-    }
-
     fun parseImportOutcome(
         content: String,
         formatter: SingBoxOutboundConfigFormatter = LibboxSingBoxOutboundConfigFormatter,
@@ -82,7 +58,7 @@ internal object SingBoxOutboundImporter {
                 if ("outbounds" in element) {
                     element.keys
                         .filterNot { key -> key == "outbounds" }
-                        .forEach {
+                        .forEach { _ ->
                             mutations += ImportMutation(
                                 code = ImportMutationCode.IGNORED_SECTION,
                                 message = "Ignored a top-level sing-box section",
@@ -228,7 +204,7 @@ internal object SingBoxOutboundImporter {
             if (type !in SupportedSingBoxProxyOutboundTypes) return@mapIndexedNotNull null
             val tag = outbound.stringField("tag").orEmpty()
             val remarks = tag
-                .takeUnless { value -> value.startsWith(ManagedSingBoxTagPrefix) }
+                .takeUnless(::isManagedSingBoxTag)
                 ?.takeIf(String::isNotBlank)
                 ?: "$type-${sourceIndex + 1}"
             ImportedSingBoxOutbound(
@@ -280,53 +256,6 @@ private fun rejectedJsonOutbound(
     message = message,
 )
 
-internal fun createManualOutbound(
-    type: String,
-    remarks: String,
-    server: String,
-    serverPort: Int,
-    username: String,
-    password: String,
-): ImportedSingBoxOutbound {
-    require(type in ManualSingBoxOutboundTypes) {
-        "Manual outbound type is not supported: $type"
-    }
-    require(remarks.isNotBlank()) { "Outbound remarks are required" }
-    require(server.isNotBlank()) { "Outbound server is required" }
-    require(serverPort in 1..65535) { "Outbound server port is invalid" }
-    val outbound = buildJsonObject {
-        put("type", type)
-        put("tag", remarks.trim())
-        put("server", server.trim())
-        put("server_port", serverPort)
-        username.trim().takeIf(String::isNotBlank)?.let { value -> put("username", value) }
-        password.takeIf(String::isNotBlank)?.let { value -> put("password", value) }
-    }
-    val root = buildJsonObject { put("outbounds", JsonArray(listOf(outbound))) }
-    SingBoxDeprecatedConfigValidator.validate(root)
-    return ImportedSingBoxOutbound(
-        sourceTag = remarks.trim(),
-        remarks = remarks.trim(),
-        type = type,
-        json = SingBoxJson.encodeToString(JsonElement.serializer(), outbound),
-    )
-}
-
-internal fun OutboundState.withIdentity(
-    groupId: Int,
-    remarks: String,
-): OutboundState {
-    require(remarks.isNotBlank()) { "Outbound remarks are required" }
-    val outbound = SingBoxJson.parseToJsonElement(json) as? JsonObject
-        ?: throw IllegalArgumentException("Stored outbound is not a JSON object")
-    val normalized = JsonObject(outbound + ("tag" to JsonPrimitive(tag)))
-    return copy(
-        groupId = groupId,
-        remarks = remarks.trim(),
-        json = SingBoxJson.encodeToString(JsonElement.serializer(), normalized),
-    )
-}
-
 internal fun outboundJsonWithoutManagedIdentity(json: String): String {
     val outbound = SingBoxJson.parseToJsonElement(json) as? JsonObject
         ?: throw IllegalArgumentException("Stored outbound is not a JSON object")
@@ -366,7 +295,9 @@ internal fun AppState.withImportedOutbounds(
         assigned.forEach { (id, item) ->
             item.sourceTag
                 .takeIf(String::isNotBlank)
-                ?.let { sourceTag -> putIfAbsent(sourceTag, managedOutboundTag(id)) }
+                ?.let { sourceTag ->
+                    putIfAbsent(sourceTag, managedOutboundTag(id, item.remarks))
+                }
         }
     }
     val retainedOutbounds = outbounds.filterNot { outbound ->
@@ -398,16 +329,16 @@ internal fun AppState.withImportedOutbounds(
                                 retainedOutbounds.any { outbound -> outbound.groupId == group.id }
                             )
                 }
-                .map { group -> managedOutboundGroupSelectorTag(group.id) },
+                .map { group -> managedOutboundGroupSelectorTag(group.id, group.name) },
         )
-        addAll(assigned.map { (id, _) -> managedOutboundTag(id) })
+        addAll(assigned.map { (id, item) -> managedOutboundTag(id, item.remarks) })
     }
     val dnsResolverTags = dnsServers.mapTo(mutableSetOf()) { server -> server.tag }
     val additions = assigned.map { (id, item) ->
         val source = SingBoxJson.parseToJsonElement(item.json) as? JsonObject
             ?: throw IllegalArgumentException("Imported outbound is not a JSON object")
         val normalized = source.toMutableMap().apply {
-            put("tag", JsonPrimitive(managedOutboundTag(id)))
+            put("tag", JsonPrimitive(managedOutboundTag(id, item.remarks)))
             val detour = (get("detour") as? JsonPrimitive)?.contentOrNull.orEmpty()
             if (detour.isNotBlank()) {
                 val replacement = sourceTags[detour] ?: detour.takeIf(detourTags::contains)

@@ -7,6 +7,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import app.AppState
+import app.withCanonicalManagedTagReferences
 import features.logs.AndroidAppLogger
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
@@ -50,7 +51,7 @@ class AndroidAppStateStore private constructor(
 
     fun update(transform: (AppState) -> AppState) {
         val pendingSave = synchronized(updateLock) {
-            if (deferredUpdates.deferIfReplacing(transform)) return
+            if (deferredUpdates.deferIfReplacing(canonicalAppStateUpdate(transform))) return
             applyImmediateUpdateLocked(transform)
         } ?: return
 
@@ -58,15 +59,16 @@ class AndroidAppStateStore private constructor(
     }
 
     suspend fun replaceAllAndAwaitPersistence(nextState: AppState) {
+        val canonicalNextState = nextState.withCanonicalManagedTagReferences()
         lateinit var previousState: AppState
         val replacementRevision = synchronized(updateLock) {
             previousState = mutableState.value
-            if (nextState == previousState) return
+            if (canonicalNextState == previousState) return
             deferredUpdates.beginReplacement()
             saveRevision.incrementAndGet()
         }
         val completion = CompletableDeferred<Result<Unit>>()
-        persist(nextState, replacementRevision, completion)
+        persist(canonicalNextState, replacementRevision, completion)
         var cancellation: CancellationException? = null
         val result = try {
             completion.await()
@@ -76,14 +78,19 @@ class AndroidAppStateStore private constructor(
         }
 
         val followUpSave = synchronized(updateLock) {
-            val replacementBase = if (result.isSuccess) nextState else previousState
-            val finalState = deferredUpdates.finishReplacement(replacementBase) { error ->
-                AndroidAppLogger.error(
-                    LogTag,
-                    "Discarded an invalid app state update deferred during replacement; continuing",
-                    error,
-                )
-            }
+            val finalState = deferredUpdates
+                .finishAppStateReplacement(
+                    persistenceResult = result,
+                    persistedState = canonicalNextState,
+                    previousState = previousState,
+                ) { error ->
+                    AndroidAppLogger.error(
+                        LogTag,
+                        "Discarded an invalid app state update deferred during replacement; continuing",
+                        error,
+                    )
+                }
+            val replacementBase = if (result.isSuccess) canonicalNextState else previousState
             mutableState.value = finalState
             if (result.isFailure || finalState != replacementBase) {
                 PendingStateSave(
@@ -113,7 +120,7 @@ class AndroidAppStateStore private constructor(
         transform: (AppState) -> AppState,
     ): PendingStateSave? {
         val previousState = mutableState.value
-        val nextState = transform(previousState)
+        val nextState = transform(previousState).withCanonicalManagedTagReferences()
         if (nextState === previousState || nextState.isCheapNoopUpdate(previousState)) return null
         mutableState.value = nextState
         if (
@@ -145,7 +152,7 @@ class AndroidAppStateStore private constructor(
                 )
             } else {
                 LoadedAppState(
-                    state = settings,
+                    state = settings.withCanonicalManagedTagReferences(),
                     loadedFromDatabase = false,
                 )
             }
@@ -248,6 +255,22 @@ class AndroidAppStateStore private constructor(
             }
         }
     }
+}
+
+internal fun canonicalAppStateUpdate(
+    transform: (AppState) -> AppState,
+): (AppState) -> AppState = { state ->
+    transform(state).withCanonicalManagedTagReferences()
+}
+
+internal fun DeferredStateUpdates<AppState>.finishAppStateReplacement(
+    persistenceResult: Result<Unit>,
+    persistedState: AppState,
+    previousState: AppState,
+    onFailure: (Throwable) -> Unit = {},
+): AppState {
+    val replacementBase = if (persistenceResult.isSuccess) persistedState else previousState
+    return finishReplacement(replacementBase, onFailure).withCanonicalManagedTagReferences()
 }
 
 private class StatePersistenceSupersededException : IllegalStateException(

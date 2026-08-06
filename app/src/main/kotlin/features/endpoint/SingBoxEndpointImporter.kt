@@ -4,9 +4,9 @@
 package features.endpoint
 
 import app.AppState
-import app.ManagedSingBoxTagPrefix
 import app.SingBoxEndpointState
 import app.SupportedSingBoxEndpointTypes
+import app.isManagedSingBoxTag
 import app.managedEndpointTag
 import app.managedOutboundGroupSelectorTag
 import engine.singbox.config.APP_DIRECT_OUTBOUND
@@ -39,14 +39,6 @@ internal data class ImportedSingBoxEndpoint(
     val type: String,
     val json: String,
 ) {
-    constructor(remarks: String, type: String, json: String) : this(
-        sourceIndex = null,
-        sourceTag = remarks,
-        remarks = remarks,
-        type = type,
-        json = json,
-    )
-
     fun withIdentity(
         type: String = this.type,
         remarks: String = this.remarks,
@@ -159,7 +151,7 @@ internal object SingBoxEndpointImporter {
             }.getOrNull() ?: return@mapIndexedNotNull null
             val sourceTag = endpoint.stringField("tag")?.trim().orEmpty()
             val remarks = sourceTag
-                .takeUnless { value -> value.startsWith(ManagedSingBoxTagPrefix) }
+                .takeUnless(::isManagedSingBoxTag)
                 ?.takeIf(String::isNotBlank)
                 ?: "$type-${index + 1}"
             ImportedSingBoxEndpoint(
@@ -212,17 +204,23 @@ internal fun AppState.withImportedEndpoints(
         assigned.forEach { (endpoint, endpointId) ->
             endpoint.sourceTag
                 .takeIf(String::isNotBlank)
-                ?.let { sourceTag -> putIfAbsent(sourceTag, managedEndpointTag(endpointId)) }
+                ?.let { sourceTag ->
+                    putIfAbsent(sourceTag, managedEndpointTag(endpointId, endpoint.remarks))
+                }
         }
     }
     val detourReferences = buildSet {
         add(APP_DIRECT_OUTBOUND)
         add(APP_GLOBAL_SELECTOR)
-        addAll(outboundGroups.map { group -> managedOutboundGroupSelectorTag(group.id) })
+        addAll(outboundGroups.map { group ->
+            managedOutboundGroupSelectorTag(group.id, group.name)
+        })
         addAll(outbounds.map { outbound -> outbound.tag })
         addAll(endpoints.map { endpoint -> endpoint.tag })
         addAll(selectors.map { selector -> selector.tag })
-        addAll(assigned.map { (_, endpointId) -> managedEndpointTag(endpointId) })
+        addAll(assigned.map { (endpoint, endpointId) ->
+            managedEndpointTag(endpointId, endpoint.remarks)
+        })
     }
     val dnsServerReferences = buildSet {
         addAll(dnsServers.map { server -> server.tag })
@@ -232,7 +230,7 @@ internal fun AppState.withImportedEndpoints(
             ?: throw IllegalArgumentException("Endpoint must be a JSON object")
         val normalized = source.toMutableMap().apply {
             put("type", JsonPrimitive(endpoint.type))
-            put("tag", JsonPrimitive(managedEndpointTag(endpointId)))
+            put("tag", JsonPrimitive(managedEndpointTag(endpointId, endpoint.remarks)))
             rewriteManagedReference(
                 field = "detour",
                 importedTagMap = importedTagMap,

@@ -5,7 +5,7 @@ package ui.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import app.ManagedSingBoxTagPrefix
+import app.isManagedSingBoxTag
 import org.asterisk.zcc.abox.R
 
 @Composable
@@ -17,7 +17,7 @@ internal fun singBoxOptionLabel(
     return if (
         normalizedValue.isEmpty() ||
         label.equals(normalizedValue, ignoreCase = true) ||
-        normalizedValue.startsWith(ManagedSingBoxTagPrefix)
+        isManagedSingBoxTag(normalizedValue)
     ) {
         label
     } else {

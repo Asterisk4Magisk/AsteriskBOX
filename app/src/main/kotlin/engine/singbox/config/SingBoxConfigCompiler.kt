@@ -5,6 +5,12 @@ package engine.singbox.config
 
 import android.content.Context
 import app.AppState
+import app.ManagedApiServiceTag
+import app.ManagedDirectOutboundTag
+import app.ManagedGlobalSelectorTag
+import app.ManagedLocalInboundTag
+import app.ManagedRootInboundTag
+import app.ManagedTunInboundTag
 import app.SingBoxRouteNetworkStrategies
 import app.SingBoxRouteNetworkTypes
 import app.SingBoxRouteRuleActionReject
@@ -15,6 +21,7 @@ import app.SingBoxSelectorTypeSelector
 import app.SingBoxSelectorTypeUrlTest
 import app.managedOutboundGroupSelectorTag
 import app.managedRuleSetChoices
+import app.isManagedSingBoxTag
 import app.modes.RunModeBpf2Socks
 import app.modes.RunModeEbpf
 import app.modes.RunModeTproxy
@@ -25,6 +32,7 @@ import app.modes.SingBoxModeDirect
 import app.modes.SingBoxModeGlobal
 import app.modes.SingBoxModeRule
 import app.modes.isRootRunMode
+import app.withCanonicalManagedTagReferences
 import app.withPrunedDnsServerReferences
 import app.withUnavailableManagedRuleSetsDisabled
 import engine.network.toPortOrNull
@@ -53,12 +61,11 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 
-internal const val APP_TAG_PREFIX = "__asteriskbox_"
-internal const val APP_GLOBAL_SELECTOR = "__asteriskbox_global__"
-internal const val APP_LOCAL_INBOUND = "__asteriskbox_local__"
-internal const val APP_TUN_INBOUND = "__asteriskbox_tun__"
-internal const val APP_DIRECT_OUTBOUND = "__asteriskbox_direct__"
-internal const val APP_ROOT_INBOUND = "__asteriskbox_root__"
+internal const val APP_GLOBAL_SELECTOR = ManagedGlobalSelectorTag
+internal const val APP_LOCAL_INBOUND = ManagedLocalInboundTag
+internal const val APP_TUN_INBOUND = ManagedTunInboundTag
+internal const val APP_DIRECT_OUTBOUND = ManagedDirectOutboundTag
+internal const val APP_ROOT_INBOUND = ManagedRootInboundTag
 
 internal data class SingBoxLocalRuleSet(
     val tag: String,
@@ -72,8 +79,10 @@ internal object SingBoxConfigCompiler {
         runMode: Int = appState.runMode,
         exposePorts: Boolean = true,
     ): String {
-        val files = context.singBoxRuleSetFiles(appState.customResourceFiles)
-        val choicesByFileName = appState.managedRuleSetChoices(files.map { file -> file.name })
+        val canonicalState = appState.withCanonicalManagedTagReferences()
+        val files = context.singBoxRuleSetFiles(canonicalState.customResourceFiles)
+        val choicesByFileName = canonicalState
+            .managedRuleSetChoices(files.map { file -> file.name })
             .associateBy { choice -> choice.fileName }
         val localRuleSets = files.mapNotNull { file ->
             choicesByFileName[file.name]?.let { choice ->
@@ -83,7 +92,7 @@ internal object SingBoxConfigCompiler {
                 )
             }
         }.distinctBy(SingBoxLocalRuleSet::tag)
-        val runtimeState = appState
+        val runtimeState = canonicalState
             .withUnavailableManagedRuleSetsDisabled(
                 localRuleSets.mapTo(mutableSetOf(), SingBoxLocalRuleSet::tag),
             )
@@ -108,9 +117,11 @@ internal object SingBoxConfigCompiler {
         localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
         ebpfUidPolicy: EbpfUidPolicy = EbpfUidPolicy(),
     ): String {
+        val canonicalState = appState.withCanonicalManagedTagReferences()
         val encoded = encodeSingBoxJson(
             generateRoot(
-                appState = appState,
+                sourceRoot = JsonObject(emptyMap()),
+                appState = canonicalState,
                 runMode = runMode,
                 exposePorts = exposePorts,
                 localRuleSets = localRuleSets,
@@ -127,14 +138,17 @@ internal object SingBoxConfigCompiler {
         exposePorts: Boolean = true,
         localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
         ebpfUidPolicy: EbpfUidPolicy = EbpfUidPolicy(),
-    ): JsonObject = generateRoot(
-        sourceRoot = JsonObject(emptyMap()),
-        appState = appState,
-        runMode = runMode,
-        exposePorts = exposePorts,
-        localRuleSets = localRuleSets,
-        ebpfUidPolicy = ebpfUidPolicy,
-    )
+    ): JsonObject {
+        val canonicalState = appState.withCanonicalManagedTagReferences()
+        return generateRoot(
+            sourceRoot = JsonObject(emptyMap()),
+            appState = canonicalState,
+            runMode = runMode,
+            exposePorts = exposePorts,
+            localRuleSets = localRuleSets,
+            ebpfUidPolicy = ebpfUidPolicy,
+        )
+    }
 
     private fun generateRoot(
         sourceRoot: JsonObject,
@@ -176,14 +190,14 @@ internal object SingBoxConfigCompiler {
     }
 }
 
-private fun JsonObject.withLocalRuleSets(localRuleSets: List<SingBoxLocalRuleSet>): JsonObject {
-    if (localRuleSets.isEmpty()) return this
+internal fun JsonObject.withLocalRuleSets(localRuleSets: List<SingBoxLocalRuleSet>): JsonObject {
     val sourceRoute = this["route"] as? JsonObject
-    val managedTags = localRuleSets.mapTo(mutableSetOf(), SingBoxLocalRuleSet::tag)
-    val retainedRuleSets = (sourceRoute?.get("rule_set") as? JsonArray)
+    val sourceRuleSets = sourceRoute?.get("rule_set") as? JsonArray
+    if (sourceRuleSets == null && localRuleSets.isEmpty()) return this
+    val retainedRuleSets = sourceRuleSets
         ?.filterNot { element ->
             val tag = ((element as? JsonObject)?.get("tag") as? JsonPrimitive)?.contentOrNull
-            tag in managedTags
+            tag?.let(::isManagedSingBoxTag) == true
         }
         .orEmpty()
     val compiledRuleSets: List<JsonElement> = retainedRuleSets + localRuleSets.map { ruleSet ->
@@ -452,7 +466,7 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
                     ?.takeIf(String::isNotBlank)
             }
         if (members.isNotEmpty()) {
-            val groupTag = managedOutboundGroupSelectorTag(group.id)
+            val groupTag = managedOutboundGroupSelectorTag(group.id, group.name)
             retained += buildSelectorOutbound(
                 tag = groupTag,
                 members = members,
@@ -666,7 +680,7 @@ private fun compileServices(
         val control = appState.singBoxControlConfig()
         retained += buildJsonObject {
             put("type", "api")
-            put("tag", "${APP_TAG_PREFIX}api__")
+            put("tag", ManagedApiServiceTag)
             put("listen", control.host)
             put("listen_port", control.port)
             if (control.secret.isNotEmpty()) {
@@ -1000,7 +1014,7 @@ private fun JsonArray?.orEmptyObjects(): List<JsonObject> =
     this?.mapNotNull { element -> element as? JsonObject }.orEmpty()
 
 private fun JsonObject.hasAppTag(): Boolean =
-    ((this["tag"] as? JsonPrimitive)?.contentOrNull ?: "").startsWith(APP_TAG_PREFIX)
+    isManagedSingBoxTag((this["tag"] as? JsonPrimitive)?.contentOrNull.orEmpty())
 
 private fun compileExperimental(appState: AppState): JsonObject? {
     if (!appState.storeFakeIp && !appState.storeDns) return null

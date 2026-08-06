@@ -69,7 +69,6 @@ import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
 import app.collectAppState
 import app.managedOutboundGroupSelectorTag
-import app.nextAvailableOutboundGroupId
 import app.withRemovedManagedOutboundTags
 import features.importing.ImportOperation
 import features.importing.ImportResultDetail
@@ -144,32 +143,7 @@ internal fun OutboundGroupListPage(
     val subscriptionGroups = appState.outboundGroups.outboundSubscriptionGroups()
 
     fun saveGroup(group: OutboundGroupState) {
-        updateAppState { state ->
-            val previous = state.outboundGroups.firstOrNull { item -> item.id == group.id }
-            val updated = if (previous != null) {
-                state.copy(
-                    outboundGroups = state.outboundGroups.map { item ->
-                        if (item.id == group.id) group else item
-                    },
-                )
-            } else {
-                val id = state.nextAvailableOutboundGroupId()
-                state.copy(
-                    outboundGroups = state.outboundGroups + group.copy(id = id),
-                    nextOutboundGroupId = id + 1,
-                )
-            }
-            if (previous?.enabled == true && !group.enabled) {
-                updated.withRemovedManagedOutboundTags(
-                    state.outbounds
-                        .filter { outbound -> outbound.groupId == group.id }
-                        .mapTo(mutableSetOf()) { outbound -> outbound.tag }
-                        .apply { add(managedOutboundGroupSelectorTag(group.id)) },
-                )
-            } else {
-                updated
-            }
-        }
+        updateAppState { state -> state.withSavedOutboundGroup(group) }
         showGroupEditor = false
     }
 
@@ -178,7 +152,7 @@ internal fun OutboundGroupListPage(
             val removedTags = state.outbounds
                 .filter { outbound -> outbound.groupId == group.id }
                 .mapTo(mutableSetOf()) { outbound -> outbound.tag }
-                .apply { add(managedOutboundGroupSelectorTag(group.id)) }
+                .apply { add(managedOutboundGroupSelectorTag(group.id, group.name)) }
             state.copy(
                 outboundGroups = state.outboundGroups.filterNot { item -> item.id == group.id },
                 outbounds = state.outbounds.filterNot { outbound -> outbound.groupId == group.id },
@@ -488,7 +462,9 @@ internal fun OutboundGroupListPage(
                                 val groupTags = state.outbounds
                                     .filter { outbound -> outbound.groupId == group.id }
                                     .mapTo(mutableSetOf()) { outbound -> outbound.tag }
-                                    .apply { add(managedOutboundGroupSelectorTag(group.id)) }
+                                    .apply {
+                                        add(managedOutboundGroupSelectorTag(group.id, group.name))
+                                    }
                                 state.copy(
                                     outboundGroups = state.outboundGroups.map { item ->
                                         if (item.id == group.id) {
