@@ -213,12 +213,13 @@ private fun parseOpenVpn(content: String): ImportOutcome<ImportedSingBoxEndpoint
         authLines.getOrNull(0)?.let { put("username", it) }
         authLines.getOrNull(1)?.let { put("password", it) }
         put("tls", tls)
-        directive("cipher")?.arguments?.firstOrNull()?.let { put("cipher", it) }
         directive("data-ciphers")?.arguments?.firstOrNull()?.let {
             put("data_ciphers", JsonArray(it.split(':').map(::JsonPrimitive)))
         }
-        directive("data-ciphers-fallback")?.arguments?.firstOrNull()
-            ?.let { put("data_ciphers_fallback", it) }
+        val dataCiphersFallback =
+            directive("data-ciphers-fallback")?.arguments?.firstOrNull()
+                ?: directive("cipher")?.arguments?.firstOrNull()
+        dataCiphersFallback?.let { put("data_ciphers_fallback", it) }
         directive("auth")?.arguments?.firstOrNull()?.let { put("auth", it) }
         directive("mssfix")?.let { item ->
             if (item.arguments.isNotEmpty()) {
