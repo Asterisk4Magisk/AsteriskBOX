@@ -110,6 +110,8 @@ internal class SingBoxCommandClient(
         requireClient().serviceReload()
     }
 
+    fun serviceStartedAtMillis(): Long = requireClient().startedAt
+
     private fun requireClient(): CommandClient =
         synchronized(access) { client } ?: error("sing-box API is not connected")
 

@@ -69,6 +69,7 @@ internal data class SingBoxProxiesState(
 
 internal data class SingBoxRuntimeState(
     val running: Boolean = false,
+    val serviceStartedAtMillis: Long = 0L,
     val control: SingBoxControlConfig = SingBoxControlConfig(),
     val traffic: SingBoxTrafficState = SingBoxTrafficState(),
     val memory: SingBoxMemoryState = SingBoxMemoryState(),
@@ -80,6 +81,11 @@ internal data class SingBoxRuntimeState(
     val delayTestingBaselines: Map<String, Long> = emptyMap(),
     val delayFailureBaselines: Map<String, Long> = emptyMap(),
     val lastError: String = "",
+)
+
+internal fun SingBoxRuntimeState.withServiceEpoch(startedAtMillis: Long): SingBoxRuntimeState = copy(
+    serviceStartedAtMillis = startedAtMillis.coerceAtLeast(0L),
+    traffic = traffic.copy(connected = false),
 )
 
 internal data class SingBoxDelayResult(

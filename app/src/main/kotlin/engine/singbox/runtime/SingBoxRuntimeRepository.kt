@@ -100,6 +100,7 @@ internal class SingBoxRuntimeRepository(
             } else {
                 current.copy(
                     running = false,
+                    serviceStartedAtMillis = 0L,
                     traffic = current.traffic.copy(connected = false),
                     proxiesRefreshing = false,
                     delayTestingTarget = null,
@@ -154,19 +155,38 @@ internal class SingBoxRuntimeRepository(
     private suspend fun reloadConfiguration(appState: AppState) {
         if (!appState.proxyRunning) return
         val active = requireActiveSession(appState)
+        val activeGeneration = synchronized(sessionLock) {
+            check(session === active) { "sing-box API session changed before reload" }
+            generation
+        }
         withContext(Dispatchers.IO) {
             if (appState.runMode == RunModeVpnService) {
                 VpnSingBoxConfigFactory.create(appContext, ProxyEngineStartRequest(appState))
-                active.reloadService()
+                check(updateServiceStartedAtIfCurrent(activeGeneration, active, 0L)) {
+                    "sing-box API session changed during reload"
+                }
+                try {
+                    active.reloadService()
+                } catch (error: Throwable) {
+                    refreshServiceStartedAt(activeGeneration, active)
+                    throw error
+                }
+                replaceSession(appState, appState.commandTarget())
             } else {
                 val root = appContext
                     .prepareRootConfigBuildContext(ProxyEngineStartRequest(appState))
                     .buildRootStartConfig()
                 writeRootConfigFile(root)
+                check(updateServiceStartedAtIfCurrent(activeGeneration, active, 0L)) {
+                    "sing-box API session changed during reload"
+                }
                 val result = AndroidRootShellGateway().exec(
                     command = "kill -HUP \"$(cat ${root.runtimeLayout.pidPath.shellQuote()})\"",
                     options = ShellExecOptions(logFailure = false),
                 )
+                if (result.errno != 0) {
+                    refreshServiceStartedAt(activeGeneration, active)
+                }
                 check(result.errno == 0) {
                     result.stderr.ifBlank { "Failed to reload ROOT sing-box configuration" }
                 }
@@ -236,6 +256,7 @@ internal class SingBoxRuntimeRepository(
             mutableState.update { current ->
                 current.copy(
                     running = false,
+                    serviceStartedAtMillis = 0L,
                     control = target.control,
                     traffic = current.traffic.copy(connected = false),
                     proxiesRefreshing = true,
@@ -251,11 +272,19 @@ internal class SingBoxRuntimeRepository(
                     if (!isCurrent(nextGeneration, target)) return@launch
                     val result = runCatching { next.connect() }
                     if (result.isSuccess) {
-                        synchronized(sessionLock) {
+                        val installed = synchronized(sessionLock) {
                             if (isCurrentLocked(nextGeneration, target)) {
                                 session = next
+                                true
+                            } else {
+                                false
                             }
                         }
+                        if (!installed) {
+                            next.disconnect()
+                            return@launch
+                        }
+                        refreshServiceStartedAt(nextGeneration, next)
                         if (appState.runMode == RunModeVpnService) {
                             runCatching {
                                 next.setMode(appState.singBoxModeName())
@@ -274,15 +303,14 @@ internal class SingBoxRuntimeRepository(
                         delay(ConnectRetryMillis.milliseconds)
                     }
                 }
-                if (isCurrent(nextGeneration, target)) {
-                    mutableState.update { current ->
-                        current.copy(
-                            running = false,
-                            traffic = current.traffic.copy(connected = false),
-                            proxiesRefreshing = false,
-                            lastError = lastError?.message.orEmpty(),
-                        )
-                    }
+                updateIfCurrent(nextGeneration) { current ->
+                    current.copy(
+                        running = false,
+                        serviceStartedAtMillis = 0L,
+                        traffic = current.traffic.copy(connected = false),
+                        proxiesRefreshing = false,
+                        lastError = lastError?.message.orEmpty(),
+                    )
                 }
             }
         }
@@ -317,6 +345,7 @@ internal class SingBoxRuntimeRepository(
                 updateIfCurrent(listenerGeneration) { current ->
                     current.copy(
                         running = false,
+                        serviceStartedAtMillis = 0L,
                         traffic = current.traffic.copy(connected = false),
                         proxiesRefreshing = false,
                         delayTestingTarget = null,
@@ -327,8 +356,10 @@ internal class SingBoxRuntimeRepository(
                 if (reconnect) {
                     appScope.launch(Dispatchers.IO) {
                         delay(ReconnectDelayMillis.milliseconds)
-                        if (isCurrent(listenerGeneration, target)) {
-                            replaceSession(appState, target)
+                        synchronized(sessionLock) {
+                            if (isCurrentLocked(listenerGeneration, target)) {
+                                replaceSession(appState, target)
+                            }
                         }
                     }
                 }
@@ -363,10 +394,46 @@ internal class SingBoxRuntimeRepository(
             }
 
             override fun onConnections(connections: SingBoxConnectionsState) {
-                if (!isGenerationCurrent(listenerGeneration)) return
-                latestConnections = connections
+                synchronized(sessionLock) {
+                    if (generation == listenerGeneration) {
+                        latestConnections = connections
+                    }
+                }
             }
         }
+
+    private fun refreshServiceStartedAt(
+        expectedGeneration: Long,
+        active: SingBoxCommandClient,
+    ) {
+        val startedAtMillis = runCatching {
+            active.serviceStartedAtMillis().also { value ->
+                require(value > 0L) { "sing-box returned an invalid service start timestamp: $value" }
+            }
+        }.onFailure { error ->
+            AndroidAppLogger.warn(
+                LogTag,
+                "Failed to read sing-box service start timestamp",
+                error,
+            )
+        }.getOrDefault(0L)
+        updateServiceStartedAtIfCurrent(expectedGeneration, active, startedAtMillis)
+    }
+
+    private fun updateServiceStartedAtIfCurrent(
+        expectedGeneration: Long,
+        active: SingBoxCommandClient,
+        startedAtMillis: Long,
+    ): Boolean = synchronized(sessionLock) {
+        if (generation != expectedGeneration || session !== active) {
+            false
+        } else {
+            mutableState.update { current ->
+                current.withServiceEpoch(startedAtMillis)
+            }
+            true
+        }
+    }
 
     private suspend fun requireActiveSession(appState: AppState): SingBoxCommandClient {
         require(appState.proxyRunning) { "Proxy service is not running" }
@@ -508,11 +575,16 @@ internal class SingBoxRuntimeRepository(
     }
 
     private fun updateIfCurrent(
-        generation: Long,
+        expectedGeneration: Long,
         transform: (SingBoxRuntimeState) -> SingBoxRuntimeState,
     ) {
-        if (!isGenerationCurrent(generation)) return
-        mutableState.update(transform)
+        updateStateIfGenerationCurrent(
+            lock = sessionLock,
+            expectedGeneration = expectedGeneration,
+            currentGeneration = { generation },
+            state = mutableState,
+            transform = transform,
+        )
     }
 
     private companion object {
@@ -525,6 +597,21 @@ internal class SingBoxRuntimeRepository(
         const val DelayTestNoProgressTimeoutMillis = 5_000L
         const val RootReloadWaitMillis = 750L
         const val LogTag = "SingBoxRuntime"
+    }
+}
+
+internal fun <T> updateStateIfGenerationCurrent(
+    lock: Any,
+    expectedGeneration: Long,
+    currentGeneration: () -> Long,
+    state: MutableStateFlow<T>,
+    transform: (T) -> T,
+): Boolean = synchronized(lock) {
+    if (currentGeneration() != expectedGeneration) {
+        false
+    } else {
+        state.update(transform)
+        true
     }
 }
 
