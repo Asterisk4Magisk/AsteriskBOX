@@ -9,6 +9,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,6 +47,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -59,11 +61,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -71,6 +76,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -320,6 +326,24 @@ fun SingBoxProxyPage(
         }
     }
 
+    fun testProxy(node: SingBoxProxyNode) {
+        if (!requireRuntime() || testingTarget != null) return
+        val stateSnapshot = appState
+        val proxyName = node.name
+        services.appScope.launch {
+            services.singBoxRuntime.testProxyDelay(stateSnapshot, proxyName)
+                .onSuccess { result ->
+                    val message = if (didSingBoxProxyDelayTestSucceed(result)) {
+                        delayDoneMessage
+                    } else {
+                        delayFailedMessage
+                    }
+                    tipNotifier.show(message)
+                }
+                .onFailure { error -> tipNotifier.showError(error, delayFailedMessage) }
+        }
+    }
+
     Scaffold(
         topBar = {
             Column(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
@@ -474,6 +498,7 @@ fun SingBoxProxyPage(
                                                 pendingSelections = pendingSelections,
                                             ),
                                             selectionEnabled = selectionEnabled,
+                                            delayTestEnabled = runtimeAvailable && testingTarget == null,
                                             compact = columns > 1,
                                             delayStatus = resolveSingBoxProxyDelayStatus(
                                                 nodeName = node.name,
@@ -484,7 +509,9 @@ fun SingBoxProxyPage(
                                                     runtimeState.delayTestingBaselines,
                                                 failedNodes = runtimeState.delayFailedNodes,
                                             ),
+                                            testing = testingTarget == node.name,
                                             onSelect = { selectProxy(group, node) },
+                                            onDelayTest = { testProxy(node) },
                                         )
                                     }
                                 }
@@ -807,9 +834,12 @@ private fun SingBoxProxyNodeCard(
     displayName: String,
     selected: Boolean,
     selectionEnabled: Boolean,
+    delayTestEnabled: Boolean,
     compact: Boolean,
     delayStatus: SingBoxProxyDelayStatus,
+    testing: Boolean,
     onSelect: () -> Unit,
+    onDelayTest: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val content: @Composable () -> Unit = {
@@ -852,7 +882,10 @@ private fun SingBoxProxyNodeCard(
                 delay = node.delay,
                 delayStatus = delayStatus,
                 selected = selected,
+                testing = testing,
+                enabled = delayTestEnabled,
                 compact = compact,
+                onClick = onDelayTest,
             )
         }
     }
@@ -875,7 +908,10 @@ private fun ProtocolDelayLine(
     delay: Int?,
     delayStatus: SingBoxProxyDelayStatus,
     selected: Boolean,
+    testing: Boolean,
+    enabled: Boolean,
     compact: Boolean,
+    onClick: () -> Unit,
 ) {
     val delayText = when (delayStatus) {
         SingBoxProxyDelayStatus.NotTested ->
@@ -888,46 +924,63 @@ private fun ProtocolDelayLine(
         SingBoxProxyDelayStatus.Failed ->
             stringResource(R.string.sing_box_proxies_delay_status_failed)
     }.trim()
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(28.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AsteriskInfoChip(
-            text = protocol.displaySingBoxProtocolName(compact = compact),
-            modifier = Modifier.weight(1f, fill = false),
-            emphasized = selected,
-            textStyle = if (compact) {
-                MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 10.sp,
-                    lineHeight = 14.sp,
-                )
-            } else {
-                MaterialTheme.typography.labelSmall
-            },
-        )
-        Box(
-            modifier = Modifier.padding(end = 8.dp).height(28.dp),
-            contentAlignment = Alignment.CenterEnd,
+    val viewConfiguration = LocalViewConfiguration.current
+    val chipTouchTargetViewConfiguration = remember(viewConfiguration) {
+        object : ViewConfiguration by viewConfiguration {
+            override val minimumTouchTargetSize = DpSize(28.dp, 28.dp)
+        }
+    }
+    CompositionLocalProvider(LocalViewConfiguration provides chipTouchTargetViewConfiguration) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(28.dp)
+                .clip(ui.theme.AsteriskShapeTokens.Pill)
+                .clickable(enabled = enabled, onClick = onClick),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = delayText,
-                style = if (compact) {
+            AsteriskInfoChip(
+                text = protocol.displaySingBoxProtocolName(compact = compact),
+                modifier = Modifier.weight(1f, fill = false),
+                emphasized = selected,
+                textStyle = if (compact) {
                     MaterialTheme.typography.labelSmall.copy(
                         fontSize = 10.sp,
                         lineHeight = 14.sp,
                     )
                 } else {
-                    MaterialTheme.typography.labelMedium
+                    MaterialTheme.typography.labelSmall
                 },
-                fontWeight = FontWeight.Medium,
-                color = delayColor(delayStatus, delay),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.End,
             )
+            Box(
+                modifier = Modifier.padding(end = 8.dp).height(28.dp),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                if (testing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.5.dp,
+                    )
+                } else {
+                    Text(
+                        text = delayText,
+                        style = if (compact) {
+                            MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp,
+                            )
+                        } else {
+                            MaterialTheme.typography.labelMedium
+                        },
+                        fontWeight = FontWeight.Medium,
+                        color = delayColor(delayStatus, delay),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.End,
+                    )
+                }
+            }
         }
     }
 }

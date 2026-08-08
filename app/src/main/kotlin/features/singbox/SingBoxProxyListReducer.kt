@@ -11,6 +11,7 @@ import app.modes.SingBoxProxySortDefault
 import app.modes.SingBoxProxySortDelay
 import app.modes.SingBoxProxySortName
 import engine.singbox.config.APP_GLOBAL_SELECTOR
+import engine.singbox.runtime.SingBoxDelayResult
 import engine.singbox.runtime.SingBoxProxiesState
 import engine.singbox.runtime.SingBoxProxyGroup
 
@@ -19,6 +20,10 @@ internal enum class SingBoxProxyDelayStatus {
     Testing,
     Measured,
     Failed,
+}
+
+internal fun didSingBoxProxyDelayTestSucceed(result: SingBoxDelayResult): Boolean {
+    return result.firstDelay != null
 }
 
 internal fun resolveSingBoxProxyDelayStatus(

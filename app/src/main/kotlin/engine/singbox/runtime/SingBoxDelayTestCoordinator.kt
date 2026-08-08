@@ -128,6 +128,27 @@ internal fun buildSingBoxDelayTestPlan(
     )
 }
 
+internal fun buildSingBoxProxyDelayTestPlan(
+    proxies: SingBoxProxiesState,
+    proxyName: String,
+): SingBoxDelayTestPlan {
+    if (proxies.groups.any { group -> group.name == proxyName }) {
+        return buildSingBoxDelayTestPlan(proxies, proxyName)
+    }
+    val proxy = requireNotNull(proxies.nodeByName[proxyName]) {
+        "sing-box proxy is unavailable: $proxyName"
+    }
+    return SingBoxDelayTestPlan(
+        commandGroupNames = listOf(proxyName),
+        targetNames = setOf(proxyName),
+        directTargetNamesByCommand = mapOf(proxyName to setOf(proxyName)),
+        maxDirectTargetCount = 1,
+        baselineTimes = mapOf(
+            proxyName to (proxy.delayUpdatedAtEpochSeconds ?: Long.MIN_VALUE),
+        ),
+    )
+}
+
 internal fun SingBoxDelayTestPlan.freshnessBaselines(
     failureBaselines: Map<String, Long>,
 ): Map<String, Long> = targetNames.associateWith { name ->
