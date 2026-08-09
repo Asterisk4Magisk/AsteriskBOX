@@ -16,6 +16,7 @@ internal fun AppBackupData.validateForRestore() {
     requireValidIds("route rule", routeRules, SingBoxRouteRuleState::id)
     requireValidIds("DNS server", dnsServers, SingBoxDnsServerState::id)
     requireValidIds("DNS rule", dnsRules, SingBoxDnsRuleState::id)
+    dnsRules.forEach { rule -> rule.requireValidLogicalChildIds("DNS rule ${rule.id}") }
     requireValidIds("custom resource file", customResourceFiles, AppBackupCustomResourceFile::id)
 
     val groupIds = outboundGroups.mapTo(mutableSetOf(), AppBackupOutboundGroup::id)
@@ -30,6 +31,17 @@ internal fun AppBackupData.validateForRestore() {
         ) {
             "Unknown outbound group update status: ${group.lastUpdateStatus}"
         }
+    }
+}
+
+private fun SingBoxDnsRuleState.requireValidLogicalChildIds(parentLabel: String) {
+    requireValidIds(
+        "$parentLabel logical child",
+        logicalRules,
+        SingBoxDnsRuleState::id,
+    )
+    logicalRules.forEach { child ->
+        child.requireValidLogicalChildIds("$parentLabel logical child ${child.id}")
     }
 }
 

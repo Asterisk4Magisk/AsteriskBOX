@@ -514,7 +514,7 @@
     <string name="settings_dns_ttl_invalid">TTL must be an integer from 0 to 4294967295</string>
     <string name="settings_sing_box_validation_failed">sing-box rejected these settings. Check the fields and try again.</string>
     <string name="settings_dns_reject_method">Reject method</string>
-    <string name="settings_dns_no_drop">Never switch to drop</string>
+    <string name="settings_dns_no_drop">Never drop requests</string>
     <string name="settings_dns_response_code">Response code</string>
     <string name="settings_dns_answer_records">Answer records</string>
     <string name="settings_dns_ns_records">Name server records</string>
@@ -1080,6 +1080,8 @@
     <string name="routing_conditions">Conditions</string>
     <string name="routing_add_condition">Add condition</string>
     <string name="routing_conditions_empty">Add a condition, then choose whether all or any conditions must match.</string>
+    <string name="settings_dns_logical_enabled_condition_required">At least one condition must be enabled.</string>
+    <string name="settings_dns_logical_invalid_condition">Every condition must contain a valid matcher.</string>
     <plurals name="routing_condition_count">
         <item quantity="one">%1$d condition</item>
         <item quantity="other">%1$d conditions</item>

@@ -17,6 +17,7 @@ internal fun AppBackupFile.migrateAppBackup(): AppBackupFile {
 
     return when (version) {
         CurrentAppBackupVersion -> this
+        1 -> copy(version = CurrentAppBackupVersion)
         else -> error("Unsupported backup file version")
     }
 }

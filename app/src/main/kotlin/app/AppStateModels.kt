@@ -251,12 +251,20 @@ data class SingBoxDnsRuleMatchState(
     val encodeAsString: Boolean = false,
 )
 
+const val SingBoxDnsRuleTypeDefault = "default"
+const val SingBoxDnsRuleTypeLogical = "logical"
+const val SingBoxDnsRuleLogicalModeAnd = "and"
+const val SingBoxDnsRuleLogicalModeOr = "or"
+
 @Stable
 @Serializable
 data class SingBoxDnsRuleState(
     val id: Int = 0,
     val remarks: String = "",
     val enabled: Boolean = true,
+    val type: String = SingBoxDnsRuleTypeDefault,
+    val logicalMode: String = SingBoxDnsRuleLogicalModeAnd,
+    val logicalRules: List<SingBoxDnsRuleState> = emptyList(),
     val matches: List<SingBoxDnsRuleMatchState> = emptyList(),
     val ipVersion: String = "",
     val network: String = "",

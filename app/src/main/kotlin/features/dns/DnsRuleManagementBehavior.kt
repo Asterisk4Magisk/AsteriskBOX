@@ -6,9 +6,11 @@ package features.dns
 import app.AppState
 import app.SingBoxDnsRuleMatchState
 import app.SingBoxDnsRuleState
+import app.SingBoxDnsRuleTypeLogical
 import app.nextAvailableDnsRuleId
 import app.visibleManagedReference
 import app.withPrunedDnsEvaluationReferences
+import engine.singbox.config.sanitized
 
 internal val DnsRuleMatcherGroups = listOf(
     listOf(
@@ -99,6 +101,41 @@ internal fun AppState.withSavedDnsRule(
     ).withPrunedDnsEvaluationReferences()
 }
 
+internal fun SingBoxDnsRuleState.nextLogicalDnsRuleId(): Int {
+    val usedIds = logicalRules.mapTo(mutableSetOf()) { rule -> rule.id }
+    var candidate = 1
+    while (candidate in usedIds) candidate += 1
+    return candidate
+}
+
+internal fun dnsPendingMatchersBlockSave(
+    ruleType: String,
+    hasPendingMatchers: Boolean,
+): Boolean = ruleType != SingBoxDnsRuleTypeLogical && hasPendingMatchers
+
+internal fun SingBoxDnsRuleState.dnsMatcherCount(): Int =
+    matches.count { match -> match.values.isNotEmpty() } +
+        ipVersion.countAsDnsMatcher() +
+        network.countAsDnsMatcher()
+
+private fun String.countAsDnsMatcher(): Int = if (isBlank()) 0 else 1
+
+internal fun SingBoxDnsRuleState.withSavedLogicalRule(
+    child: SingBoxDnsRuleState,
+): SingBoxDnsRuleState {
+    val normalized = child.sanitized()
+    val exists = logicalRules.any { rule -> rule.id == normalized.id }
+    return copy(
+        logicalRules = if (exists) {
+            logicalRules.map { rule ->
+                if (rule.id == normalized.id) normalized else rule
+            }
+        } else {
+            logicalRules + normalized
+        },
+    )
+}
+
 internal fun SingBoxDnsRuleState.withDnsRuleMatchValues(
     field: String,
     values: List<String>,
@@ -132,6 +169,9 @@ internal fun SingBoxDnsRuleState.withVisibleManagedReferences(
     labels: Map<String, String>,
     unavailableLabel: String,
 ): SingBoxDnsRuleState = copy(
+    logicalRules = logicalRules.map { rule ->
+        rule.withVisibleManagedReferences(labels, unavailableLabel)
+    },
     matches = matches.map { match ->
         if (match.field in ManagedDnsReferenceFields) {
             match.copy(
@@ -151,6 +191,9 @@ internal fun SingBoxDnsRuleState.withVisibleManagedReferences(
 )
 
 internal data class DnsRuleCardPresentation(
+    val type: String,
+    val logicalMode: String,
+    val logicalChildCount: Int,
     val action: String,
     val target: String?,
     val matchRules: List<SingBoxDnsRuleState>,
@@ -159,14 +202,17 @@ internal data class DnsRuleCardPresentation(
 internal fun SingBoxDnsRuleState.toDnsRuleCardPresentation(): DnsRuleCardPresentation {
     val ruleWithoutTarget = copy(server = "")
     return DnsRuleCardPresentation(
+        type = type,
+        logicalMode = logicalMode,
+        logicalChildCount = logicalRules.size,
         action = action,
         target = server.takeIf {
             (action == "route" || action == "evaluate") && server.isNotBlank()
         },
-        matchRules = if (matches.isEmpty()) {
-            listOf(ruleWithoutTarget)
-        } else {
-            matches.map { match -> ruleWithoutTarget.copy(matches = listOf(match)) }
+        matchRules = when {
+            type == SingBoxDnsRuleTypeLogical -> emptyList()
+            matches.isEmpty() -> listOf(ruleWithoutTarget)
+            else -> matches.map { match -> ruleWithoutTarget.copy(matches = listOf(match)) }
         },
     )
 }

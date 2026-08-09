@@ -5,8 +5,12 @@ package engine.singbox.config
 
 import app.AppState
 import app.SingBoxDnsRuleMatchState
+import app.SingBoxDnsRuleLogicalModeAnd
+import app.SingBoxDnsRuleLogicalModeOr
 import app.SingBoxDnsRuleMatchers
 import app.SingBoxDnsRuleState
+import app.SingBoxDnsRuleTypeDefault
+import app.SingBoxDnsRuleTypeLogical
 import app.SingBoxDnsServerState
 import app.SingBoxDnsServerTypes
 import app.effectiveLocalDnsEnabled
@@ -60,6 +64,15 @@ internal object SingBoxDnsCompiler {
                 val rules = appState.dnsRules
                     .filter(SingBoxDnsRuleState::enabled)
                     .map(SingBoxDnsRuleState::sanitized)
+                    .onEach { rule ->
+                        require(
+                            rule.hasValidDnsRuleStructure(
+                                validateDisabledChildren = false,
+                            ),
+                        ) {
+                            "DNS rule ${rule.id} contains an empty logical or headless rule"
+                        }
+                    }
                     .mapNotNull { rule ->
                         if (appState.runMode == RunModeVpnService) {
                             rule
@@ -96,9 +109,73 @@ internal object SingBoxDnsCompiler {
     }
 }
 
-private fun SingBoxDnsRuleState.forSingBoxMode(mode: Int): SingBoxDnsRuleState? {
+private sealed interface StaticDnsMatch {
+    data object Always : StaticDnsMatch
+    data object Never : StaticDnsMatch
+    data class Rule(val state: SingBoxDnsRuleState) : StaticDnsMatch
+}
+
+private fun SingBoxDnsRuleState.forSingBoxMode(mode: Int): SingBoxDnsRuleState? =
+    when (val resolved = resolveClashMode(mode)) {
+        StaticDnsMatch.Never -> null
+        StaticDnsMatch.Always -> copy(
+            type = SingBoxDnsRuleTypeDefault,
+            logicalMode = SingBoxDnsRuleLogicalModeAnd,
+            logicalRules = emptyList(),
+            matches = emptyList(),
+            ipVersion = "",
+            network = "",
+            invert = false,
+        )
+        is StaticDnsMatch.Rule -> resolved.state
+    }
+
+private fun SingBoxDnsRuleState.resolveClashMode(mode: Int): StaticDnsMatch {
+    if (type == SingBoxDnsRuleTypeLogical) {
+        val children = logicalRules
+            .filter(SingBoxDnsRuleState::enabled)
+            .map { child -> child.resolveClashMode(mode) }
+        val resolved = if (logicalMode == SingBoxDnsRuleLogicalModeOr) {
+            when {
+                children.any { child -> child == StaticDnsMatch.Always } ->
+                    StaticDnsMatch.Always
+                else -> {
+                    val remaining = children.filterIsInstance<StaticDnsMatch.Rule>()
+                    if (remaining.isEmpty()) {
+                        StaticDnsMatch.Never
+                    } else {
+                        StaticDnsMatch.Rule(
+                            copy(logicalRules = remaining.map { child -> child.state }),
+                        )
+                    }
+                }
+            }
+        } else {
+            when {
+                children.any { child -> child == StaticDnsMatch.Never } ->
+                    StaticDnsMatch.Never
+                else -> {
+                    val remaining = children.filterIsInstance<StaticDnsMatch.Rule>()
+                    if (remaining.isEmpty()) {
+                        StaticDnsMatch.Always
+                    } else {
+                        StaticDnsMatch.Rule(
+                            copy(logicalRules = remaining.map { child -> child.state }),
+                        )
+                    }
+                }
+            }
+        }
+        if (!invert || resolved is StaticDnsMatch.Rule) return resolved
+        return when (resolved) {
+            StaticDnsMatch.Always -> StaticDnsMatch.Never
+            StaticDnsMatch.Never -> StaticDnsMatch.Always
+            is StaticDnsMatch.Rule -> resolved
+        }
+    }
+
     val modeMatch = matches.firstOrNull { match -> match.field == "clash_mode" }
-        ?: return this
+        ?: return StaticDnsMatch.Rule(this)
     val activeMode = when (mode) {
         SingBoxModeGlobal -> "Global"
         SingBoxModeDirect -> "Direct"
@@ -107,21 +184,45 @@ private fun SingBoxDnsRuleState.forSingBoxMode(mode: Int): SingBoxDnsRuleState? 
     val matchesActiveMode = modeMatch.values.any { value ->
         value.equals(activeMode, ignoreCase = true)
     }
-    if (!matchesActiveMode && !invert) return null
     if (!matchesActiveMode) {
-        return copy(
-            matches = emptyList(),
-            ipVersion = "",
-            network = "",
-            invert = false,
-        )
+        return if (invert) StaticDnsMatch.Always else StaticDnsMatch.Never
     }
     val remainingMatches = matches.filterNot { match -> match.field == "clash_mode" }
-    if (invert && remainingMatches.isEmpty() && ipVersion.isBlank() && network.isBlank()) {
-        return null
+    val withoutMode = copy(matches = remainingMatches)
+    if (withoutMode.hasDefaultDnsMatchers()) {
+        return StaticDnsMatch.Rule(withoutMode)
     }
-    return copy(matches = remainingMatches)
+    return if (invert) StaticDnsMatch.Never else StaticDnsMatch.Always
 }
+
+internal fun SingBoxDnsRuleState.hasValidDnsRuleStructure(
+    nested: Boolean = false,
+    validateDisabledChildren: Boolean = true,
+): Boolean {
+    return when (type) {
+        SingBoxDnsRuleTypeLogical -> {
+            val enabledChildren = logicalRules.filter(SingBoxDnsRuleState::enabled)
+            val childrenToValidate = if (validateDisabledChildren) {
+                logicalRules
+            } else {
+                enabledChildren
+            }
+            logicalMode in setOf(SingBoxDnsRuleLogicalModeAnd, SingBoxDnsRuleLogicalModeOr) &&
+                enabledChildren.isNotEmpty() &&
+                childrenToValidate.all { child ->
+                    child.hasValidDnsRuleStructure(
+                        nested = true,
+                        validateDisabledChildren = validateDisabledChildren,
+                    )
+                }
+        }
+        SingBoxDnsRuleTypeDefault -> !nested || hasDefaultDnsMatchers()
+        else -> false
+    }
+}
+
+private fun SingBoxDnsRuleState.hasDefaultDnsMatchers(): Boolean =
+    compileDnsRuleMatch(this).keys.any { field -> field != "invert" }
 
 internal fun SingBoxDnsServerState.sanitized(): SingBoxDnsServerState =
     copy(
@@ -148,6 +249,13 @@ internal fun SingBoxDnsServerState.sanitized(): SingBoxDnsServerState =
 internal fun SingBoxDnsRuleState.sanitized(): SingBoxDnsRuleState =
     copy(
         remarks = remarks.trim(),
+        type = type.takeIf { value ->
+            value == SingBoxDnsRuleTypeDefault || value == SingBoxDnsRuleTypeLogical
+        } ?: SingBoxDnsRuleTypeDefault,
+        logicalMode = logicalMode.takeIf { value ->
+            value == SingBoxDnsRuleLogicalModeAnd || value == SingBoxDnsRuleLogicalModeOr
+        } ?: SingBoxDnsRuleLogicalModeAnd,
+        logicalRules = logicalRules.map(SingBoxDnsRuleState::sanitized),
         matches = matches
             .map(SingBoxDnsRuleMatchState::sanitized)
             .filter { match -> match.field in SingBoxDnsRuleMatchers && match.values.isNotEmpty() }
@@ -252,8 +360,30 @@ private fun kotlinx.serialization.json.JsonObjectBuilder.putNetworkServerFields(
     }
 }
 
-private fun SingBoxDnsRuleState.toJson(): JsonObject = buildJsonObject {
-    matches.filter { match -> match.field in SingBoxDnsRuleMatchers }.forEach { match ->
+private fun SingBoxDnsRuleState.toJson(): JsonObject =
+    JsonObject(compileDnsRuleMatch(this) + compileDnsRuleAction(this))
+
+private fun compileDnsRuleMatch(rule: SingBoxDnsRuleState): JsonObject = buildJsonObject {
+    if (rule.type == SingBoxDnsRuleTypeLogical) {
+        put("type", SingBoxDnsRuleTypeLogical)
+        put(
+            "mode",
+            if (rule.logicalMode == SingBoxDnsRuleLogicalModeOr) {
+                SingBoxDnsRuleLogicalModeOr
+            } else {
+                SingBoxDnsRuleLogicalModeAnd
+            },
+        )
+        putJsonArray("rules") {
+            rule.logicalRules
+                .filter(SingBoxDnsRuleState::enabled)
+                .forEach { child -> add(compileDnsRuleMatch(child)) }
+        }
+        if (rule.invert) put("invert", true)
+        return@buildJsonObject
+    }
+
+    rule.matches.filter { match -> match.field in SingBoxDnsRuleMatchers }.forEach { match ->
         when (match.field) {
             "source_port", "port" -> {
                 val numbers = match.values.mapNotNull(String::toIntOrNull)
@@ -296,35 +426,37 @@ private fun SingBoxDnsRuleState.toJson(): JsonObject = buildJsonObject {
             else -> putStringArrayIfNotEmpty(match.field, match.values)
         }
     }
-    ipVersion.toIntOrNull()?.takeIf { version -> version == 4 || version == 6 }?.let { version ->
+    rule.ipVersion.toIntOrNull()?.takeIf { version -> version == 4 || version == 6 }?.let { version ->
         put("ip_version", version)
     }
-    putIfNotBlank("network", network)
-    if (invert) put("invert", true)
+    putIfNotBlank("network", rule.network)
+    if (rule.invert) put("invert", true)
+}
 
-    put("action", action)
-    when (action) {
+private fun compileDnsRuleAction(rule: SingBoxDnsRuleState): JsonObject = buildJsonObject {
+    put("action", rule.action)
+    when (rule.action) {
         "route", "evaluate" -> {
-            putIfNotBlank("server", server)
-            if (action == "evaluate") putIfNotBlank("tag", evaluationTag)
-            putRouteOptions(this@toJson)
+            putIfNotBlank("server", rule.server)
+            if (rule.action == "evaluate") putIfNotBlank("tag", rule.evaluationTag)
+            putRouteOptions(rule)
         }
-        "route-options" -> putRouteOptions(this@toJson)
+        "route-options" -> putRouteOptions(rule)
         "reject" -> {
-            if (rejectMethod == "drop") {
+            if (rule.rejectMethod == "drop") {
                 put("method", "drop")
-            } else if (noDrop) {
+            } else if (rule.noDrop) {
                 put("no_drop", true)
             }
         }
         "predefined" -> {
-            rcode.takeIf(String::isNotBlank)?.let { value ->
+            rule.rcode.takeIf(String::isNotBlank)?.let { value ->
                 val code = value.toIntOrNull()
                 if (code != null) put("rcode", code) else put("rcode", value)
             }
-            putStringArrayIfNotEmpty("answer", answer)
-            putStringArrayIfNotEmpty("ns", ns)
-            putStringArrayIfNotEmpty("extra", extra)
+            putStringArrayIfNotEmpty("answer", rule.answer)
+            putStringArrayIfNotEmpty("ns", rule.ns)
+            putStringArrayIfNotEmpty("extra", rule.extra)
         }
     }
 }

@@ -47,7 +47,11 @@ import androidx.compose.ui.unit.sp
 import app.ManagedOutboundChoice
 import app.ManagedReferenceChoice
 import app.SingBoxDnsRuleActions
+import app.SingBoxDnsRuleLogicalModeAnd
+import app.SingBoxDnsRuleLogicalModeOr
 import app.SingBoxDnsRuleState
+import app.SingBoxDnsRuleTypeDefault
+import app.SingBoxDnsRuleTypeLogical
 import app.SingBoxDnsServerState
 import app.SingBoxDnsServerTypes
 import app.visibleManagedReference
@@ -56,6 +60,7 @@ import engine.network.isIpAddress
 import engine.network.isIpv4CidrAddress
 import engine.singbox.DefaultSingBoxDnsFakeIpRange
 import engine.singbox.DefaultSingBoxDnsTimeout
+import engine.singbox.config.hasValidDnsRuleStructure
 import engine.singbox.config.sanitized
 import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.isSingBoxDnsQueryType
@@ -65,6 +70,8 @@ import engine.singbox.isSingBoxUnsigned16
 import engine.singbox.isSingBoxUnsigned32
 import features.dns.DnsMatchResponseChoice
 import features.dns.DnsRuleMatcherGroups
+import features.dns.dnsPendingMatchersBlockSave
+import features.dns.nextLogicalDnsRuleId
 import features.dns.withDnsRuleMatchValues
 import features.settings.DnsSettingsDraft
 import features.settings.withDnsServerTagReplacement
@@ -72,8 +79,16 @@ import org.asterisk.zcc.abox.R
 import ui.components.AsteriskInfoChip
 import ui.components.EditorPageScaffold
 import ui.components.ReferenceSelectionCard
+import ui.components.RuleEditorChoice
+import ui.components.RuleEditorChoiceCard
+import ui.components.RuleEditorChipGroupCard
+import ui.components.RuleEditorSectionTitle
+import ui.components.RuleEditorSwitchCard
+import ui.components.RuleEditorTextField
 import ui.components.StringListEditor
+import ui.components.WarningConfirmDialog
 import ui.components.localizedLabel
+import ui.components.ruleEditorChoices
 import ui.components.singBoxOptionLabel
 import ui.components.singBoxProtocolChoices
 import ui.theme.AsteriskMotion
@@ -869,9 +884,12 @@ internal fun DnsRuleEditorScaffold(
     onEditorChange: (SingBoxDnsRuleState) -> Unit,
     onDismissRequest: () -> Unit,
     onSave: (SingBoxDnsRuleState) -> Unit,
+    onEditChild: (SingBoxDnsRuleState, SingBoxDnsRuleState) -> Unit,
+    nested: Boolean = false,
 ) {
     val rule = editor.rule
-    val pendingMatchers = remember(editor.index, rule.id) {
+    var pendingChildDelete by remember { mutableStateOf<SingBoxDnsRuleState?>(null) }
+    val pendingMatchers = remember(editor.index, rule.id, rule.type) {
         mutableStateMapOf<String, Boolean>()
     }
     val actionLabels = SingBoxDnsRuleActions.map { action -> dnsRuleActionLabel(action) }
@@ -881,56 +899,75 @@ internal fun DnsRuleEditorScaffold(
     val durationMessage = stringResource(R.string.settings_dns_duration_invalid)
     val invalidMatchMessage = stringResource(R.string.settings_dns_rule_value_invalid)
     val routeAction = rule.action == "route" || rule.action == "evaluate"
-    val serverError = if (routeAction && rule.server !in serverTags) {
+    val serverError = if (!nested && routeAction && rule.server !in serverTags) {
         stringResource(R.string.settings_dns_server_required)
     } else {
         null
     }
-    val timeoutError = rule.timeout.takeIf(String::isNotBlank)?.let {
+    val timeoutError = rule.timeout.takeIf { value -> !nested && value.isNotBlank() }?.let {
         dnsDurationError(it, durationMessage)
     }
-    val ttlError = rule.rewriteTtl.takeIf(String::isNotBlank)?.let { value ->
+    val ttlError = rule.rewriteTtl.takeIf { value -> !nested && value.isNotBlank() }?.let { value ->
         if (isSingBoxUnsigned32(value)) null
         else stringResource(R.string.settings_dns_ttl_invalid)
     }
-    val subnetError = rule.clientSubnet.takeIf(String::isNotBlank)?.let { value ->
+    val subnetError = rule.clientSubnet.takeIf { value -> !nested && value.isNotBlank() }?.let { value ->
         if (isIpAddress(value) || isCidrAddress(value)) null
         else stringResource(R.string.settings_dns_cidr_invalid)
     }
     val rcodeError = rule.rcode
-        .takeIf { value -> rule.action == "predefined" && value.isNotBlank() }
+        .takeIf { value -> !nested && rule.action == "predefined" && value.isNotBlank() }
         ?.let { value ->
             if (isSingBoxDnsRCode(value)) null else invalidMatchMessage
         }
-    val matchesValid = rule.matches.all { match ->
-        val managedChoices = when (match.field) {
-            "inbound" -> inboundChoices.map { choice -> choice.first }
-            "preferred_by" -> preferredByChoices.map { choice -> choice.first }
-            "match_response" -> null
-            "protocol" -> protocolChoices.map { choice -> choice.first }
-            "network_type" -> DnsNetworkTypes
-            "rule_set" -> ruleSetChoices.map { choice -> choice.first }
-            else -> null
-        }
-        match.values.isNotEmpty() &&
-            (managedChoices == null || match.values.all(managedChoices::contains)) &&
-            (
-                match.field != "match_response" ||
-                    match.values.singleOrNull()?.let { value ->
-                        matchResponseChoices.any { choice ->
-                            choice.first.value == value && match.encodeAsString
-                        }
-                    } == true
-                ) &&
-            match.values.all { value ->
-                dnsRuleValueError(match.field, value, invalidMatchMessage) == null
+    fun fieldMatchesValid(candidate: SingBoxDnsRuleState): Boolean =
+        candidate.matches.all { match ->
+            val managedChoices = when (match.field) {
+                "inbound" -> inboundChoices.map { choice -> choice.first }
+                "preferred_by" -> preferredByChoices.map { choice -> choice.first }
+                "match_response" -> null
+                "protocol" -> protocolChoices.map { choice -> choice.first }
+                "network_type" -> DnsNetworkTypes
+                "rule_set" -> ruleSetChoices.map { choice -> choice.first }
+                else -> null
             }
-    }
-    val canSave = pendingMatchers.isEmpty() &&
-        matchesValid &&
+            match.values.isNotEmpty() &&
+                (managedChoices == null || match.values.all(managedChoices::contains)) &&
+                (
+                    match.field != "match_response" ||
+                        match.values.singleOrNull()?.let { value ->
+                            matchResponseChoices.any { choice ->
+                                choice.first.value == value && match.encodeAsString
+                            }
+                        } == true
+                    ) &&
+                match.values.all { value ->
+                    dnsRuleValueError(match.field, value, invalidMatchMessage) == null
+                }
+        }
+
+    fun ruleTreeValid(
+        candidate: SingBoxDnsRuleState,
+        nestedCandidate: Boolean = false,
+    ): Boolean = candidate.hasValidDnsRuleStructure(nestedCandidate) &&
+        if (candidate.type == SingBoxDnsRuleTypeLogical) {
+            candidate.logicalRules.all { child ->
+                ruleTreeValid(child, nestedCandidate = true)
+            }
+        } else {
+            fieldMatchesValid(candidate)
+        }
+
+    val canSave = !dnsPendingMatchersBlockSave(
+        ruleType = rule.type,
+        hasPendingMatchers = pendingMatchers.isNotEmpty(),
+    ) &&
+        ruleTreeValid(rule) &&
         listOf(serverError, timeoutError, ttlError, subnetError, rcodeError).all { it == null }
     val actionSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
     val actionEffectsMotion = AsteriskMotion.effects<Float>()
+    val fieldSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
+    val fieldEffectsMotion = AsteriskMotion.effects<Float>()
 
     EditorPageScaffold(
         outerPadding = outerPadding,
@@ -938,10 +975,11 @@ internal fun DnsRuleEditorScaffold(
         title = {
             Text(
                 stringResource(
-                    if (editor.index == null) {
-                        R.string.settings_dns_add_rule
-                    } else {
-                        R.string.settings_dns_edit_rule
+                    when {
+                        nested && rule.remarks.isNotBlank() -> R.string.routing_edit_condition
+                        nested -> R.string.routing_new_condition
+                        editor.index == null -> R.string.settings_dns_add_rule
+                        else -> R.string.settings_dns_edit_rule
                     },
                 ),
             )
@@ -951,147 +989,276 @@ internal fun DnsRuleEditorScaffold(
         onBack = onDismissRequest,
         onSave = { onSave(rule.sanitized()) },
     ) { contentPadding ->
-        LazyColumn(
+        AnimatedContent(
+            targetState = rule.type,
             modifier = Modifier.fillMaxWidth(),
-            contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            item(key = "basic-title") {
-                DnsRuleEditorSectionTitle(
-                    stringResource(R.string.routing_section_basic),
-                )
-            }
-            item(key = "remarks") {
-                SettingsTextField(
-                    value = rule.remarks,
-                    onValueChange = { onEditorChange(rule.copy(remarks = it)) },
-                    label = stringResource(R.string.dns_rule_remarks),
-                    errorText = null,
-                    horizontalPadding = 0.dp,
-                )
-            }
-            item(key = "action") {
-                WindowDropdownPreference(
-                    title = stringResource(R.string.settings_dns_rule_action),
-                    icon = Icons.AutoMirrored.Rounded.AltRoute,
-                    items = actionLabels,
-                    selectedIndex = SingBoxDnsRuleActions.indexOf(rule.action).coerceAtLeast(0),
-                    onSelectedIndexChange = { index ->
-                        onEditorChange(rule.copy(action = SingBoxDnsRuleActions[index]))
-                    },
-                )
-            }
-            item(key = "action-fields") {
-                AnimatedContent(
-                    targetState = rule.action,
-                    modifier = Modifier.fillMaxWidth(),
-                    transitionSpec = AsteriskMotion.fadeThrough(
-                        effectsSpec = actionEffectsMotion,
-                        sizeSpec = actionSizeMotion,
-                    ),
-                    contentAlignment = Alignment.TopStart,
-                    label = "dns-rule-action-fields",
-                ) { currentAction ->
-                    DnsRuleActionFields(
-                        action = currentAction,
-                        rule = rule,
-                        editorKey = editor.rule.id,
-                        serverChoices = serverChoices,
-                        rejectMethodLabels = rejectMethodLabels,
-                        serverError = serverError,
-                        timeoutError = timeoutError,
-                        ttlError = ttlError,
-                        subnetError = subnetError,
-                        rcodeError = rcodeError,
-                        onRuleChange = onEditorChange,
+            transitionSpec = AsteriskMotion.fadeThrough(
+                effectsSpec = fieldEffectsMotion,
+                sizeSpec = fieldSizeMotion,
+            ),
+            contentAlignment = Alignment.TopStart,
+            label = "dns-rule-type-fields",
+        ) { visibleType ->
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = contentPadding,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                item(key = "basic-title") {
+                    RuleEditorSectionTitle(
+                        stringResource(R.string.routing_section_basic),
                     )
                 }
-            }
-            item(key = "invert") {
-                SwitchPreference(
-                    title = stringResource(R.string.settings_dns_invert),
-                    icon = Icons.Rounded.Sync,
-                    checked = rule.invert,
-                    onCheckedChange = { onEditorChange(rule.copy(invert = it)) },
-                )
-            }
-
-            DnsRuleMatcherGroups.forEachIndexed { sectionIndex, matchers ->
-                item(key = "matcher-section-$sectionIndex") {
-                    DnsRuleEditorSectionTitle(
-                        stringResource(dnsRuleMatcherSectionTitleResource(sectionIndex)),
-                    )
-                }
-                if (sectionIndex == 0) {
-                    item(key = "ip-version") {
-                        WindowDropdownPreference(
-                            title = dnsRuleMatcherLabel("ip_version"),
-                            icon = Icons.Rounded.Language,
-                            items = listOf(
-                                stringResource(R.string.settings_dns_any),
-                                singBoxOptionLabel(
-                                    stringResource(R.string.common_ipv4),
-                                    "4",
-                                ),
-                                singBoxOptionLabel(
-                                    stringResource(R.string.common_ipv6),
-                                    "6",
-                                ),
-                            ),
-                            selectedIndex = DnsIpVersions.indexOf(rule.ipVersion).coerceAtLeast(0),
-                            onSelectedIndexChange = { index ->
-                                onEditorChange(rule.copy(ipVersion = DnsIpVersions[index]))
-                            },
-                        )
-                    }
-                    item(key = "network") {
-                        WindowDropdownPreference(
-                            title = dnsRuleMatcherLabel("network"),
-                            icon = Icons.Rounded.Lan,
-                            items = listOf(
-                                stringResource(R.string.settings_dns_any),
-                                singBoxOptionLabel(
-                                    stringResource(R.string.common_tcp),
-                                    "tcp",
-                                ),
-                                singBoxOptionLabel(
-                                    stringResource(R.string.common_udp),
-                                    "udp",
-                                ),
-                            ),
-                            selectedIndex = DnsNetworks.indexOf(rule.network).coerceAtLeast(0),
-                            onSelectedIndexChange = { index ->
-                                onEditorChange(rule.copy(network = DnsNetworks[index]))
-                            },
-                        )
-                    }
-                }
-                items(
-                    items = matchers,
-                    key = { matcher -> "matcher-$matcher" },
-                ) { matcher ->
-                    DnsRuleMatchFieldEditor(
-                        rule = rule,
-                        matcher = matcher,
-                        inboundChoices = inboundChoices,
-                        preferredByChoices = preferredByChoices,
-                        matchResponseChoices = matchResponseChoices,
-                        protocolChoices = protocolChoices,
-                        ruleSetChoices = ruleSetChoices,
-                        invalidMessage = invalidMatchMessage,
-                        onRuleChange = onEditorChange,
-                        onPendingChange = { pending ->
-                            if (pending) {
-                                pendingMatchers[matcher] = true
+                item(key = "remarks") {
+                    RuleEditorTextField(
+                        value = rule.remarks,
+                        onValueChange = { onEditorChange(rule.copy(remarks = it)) },
+                        label = stringResource(
+                            if (nested) {
+                                R.string.routing_condition_name
                             } else {
-                                pendingMatchers.remove(matcher)
-                            }
-                        },
+                                R.string.dns_rule_remarks
+                            },
+                        ),
+                        errorText = null,
                     )
+                }
+                item(key = "type") {
+                    RuleEditorChoiceCard(
+                        title = stringResource(R.string.routing_rule_type),
+                        summary = "",
+                        choices = listOf(
+                            RuleEditorChoice(
+                                SingBoxDnsRuleTypeDefault,
+                                singBoxOptionLabel(
+                                    stringResource(R.string.routing_rule_type_default),
+                                    SingBoxDnsRuleTypeDefault,
+                                ),
+                            ),
+                            RuleEditorChoice(
+                                SingBoxDnsRuleTypeLogical,
+                                singBoxOptionLabel(
+                                    stringResource(R.string.routing_rule_type_logical),
+                                    SingBoxDnsRuleTypeLogical,
+                                ),
+                            ),
+                        ),
+                        selectedValue = rule.type,
+                        onSelected = { value -> onEditorChange(rule.copy(type = value)) },
+                    )
+                }
+                if (!nested) {
+                    item(key = "action") {
+                        RuleEditorChoiceCard(
+                            title = stringResource(R.string.settings_dns_rule_action),
+                            summary = "",
+                            choices = ruleEditorChoices(SingBoxDnsRuleActions, actionLabels),
+                            selectedValue = rule.action,
+                            onSelected = { action ->
+                                onEditorChange(rule.copy(action = action))
+                            },
+                        )
+                    }
+                    item(key = "action-fields") {
+                        AnimatedContent(
+                            targetState = rule.action,
+                            modifier = Modifier.fillMaxWidth(),
+                            transitionSpec = AsteriskMotion.fadeThrough(
+                                effectsSpec = actionEffectsMotion,
+                                sizeSpec = actionSizeMotion,
+                            ),
+                            contentAlignment = Alignment.TopStart,
+                            label = "dns-rule-action-fields",
+                        ) { currentAction ->
+                            DnsRuleActionFields(
+                                action = currentAction,
+                                rule = rule,
+                                editorKey = editor.rule.id,
+                                serverChoices = serverChoices,
+                                rejectMethodLabels = rejectMethodLabels,
+                                serverError = serverError,
+                                timeoutError = timeoutError,
+                                ttlError = ttlError,
+                                subnetError = subnetError,
+                                rcodeError = rcodeError,
+                                onRuleChange = onEditorChange,
+                            )
+                        }
+                    }
+                }
+                item(key = "invert") {
+                    RuleEditorSwitchCard(
+                        title = stringResource(R.string.settings_dns_invert),
+                        checked = rule.invert,
+                        onCheckedChange = { onEditorChange(rule.copy(invert = it)) },
+                    )
+                }
+
+                if (visibleType == SingBoxDnsRuleTypeLogical) {
+                    item(key = "logic-title") {
+                        RuleEditorSectionTitle(stringResource(R.string.routing_section_logic))
+                    }
+                    item(key = "logic-mode") {
+                        val modes = listOf(
+                            SingBoxDnsRuleLogicalModeAnd,
+                            SingBoxDnsRuleLogicalModeOr,
+                        )
+                        WindowDropdownPreference(
+                            title = stringResource(R.string.routing_logical_mode),
+                            icon = Icons.Rounded.AccountTree,
+                            items = listOf(
+                                singBoxOptionLabel(
+                                    stringResource(R.string.routing_logical_mode_and),
+                                    SingBoxDnsRuleLogicalModeAnd,
+                                ),
+                                singBoxOptionLabel(
+                                    stringResource(R.string.routing_logical_mode_or),
+                                    SingBoxDnsRuleLogicalModeOr,
+                                ),
+                            ),
+                            selectedIndex = modes.indexOf(rule.logicalMode).coerceAtLeast(0),
+                            onSelectedIndexChange = { index ->
+                                onEditorChange(rule.copy(logicalMode = modes[index]))
+                            },
+                        )
+                    }
+                    item(key = "logic-conditions") {
+                        DnsLogicalChildrenCard(
+                            rules = rule.logicalRules,
+                            onAdd = {
+                                onEditChild(
+                                    rule,
+                                    SingBoxDnsRuleState(id = rule.nextLogicalDnsRuleId()),
+                                )
+                            },
+                            onEdit = { child -> onEditChild(rule, child) },
+                            onEnabledChange = { child, enabled ->
+                                onEditorChange(
+                                    rule.copy(
+                                        logicalRules = rule.logicalRules.map { candidate ->
+                                            if (candidate.id == child.id) {
+                                                candidate.copy(enabled = enabled)
+                                            } else {
+                                                candidate
+                                            }
+                                        },
+                                    ),
+                                )
+                            },
+                            onDelete = { child -> pendingChildDelete = child },
+                        )
+                    }
+                } else {
+                    DnsRuleMatcherGroups.forEachIndexed { sectionIndex, matchers ->
+                        item(key = "matcher-section-$sectionIndex") {
+                            RuleEditorSectionTitle(
+                                stringResource(
+                                    dnsRuleMatcherSectionTitleResource(sectionIndex),
+                                ),
+                            )
+                        }
+                        if (sectionIndex == 0) {
+                            item(key = "ip-version") {
+                                WindowDropdownPreference(
+                                    title = dnsRuleMatcherLabel("ip_version"),
+                                    icon = Icons.Rounded.Language,
+                                    items = listOf(
+                                        stringResource(R.string.settings_dns_any),
+                                        singBoxOptionLabel(
+                                            stringResource(R.string.common_ipv4),
+                                            "4",
+                                        ),
+                                        singBoxOptionLabel(
+                                            stringResource(R.string.common_ipv6),
+                                            "6",
+                                        ),
+                                    ),
+                                    selectedIndex = DnsIpVersions.indexOf(rule.ipVersion)
+                                        .coerceAtLeast(0),
+                                    onSelectedIndexChange = { index ->
+                                        onEditorChange(
+                                            rule.copy(ipVersion = DnsIpVersions[index]),
+                                        )
+                                    },
+                                )
+                            }
+                            item(key = "network") {
+                                WindowDropdownPreference(
+                                    title = dnsRuleMatcherLabel("network"),
+                                    icon = Icons.Rounded.Lan,
+                                    items = listOf(
+                                        stringResource(R.string.settings_dns_any),
+                                        singBoxOptionLabel(
+                                            stringResource(R.string.common_tcp),
+                                            "tcp",
+                                        ),
+                                        singBoxOptionLabel(
+                                            stringResource(R.string.common_udp),
+                                            "udp",
+                                        ),
+                                    ),
+                                    selectedIndex = DnsNetworks.indexOf(rule.network)
+                                        .coerceAtLeast(0),
+                                    onSelectedIndexChange = { index ->
+                                        onEditorChange(rule.copy(network = DnsNetworks[index]))
+                                    },
+                                )
+                            }
+                        }
+                        items(
+                            items = matchers,
+                            key = { matcher -> "matcher-$matcher" },
+                        ) { matcher ->
+                            DnsRuleMatchFieldEditor(
+                                rule = rule,
+                                matcher = matcher,
+                                inboundChoices = inboundChoices,
+                                preferredByChoices = preferredByChoices,
+                                matchResponseChoices = matchResponseChoices,
+                                protocolChoices = protocolChoices,
+                                ruleSetChoices = ruleSetChoices,
+                                invalidMessage = invalidMatchMessage,
+                                onRuleChange = onEditorChange,
+                                onPendingChange = { pending ->
+                                    if (pending) {
+                                        pendingMatchers[matcher] = true
+                                    } else {
+                                        pendingMatchers.remove(matcher)
+                                    }
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }
     }
+
+    WarningConfirmDialog(
+        show = pendingChildDelete != null,
+        title = stringResource(R.string.routing_delete_condition_title),
+        summary = stringResource(
+            R.string.routing_delete_condition_message,
+            pendingChildDelete?.remarks?.takeIf(String::isNotBlank)
+                ?: stringResource(R.string.routing_unnamed_condition),
+        ),
+        dismissText = stringResource(R.string.common_cancel),
+        confirmText = stringResource(R.string.common_delete),
+        onDismissRequest = { pendingChildDelete = null },
+        onConfirm = {
+            val childId = pendingChildDelete?.id
+            if (childId != null) {
+                onEditorChange(
+                    rule.copy(
+                        logicalRules = rule.logicalRules.filterNot { child ->
+                            child.id == childId
+                        },
+                    ),
+                )
+            }
+            pendingChildDelete = null
+        },
+    )
 }
 
 @Composable
@@ -1108,26 +1275,33 @@ private fun DnsRuleActionFields(
     rcodeError: String?,
     onRuleChange: (SingBoxDnsRuleState) -> Unit,
 ) {
-    val serverTags = serverChoices.map { choice -> choice.first }
+    val unavailableLabel = stringResource(R.string.common_unavailable)
+    val noServerLabel = stringResource(R.string.settings_dns_no_server)
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         when (action) {
             "route", "evaluate" -> {
-                WindowDropdownPreference(
+                RuleEditorChoiceCard(
                     title = stringResource(R.string.settings_dns_target_server),
-                    icon = Icons.Rounded.Dns,
-                    items = serverChoices.map { choice -> choice.second }.ifEmpty {
-                        listOf(stringResource(R.string.settings_dns_no_server))
+                    summary = serverError.orEmpty(),
+                    choices = dnsServerEditorChoices(serverChoices),
+                    selectedValue = rule.server,
+                    onSelected = { server ->
+                        onRuleChange(selectDnsRuleServer(rule, server, serverChoices))
                     },
-                    selectedIndex = serverTags.indexOf(rule.server).coerceAtLeast(0),
-                    onSelectedIndexChange = { index ->
-                        serverTags.getOrNull(index)?.let { tag ->
-                            onRuleChange(rule.copy(server = tag))
+                    missingLabel = { value ->
+                        if (serverChoices.isEmpty()) {
+                            noServerLabel
+                        } else {
+                            visibleManagedReference(
+                                value = value,
+                                labels = serverChoices.toMap(),
+                                unavailableLabel = unavailableLabel,
+                            )
                         }
                     },
-                    summary = serverError.orEmpty(),
                 )
                 DnsRuleRouteOptions(
                     rule,
@@ -1145,13 +1319,13 @@ private fun DnsRuleActionFields(
                 subnetError,
             )
             "reject" -> {
-                WindowDropdownPreference(
+                RuleEditorChoiceCard(
                     title = stringResource(R.string.settings_dns_reject_method),
-                    icon = Icons.Rounded.Block,
-                    items = rejectMethodLabels,
-                    selectedIndex = DnsRejectMethods.indexOf(rule.rejectMethod).coerceAtLeast(0),
-                    onSelectedIndexChange = { index ->
-                        onRuleChange(rule.copy(rejectMethod = DnsRejectMethods[index]))
+                    summary = "",
+                    choices = ruleEditorChoices(DnsRejectMethods, rejectMethodLabels),
+                    selectedValue = rule.rejectMethod,
+                    onSelected = { method ->
+                        onRuleChange(rule.copy(rejectMethod = method))
                     },
                 )
                 AnimatedVisibility(
@@ -1159,9 +1333,8 @@ private fun DnsRuleActionFields(
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
-                    SwitchPreference(
+                    RuleEditorSwitchCard(
                         title = stringResource(R.string.settings_dns_no_drop),
-                        icon = Icons.Rounded.Security,
                         checked = rule.noDrop,
                         onCheckedChange = {
                             onRuleChange(rule.copy(noDrop = it))
@@ -1171,29 +1344,43 @@ private fun DnsRuleActionFields(
             }
             "predefined" -> {
                 var customResponseCode by rememberSaveable(editorKey) {
-                    mutableStateOf(rule.rcode !in DnsResponseCodes)
+                    mutableStateOf(
+                        initialDnsPredefinedResponseState(
+                            rcode = rule.rcode,
+                            responseCodes = DnsResponseCodes,
+                        ).custom,
+                    )
                 }
                 val responseCodeLabels = DnsResponseCodes.map { code ->
                     code.ifBlank {
                         stringResource(R.string.settings_dns_response_code_default)
                     }
                 }
-                WindowDropdownPreference(
+                RuleEditorChoiceCard(
                     title = stringResource(R.string.settings_dns_response_code),
-                    icon = Icons.Rounded.Policy,
-                    items = responseCodeLabels +
-                        stringResource(R.string.settings_dns_custom_response_code),
-                    selectedIndex = if (customResponseCode) {
-                        DnsResponseCodes.size
+                    summary = "",
+                    choices = ruleEditorChoices(
+                        values = DnsResponseCodes + DnsCustomResponseCodeChoice,
+                        labels = responseCodeLabels +
+                            stringResource(R.string.settings_dns_custom_response_code),
+                    ),
+                    selectedValue = if (customResponseCode) {
+                        DnsCustomResponseCodeChoice
                     } else {
-                        DnsResponseCodes.indexOf(rule.rcode).coerceAtLeast(0)
+                        rule.rcode
                     },
-                    onSelectedIndexChange = { index ->
-                        customResponseCode = index == DnsResponseCodes.size
-                        if (!customResponseCode) {
-                            onRuleChange(rule.copy(rcode = DnsResponseCodes[index]))
-                        } else if (rule.rcode in DnsResponseCodes) {
-                            onRuleChange(rule.copy(rcode = ""))
+                    onSelected = { responseCode ->
+                        val next = selectDnsPredefinedResponseCode(
+                            state = DnsPredefinedResponseState(
+                                custom = customResponseCode,
+                                rcode = rule.rcode,
+                            ),
+                            selectedValue = responseCode,
+                            responseCodes = DnsResponseCodes,
+                        )
+                        customResponseCode = next.custom
+                        if (next.rcode != rule.rcode) {
+                            onRuleChange(rule.copy(rcode = next.rcode))
                         }
                     },
                 )
@@ -1202,7 +1389,7 @@ private fun DnsRuleActionFields(
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
-                    SettingsTextField(
+                    RuleEditorTextField(
                         value = rule.rcode.takeUnless(DnsResponseCodes::contains).orEmpty(),
                         onValueChange = { value ->
                             onRuleChange(rule.copy(rcode = value))
@@ -1210,7 +1397,6 @@ private fun DnsRuleActionFields(
                         label = stringResource(R.string.settings_dns_custom_response_code),
                         errorText = rcodeError,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                        horizontalPadding = 0.dp,
                     )
                 }
                 DnsRecordListEditor(
@@ -1309,9 +1495,9 @@ private fun DnsRuleMatchFieldEditor(
                 )
                 networkType to singBoxOptionLabel(label, networkType)
             }
-            ReferenceSelectionCard(
+            val unavailableLabel = stringResource(R.string.common_unavailable)
+            RuleEditorChipGroupCard(
                 title = dnsRuleMatcherLabel(matcher),
-                emptyText = stringResource(R.string.common_not_specified),
                 choices = choices,
                 selected = values.toSet(),
                 onToggle = { networkType ->
@@ -1322,6 +1508,7 @@ private fun DnsRuleMatchFieldEditor(
                     }
                     onRuleChange(rule.withDnsRuleMatchValues(matcher, nextValues))
                 },
+                staleLabel = { unavailableLabel },
             )
             onPendingChange(false)
         }
@@ -1374,7 +1561,7 @@ private fun DnsRuleMatchFieldEditor(
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
-                    SettingsTextField(
+                    RuleEditorTextField(
                         value = customValue,
                         onValueChange = { value ->
                             customValue = value
@@ -1391,7 +1578,6 @@ private fun DnsRuleMatchFieldEditor(
                             keyboardType = KeyboardType.Number,
                             imeAction = ImeAction.Next,
                         ),
-                        horizontalPadding = 0.dp,
                     )
                 }
             }
@@ -1497,19 +1683,6 @@ private fun DnsRuleMatchFieldEditor(
     }
 }
 
-@Composable
-private fun DnsRuleEditorSectionTitle(title: String) {
-    Text(
-        text = title,
-        color = MaterialTheme.colorScheme.primary,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(start = 8.dp, end = 8.dp, top = 10.dp),
-    )
-}
-
 @StringRes
 private fun dnsRuleMatcherSectionTitleResource(index: Int): Int = when (index) {
     0 -> R.string.routing_section_network
@@ -1529,13 +1702,12 @@ private fun DnsRuleRouteOptions(
     ttlError: String?,
     subnetError: String?,
 ) {
-    SwitchPreference(
+    RuleEditorSwitchCard(
         title = stringResource(R.string.settings_dns_disable_cache),
-        icon = Icons.Rounded.Storage,
         checked = rule.disableCache,
         onCheckedChange = { onRuleChange(rule.copy(disableCache = it)) },
     )
-    SettingsTextField(
+    RuleEditorTextField(
         value = rule.rewriteTtl,
         onValueChange = { onRuleChange(rule.copy(rewriteTtl = it.filter(Char::isDigit))) },
         label = stringResource(R.string.settings_dns_rewrite_ttl),
@@ -1544,21 +1716,20 @@ private fun DnsRuleRouteOptions(
             keyboardType = KeyboardType.Number,
             imeAction = ImeAction.Next,
         ),
-        horizontalPadding = 0.dp,
     )
-    SettingsTextField(
+    RuleEditorTextField(
         value = rule.timeout,
         onValueChange = { onRuleChange(rule.copy(timeout = it)) },
         label = stringResource(R.string.settings_dns_rule_timeout),
         errorText = timeoutError,
-        horizontalPadding = 0.dp,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
     )
-    SettingsTextField(
+    RuleEditorTextField(
         value = rule.clientSubnet,
         onValueChange = { onRuleChange(rule.copy(clientSubnet = it)) },
         label = stringResource(R.string.settings_dns_client_subnet),
         errorText = subnetError,
-        horizontalPadding = 0.dp,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
     )
 }
 

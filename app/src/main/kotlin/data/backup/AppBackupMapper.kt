@@ -8,6 +8,8 @@ import app.CustomResourceFileState
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
 import app.OutboundState
+import app.SingBoxDnsRuleState
+import app.SingBoxDnsRuleTypeLogical
 import app.SingBoxEndpointState
 import app.SingBoxRouteRuleState
 import app.SingBoxSelectorState
@@ -371,7 +373,7 @@ private fun AppState.restoreWarnings(): List<AppBackupWarning> {
         add(dnsFinal)
         add(routeDefaultDomainResolver)
         dnsServers.forEach { server -> add(server.domainResolver) }
-        dnsRules.forEach { rule -> add(rule.server) }
+        dnsRules.forEach { rule -> addAll(rule.dnsServerReferences(includeAction = true)) }
     }
     val missingDnsServerCount = dnsReferences.countMissingManagedReferences(availableDnsServers)
 
@@ -398,6 +400,21 @@ private fun SingBoxRouteRuleState.outboundReferences(): List<String> =
         add(outbound)
         logicalRules.forEach { rule -> addAll(rule.outboundReferences()) }
     }
+
+private fun SingBoxDnsRuleState.dnsServerReferences(
+    includeAction: Boolean,
+): List<String> = buildList {
+    if (includeAction) add(server)
+    if (type == SingBoxDnsRuleTypeLogical) {
+        logicalRules.forEach { rule ->
+            addAll(rule.dnsServerReferences(includeAction = false))
+        }
+    } else {
+        matches
+            .filter { match -> match.field == "preferred_by" }
+            .forEach { match -> addAll(match.values) }
+    }
+}
 
 private fun Iterable<String>.countMissingManagedReferences(availableTags: Set<String>): Int =
     count { reference ->

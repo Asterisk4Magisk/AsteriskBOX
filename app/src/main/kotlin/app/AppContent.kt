@@ -204,10 +204,20 @@ fun AppContent(
                     )
                 }
                 entry<Route.DnsRuleEdit> { route ->
-                    key(route.ruleId) {
+                    key(
+                        route.ruleId,
+                        route.initialDraft,
+                        route.resultKey,
+                        route.nested,
+                        route.topLevelRuleId,
+                    ) {
                         DnsRuleEditorPage(
                             padding = padding,
                             ruleId = route.ruleId,
+                            initialDraft = route.initialDraft,
+                            resultKey = route.resultKey,
+                            nested = route.nested,
+                            topLevelRuleId = route.topLevelRuleId,
                         )
                     }
                 }

@@ -3,18 +3,16 @@
 
 package data
 
-import app.CustomResourceFileState
 import app.SingBoxDnsRuleActions
+import app.SingBoxDnsRuleLogicalModeAnd
+import app.SingBoxDnsRuleLogicalModeOr
 import app.SingBoxDnsRuleMatchers
 import app.SingBoxDnsRuleState
+import app.SingBoxDnsRuleTypeDefault
+import app.SingBoxDnsRuleTypeLogical
 import app.SingBoxDnsServerState
-import app.SingBoxDnsServerTypes
-import app.SingBoxRouteRuleActionReject
-import app.SingBoxRouteRuleActionRoute
 import app.SingBoxRouteRuleState
-import app.sanitizeCustomResourceFileName
 import features.logs.AndroidAppLogger
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 private val appStateJson = Json {
@@ -54,22 +52,6 @@ internal object StringMapJson {
     private const val LogTag = "AppStateJson"
 }
 
-internal object SingBoxDnsServerListJson {
-    fun encode(values: List<SingBoxDnsServerState>): String =
-        appStateJson.encodeToString(values)
-
-    fun decode(payload: String): List<SingBoxDnsServerState> {
-        return runCatching {
-            appStateJson.decodeFromString<List<SingBoxDnsServerState>>(payload)
-                .filter { server -> server.type in SingBoxDnsServerTypes }
-        }.onFailure { error ->
-            AndroidAppLogger.warn(LogTag, "Failed to decode persisted DNS servers", error)
-        }.getOrDefault(emptyList())
-    }
-
-    private const val LogTag = "AppStateJson"
-}
-
 internal object SingBoxDnsServerJson {
     fun encode(value: SingBoxDnsServerState): String = appStateJson.encodeToString(value)
 
@@ -84,11 +66,7 @@ internal object SingBoxDnsRuleListJson {
     fun decode(payload: String): List<SingBoxDnsRuleState> {
         return runCatching {
             appStateJson.decodeFromString<List<SingBoxDnsRuleState>>(payload)
-                .filter { rule ->
-                    rule.id > 0 &&
-                        rule.matches.all { match -> match.field in SingBoxDnsRuleMatchers } &&
-                        rule.action in SingBoxDnsRuleActions
-                }
+                .filter(SingBoxDnsRuleState::isValidPersistedDnsRule)
                 .distinctBy(SingBoxDnsRuleState::id)
         }.onFailure { error ->
             AndroidAppLogger.warn(LogTag, "Failed to decode persisted DNS rules", error)
@@ -98,34 +76,23 @@ internal object SingBoxDnsRuleListJson {
     private const val LogTag = "AppStateJson"
 }
 
+private fun SingBoxDnsRuleState.isValidPersistedDnsRule(): Boolean =
+    id > 0 &&
+        type in setOf(SingBoxDnsRuleTypeDefault, SingBoxDnsRuleTypeLogical) &&
+        logicalMode in setOf(SingBoxDnsRuleLogicalModeAnd, SingBoxDnsRuleLogicalModeOr) &&
+        matches.all { match -> match.field in SingBoxDnsRuleMatchers } &&
+        action in SingBoxDnsRuleActions &&
+        logicalRules.map(SingBoxDnsRuleState::id).distinct().size == logicalRules.size &&
+        logicalRules.all(SingBoxDnsRuleState::isValidPersistedDnsRule)
+
 internal object SingBoxDnsRuleJson {
     fun encode(value: SingBoxDnsRuleState): String = appStateJson.encodeToString(value)
 
-    fun decode(payload: String): SingBoxDnsRuleState =
-        appStateJson.decodeFromString(payload)
-}
-
-internal object SingBoxRouteRuleListJson {
-    fun encode(values: List<SingBoxRouteRuleState>): String =
-        appStateJson.encodeToString(values)
-
-    fun decode(payload: String): List<SingBoxRouteRuleState> {
-        return runCatching {
-            appStateJson.decodeFromString<List<SingBoxRouteRuleState>>(payload)
-                .filter { rule ->
-                    rule.id > 0 &&
-                        rule.action in setOf(
-                            SingBoxRouteRuleActionRoute,
-                            SingBoxRouteRuleActionReject,
-                        )
-                }
-                .distinctBy(SingBoxRouteRuleState::id)
-        }.onFailure { error ->
-            AndroidAppLogger.warn(LogTag, "Failed to decode persisted route rules", error)
-        }.getOrDefault(emptyList())
+    fun decode(payload: String): SingBoxDnsRuleState {
+        val decoded = appStateJson.decodeFromString<SingBoxDnsRuleState>(payload)
+        require(decoded.isValidPersistedDnsRule()) { "Invalid persisted DNS rule" }
+        return decoded
     }
-
-    private const val LogTag = "AppStateJson"
 }
 
 internal object SingBoxRouteRuleJson {
@@ -133,49 +100,4 @@ internal object SingBoxRouteRuleJson {
 
     fun decode(payload: String): SingBoxRouteRuleState =
         appStateJson.decodeFromString(payload)
-}
-
-internal object CustomResourceFileListJson {
-    fun encode(values: List<CustomResourceFileState>): String {
-        return appStateJson.encodeToString(values.map(PersistedCustomResourceFile::from))
-    }
-
-    fun decode(payload: String): List<CustomResourceFileState> {
-        return runCatching {
-            appStateJson.decodeFromString<List<PersistedCustomResourceFile>>(payload)
-                .mapNotNull(PersistedCustomResourceFile::toStateOrNull)
-        }.onFailure { error ->
-            AndroidAppLogger.warn(LogTag, "Failed to decode persisted custom resource files", error)
-        }.getOrDefault(emptyList())
-    }
-
-    private const val LogTag = "AppStateJson"
-}
-
-@Serializable
-private data class PersistedCustomResourceFile(
-    val id: Int,
-    val name: String,
-    val url: String,
-) {
-    fun toStateOrNull(): CustomResourceFileState? {
-        val fileName = sanitizeCustomResourceFileName(name, fallback = "")
-        val updateUrl = url.trim()
-        if (id <= 0 || fileName.isBlank()) return null
-        return CustomResourceFileState(
-            id = id,
-            name = fileName,
-            url = updateUrl,
-        )
-    }
-
-    companion object {
-        fun from(state: CustomResourceFileState): PersistedCustomResourceFile {
-            return PersistedCustomResourceFile(
-                id = state.id,
-                name = state.name,
-                url = state.url,
-            )
-        }
-    }
 }

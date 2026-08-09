@@ -60,6 +60,7 @@ import app.LocalIsWideScreen
 import app.LocalNavigator
 import app.LocalUpdateAppState
 import app.SingBoxDnsRuleState
+import app.SingBoxDnsRuleTypeLogical
 import app.collectAppState
 import app.managedInboundTags
 import app.managedReferenceRemarks
@@ -76,6 +77,7 @@ import features.settings.SettingsActionRow
 import features.settings.SettingsSectionCard
 import features.settings.sheets.DnsSettingsBottomSheet
 import features.settings.sheets.dnsRuleActionLabel
+import features.settings.sheets.dnsRuleMatchSummary
 import features.settings.sheets.dnsRuleSummary
 import features.settings.sheets.dnsServerTypeLabel
 import features.settings.toDnsSettingsDraft
@@ -578,11 +580,18 @@ private fun DnsRuleCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    presentation.matchRules.forEach { matchRule ->
+                    if (presentation.type == SingBoxDnsRuleTypeLogical) {
                         AsteriskInfoChip(
-                            text = dnsRuleSummary(matchRule),
+                            text = dnsRuleMatchSummary(rule),
                             emphasized = rule.invert,
                         )
+                    } else {
+                        presentation.matchRules.forEach { matchRule ->
+                            AsteriskInfoChip(
+                                text = dnsRuleSummary(matchRule),
+                                emphasized = rule.invert,
+                            )
+                        }
                     }
                 }
             }

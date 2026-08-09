@@ -18,13 +18,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -39,7 +37,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -54,7 +51,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -98,9 +94,14 @@ import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskExpressiveCard
 import ui.components.EditorPageScaffold
 import ui.components.localizedLabel
-import ui.components.AsteriskFilterChip
 import ui.components.AsteriskInfoChip
 import ui.components.ReferenceSelectionCard
+import ui.components.RuleEditorChoice
+import ui.components.RuleEditorChoiceCard
+import ui.components.RuleEditorChipGroupCard
+import ui.components.RuleEditorSectionTitle
+import ui.components.RuleEditorSwitchCard
+import ui.components.RuleEditorTextField
 import ui.components.StringListEditor
 import ui.components.WarningConfirmDialog
 import ui.components.draggedCardShadow
@@ -115,11 +116,6 @@ import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
-
-internal data class RouteChoice(
-    val value: String,
-    val label: String,
-)
 
 @Composable
 internal fun RoutingManagementPage(
@@ -346,15 +342,15 @@ internal fun RoutingManagementPage(
 }
 
 @Composable
-internal fun managedOutboundChoices(appState: AppState): List<RouteChoice> {
+internal fun managedOutboundChoices(appState: AppState): List<RuleEditorChoice> {
     return selectableManagedOutbounds(appState)
         .map { choice ->
-            RouteChoice(
+            RuleEditorChoice(
                 value = choice.tag,
                 label = choice.localizedLabel(),
             )
         }
-        .distinctBy(RouteChoice::value)
+        .distinctBy(RuleEditorChoice::value)
 }
 
 @Composable
@@ -364,7 +360,7 @@ private fun RoutingRuleGrid(
     columns: Int,
     contentPadding: PaddingValues,
     finalOutbound: String,
-    outboundChoices: List<RouteChoice>,
+    outboundChoices: List<RuleEditorChoice>,
     referenceLabels: Map<String, String>,
     unavailableLabel: String,
     globalLabel: String,
@@ -395,12 +391,20 @@ private fun RoutingRuleGrid(
             RoutingSettingsEntryCard(onClick = onOpenRouteSettings)
         }
         item(key = "final-outbound", span = { GridItemSpan(maxLineSpan) }) {
-            RouteChoiceCard(
+            RuleEditorChoiceCard(
                 title = stringResource(R.string.routing_default_outbound),
                 summary = stringResource(R.string.routing_default_outbound_summary),
                 choices = outboundChoices,
                 selectedValue = finalOutbound,
-                unavailableLabel = unavailableLabel,
+                missingLabel = { value ->
+                    app.visibleManagedReference(
+                        value = value,
+                        labels = outboundChoices.associate { choice ->
+                            choice.value to choice.label
+                        },
+                        unavailableLabel = unavailableLabel,
+                    )
+                },
                 onSelected = onFinalOutboundChange,
             )
         }
@@ -615,122 +619,11 @@ private fun RouteRuleCard(
 }
 
 @Composable
-private fun RouteChoiceCard(
-    title: String,
-    summary: String,
-    choices: List<RouteChoice>,
-    selectedValue: String,
-    onSelected: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    unavailableLabel: String = stringResource(R.string.common_unavailable),
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val rotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = AsteriskMotion.fastEffects(),
-        label = "routing-choice-arrow",
-    )
-    val selected = choices.firstOrNull { choice -> choice.value == selectedValue }
-        ?: RouteChoice(
-            selectedValue,
-            app.visibleManagedReference(
-                value = selectedValue,
-                labels = choices.associate { choice -> choice.value to choice.label },
-                unavailableLabel = unavailableLabel,
-            ),
-        )
-    val labelMotion = AsteriskMotion.fastEffects<Float>()
-    Box {
-        Card(
-            onClick = { expanded = true },
-            modifier = modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            ),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f).padding(end = 14.dp)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium)
-                    if (summary.isNotBlank()) {
-                        Text(
-                            summary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                AnimatedContent(
-                    targetState = selected.label,
-                    modifier = Modifier.widthIn(max = 160.dp),
-                    transitionSpec = AsteriskMotion.fadeThrough(labelMotion),
-                    label = "routing-choice-label",
-                ) { label ->
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Icon(
-                    Icons.Rounded.ExpandMore,
-                    contentDescription = null,
-                    modifier = Modifier.rotate(rotation),
-                )
-            }
-        }
-        Box(
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 28.dp).size(1.dp),
-        ) {
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.widthIn(min = 220.dp, max = 320.dp),
-            ) {
-                choices.forEach { choice ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = choice.label,
-                                color = if (choice.value == selectedValue) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                            )
-                        },
-                        leadingIcon = {
-                            if (choice.value == selectedValue) {
-                                Icon(
-                                    Icons.Rounded.Check,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            } else {
-                                Spacer(Modifier.size(24.dp))
-                            }
-                        },
-                        onClick = {
-                            expanded = false
-                            onSelected(choice.value)
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
 internal fun RouteRuleEditorScaffold(
     outerPadding: PaddingValues,
     isWideScreen: Boolean,
     rule: SingBoxRouteRuleState,
-    outboundChoices: List<RouteChoice>,
+    outboundChoices: List<RuleEditorChoice>,
     inboundChoices: List<Pair<String, String>>,
     ruleSetChoices: List<Pair<String, String>>,
     saving: Boolean = false,
@@ -747,6 +640,8 @@ internal fun RouteRuleEditorScaffold(
     }
     val fieldEffectsMotion = AsteriskMotion.effects<Float>()
     val fieldSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
+    val unavailableLabel = stringResource(R.string.common_unavailable)
+    val outboundLabels = outboundChoices.associate { choice -> choice.value to choice.label }
     EditorPageScaffold(
         outerPadding = outerPadding,
         isWideScreen = isWideScreen,
@@ -786,40 +681,35 @@ internal fun RouteRuleEditorScaffold(
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                 item(key = "basic-title") {
-                    RouteEditorSectionTitle(stringResource(R.string.routing_section_basic))
+                    RuleEditorSectionTitle(stringResource(R.string.routing_section_basic))
                 }
                 item(key = "name") {
-                    OutlinedTextField(
+                    RuleEditorTextField(
                         value = current.remarks,
                         onValueChange = { draft = current.copy(remarks = it) },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = {
-                            Text(
-                                stringResource(
-                                    if (nested) {
-                                        R.string.routing_condition_name
-                                    } else {
-                                        R.string.routing_rule_remarks
-                                    },
-                                ),
-                            )
-                        },
-                        singleLine = true,
+                        label = stringResource(
+                            if (nested) {
+                                R.string.routing_condition_name
+                            } else {
+                                R.string.routing_rule_remarks
+                            },
+                        ),
+                        errorText = null,
                     )
                 }
                 item(key = "type") {
-                    RouteChoiceCard(
+                    RuleEditorChoiceCard(
                         title = stringResource(R.string.routing_rule_type),
                         summary = "",
                         choices = listOf(
-                            RouteChoice(
+                            RuleEditorChoice(
                                 SingBoxRouteRuleTypeDefault,
                                 singBoxOptionLabel(
                                     stringResource(R.string.routing_rule_type_default),
                                     SingBoxRouteRuleTypeDefault,
                                 ),
                             ),
-                            RouteChoice(
+                            RuleEditorChoice(
                                 SingBoxRouteRuleTypeLogical,
                                 singBoxOptionLabel(
                                     stringResource(R.string.routing_rule_type_logical),
@@ -833,18 +723,18 @@ internal fun RouteRuleEditorScaffold(
                 }
                 if (!nested) {
                     item(key = "action") {
-                        RouteChoiceCard(
+                        RuleEditorChoiceCard(
                             title = stringResource(R.string.routing_action),
                             summary = "",
                             choices = listOf(
-                                RouteChoice(
+                                RuleEditorChoice(
                                     SingBoxRouteRuleActionRoute,
                                     singBoxOptionLabel(
                                         stringResource(R.string.routing_action_route),
                                         SingBoxRouteRuleActionRoute,
                                     ),
                                 ),
-                                RouteChoice(
+                                RuleEditorChoice(
                                     SingBoxRouteRuleActionReject,
                                     singBoxOptionLabel(
                                         stringResource(R.string.routing_action_reject),
@@ -872,7 +762,7 @@ internal fun RouteRuleEditorScaffold(
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 if (visibleAction == SingBoxRouteRuleActionRoute) {
-                                    RouteChoiceCard(
+                                    RuleEditorChoiceCard(
                                         title = stringResource(R.string.routing_outbound),
                                         summary = "",
                                         choices = outboundChoices,
@@ -882,27 +772,34 @@ internal fun RouteRuleEditorScaffold(
                                         onSelected = { value ->
                                             draft = current.copy(outbound = value)
                                         },
+                                        missingLabel = { value ->
+                                            app.visibleManagedReference(
+                                                value = value,
+                                                labels = outboundLabels,
+                                                unavailableLabel = unavailableLabel,
+                                            )
+                                        },
                                     )
                                 } else {
-                                    RouteChoiceCard(
+                                    RuleEditorChoiceCard(
                                         title = stringResource(R.string.routing_reject_method),
                                         summary = "",
                                         choices = listOf(
-                                            RouteChoice(
+                                            RuleEditorChoice(
                                                 "default",
                                                 singBoxOptionLabel(
                                                     stringResource(R.string.routing_reject_default),
                                                     "default",
                                                 ),
                                             ),
-                                            RouteChoice(
+                                            RuleEditorChoice(
                                                 "drop",
                                                 singBoxOptionLabel(
                                                     stringResource(R.string.routing_reject_drop),
                                                     "drop",
                                                 ),
                                             ),
-                                            RouteChoice(
+                                            RuleEditorChoice(
                                                 "reply",
                                                 singBoxOptionLabel(
                                                     stringResource(R.string.routing_reject_reply),
@@ -924,7 +821,7 @@ internal fun RouteRuleEditorScaffold(
                                         enter = AsteriskMotion.contentEnter(),
                                         exit = AsteriskMotion.contentExit(),
                                     ) {
-                                        RouteSwitchCard(
+                                        RuleEditorSwitchCard(
                                             title = stringResource(
                                                 R.string.routing_reject_no_drop,
                                             ),
@@ -940,7 +837,7 @@ internal fun RouteRuleEditorScaffold(
                     }
                 }
                 item(key = "invert") {
-                    RouteSwitchCard(
+                    RuleEditorSwitchCard(
                         title = stringResource(R.string.routing_invert),
                         checked = current.invert,
                         onCheckedChange = { checked -> draft = current.copy(invert = checked) },
@@ -948,7 +845,7 @@ internal fun RouteRuleEditorScaffold(
                 }
                 if (visibleType == SingBoxRouteRuleTypeLogical) {
                     item(key = "logic-title") {
-                        RouteEditorSectionTitle(stringResource(R.string.routing_section_logic))
+                        RuleEditorSectionTitle(stringResource(R.string.routing_section_logic))
                     }
                     item(key = "logic-mode") {
                         val modes = listOf(
@@ -1004,7 +901,7 @@ internal fun RouteRuleEditorScaffold(
                     }
                 } else {
                     item(key = "network-title") {
-                    RouteEditorSectionTitle(stringResource(R.string.routing_section_network))
+                    RuleEditorSectionTitle(stringResource(R.string.routing_section_network))
                 }
                 item(key = "clash-mode") {
                     val modes = listOf("") + SingBoxRouteRuleClashModes
@@ -1055,7 +952,7 @@ internal fun RouteRuleEditorScaffold(
                     )
                 }
                 item(key = "network") {
-                    RouteChipGroupCard(
+                    RuleEditorChipGroupCard(
                         title = routeRuleMatcherLabel("network"),
                         choices = listOf(
                             "tcp" to singBoxOptionLabel(
@@ -1100,7 +997,7 @@ internal fun RouteRuleEditorScaffold(
                     )
                 }
                 item(key = "destination-title") {
-                    RouteEditorSectionTitle(stringResource(R.string.routing_section_destination))
+                    RuleEditorSectionTitle(stringResource(R.string.routing_section_destination))
                 }
                 item(key = "domain") {
                     RouteStringList(
@@ -1145,7 +1042,7 @@ internal fun RouteRuleEditorScaffold(
                     )
                 }
                 item(key = "ip-private") {
-                    RouteSwitchCard(
+                    RuleEditorSwitchCard(
                         title = routeRuleMatcherLabel("ip_is_private"),
                         checked = current.ipIsPrivate,
                         onCheckedChange = { checked -> draft = current.copy(ipIsPrivate = checked) },
@@ -1181,7 +1078,7 @@ internal fun RouteRuleEditorScaffold(
                     )
                 }
                 item(key = "source-title") {
-                    RouteEditorSectionTitle(stringResource(R.string.routing_section_source))
+                    RuleEditorSectionTitle(stringResource(R.string.routing_section_source))
                 }
                 item(key = "source-ip-cidr") {
                     val invalidMessage = stringResource(R.string.routing_cidr_invalid)
@@ -1194,7 +1091,7 @@ internal fun RouteRuleEditorScaffold(
                     )
                 }
                 item(key = "source-ip-private") {
-                    RouteSwitchCard(
+                    RuleEditorSwitchCard(
                         title = routeRuleMatcherLabel("source_ip_is_private"),
                         checked = current.sourceIpIsPrivate,
                         onCheckedChange = { checked ->
@@ -1223,7 +1120,7 @@ internal fun RouteRuleEditorScaffold(
                     )
                 }
                 item(key = "android-title") {
-                    RouteEditorSectionTitle(stringResource(R.string.routing_section_android))
+                    RuleEditorSectionTitle(stringResource(R.string.routing_section_android))
                 }
                 item(key = "package-name") {
                     RouteStringList(
@@ -1234,7 +1131,7 @@ internal fun RouteRuleEditorScaffold(
                     )
                 }
                 item(key = "network-type") {
-                    RouteChipGroupCard(
+                    RuleEditorChipGroupCard(
                         title = routeRuleMatcherLabel("network_type"),
                         choices = listOf(
                             "wifi" to singBoxOptionLabel(
@@ -1461,79 +1358,6 @@ private fun RouteLogicalChildCard(
                             menuExpanded = false
                             onDelete()
                         },
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RouteEditorSectionTitle(text: String) {
-    Text(
-        text = text,
-        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 10.dp),
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.SemiBold,
-    )
-}
-
-@Composable
-private fun RouteSwitchCard(
-    title: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    AsteriskExpressiveCard(
-        onClick = { onCheckedChange(!checked) },
-        modifier = Modifier.fillMaxWidth(),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = title,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleSmall,
-            )
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
-        }
-    }
-}
-
-@Composable
-private fun <T> RouteChipGroupCard(
-    title: String,
-    choices: List<Pair<T, String>>,
-    selected: Set<T>,
-    onToggle: (T) -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-            )
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                choices.forEach { (value, label) ->
-                    AsteriskFilterChip(
-                        selected = value in selected,
-                        onClick = { onToggle(value) },
-                        label = label,
                     )
                 }
             }

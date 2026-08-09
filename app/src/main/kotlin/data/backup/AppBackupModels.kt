@@ -16,7 +16,7 @@ import app.SingBoxSelectorTypeSelector
 import kotlinx.serialization.Serializable
 
 internal const val AppBackupFormat = "asteriskbox-backup"
-internal const val CurrentAppBackupVersion = 1
+internal const val CurrentAppBackupVersion = 2
 
 private val BackupDefaults = AppState()
 

@@ -499,7 +499,7 @@
     <string name="settings_dns_ip_version">IP 版本</string>
     <string name="settings_dns_network">网络协议</string>
     <string name="settings_dns_any">不限</string>
-    <string name="settings_dns_invert">反向匹配</string>
+    <string name="settings_dns_invert">反转匹配结果</string>
     <string name="settings_dns_rule_action">动作</string>
     <string name="settings_dns_target_server">目标服务器</string>
     <string name="settings_dns_no_server">没有可用服务器</string>
@@ -509,7 +509,7 @@
     <string name="settings_dns_ttl_invalid">TTL 必须是 0 到 4294967295 之间的整数</string>
     <string name="settings_sing_box_validation_failed">sing-box 拒绝了这些设置，请检查字段后重试</string>
     <string name="settings_dns_reject_method">拒绝方式</string>
-    <string name="settings_dns_no_drop">禁止自动切换为丢弃</string>
+    <string name="settings_dns_no_drop">永不丢弃请求</string>
     <string name="settings_dns_response_code">响应码</string>
     <string name="settings_dns_answer_records">应答记录</string>
     <string name="settings_dns_ns_records">名称服务器记录</string>
@@ -1063,6 +1063,8 @@
     <string name="routing_conditions">条件</string>
     <string name="routing_add_condition">添加条件</string>
     <string name="routing_conditions_empty">添加条件，然后选择需要全部满足还是任一满足。</string>
+    <string name="settings_dns_logical_enabled_condition_required">请至少启用一个条件。</string>
+    <string name="settings_dns_logical_invalid_condition">每个条件都必须包含有效的匹配项。</string>
     <plurals name="routing_condition_count">
         <item quantity="other">%1$d 个条件</item>
     </plurals>

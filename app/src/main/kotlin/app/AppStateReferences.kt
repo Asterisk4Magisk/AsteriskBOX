@@ -264,18 +264,7 @@ internal fun AppState.withCanonicalManagedTagReferences(): AppState {
                 servers = server.servers.map(resolve),
             )
         },
-        dnsRules = dnsRules.map { rule ->
-            rule.copy(
-                server = resolve(rule.server),
-                matches = rule.matches.map { match ->
-                    if (match.field in CanonicalDnsReferenceFields) {
-                        match.copy(values = match.values.map(resolve))
-                    } else {
-                        match
-                    }
-                },
-            )
-        },
+        dnsRules = dnsRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
     )
     return if (canonical == this) this else canonical
 }
@@ -315,6 +304,20 @@ private fun SingBoxRouteRuleState.withCanonicalManagedReferences(
     inbound = inbound.map(resolve),
     ruleSet = ruleSet.map(resolve),
     outbound = resolve(outbound),
+)
+
+private fun SingBoxDnsRuleState.withCanonicalManagedReferences(
+    resolve: (String) -> String,
+): SingBoxDnsRuleState = copy(
+    logicalRules = logicalRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
+    server = resolve(server),
+    matches = matches.map { match ->
+        if (match.field in CanonicalDnsReferenceFields) {
+            match.copy(values = match.values.map(resolve))
+        } else {
+            match
+        }
+    },
 )
 
 private fun OutboundState.withCanonicalManagedReferences(
@@ -428,11 +431,7 @@ internal fun AppState.withPrunedManagedInboundReferences(): AppState {
             rule.disableUnavailableInboundReferences(availableTags)
         },
         dnsRules = dnsRules.map { rule ->
-            val hasUnavailableInbound = rule.matches.any { match ->
-                match.field == SingBoxInboundField &&
-                    match.values.any { tag -> tag !in availableTags }
-            }
-            if (hasUnavailableInbound) rule.copy(enabled = false) else rule
+            rule.disableUnavailableDnsMatchReferences(SingBoxInboundField, availableTags)
         },
     ).withPrunedDnsEvaluationReferences()
 }
@@ -506,29 +505,14 @@ internal fun AppState.withUnavailableManagedRuleSetsDisabled(
             rule.disableUnavailableRuleSetReferences(availableTags)
         },
         dnsRules = dnsRules.map { rule ->
-            val hasUnavailableRuleSet = rule.matches.any { match ->
-                match.field == SingBoxRuleSetField &&
-                    match.values.any { tag -> tag !in availableTags }
-            }
-            if (hasUnavailableRuleSet) rule.copy(enabled = false) else rule
+            rule.disableUnavailableDnsMatchReferences(SingBoxRuleSetField, availableTags)
         },
     ).withPrunedDnsEvaluationReferences()
 
 internal fun AppState.withPrunedDnsEvaluationReferences(): AppState {
     val taggedResponses = mutableSetOf<String>()
     val updatedRules = dnsRules.map { rule ->
-        var lostEvaluationReference = false
-        val updatedMatches = rule.matches.map { match ->
-            if (match.field != SingBoxMatchResponseField) return@map match
-            val value = match.values.firstOrNull().orEmpty()
-            val available = match.encodeAsString && value in taggedResponses
-            if (!available) lostEvaluationReference = true
-            match
-        }
-        val updatedRule = rule.copy(
-            enabled = rule.enabled && !lostEvaluationReference,
-            matches = updatedMatches,
-        )
+        val updatedRule = rule.disableUnavailableDnsEvaluationReferences(taggedResponses)
         if (updatedRule.enabled && updatedRule.action == SingBoxDnsEvaluateAction) {
             taggedResponses += updatedRule.evaluationTag
         }
@@ -821,18 +805,80 @@ private fun SingBoxRouteRuleState.disableUnavailableRuleSetReferences(
 internal fun SingBoxDnsRuleState.updateManagedMatchReferences(
     field: String,
     transform: (String) -> String?,
-): SingBoxDnsRuleState = copy(
-    matches = matches.mapNotNull { match ->
+): SingBoxDnsRuleState {
+    var lostRequiredReference = false
+    val updatedMatches = matches.mapNotNull { match ->
         if (match.field != field) return@mapNotNull match
-        match.copy(values = match.values.mapNotNull(transform).distinct())
-            .takeIf { updated -> updated.values.isNotEmpty() }
-    },
-    enabled = enabled && matches.none { match ->
-        match.field == field &&
+        val updatedValues = match.values.mapNotNull(transform).distinct()
+        if (
+            type != SingBoxDnsRuleTypeLogical &&
             match.values.isNotEmpty() &&
-            match.values.mapNotNull(transform).isEmpty()
-    },
-)
+            updatedValues.isEmpty()
+        ) {
+            lostRequiredReference = true
+        }
+        match.copy(values = updatedValues)
+            .takeIf { updated -> updated.values.isNotEmpty() }
+    }
+    val updatedLogicalRules = logicalRules.map { rule ->
+        rule.updateManagedMatchReferences(field, transform)
+    }
+    val lostEnabledChild =
+        type == SingBoxDnsRuleTypeLogical &&
+            logicalRules.zip(updatedLogicalRules).any { (previous, updated) ->
+                previous.enabled && !updated.enabled
+            }
+    return copy(
+        matches = updatedMatches,
+        logicalRules = updatedLogicalRules,
+        enabled = enabled && !lostRequiredReference && !lostEnabledChild,
+    )
+}
+
+private fun SingBoxDnsRuleState.disableUnavailableDnsMatchReferences(
+    field: String,
+    availableTags: Set<String>,
+): SingBoxDnsRuleState {
+    val updatedLogicalRules = logicalRules.map { rule ->
+        rule.disableUnavailableDnsMatchReferences(field, availableTags)
+    }
+    val hasUnavailableReference = type != SingBoxDnsRuleTypeLogical &&
+        matches.any { match ->
+            match.field == field && match.values.any { tag -> tag !in availableTags }
+        }
+    val lostEnabledChild =
+        type == SingBoxDnsRuleTypeLogical &&
+            logicalRules.zip(updatedLogicalRules).any { (previous, updated) ->
+                previous.enabled && !updated.enabled
+            }
+    return copy(
+        enabled = enabled && !hasUnavailableReference && !lostEnabledChild,
+        logicalRules = updatedLogicalRules,
+    )
+}
+
+private fun SingBoxDnsRuleState.disableUnavailableDnsEvaluationReferences(
+    availableTags: Set<String>,
+): SingBoxDnsRuleState {
+    val updatedLogicalRules = logicalRules.map { rule ->
+        rule.disableUnavailableDnsEvaluationReferences(availableTags)
+    }
+    val hasUnavailableReference = type != SingBoxDnsRuleTypeLogical &&
+        matches.any { match ->
+            if (match.field != SingBoxMatchResponseField) return@any false
+            val value = match.values.firstOrNull().orEmpty()
+            !match.encodeAsString || value !in availableTags
+        }
+    val lostEnabledChild =
+        type == SingBoxDnsRuleTypeLogical &&
+            logicalRules.zip(updatedLogicalRules).any { (previous, updated) ->
+                previous.enabled && !updated.enabled
+            }
+    return copy(
+        enabled = enabled && !hasUnavailableReference && !lostEnabledChild,
+        logicalRules = updatedLogicalRules,
+    )
+}
 
 private fun OutboundState.updateManagedReference(
     field: String,
