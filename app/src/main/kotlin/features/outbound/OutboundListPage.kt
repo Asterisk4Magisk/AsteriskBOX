@@ -126,6 +126,7 @@ import ui.components.draggedCardShadow
 import ui.components.longPressReorderDragHandle
 import ui.components.rememberAsteriskReorderableLazyGridState
 import ui.components.singBoxOptionLabel
+import ui.components.verticalReorderScrollThresholdPadding
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
@@ -779,8 +780,9 @@ private fun OutboundPage(
     val reorderableState = rememberAsteriskReorderableLazyGridState(
         lazyGridState = gridState,
         itemCount = outbounds.size,
-        scrollThresholdPadding = PaddingValues(
-            bottom = dragScrollThresholdBottomPadding,
+        scrollThresholdPadding = verticalReorderScrollThresholdPadding(
+            contentPadding = contentPadding,
+            bottomPadding = dragScrollThresholdBottomPadding,
         ),
         onMove = onMove,
     )

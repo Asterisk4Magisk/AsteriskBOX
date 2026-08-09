@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.Dp
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableLazyGridState
 import sh.calvin.reorderable.ReorderableLazyListState
@@ -25,6 +26,14 @@ internal class AsteriskReorderableLazyGridState(
 internal class AsteriskReorderableLazyListState(
     val reorderableState: ReorderableLazyListState,
     val hapticFeedback: HapticFeedback,
+)
+
+internal fun verticalReorderScrollThresholdPadding(
+    contentPadding: PaddingValues,
+    bottomPadding: Dp = contentPadding.calculateBottomPadding(),
+): PaddingValues = PaddingValues(
+    top = contentPadding.calculateTopPadding(),
+    bottom = bottomPadding,
 )
 
 internal fun translateAsteriskReorderableLazyGridMove(

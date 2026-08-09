@@ -109,6 +109,7 @@ import ui.components.rememberAsteriskReorderableLazyGridState
 import ui.components.singBoxOptionLabel
 import ui.components.managedInboundChoices
 import ui.components.singBoxProtocolChoices
+import ui.components.verticalReorderScrollThresholdPadding
 import ui.icons.AsteriskIcons as Icons
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
@@ -332,7 +333,7 @@ private fun RoutingRuleGrid(
         lazyGridState = gridState,
         itemCount = rules.size,
         indexOffset = 2,
-        scrollThresholdPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
+        scrollThresholdPadding = verticalReorderScrollThresholdPadding(contentPadding),
         onMove = onMove,
     )
     LazyVerticalGrid(

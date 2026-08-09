@@ -91,6 +91,7 @@ import ui.components.draggedCardShadow
 import ui.components.longPressReorderDragHandle
 import ui.components.managedInboundChoices
 import ui.components.rememberAsteriskReorderableLazyGridState
+import ui.components.verticalReorderScrollThresholdPadding
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
@@ -396,7 +397,7 @@ private fun DnsRuleGrid(
         lazyGridState = gridState,
         itemCount = rules.size,
         indexOffset = layout.ruleIndexOffset,
-        scrollThresholdPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding()),
+        scrollThresholdPadding = verticalReorderScrollThresholdPadding(contentPadding),
         onMove = onMove,
     )
     LazyVerticalGrid(

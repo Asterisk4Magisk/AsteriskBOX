@@ -104,6 +104,7 @@ import ui.components.WarningConfirmDialog
 import ui.components.draggedCardShadow
 import ui.components.longPressReorderDragHandle
 import ui.components.rememberAsteriskReorderableLazyListState
+import ui.components.verticalReorderScrollThresholdPadding
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
@@ -409,9 +410,7 @@ internal fun OutboundGroupListPage(
         val reorderableState = rememberAsteriskReorderableLazyListState(
             lazyListState = listState,
             itemCount = appState.outboundGroups.size,
-            scrollThresholdPadding = PaddingValues(
-                bottom = listContentPadding.calculateBottomPadding(),
-            ),
+            scrollThresholdPadding = verticalReorderScrollThresholdPadding(listContentPadding),
             onMove = { fromIndex, toIndex ->
                 updateAppState { state ->
                     state.copy(
