@@ -919,7 +919,10 @@ private object ProxyUrlOutboundParser {
         val port = uri.port.takeIf { it > 0 } ?: defaultPort(scheme)
         require(!host.isNullOrBlank()) { "Proxy URL server is required" }
         require(port in 1..65535) { "Proxy URL port is invalid" }
-        val credentials = splitUserInfo(uri.rawUserInfo)
+        val credentials = splitUserInfo(
+            rawUserInfo = uri.rawUserInfo,
+            decodeBase64Credentials = type !in setOf("vmess", "vless"),
+        )
         val authentication = decodeComponent(uri.rawUserInfo)
         if (type == "hysteria" &&
             query.first("protocol").isNotBlank() &&
@@ -1592,13 +1595,20 @@ private fun parsePortHoppingAuthority(link: String, scheme: String): PortHopping
     )
 }
 
-private fun splitUserInfo(rawUserInfo: String?): Pair<String, String> {
+private fun splitUserInfo(
+    rawUserInfo: String?,
+    decodeBase64Credentials: Boolean,
+): Pair<String, String> {
     val raw = rawUserInfo.orEmpty()
     if (':' in raw) {
         return decodeComponent(raw.substringBefore(':')) to
             decodeComponent(raw.substringAfter(':', ""))
     }
-    val decoded = decodeBase64(decodeComponent(raw))?.takeIf { ':' in it }
+    val decoded = if (decodeBase64Credentials) {
+        decodeBase64(decodeComponent(raw))?.takeIf { ':' in it }
+    } else {
+        null
+    }
     return if (decoded != null) {
         decoded.substringBefore(':') to decoded.substringAfter(':', "")
     } else {
