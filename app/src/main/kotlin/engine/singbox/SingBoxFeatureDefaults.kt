@@ -30,7 +30,7 @@ val DefaultSingBoxDnsServers = listOf(
         id = 2,
         remarks = "proxy",
         type = "tls",
-        server = "1.1.1.1",
+        server = "8.8.8.8",
         detour = APP_GLOBAL_SELECTOR,
     ),
 )
