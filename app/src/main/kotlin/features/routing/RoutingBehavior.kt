@@ -3,6 +3,7 @@
 
 package features.routing
 
+import app.AppState
 import app.SingBoxRouteRuleState
 import app.SingBoxRouteRuleTypeLogical
 import app.visibleManagedReference
@@ -44,6 +45,15 @@ internal fun List<SingBoxRouteRuleState>.moveRouteRule(
         add(toIndex, removeAt(fromIndex))
     }
 }
+
+internal fun AppState.withRouteRuleEnabled(
+    ruleId: Int,
+    enabled: Boolean,
+): AppState = copy(
+    routeRules = routeRules.map { rule ->
+        if (rule.id == ruleId) rule.copy(enabled = enabled) else rule
+    },
+)
 
 internal fun SingBoxRouteRuleState.nextLogicalRouteRuleId(): Int =
     flattenRouteRuleIds().maxOrNull()?.plus(1) ?: 1

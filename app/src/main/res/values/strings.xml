@@ -1161,6 +1161,7 @@
     <string name="routing_port_invalid">Enter a port matcher from 0 to 65535</string>
     <string name="routing_port_range_invalid">Use start:end, start:, or :end with values from 0 to 65535</string>
     <string name="routing_save_failed">sing-box rejected this routing rule. Check its match fields and try again.</string>
+    <string name="routing_rule_enable_failed">Unable to enable the route rule. Check the error log for details.</string>
     <string name="common_unknown">Unknown</string>
     <string name="common_error_details">%1$s: %2$s</string>
     <string name="home_network_speed_summary">↑ %1$s   ↓ %2$s</string>

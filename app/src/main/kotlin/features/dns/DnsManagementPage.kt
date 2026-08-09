@@ -113,7 +113,7 @@ internal fun DnsManagementPage(
     var showDnsSettings by remember { mutableStateOf(initiallyOpenDnsSettings) }
     var dnsSettingsDraft by remember { mutableStateOf(appState.toDnsSettingsDraft()) }
     var pendingDelete by remember { mutableStateOf<SingBoxDnsRuleState?>(null) }
-    var savingRule by remember { mutableStateOf(false) }
+    var pendingEnableRuleId by remember { mutableStateOf<Int?>(null) }
     var savingDnsSettings by remember { mutableStateOf(false) }
     val enableFailedMessage = stringResource(R.string.dns_rule_enable_failed)
     val validationFailedMessage = stringResource(R.string.settings_sing_box_validation_failed)
@@ -155,15 +155,13 @@ internal fun DnsManagementPage(
         }
     }
 
-    fun validateAndCommitChange(
+    fun validateAndCommitEnable(
+        ruleId: Int,
         baseState: AppState,
         candidateState: AppState,
-        operation: String,
-        failureMessage: String,
-        onCommitted: () -> Unit = {},
     ) {
-        if (savingRule) return
-        savingRule = true
+        if (pendingEnableRuleId != null) return
+        pendingEnableRuleId = ruleId
         scope.launch {
             try {
                 val committed = validateAndCommitDnsRuleState(
@@ -187,23 +185,19 @@ internal fun DnsManagementPage(
                         didCommit
                     },
                 )
-                if (committed) {
-                    onCommitted()
-                } else {
-                    tipNotifier.show(failureMessage)
-                }
+                if (!committed) tipNotifier.show(enableFailedMessage)
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 reportFailure(
                     context = FailureLogContext(
-                        operation = operation,
+                        operation = "enable_dns_rule",
                         stage = "validate",
                     ),
                     error = error,
                 )
-                tipNotifier.show(failureMessage)
+                tipNotifier.show(enableFailedMessage)
             } finally {
-                savingRule = false
+                if (pendingEnableRuleId == ruleId) pendingEnableRuleId = null
             }
         }
     }
@@ -237,10 +231,7 @@ internal fun DnsManagementPage(
                     }
                 },
                 actions = {
-                    IconButton(
-                        enabled = !savingRule,
-                        onClick = { navigator.push(app.navigation.Route.DnsRuleEdit()) },
-                    ) {
+                    IconButton(onClick = { navigator.push(app.navigation.Route.DnsRuleEdit()) }) {
                         Icon(Icons.Rounded.Add, stringResource(R.string.settings_dns_add_rule))
                     }
                 },
@@ -258,7 +249,7 @@ internal fun DnsManagementPage(
             unavailableLabel = unavailableLabel,
             columns = if (isWideScreen) 2 else 1,
             contentPadding = pageListPadding(contentPadding, bottomExtra = 24.dp),
-            interactionsEnabled = !savingRule,
+            pendingEnableRuleId = pendingEnableRuleId,
             onOpenDnsSettings = {
                 dnsSettingsDraft = appState.toDnsSettingsDraft()
                 showDnsSettings = true
@@ -272,13 +263,12 @@ internal fun DnsManagementPage(
             onEnabledChange = { rule, enabled ->
                 if (enabled) {
                     val baseState = appState
-                    validateAndCommitChange(
+                    validateAndCommitEnable(
+                        ruleId = rule.id,
                         baseState = baseState,
                         candidateState = baseState
                             .withDnsRuleEnabled(rule.id, enabled = true)
                             .withPrunedDnsEvaluationReferences(),
-                        operation = "enable_dns_rule",
-                        failureMessage = enableFailedMessage,
                     )
                 } else {
                     updateAppState { state ->
@@ -384,7 +374,7 @@ private fun DnsRuleGrid(
     unavailableLabel: String,
     columns: Int,
     contentPadding: PaddingValues,
-    interactionsEnabled: Boolean,
+    pendingEnableRuleId: Int?,
     onOpenDnsSettings: () -> Unit,
     onMove: (Int, Int) -> Unit,
     onEnabledChange: (SingBoxDnsRuleState, Boolean) -> Unit,
@@ -441,10 +431,11 @@ private fun DnsRuleGrid(
                         ) { isDragging ->
                             DnsRuleCard(
                                 rule = rule,
+                                displayedEnabled = rule.enabled || pendingEnableRuleId == rule.id,
+                                enablePending = pendingEnableRuleId == rule.id,
                                 referenceLabels = referenceLabels,
                                 unavailableLabel = unavailableLabel,
                                 isDragging = isDragging,
-                                interactionsEnabled = interactionsEnabled,
                                 onEnabledChange = { enabled -> onEnabledChange(rule, enabled) },
                                 onEdit = { onEdit(rule) },
                                 onDelete = { onDelete(rule) },
@@ -452,7 +443,7 @@ private fun DnsRuleGrid(
                                     .fillMaxWidth()
                                     .longPressReorderDragHandle(
                                         scope = this,
-                                        enabled = interactionsEnabled && rules.size > 1,
+                                        enabled = rules.size > 1,
                                         state = reorderableState,
                                     ),
                             )
@@ -498,10 +489,11 @@ private fun DnsRuleEmptyState() {
 @Composable
 private fun DnsRuleCard(
     rule: SingBoxDnsRuleState,
+    displayedEnabled: Boolean,
+    enablePending: Boolean,
     referenceLabels: Map<String, String>,
     unavailableLabel: String,
     isDragging: Boolean,
-    interactionsEnabled: Boolean,
     onEnabledChange: (Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -539,7 +531,6 @@ private fun DnsRuleCard(
     )
     Card(
         onClick = onEdit,
-        enabled = interactionsEnabled,
         modifier = modifier
             .heightIn(min = 120.dp)
             .zIndex(if (isDragging) 1f else 0f)
@@ -552,7 +543,7 @@ private fun DnsRuleCard(
                 color = MaterialTheme.colorScheme.primary,
                 cornerRadius = AsteriskShapeTokens.ListCardRadius,
             )
-            .alpha(if (rule.enabled) 1f else 0.68f),
+            .alpha(if (displayedEnabled) 1f else 0.68f),
         shape = AsteriskShapeTokens.ListCard,
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
@@ -596,15 +587,11 @@ private fun DnsRuleCard(
                 }
             }
             Switch(
-                checked = rule.enabled,
-                onCheckedChange = onEnabledChange,
-                enabled = interactionsEnabled,
+                checked = displayedEnabled,
+                onCheckedChange = if (enablePending) null else onEnabledChange,
             )
             Box {
-                IconButton(
-                    enabled = interactionsEnabled,
-                    onClick = { menuExpanded = true },
-                ) {
+                IconButton(onClick = { menuExpanded = true }) {
                     Icon(Icons.Rounded.MoreVert, stringResource(R.string.common_more))
                 }
                 DropdownMenu(

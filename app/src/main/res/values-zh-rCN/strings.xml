@@ -1142,6 +1142,7 @@
     <string name="routing_port_invalid">请输入 0 至 65535 的端口匹配值</string>
     <string name="routing_port_range_invalid">请使用 起始:结束、起始: 或 :结束，取值范围为 0 至 65535</string>
     <string name="routing_save_failed">sing-box 拒绝了这条路由规则，请检查匹配字段后重试</string>
+    <string name="routing_rule_enable_failed">无法启用路由规则，请查看错误日志了解详情。</string>
     <string name="common_unknown">未知</string>
     <string name="common_error_details">%1$s：%2$s</string>
     <string name="home_network_speed_summary">↑ %1$s   ↓ %2$s</string>

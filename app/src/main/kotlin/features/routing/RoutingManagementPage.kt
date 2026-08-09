@@ -134,8 +134,10 @@ internal fun RoutingManagementPage(
     val isWideScreen = LocalIsWideScreen.current
     var editingRouteSettings by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<SingBoxRouteRuleState?>(null) }
+    var pendingEnableRuleId by remember { mutableStateOf<Int?>(null) }
     var savingRouteSettings by remember { mutableStateOf(false) }
     val settingsSaveFailedMessage = stringResource(R.string.routing_settings_save_failed)
+    val enableFailedMessage = stringResource(R.string.routing_rule_enable_failed)
     val outboundChoices = managedOutboundChoices(appState)
     val outboundLabels = outboundChoices.associate { choice -> choice.value to choice.label }
     val unavailableLabel = stringResource(R.string.common_unavailable)
@@ -150,6 +152,44 @@ internal fun RoutingManagementPage(
         putAll(outboundLabels)
         putAll(inboundChoices)
         putAll(ruleSetChoices)
+    }
+
+    fun validateAndCommitEnable(
+        ruleId: Int,
+        baseState: AppState,
+        candidateState: AppState,
+    ) {
+        if (pendingEnableRuleId != null) return
+        pendingEnableRuleId = ruleId
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    validateSingBoxRuntimeConfiguration(context, candidateState)
+                }
+                var committed = false
+                updateAppState { current ->
+                    if (current === baseState) {
+                        committed = true
+                        candidateState
+                    } else {
+                        current
+                    }
+                }
+                if (!committed) tipNotifier.show(enableFailedMessage)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                reportFailure(
+                    context = FailureLogContext(
+                        operation = "enable_route_rule",
+                        stage = "validate",
+                    ),
+                    error = error,
+                )
+                tipNotifier.show(enableFailedMessage)
+            } finally {
+                if (pendingEnableRuleId == ruleId) pendingEnableRuleId = null
+            }
+        }
     }
 
     Scaffold(
@@ -197,6 +237,7 @@ internal fun RoutingManagementPage(
         )
         RoutingRuleGrid(
             rules = appState.routeRules,
+            pendingEnableRuleId = pendingEnableRuleId,
             columns = if (isWideScreen) 2 else 1,
             contentPadding = pageListPadding(contentPadding, bottomExtra = 24.dp),
             finalOutbound = appState.routeFinal.ifBlank { APP_GLOBAL_SELECTOR },
@@ -214,12 +255,17 @@ internal fun RoutingManagementPage(
                 }
             },
             onEnabledChange = { rule, enabled ->
-                updateAppState { state ->
-                    state.copy(
-                        routeRules = state.routeRules.map { current ->
-                            if (current.id == rule.id) current.copy(enabled = enabled) else current
-                        },
+                if (enabled) {
+                    val baseState = appState
+                    validateAndCommitEnable(
+                        ruleId = rule.id,
+                        baseState = baseState,
+                        candidateState = baseState.withRouteRuleEnabled(rule.id, enabled = true),
                     )
+                } else {
+                    updateAppState { state ->
+                        state.withRouteRuleEnabled(rule.id, enabled = false)
+                    }
                 }
             },
             onEdit = { rule ->
@@ -314,6 +360,7 @@ internal fun managedOutboundChoices(appState: AppState): List<RouteChoice> {
 @Composable
 private fun RoutingRuleGrid(
     rules: List<SingBoxRouteRuleState>,
+    pendingEnableRuleId: Int?,
     columns: Int,
     contentPadding: PaddingValues,
     finalOutbound: String,
@@ -375,6 +422,8 @@ private fun RoutingRuleGrid(
                 ) { isDragging ->
                     RouteRuleCard(
                         rule = rule,
+                        displayedEnabled = rule.enabled || pendingEnableRuleId == rule.id,
+                        enablePending = pendingEnableRuleId == rule.id,
                         referenceLabels = referenceLabels,
                         unavailableLabel = unavailableLabel,
                         globalLabel = globalLabel,
@@ -430,6 +479,8 @@ private fun RoutingEmptyState() {
 @Composable
 private fun RouteRuleCard(
     rule: SingBoxRouteRuleState,
+    displayedEnabled: Boolean,
+    enablePending: Boolean,
     referenceLabels: Map<String, String>,
     unavailableLabel: String,
     globalLabel: String,
@@ -473,7 +524,7 @@ private fun RouteRuleCard(
                 color = MaterialTheme.colorScheme.primary,
                 cornerRadius = AsteriskShapeTokens.ListCardRadius,
             )
-            .alpha(if (rule.enabled) 1f else 0.68f),
+            .alpha(if (displayedEnabled) 1f else 0.68f),
         shape = AsteriskShapeTokens.ListCard,
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
@@ -529,8 +580,8 @@ private fun RouteRuleCard(
                 }
             }
             Switch(
-                checked = rule.enabled,
-                onCheckedChange = onEnabledChange,
+                checked = displayedEnabled,
+                onCheckedChange = if (enablePending) null else onEnabledChange,
             )
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
