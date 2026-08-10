@@ -39,6 +39,24 @@ internal fun selectorTargetTags(
 
 internal fun selectorCardMemberCount(memberTags: Iterable<String>): Int = memberTags.count()
 
+internal fun List<SingBoxSelectorState>.moveSelector(
+    fromIndex: Int,
+    toIndex: Int,
+): List<SingBoxSelectorState> {
+    if (fromIndex !in indices || toIndex !in indices || fromIndex == toIndex) return this
+    return toMutableList().apply {
+        add(toIndex, removeAt(fromIndex))
+    }
+}
+
+internal fun selectorCustomSectionIndexOffset(managedSelectorCount: Int): Int =
+    if (managedSelectorCount > 0) managedSelectorCount + 2 else 1
+
+internal fun isSelectorReorderEnabled(
+    query: String,
+    selectorCount: Int,
+): Boolean = query.isBlank() && selectorCount > 1
+
 internal fun selectorDefaultMemberIndex(
     members: List<String>,
     default: String,

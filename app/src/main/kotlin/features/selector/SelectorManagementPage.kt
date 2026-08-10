@@ -10,7 +10,9 @@ package features.selector
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,6 +31,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -54,6 +58,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -64,6 +69,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import app.AppState
 import app.DefaultSingBoxUrlTestIdleTimeout
 import app.DefaultSingBoxUrlTestInterval
@@ -97,10 +103,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.asterisk.zcc.abox.R
+import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskInfoChip
 import ui.components.EditorPageScaffold
 import ui.components.WarningConfirmDialog
+import ui.components.draggedCardShadow
+import ui.components.longPressReorderDragHandle
+import ui.components.rememberAsteriskReorderableLazyGridState
 import ui.components.singBoxOptionLabel
+import ui.components.verticalReorderScrollThresholdPadding
 import ui.icons.AsteriskIcons as Icons
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
@@ -277,10 +288,27 @@ internal fun SelectorManagementPage(padding: PaddingValues) {
             outerPadding = padding,
             isWideScreen = isWideScreen,
         )
+        val listContentPadding = pageListPadding(contentPadding, bottomExtra = 24.dp)
+        val gridState = rememberLazyGridState()
+        val reorderEnabled = isSelectorReorderEnabled(query, appState.selectors.size)
+        val reorderableState = rememberAsteriskReorderableLazyGridState(
+            lazyGridState = gridState,
+            itemCount = customSelectors.size,
+            indexOffset = selectorCustomSectionIndexOffset(managedGroups.size),
+            scrollThresholdPadding = verticalReorderScrollThresholdPadding(listContentPadding),
+            onMove = { fromIndex, toIndex ->
+                if (reorderEnabled) {
+                    updateAppState { state ->
+                        state.copy(selectors = state.selectors.moveSelector(fromIndex, toIndex))
+                    }
+                }
+            },
+        )
         LazyVerticalGrid(
             columns = GridCells.Adaptive(300.dp),
+            state = gridState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = pageListPadding(contentPadding, bottomExtra = 24.dp),
+            contentPadding = listContentPadding,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -312,13 +340,31 @@ internal fun SelectorManagementPage(padding: PaddingValues) {
                 ) {
                     SelectorSectionTitle(stringResource(R.string.selector_custom_section))
                 }
-                customSelectors.forEach { selector ->
-                    item(key = "custom:${selector.id}") {
+                gridItems(
+                    items = customSelectors,
+                    key = { selector -> "custom:${selector.id}" },
+                    contentType = { "custom-selector" },
+                ) { selector ->
+                    val reorderKey = "custom:${selector.id}"
+                    ReorderableItem(
+                        state = reorderableState.reorderableState,
+                        key = reorderKey,
+                        enabled = reorderEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                        animateItemModifier = Modifier.animateItem(),
+                    ) { isDragging ->
                         CustomSelectorCard(
                             selector = selector,
+                            isDragging = isDragging && reorderEnabled,
                             onEdit = { openEditor(selector) },
                             onDelete = { pendingDelete = selector },
-                            modifier = Modifier.animateItem(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .longPressReorderDragHandle(
+                                    scope = this,
+                                    enabled = reorderEnabled,
+                                    state = reorderableState,
+                                ),
                         )
                     }
                 }
@@ -395,6 +441,7 @@ private fun ManagedSelectorCard(
 @Composable
 private fun CustomSelectorCard(
     selector: SingBoxSelectorState,
+    isDragging: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
@@ -414,6 +461,7 @@ private fun CustomSelectorCard(
         memberCount = selectorCardMemberCount(selector.outbounds),
         status = null,
         enabled = selector.outbounds.isNotEmpty(),
+        isDragging = isDragging,
         onClick = onEdit,
         menu = {
             Box {
@@ -454,9 +502,41 @@ private fun SelectorCard(
     status: String?,
     enabled: Boolean,
     modifier: Modifier = Modifier,
+    isDragging: Boolean = false,
     onClick: (() -> Unit)? = null,
     menu: (@Composable () -> Unit)?,
 ) {
+    val containerColor by animateColorAsState(
+        targetValue = if (isDragging) {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        } else {
+            MaterialTheme.colorScheme.surfaceContainer
+        },
+        animationSpec = AsteriskMotion.effects(),
+        label = "selector-card-color",
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isDragging) 1.025f else 1f,
+        animationSpec = AsteriskMotion.fastSpatial(),
+        label = "selector-card-scale",
+    )
+    val shadowAlpha by animateFloatAsState(
+        targetValue = if (isDragging) 1f else 0f,
+        animationSpec = AsteriskMotion.fastEffects(),
+        label = "selector-card-shadow",
+    )
+    val cardModifier = modifier
+        .zIndex(if (isDragging) 1f else 0f)
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .draggedCardShadow(
+            alpha = shadowAlpha,
+            color = MaterialTheme.colorScheme.primary,
+            cornerRadius = AsteriskShapeTokens.InnerContainerRadius,
+        )
+    val cardColors = CardDefaults.cardColors(containerColor = containerColor)
     val content: @Composable () -> Unit = {
         Column(
             modifier = Modifier
@@ -505,19 +585,15 @@ private fun SelectorCard(
     }
     if (onClick == null) {
         Card(
-            modifier = modifier,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            ),
+            modifier = cardModifier,
+            colors = cardColors,
             content = { content() },
         )
     } else {
         Card(
             onClick = onClick,
-            modifier = modifier,
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            ),
+            modifier = cardModifier,
+            colors = cardColors,
             content = { content() },
         )
     }
