@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.Color
 @Composable
 internal fun AsteriskSelectionCard(
     selected: Boolean,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     containerColor: Color = MaterialTheme.colorScheme.surfaceContainer,

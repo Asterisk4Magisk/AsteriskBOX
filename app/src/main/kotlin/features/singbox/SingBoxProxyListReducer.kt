@@ -116,11 +116,36 @@ internal fun isSingBoxProxyNodeCurrent(
     return (pendingSelections[group.name] ?: group.now) == nodeName
 }
 
-internal fun isSingBoxProxyGroupSelectable(group: SingBoxProxyGroup): Boolean {
+internal data class SingBoxProxySelectionBehavior(
+    val canSelect: Boolean,
+    val cardEnabled: Boolean,
+)
+
+internal fun resolveSingBoxProxySelectionBehavior(
+    group: SingBoxProxyGroup,
+    runtimeAvailable: Boolean,
+): SingBoxProxySelectionBehavior {
     return when (group.type.normalizedSingBoxGroupType()) {
-        "select", "selector", "urltest", "fallback" -> true
-        else -> false
+        "select", "selector", "fallback" -> SingBoxProxySelectionBehavior(
+            canSelect = true,
+            cardEnabled = runtimeAvailable,
+        )
+        "urltest" -> SingBoxProxySelectionBehavior(
+            canSelect = false,
+            cardEnabled = true,
+        )
+        else -> SingBoxProxySelectionBehavior(
+            canSelect = false,
+            cardEnabled = false,
+        )
     }
+}
+
+internal fun isSingBoxProxyGroupSelectable(group: SingBoxProxyGroup): Boolean {
+    return resolveSingBoxProxySelectionBehavior(
+        group = group,
+        runtimeAvailable = true,
+    ).canSelect
 }
 
 internal fun isSingBoxProxySelectionPersistent(group: SingBoxProxyGroup): Boolean {

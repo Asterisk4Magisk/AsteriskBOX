@@ -483,8 +483,17 @@ fun SingBoxProxyPage(
                                         key = { nodeName -> "${group.name}:$nodeName" },
                                     ) { nodeName ->
                                         val node = proxies.node(nodeName)
-                                        val selectionEnabled =
-                                            isSingBoxProxyGroupSelectable(group) && runtimeAvailable
+                                        val selectionBehavior =
+                                            resolveSingBoxProxySelectionBehavior(
+                                                group = group,
+                                                runtimeAvailable = runtimeAvailable,
+                                            )
+                                        val onSelect: (() -> Unit)? =
+                                            if (selectionBehavior.canSelect) {
+                                                { selectProxy(group, node) }
+                                            } else {
+                                                null
+                                            }
                                         SingBoxProxyNodeCard(
                                             modifier = Modifier
                                                 .animateItem()
@@ -497,7 +506,7 @@ fun SingBoxProxyPage(
                                                 nodeName = node.name,
                                                 pendingSelections = pendingSelections,
                                             ),
-                                            selectionEnabled = selectionEnabled,
+                                            selectionEnabled = selectionBehavior.cardEnabled,
                                             delayTestEnabled = runtimeAvailable && testingTarget == null,
                                             compact = columns > 1,
                                             delayStatus = resolveSingBoxProxyDelayStatus(
@@ -510,7 +519,7 @@ fun SingBoxProxyPage(
                                                 failedNodes = runtimeState.delayFailedNodes,
                                             ),
                                             testing = testingTarget == node.name,
-                                            onSelect = { selectProxy(group, node) },
+                                            onSelect = onSelect,
                                             onDelayTest = { testProxy(node) },
                                         )
                                     }
@@ -838,7 +847,7 @@ private fun SingBoxProxyNodeCard(
     compact: Boolean,
     delayStatus: SingBoxProxyDelayStatus,
     testing: Boolean,
-    onSelect: () -> Unit,
+    onSelect: (() -> Unit)?,
     onDelayTest: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
