@@ -107,6 +107,7 @@ import ui.components.WarningConfirmDialog
 import ui.components.draggedCardShadow
 import ui.components.longPressReorderDragHandle
 import ui.components.rememberAsteriskReorderableLazyGridState
+import ui.components.ruleEditorAnimatedListContentKey
 import ui.components.singBoxOptionLabel
 import ui.components.managedInboundChoices
 import ui.components.singBoxProtocolChoices
@@ -1253,6 +1254,9 @@ private fun RouteLogicalChildrenCard(
             AnimatedContent(
                 targetState = rules,
                 transitionSpec = AsteriskMotion.fadeThrough(listMotion),
+                contentKey = { visibleRules ->
+                    ruleEditorAnimatedListContentKey(visibleRules, SingBoxRouteRuleState::id)
+                },
                 label = "routing-logical-conditions",
             ) { visibleRules ->
                 if (visibleRules.isEmpty()) {

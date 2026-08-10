@@ -39,6 +39,7 @@ import engine.singbox.config.hasValidDnsRuleStructure
 import features.dns.dnsMatcherCount
 import org.asterisk.zcc.abox.R
 import ui.components.AsteriskExpressiveCard
+import ui.components.ruleEditorAnimatedListContentKey
 import ui.theme.AsteriskMotion
 import ui.icons.AsteriskIcons as Icons
 
@@ -91,6 +92,9 @@ internal fun DnsLogicalChildrenCard(
             AnimatedContent(
                 targetState = rules,
                 transitionSpec = AsteriskMotion.fadeThrough(listMotion),
+                contentKey = { visibleRules ->
+                    ruleEditorAnimatedListContentKey(visibleRules, SingBoxDnsRuleState::id)
+                },
                 label = "dns-logical-conditions",
             ) { visibleRules ->
                 if (visibleRules.isEmpty()) {

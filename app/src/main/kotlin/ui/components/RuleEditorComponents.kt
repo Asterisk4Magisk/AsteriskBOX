@@ -44,6 +44,11 @@ import androidx.compose.ui.unit.dp
 import ui.icons.AsteriskIcons as Icons
 import ui.theme.AsteriskMotion
 
+internal fun <T, K> ruleEditorAnimatedListContentKey(
+    items: List<T>,
+    stableId: (T) -> K,
+): List<K> = items.map(stableId)
+
 internal data class RuleEditorChoice(
     val value: String,
     val label: String,
