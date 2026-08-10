@@ -11,13 +11,13 @@ import org.gradle.api.tasks.TaskAction
 object ProjectConfig {
     const val JVM_VERSION = 26
     const val PROJECT_NAME = "AsteriskBOX"
-    const val VERSION_NAME = "1.0.9"
+    const val VERSION_NAME = "1.0.10-dev"
     const val PACKAGE_NAME = "org.asterisk.zcc.abox"
     const val ASTERISKD_VERSION = "v1.0.4"
     const val BPF2SOCKS_VERSION = "v1.0.4"
     const val BPF_MATCHER_VERSION = "v1.0.1"
     const val SETUIDGID_VERSION = "v1.0.0"
-    const val ANDROID_LIB_BOX_LITE_VERSION = "v1.14.0-beta.12-reF1nd"
+    const val ANDROID_LIB_BOX_LITE_VERSION = "v1.14.0-beta.13-reF1nd"
     const val SING_BOX_VERSION = ANDROID_LIB_BOX_LITE_VERSION
     const val HEV_SOCKS5_TUNNEL_VERSION = "2.17.0"
     const val TARGET_SDK = 37
