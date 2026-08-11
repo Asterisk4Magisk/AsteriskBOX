@@ -397,6 +397,7 @@ private fun HomeControllerCard(
                 }
             }
         },
+        keepPrimaryActionInline = true,
     ) {
         Box(modifier = Modifier.offset(y = HomeModeControlOffset)) {
             AsteriskSegmentedControl(
