@@ -61,6 +61,7 @@ internal class AndroidProxyEngine(
     ): ProxyEngineStatus = withContext(Dispatchers.Default) {
         SingBoxTrafficStatsNotificationService.reconcile(appContext, null)
         val requestedEngine = request.appState.runMode.engine()
+        var rootResumeChecked = false
         if (shouldResumeRootBeforeResolvingPorts(explicitRestart, activeEngine != null, requestedEngine is RootModeEngine)) {
             requestedEngine as RootModeEngine
             requestedEngine.resumeIfRunning(request)?.let { status ->
@@ -72,6 +73,7 @@ internal class AndroidProxyEngine(
                 )
                 return@withContext resumed
             }
+            rootResumeChecked = true
         }
         val resolvedRequest = request.copy(
             appState = request.appState
@@ -86,10 +88,14 @@ internal class AndroidProxyEngine(
         }
         activeEngine = nextEngine
         try {
-            val status = if (explicitRestart && nextEngine is RootModeEngine) {
-                nextEngine.restart(resolvedRequest)
-            } else {
-                nextEngine.start(resolvedRequest)
+            val status = when {
+                explicitRestart && nextEngine is RootModeEngine -> nextEngine.restart(resolvedRequest)
+                shouldUsePreResolvedRootStart(
+                    explicitRestart = explicitRestart,
+                    resumeChecked = rootResumeChecked,
+                    nextEngineIsRoot = nextEngine is RootModeEngine,
+                ) -> (nextEngine as RootModeEngine).startAfterResumeCheck(resolvedRequest)
+                else -> nextEngine.start(resolvedRequest)
             }
                 .copy(
                     appState = resolvedRequest.appState,
@@ -247,3 +253,9 @@ internal fun shouldResumeRootBeforeResolvingPorts(
     hasActiveEngine: Boolean,
     requestedIsRoot: Boolean,
 ): Boolean = !explicitRestart && !hasActiveEngine && requestedIsRoot
+
+internal fun shouldUsePreResolvedRootStart(
+    explicitRestart: Boolean,
+    resumeChecked: Boolean,
+    nextEngineIsRoot: Boolean,
+): Boolean = !explicitRestart && resumeChecked && nextEngineIsRoot
