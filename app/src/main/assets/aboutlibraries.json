@@ -15,7 +15,7 @@
         },
         {
             "uniqueId": "com.github.asterisk4magisk:libbox",
-            "artifactVersion": "v1.14.0-beta.13-reF1nd",
+            "artifactVersion": "v1.14.0-beta.14-reF1nd",
             "name": "AndroidLibBoxLite",
             "description": "Pinned Android JNI and command API bindings for sing-box.",
             "website": "https://github.com/Asterisk4Magisk/AndroidLibBoxLite",
@@ -54,7 +54,7 @@
         },
         {
             "uniqueId": "github:Asterisk4Magisk/asteriskd",
-            "artifactVersion": "v2.0.0",
+            "artifactVersion": "v2.0.1",
             "name": "asteriskd",
             "description": "A root Android daemon that synchronizes local-address bypass rules and pinned eBPF maps.",
             "website": "https://github.com/Asterisk4Magisk/asteriskd",
@@ -313,21 +313,8 @@
             ]
         },
         {
-            "uniqueId": "github:Asterisk4Magisk/setuidgid",
-            "artifactVersion": "v1.0.0",
-            "name": "setuidgid",
-            "description": "A privileged Android/Linux helper that launches a process under an explicit numeric UID and GID.",
-            "website": "https://github.com/Asterisk4Magisk/setuidgid",
-            "scm": {
-                "url": "https://github.com/Asterisk4Magisk/setuidgid"
-            },
-            "licenses": [
-                "GPL-3.0"
-            ]
-        },
-        {
             "uniqueId": "github:reF1nd/sing-box-releases",
-            "artifactVersion": "v1.14.0-beta.13-reF1nd",
+            "artifactVersion": "v1.14.0-beta.14-reF1nd",
             "name": "sing-box reF1nd build",
             "description": "A reF1nd build of the sing-box proxy platform used by AsteriskBOX ROOT modes.",
             "website": "https://github.com/reF1nd/sing-box-releases",

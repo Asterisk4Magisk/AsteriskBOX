@@ -217,9 +217,7 @@ fun App(
     )
     SingBoxRuntimeSynchronizer(
         stateStore = stateStore,
-        proxyEngine = proxyEngine,
         singBoxRuntime = application.singBoxRuntime,
-        updateAppState = updateAppState,
     )
     ResourceFileSynchronizer(
         resourceFileUseCase = resourceFileUseCase,
