@@ -374,12 +374,14 @@
     <string name="settings_resource_files_catalog_empty">No available resource files were returned</string>
     <string name="settings_resource_files_catalog_no_results">No matching files</string>
     <string name="settings_resource_files_catalog_existing">Existing</string>
-    <string name="settings_resource_files_catalog_status">%1$d files</string>
+    <plurals name="settings_resource_files_catalog_status">
+        <item quantity="one">%1$d file</item>
+        <item quantity="other">%1$d files</item>
+    </plurals>
     <string name="settings_resource_files_catalog_add_selected">Add %1$d</string>
     <string name="settings_resource_files_catalog_added">Added and downloaded {count} resource files</string>
     <string name="settings_resource_files_catalog_partial">Downloaded {success} resource files; {failed} failed and can be retried from the list</string>
     <string name="settings_resource_files_catalog_conflicts_skipped">Skipped {count} files whose names are already in use</string>
-    <string name="settings_resource_files_add_custom">Add custom resource file</string>
     <string name="settings_resource_files_custom_file">Custom resource file</string>
     <string name="settings_resource_files_custom_name">File name</string>
     <string name="settings_resource_files_custom_url_optional">URL (optional)</string>
@@ -753,7 +755,6 @@
     </plurals>
     <string name="outbound_delete_title">Delete outbound?</string>
     <string name="outbound_delete_message">The outbound “%1$s” will be permanently deleted.</string>
-    <string name="outbound_editor_invalid">Check the highlighted fields</string>
     <string name="outbound_editor_list_hint">One item per line; commas are also accepted</string>
     <string name="outbound_editor_key_value_empty">No entries</string>
     <string name="outbound_editor_key">Name</string>

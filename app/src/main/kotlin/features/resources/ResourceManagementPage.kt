@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -82,7 +83,7 @@ fun ResourceManagementPage(
     var resourceCatalogLoadState by remember {
         mutableStateOf<ResourceCatalogLoadState>(ResourceCatalogLoadState.Loading)
     }
-    var resourceCatalogReloadRevision by remember { mutableStateOf(0) }
+    var resourceCatalogReloadRevision by remember { mutableIntStateOf(0) }
     var returnToSourceAfterCatalogHidden by remember { mutableStateOf(false) }
     val showCustomResourceFileDialog = remember { mutableStateOf(false) }
     var editingCustomResourceFile by remember { mutableStateOf<CustomResourceFileState?>(null) }

@@ -7,8 +7,6 @@ import android.content.Context
 import app.AppState
 import app.modes.RunModeVpnService
 import engine.proxy.ProxyEngineStartRequest
-import engine.root.prepareRootConfigBuildContext
-import engine.root.writeRootConfigFile
 import engine.singbox.singBoxControlConfig
 import engine.singbox.singBoxModeName
 import engine.vpn.VpnSingBoxConfigFactory
@@ -29,9 +27,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import system.AndroidRootShellGateway
-import system.ShellExecOptions
-import utils.shellQuote
 import kotlin.time.Duration.Companion.milliseconds
 
 internal class SingBoxRuntimeRepository(
@@ -173,25 +168,7 @@ internal class SingBoxRuntimeRepository(
                 }
                 replaceSession(appState, appState.commandTarget())
             } else {
-                val root = appContext
-                    .prepareRootConfigBuildContext(ProxyEngineStartRequest(appState))
-                    .buildRootStartConfig()
-                writeRootConfigFile(root)
-                check(updateServiceStartedAtIfCurrent(activeGeneration, active, 0L)) {
-                    "sing-box API session changed during reload"
-                }
-                val result = AndroidRootShellGateway().exec(
-                    command = "kill -HUP \"$(cat ${root.runtimeLayout.pidPath.shellQuote()})\"",
-                    options = ShellExecOptions(logFailure = false),
-                )
-                if (result.errno != 0) {
-                    refreshServiceStartedAt(activeGeneration, active)
-                }
-                check(result.errno == 0) {
-                    result.stderr.ifBlank { "Failed to reload ROOT sing-box configuration" }
-                }
-                delay(RootReloadWaitMillis.milliseconds)
-                replaceSession(appState, appState.commandTarget())
+                error("ROOT runtime configuration changes require a supervised restart")
             }
         }
     }
@@ -595,7 +572,6 @@ internal class SingBoxRuntimeRepository(
         const val SessionWaitMillis = 8_000L
         const val DelayTestTimestampBoundaryWaitMillis = 1_100L
         const val DelayTestNoProgressTimeoutMillis = 5_000L
-        const val RootReloadWaitMillis = 750L
         const val LogTag = "SingBoxRuntime"
     }
 }

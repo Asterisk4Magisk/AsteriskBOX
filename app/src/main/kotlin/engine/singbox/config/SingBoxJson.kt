@@ -26,7 +26,7 @@ internal fun parseSingBoxJson(content: String): JsonObject {
 }
 
 internal fun encodeSingBoxJson(root: JsonObject): String =
-    SingBoxJson.encodeToString(JsonElement.serializer(), root)
+    SingBoxJson.encodeToString(JsonElement.serializer(), root).trimEnd('\r', '\n') + "\n"
 
 internal fun JsonObject.updated(
     name: String,

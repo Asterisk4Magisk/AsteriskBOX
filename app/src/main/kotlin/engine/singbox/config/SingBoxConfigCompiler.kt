@@ -36,18 +36,11 @@ import app.withCanonicalManagedTagReferences
 import app.withPrunedDnsServerReferences
 import app.withUnavailableManagedRuleSetsDisabled
 import engine.network.toPortOrNull
-import engine.ebpf.EbpfRedirectIpv4Prefix
-import engine.ebpf.EbpfRedirectIpv6Prefix
-import engine.ebpf.EbpfUidPolicy
-import engine.ebpf.normalizeEbpfSharedNetworkInterfaces
-import engine.ebpf.resolveEbpfUidPolicy
 import engine.proxy.LocalProxyLoopbackAddress
 import engine.proxy.toLocalProxyOptions
 import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.singBoxControlConfig
-import engine.tproxy.DefaultTproxyPort
-import engine.tun.SingBoxTunDevice
-import engine.tun2socks.DefaultTun2SocksProxyPort
+import engine.root.RootModeEngine
 import engine.vpn.toTunOptions
 import features.resources.runtime.singBoxRuleSetFiles
 import kotlinx.serialization.json.JsonArray
@@ -251,13 +244,13 @@ private fun compileInbounds(
             put("type", "tproxy")
             put("tag", APP_ROOT_INBOUND)
             put("listen", "0.0.0.0")
-            put("listen_port", appState.transparentProxyPort.toPortOrNull() ?: DefaultTproxyPort)
+            put("listen_port", appState.transparentProxyPort.toPortOrNull() ?: RootModeEngine.DefaultTproxyPort)
         }
         RunModeTun2Socks, RunModeBpf2Socks -> retained += buildJsonObject {
             put("type", "socks")
             put("tag", APP_ROOT_INBOUND)
             put("listen", LocalProxyLoopbackAddress)
-            put("listen_port", appState.socks5ProxyPort.toPortOrNull() ?: DefaultTun2SocksProxyPort)
+            put("listen_port", appState.socks5ProxyPort.toPortOrNull() ?: RootModeEngine.DefaultTun2SocksProxyPort)
         }
         RunModeTun -> retained += compileTunInbound(appState, rootMode = true)
         RunModeEbpf -> retained += compileEbpfInbound(appState, ebpfUidPolicy)

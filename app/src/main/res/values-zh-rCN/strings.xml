@@ -370,12 +370,13 @@
     <string name="settings_resource_files_catalog_empty">未获取到可用的资源文件</string>
     <string name="settings_resource_files_catalog_no_results">没有匹配的文件</string>
     <string name="settings_resource_files_catalog_existing">已存在</string>
-    <string name="settings_resource_files_catalog_status">共 %1$d 个文件</string>
+    <plurals name="settings_resource_files_catalog_status">
+        <item quantity="other">共 %1$d 个文件</item>
+    </plurals>
     <string name="settings_resource_files_catalog_add_selected">添加 %1$d 个</string>
     <string name="settings_resource_files_catalog_added">已添加并下载 {count} 个资源文件</string>
     <string name="settings_resource_files_catalog_partial">已下载 {success} 个资源文件，{failed} 个失败，可在列表中重试</string>
     <string name="settings_resource_files_catalog_conflicts_skipped">已忽略 {count} 个同名资源文件</string>
-    <string name="settings_resource_files_add_custom">添加自定义资源文件</string>
     <string name="settings_resource_files_custom_file">自定义资源文件</string>
     <string name="settings_resource_files_custom_name">文件名</string>
     <string name="settings_resource_files_custom_url_optional">URL（可选）</string>
@@ -742,7 +743,6 @@
     </plurals>
     <string name="outbound_delete_title">删除出站？</string>
     <string name="outbound_delete_message">出站“%1$s”将被永久删除。</string>
-    <string name="outbound_editor_invalid">请检查标记的字段</string>
     <string name="outbound_editor_list_hint">每行一项，也可以使用逗号分隔</string>
     <string name="outbound_editor_key_value_empty">暂无条目</string>
     <string name="outbound_editor_key">名称</string>

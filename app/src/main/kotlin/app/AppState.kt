@@ -13,7 +13,6 @@ import app.modes.SingBoxModeRule
 import app.modes.SingBoxProxyLayoutAuto
 import app.modes.SingBoxProxySortDefault
 import app.modes.SingBoxTunStackGvisor
-import engine.root.RootBpf2SocksDefaultBridgePort
 import engine.singbox.DefaultSingBoxControlPort
 import engine.singbox.DefaultSingBoxDnsCacheCapacity
 import engine.singbox.DefaultSingBoxDnsFinal
@@ -25,8 +24,7 @@ import engine.singbox.DefaultSingBoxRouteDefaultDomainResolver
 import engine.singbox.DefaultSingBoxRouteRules
 import engine.singbox.DefaultSingBoxSnifferProtocols
 import engine.singbox.DefaultSingBoxSnifferTimeout
-import engine.tproxy.DefaultTproxyPort
-import engine.tun2socks.DefaultTun2SocksProxyPort
+import engine.root.RootModeEngine
 import engine.vpn.VpnDefaults
 import features.resources.ResourceFileSourceDefault
 
@@ -115,13 +113,13 @@ data class AppState(
     val nextDnsRuleId: Int =
         (DefaultSingBoxDnsRules.maxOfOrNull(SingBoxDnsRuleState::id) ?: 0) + 1,
 
-    val transparentProxyPort: String = DefaultTproxyPort.toString(),
+    val transparentProxyPort: String = RootModeEngine.DefaultTproxyPort.toString(),
     val enableRootBootScript: Boolean = false,
     val enableRootEbpfRules: Boolean = false,
     val enableRootEbpfDirectCidrBypass: Boolean = false,
     val enableRootIpv6Disabler: Boolean = false,
-    val socks5ProxyPort: String = DefaultTun2SocksProxyPort.toString(),
-    val bpf2SocksBridgePort: String = RootBpf2SocksDefaultBridgePort.toString(),
+    val socks5ProxyPort: String = RootModeEngine.DefaultTun2SocksProxyPort.toString(),
+    val bpf2SocksBridgePort: String = RootModeEngine.DefaultBpf2SocksBridgePort.toString(),
 
     val externalInterfaces: List<String> = emptyList(),
     val ebpfSharedNetworkInterfaces: List<String> = emptyList(),

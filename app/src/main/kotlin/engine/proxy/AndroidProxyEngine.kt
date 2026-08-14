@@ -5,29 +5,13 @@ package engine.proxy
 
 import android.content.Context
 import android.content.Intent
-import org.asterisk.zcc.abox.R
-import app.modes.RunModeBpf2Socks
-import app.modes.RunModeEbpf
-import app.modes.RunModeTun
-import app.modes.RunModeTun2Socks
-import app.modes.RunModeTproxy
 import app.modes.RunModeVpnService
 import engine.proxy.mode.AndroidModeProxyEngine
 import engine.root.RootModeEngine
-import engine.bpf2socks.Bpf2SocksRootRunner
-import engine.bpf2socks.buildBpf2SocksStartConfig
-import engine.ebpf.EbpfRootRunner
-import engine.ebpf.buildEbpfStartConfig
 import engine.stats.SingBoxTrafficStatsNotificationService
 import engine.stats.toSingBoxTrafficStatsRuntime
 import engine.singbox.withResolvedSingBoxControlPort
 import engine.singbox.SingBoxConfigFactory
-import engine.tun.TunRootRunner
-import engine.tun.buildTunStartConfig
-import engine.tproxy.TproxyRootRunner
-import engine.tproxy.buildTproxyStartConfig
-import engine.tun2socks.Tun2SocksRootRunner
-import engine.tun2socks.buildTun2SocksStartConfig
 import engine.vpn.VpnSingBoxEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -42,61 +26,8 @@ internal class AndroidProxyEngine(
 ) {
     private val appContext = context.applicationContext
     private val vpnSingBoxEngine = VpnSingBoxEngine(appContext, requestVpnPermission)
-    private val tproxyEngine = RootModeEngine(
-        context = appContext,
-        rootAccess = rootAccess,
-        runner = TproxyRootRunner(rootAccess),
-        runMode = RunModeTproxy,
-        rootRequiredErrorResId = R.string.error_tproxy_root_required,
-        startFailedErrorResId = R.string.error_tproxy_start_failed,
-        modeName = "TPROXY",
-        logTag = "TproxyEngine",
-        buildConfig = { rootContext -> rootContext.buildTproxyStartConfig() },
-    )
-    private val tunEngine = RootModeEngine(
-        context = appContext,
-        rootAccess = rootAccess,
-        runner = TunRootRunner(rootAccess),
-        runMode = RunModeTun,
-        rootRequiredErrorResId = R.string.error_tun_root_required,
-        startFailedErrorResId = R.string.error_tun_start_failed,
-        modeName = "TUN",
-        logTag = "TunEngine",
-        buildConfig = { rootContext -> rootContext.buildTunStartConfig() },
-    )
-    private val tun2SocksEngine = RootModeEngine(
-        context = appContext,
-        rootAccess = rootAccess,
-        runner = Tun2SocksRootRunner(rootAccess),
-        runMode = RunModeTun2Socks,
-        rootRequiredErrorResId = R.string.error_tun2socks_root_required,
-        startFailedErrorResId = R.string.error_tun2socks_start_failed,
-        modeName = "TUN2SOCKS",
-        logTag = "Tun2SocksEngine",
-        buildConfig = { rootContext -> rootContext.buildTun2SocksStartConfig() },
-    )
-    private val bpf2SocksEngine = RootModeEngine(
-        context = appContext,
-        rootAccess = rootAccess,
-        runner = Bpf2SocksRootRunner(rootAccess),
-        runMode = RunModeBpf2Socks,
-        rootRequiredErrorResId = R.string.error_bpf2socks_root_required,
-        startFailedErrorResId = R.string.error_bpf2socks_start_failed,
-        modeName = "BPF2SOCKS",
-        logTag = "Bpf2SocksEngine",
-        buildConfig = { rootContext -> rootContext.buildBpf2SocksStartConfig() },
-    )
-    private val ebpfEngine = RootModeEngine(
-        context = appContext,
-        rootAccess = rootAccess,
-        runner = EbpfRootRunner(rootAccess),
-        runMode = RunModeEbpf,
-        rootRequiredErrorResId = R.string.error_ebpf_root_required,
-        startFailedErrorResId = R.string.error_ebpf_start_failed,
-        modeName = "eBPF",
-        logTag = "EbpfEngine",
-        buildConfig = { rootContext -> rootContext.buildEbpfStartConfig() },
-    )
+    private val rootEngines = RootModeEngine.createAll(appContext, rootAccess)
+    private val rootEnginesByRunMode = rootEngines.associateBy(RootModeEngine::runMode)
     private val operationMutex = Mutex()
     private var activeEngine: AndroidModeProxyEngine? = null
 
@@ -113,7 +44,7 @@ internal class AndroidProxyEngine(
     }
 
     suspend fun restart(request: ProxyEngineStartRequest): ProxyEngineStatus = operationMutex.withLock {
-        startUnlocked(request)
+        startUnlocked(request, explicitRestart = true)
     }
 
     suspend fun status(
@@ -123,32 +54,46 @@ internal class AndroidProxyEngine(
         statusUnlocked(preferredRunMode, appState)
     }
 
-    private suspend fun startUnlocked(request: ProxyEngineStartRequest): ProxyEngineStatus = withContext(Dispatchers.Default) {
+    private suspend fun startUnlocked(
+        request: ProxyEngineStartRequest,
+        explicitRestart: Boolean = false,
+    ): ProxyEngineStatus = withContext(Dispatchers.Default) {
         // Build once before any notification, engine replacement, VPN permission,
         // Root command, or routing change. This makes an explicit restart atomic
         // with respect to invalid or deprecated sing-box JSON.
         SingBoxConfigFactory.buildConfigBytes(appContext, request.appState)
         SingBoxTrafficStatsNotificationService.reconcile(appContext, null)
+        val requestedEngine = request.appState.runMode.engine()
+        if (shouldResumeRootBeforeResolvingPorts(explicitRestart, activeEngine != null, requestedEngine is RootModeEngine)) {
+            requestedEngine as RootModeEngine
+            requestedEngine.resumeIfRunning(request)?.let { status ->
+                activeEngine = requestedEngine
+                val resumed = status.copy(appState = request.appState)
+                SingBoxTrafficStatsNotificationService.reconcile(
+                    appContext,
+                    request.appState.toSingBoxTrafficStatsRuntime(status.runMode ?: request.appState.runMode),
+                )
+                return@withContext resumed
+            }
+        }
         val resolvedRequest = request.copy(
             appState = request.appState
                 .withResolvedDynamicLocalProxyPort()
                 .withResolvedSingBoxControlPort(),
         )
-        val nextEngine = when (resolvedRequest.appState.runMode) {
-            RunModeTproxy -> tproxyEngine
-            RunModeTun -> tunEngine
-            RunModeTun2Socks -> tun2SocksEngine
-            RunModeBpf2Socks -> bpf2SocksEngine
-            RunModeEbpf -> ebpfEngine
-            else -> vpnSingBoxEngine
-        }
+        val nextEngine = resolvedRequest.appState.runMode.engine()
         val currentEngine = activeEngine ?: findEngineToStop(resolvedRequest.appState.runMode)
-        if (currentEngine != null && currentEngine !== nextEngine) {
+        val rootToRootRestart = explicitRestart && currentEngine is RootModeEngine && nextEngine is RootModeEngine
+        if (currentEngine != null && currentEngine !== nextEngine && !rootToRootRestart) {
             currentEngine.stop()
         }
         activeEngine = nextEngine
         try {
-            val status = nextEngine.start(resolvedRequest)
+            val status = if (explicitRestart && nextEngine is RootModeEngine) {
+                nextEngine.restart(resolvedRequest)
+            } else {
+                nextEngine.start(resolvedRequest)
+            }
                 .copy(
                     appState = resolvedRequest.appState,
                 )
@@ -192,17 +137,9 @@ internal class AndroidProxyEngine(
         return activeEngine
             ?: preferredEngine?.takeIf { it.status().running }
             ?: preferredEngine?.takeIf { it.ownsRootRuntime() }
-            ?: tproxyEngine.takeIf { it.status().running }
-            ?: tunEngine.takeIf { it.status().running }
-            ?: tun2SocksEngine.takeIf { it.status().running }
-            ?: bpf2SocksEngine.takeIf { it.status().running }
-            ?: ebpfEngine.takeIf { it.status().running }
+            ?: rootEngines.firstOrNull { engine -> engine.status().running }
             ?: vpnSingBoxEngine.takeIf { it.status().running }
-            ?: tproxyEngine.takeIf { it.ownsRuntime() }
-            ?: tunEngine.takeIf { it.ownsRuntime() }
-            ?: tun2SocksEngine.takeIf { it.ownsRuntime() }
-            ?: bpf2SocksEngine.takeIf { it.ownsRuntime() }
-            ?: ebpfEngine.takeIf { it.ownsRuntime() }
+            ?: rootEngines.firstOrNull { engine -> engine.ownsRuntime() }
     }
 
     private suspend fun statusUnlocked(
@@ -223,10 +160,12 @@ internal class AndroidProxyEngine(
                 return@withContext preferredStatus
                     .withTrafficStatsReconciled(appState)
             }
-            fallbackStatus = preferredStatus
+            if (preferredStatus.rootSnapshot != null || fallbackStatus?.rootSnapshot == null) {
+                fallbackStatus = preferredStatus
+            }
         }
 
-        listOf(tproxyEngine, tunEngine, tun2SocksEngine, bpf2SocksEngine, ebpfEngine, vpnSingBoxEngine)
+        (rootEngines + vpnSingBoxEngine)
             .filterNot { engine -> engine.runMode == preferredRunMode }
             .forEach { engine ->
                 val status = engine.status()
@@ -234,6 +173,9 @@ internal class AndroidProxyEngine(
                     activeEngine = engine
                     return@withContext status
                         .withTrafficStatsReconciled(appState)
+                }
+                if (status.rootSnapshot != null && fallbackStatus?.rootSnapshot == null) {
+                    fallbackStatus = status
                 }
             }
 
@@ -243,18 +185,11 @@ internal class AndroidProxyEngine(
     }
 
     private fun Int.engine(): AndroidModeProxyEngine {
-        return when (this) {
-            RunModeTproxy -> tproxyEngine
-            RunModeTun -> tunEngine
-            RunModeTun2Socks -> tun2SocksEngine
-            RunModeBpf2Socks -> bpf2SocksEngine
-            RunModeEbpf -> ebpfEngine
-            else -> vpnSingBoxEngine
-        }
+        return rootEnginesByRunMode[this] ?: vpnSingBoxEngine
     }
 
     private suspend fun AndroidModeProxyEngine.ownsRootRuntime(): Boolean {
-        return this is RootModeEngine<*> && ownsRuntime()
+        return this is RootModeEngine && ownsRuntime()
     }
 
     private fun ProxyEngineStatus.withTrafficStatsReconciled(appState: app.AppState?): ProxyEngineStatus {
@@ -275,3 +210,9 @@ internal class AndroidProxyEngine(
         return this
     }
 }
+
+internal fun shouldResumeRootBeforeResolvingPorts(
+    explicitRestart: Boolean,
+    hasActiveEngine: Boolean,
+    requestedIsRoot: Boolean,
+): Boolean = !explicitRestart && !hasActiveEngine && requestedIsRoot

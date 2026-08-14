@@ -51,7 +51,6 @@ dependencyResolutionManagement {
 }
 
 include(":app")
-include(":setuidgid")
 include(":asteriskd")
 include(":bpfmatcher")
 include(":bpf2socks")

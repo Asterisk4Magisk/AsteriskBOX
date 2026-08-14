@@ -14,6 +14,11 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.io.RandomAccessFile
 import java.util.concurrent.atomic.AtomicBoolean
@@ -166,6 +171,8 @@ internal fun parseCoreLogLine(line: String, defaultLevel: String): ParsedCoreLog
         return null
     }
 
+    parseAsteriskdJsonLogLine(trimmedLine)?.let { parsed -> return parsed }
+
     SingBoxLogLineRegex.matchEntire(trimmedLine)?.let { match ->
         val (time, level, message) = match.destructured
         return ParsedCoreLogLine(
@@ -197,4 +204,34 @@ internal fun parseCoreLogLine(line: String, defaultLevel: String): ParsedCoreLog
         level = defaultLevel,
         message = trimmedLine,
     )
+}
+
+private fun parseAsteriskdJsonLogLine(line: String): ParsedCoreLogLine? {
+    if (!line.startsWith('{')) return null
+    return runCatching {
+        val value = LogJson.parseToJsonElement(line) as? JsonObject ?: return@runCatching null
+        if (value.keys != AsteriskdLogKeys) return@runCatching null
+        val timestamp = value.getValue("timestamp").jsonPrimitive.content
+        val level = value.getValue("level").jsonPrimitive.content
+        value.getValue("component").jsonPrimitive.content
+        value.getValue("event").jsonPrimitive.content
+        value.getValue("stream").jsonPrimitive.contentOrNull
+        val message = value.getValue("message").jsonPrimitive.content
+        value.getValue("truncated").jsonPrimitive.booleanOrNull ?: return@runCatching null
+        ParsedCoreLogLine(time = timestamp, level = level, message = message)
+    }.getOrNull()
+}
+
+private val AsteriskdLogKeys = setOf(
+    "timestamp",
+    "level",
+    "component",
+    "event",
+    "stream",
+    "message",
+    "truncated",
+)
+
+private val LogJson = Json {
+    isLenient = false
 }

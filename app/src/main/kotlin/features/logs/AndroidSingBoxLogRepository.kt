@@ -4,6 +4,7 @@
 package features.logs
 
 import android.content.Context
+import engine.root.runtime.rootAsteriskdLogPath
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -12,6 +13,16 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal object AndroidCoreLogRepository : AndroidSingBoxLogRepository(
     logFile = { context -> context.androidSingBoxErrorLog() },
     logTag = "AndroidCoreLogRepository",
+)
+
+internal object AndroidAsteriskdLogRepository : AndroidSingBoxLogRepository(
+    logFile = { context ->
+        CoreLogFile(
+            path = context.rootAsteriskdLogPath(),
+            defaultLevel = "info",
+        )
+    },
+    logTag = "AndroidAsteriskdLogRepository",
 )
 
 internal abstract class AndroidSingBoxLogRepository(

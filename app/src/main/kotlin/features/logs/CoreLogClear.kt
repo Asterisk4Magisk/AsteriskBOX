@@ -7,6 +7,8 @@ import android.content.Context
 import engine.singbox.SingBoxCoreLogPaths
 import engine.singbox.clearCoreLogFilesAsApp
 import engine.singbox.prepareSingBoxCoreLogPaths
+import engine.root.runtime.rootAsteriskdLogPath
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -21,6 +23,15 @@ internal suspend fun Context.clearCoreLogFile(logFile: SingBoxLogFile) {
             logPaths = listOf(logPath),
             logTag = LogTag,
         )
+    }
+}
+
+internal suspend fun Context.clearAsteriskdLogFile() {
+    val logFile = File(applicationContext.rootAsteriskdLogPath())
+    if (!logFile.exists()) return
+    withContext(Dispatchers.IO) {
+        require(logFile.isFile && logFile.canonicalFile == logFile.absoluteFile)
+        logFile.writeText("")
     }
 }
 

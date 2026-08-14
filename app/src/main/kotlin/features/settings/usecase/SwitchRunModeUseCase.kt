@@ -10,7 +10,6 @@ import app.modes.isRootRunMode
 import app.modes.normalizeRunMode
 import engine.hevtun.deleteHevSocks5TunnelLogFile
 import engine.proxy.AndroidProxyEngine
-import engine.root.deleteAsteriskdLogFile
 import features.logs.AndroidAppLogger
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -79,9 +78,6 @@ internal class SwitchRunModeUseCase(
         if (normalizedTargetMode != RunModeTun2Socks) {
             deleteHevSocks5TunnelLog()
         }
-        if (!normalizedTargetMode.isRootRunMode()) {
-            deleteAsteriskdLog()
-        }
 
         return SwitchRunModeResult.Success(
             runMode = normalizedTargetMode,
@@ -94,10 +90,6 @@ internal class SwitchRunModeUseCase(
             .onFailure { error -> AndroidAppLogger.warn(LogTag, "Failed to delete tun2socks log", error) }
     }
 
-    private fun deleteAsteriskdLog() {
-        runCatching { appContext.deleteAsteriskdLogFile() }
-            .onFailure { error -> AndroidAppLogger.warn(LogTag, "Failed to delete asteriskd log", error) }
-    }
 }
 
 internal sealed interface SwitchRunModeResult {

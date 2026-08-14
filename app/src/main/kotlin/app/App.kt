@@ -17,12 +17,12 @@ import app.effects.ResourceFileSynchronizer
 import app.effects.RootBootScriptSynchronizer
 import app.effects.SingBoxRuntimeSynchronizer
 import app.effects.TrafficStatsNotificationSynchronizer
-import app.effects.Tun2SocksRuntimeFileSynchronizer
 import data.backup.AndroidAppBackupDocumentGateway
 import data.backup.AppBackupUseCase
 import engine.proxy.AndroidProxyEngine
 import engine.proxy.ProxyServiceUseCase
 import features.logs.AndroidCoreLogRepository
+import features.logs.AndroidAsteriskdLogRepository
 import features.logs.AndroidLogcatRepository
 import features.monitoring.MonitoringRepository
 import features.resources.ResourceFileUpdateCoordinator
@@ -73,10 +73,11 @@ fun App(
     val networkInterfaces = remember(rootAccess) {
         AndroidNetworkInterfaceProvider(rootAccess)
     }
-    val resourceFileUseCase = remember(appContext, resourceFilePicker) {
+    val resourceFileUseCase = remember(appContext, resourceFilePicker, rootAccess) {
         ResourceFileUseCase(
             context = appContext,
             resourceFilePicker = resourceFilePicker,
+            rootShell = rootAccess,
         )
     }
     val appBackupUseCase = remember(appContext, backupFilePicker, backupFileCreator) {
@@ -200,6 +201,7 @@ fun App(
             tipNotifier = tipNotifier,
             logFileCreator = logFileCreator,
             coreLogRepository = AndroidCoreLogRepository,
+            rootLogRepository = AndroidAsteriskdLogRepository,
             logcatRepository = AndroidLogcatRepository,
         )
     }
@@ -226,10 +228,6 @@ fun App(
     RootBootScriptSynchronizer(
         stateStore = stateStore,
         rootBootScriptUseCase = rootBootScriptUseCase,
-    )
-    Tun2SocksRuntimeFileSynchronizer(
-        context = appContext,
-        stateStore = stateStore,
     )
     TrafficStatsNotificationSynchronizer(
         stateStore = stateStore,

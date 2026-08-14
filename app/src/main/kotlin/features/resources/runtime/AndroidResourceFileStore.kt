@@ -7,6 +7,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
 import app.CustomResourceFileState
 import app.CustomResourceFileStatus
 import app.ResourceFileKind
@@ -73,6 +76,7 @@ internal class AndroidResourceFileStore(
     fun restoreBundledDefaults(resourceFileSource: Int = ResourceFileSourceDefault) {
         val bundledUpdatedAtMillis = appContext.packageUpdatedAtMillis()
         ResourceFileKind.entries.forEach { kind ->
+            if (kind == ResourceFileKind.SingBoxCore) return@forEach
             val target = file(kind)
             if (!target.needsBundledRestore(kind, resourceFileSource, bundledUpdatedAtMillis)) return@forEach
             if (!hasBundledFile(kind)) return@forEach
@@ -100,10 +104,8 @@ internal class AndroidResourceFileStore(
     }
 
     fun restoreBundled(kind: ResourceFileKind) {
-        when (kind) {
-            ResourceFileKind.SingBoxCore -> restoreBundledSingBoxCore()
-            else -> restoreBundledResourceFile(kind)
-        }
+        require(kind != ResourceFileKind.SingBoxCore) { "sing-box core must be restored through the locked publisher" }
+        restoreBundledResourceFile(kind)
     }
 
     private fun restoreBundledResourceFile(kind: ResourceFileKind) {
@@ -114,14 +116,18 @@ internal class AndroidResourceFileStore(
         kind.applyPermissions(file(kind))
     }
 
-    private fun restoreBundledSingBoxCore() {
+    fun stageBundledSingBoxCoreCandidate(): File {
         val source = bundledSingBoxCoreFileOrNull()
             ?: error("Bundled ${ResourceFileKind.SingBoxCore.fileName} is not available for ${currentRuntimeAbi()}")
-        dataDir.mkdirs()
-        source.inputStream().use { input ->
-            writeAtomically(file(ResourceFileKind.SingBoxCore)) { output -> input.copyTo(output) }
-        }
-        ResourceFileKind.SingBoxCore.applyPermissions(file(ResourceFileKind.SingBoxCore))
+        return source.inputStream().use(::writeSingBoxCoreCandidate)
+    }
+
+    fun shouldPublishBundledSingBoxCore(resourceFileSource: Int): Boolean {
+        return bundledSingBoxCoreFileOrNull() != null && file(ResourceFileKind.SingBoxCore).needsBundledRestore(
+            ResourceFileKind.SingBoxCore,
+            resourceFileSource,
+            appContext.packageUpdatedAtMillis(),
+        )
     }
 
     private fun bundledSingBoxCoreFileOrNull(): File? {
@@ -130,24 +136,93 @@ internal class AndroidResourceFileStore(
     }
 
     fun replace(kind: ResourceFileKind, uri: Uri) {
+        require(kind != ResourceFileKind.SingBoxCore) { "sing-box core must be replaced through the locked publisher" }
         dataDir.mkdirs()
         val replaceTempFile = file(kind).resolveSibling("${kind.fileName}.replace.tmp")
         appContext.contentResolver.openInputStream(uri)?.use { input ->
             replaceTempFile.outputStream().use { output -> input.copyTo(output) }
         } ?: throw FileNotFoundException(uri.toString())
 
-        when {
-            kind == ResourceFileKind.SingBoxCore && replaceTempFile.extractZipEntry("sing-box", file(kind)) -> {
-                replaceTempFile.delete()
-            }
-
-            kind == ResourceFileKind.SingBoxCore && replaceTempFile.extractGzip(file(kind)) -> {
-                replaceTempFile.delete()
-            }
-
-            else -> replaceFile(replaceTempFile, file(kind))
-        }
+        replaceFile(replaceTempFile, file(kind))
         kind.applyPermissions(file(kind))
+    }
+
+    fun stageSingBoxCoreCandidate(uri: Uri): File {
+        val uploaded = appContext.contentResolver.openInputStream(uri)?.use(::writeSingBoxCoreCandidate)
+            ?: throw FileNotFoundException(uri.toString())
+        return normalizeSingBoxCoreCandidate(uploaded)
+    }
+
+    fun createSingBoxCoreDownloadCandidate(): File = createSingBoxCoreCandidateFile("sing-box-download-")
+
+    fun normalizeSingBoxCoreCandidate(uploaded: File): File {
+        val extracted = createSingBoxCoreCandidateFile("sing-box-extracted-")
+        try {
+            val found = uploaded.extractZipEntry("sing-box", extracted) || uploaded.extractGzip(extracted)
+            return if (found) {
+                uploaded.delete()
+                extracted
+            } else {
+                extracted.delete()
+                uploaded
+            }
+        } catch (error: Throwable) {
+            extracted.delete()
+            uploaded.delete()
+            throw error
+        }
+    }
+
+    fun installInitialSingBoxCoreCandidate(candidate: File): Boolean {
+        require(candidate.isFile && candidate.length() > 0) { "sing-box core candidate is empty" }
+        require(dataDir.exists() || dataDir.mkdirs())
+        val target = file(ResourceFileKind.SingBoxCore)
+        return synchronized(writeLockFor(target)) {
+            if (target.exists()) return@synchronized false
+            val temp = File.createTempFile(".sing-box-initial-", ".tmp", dataDir)
+            try {
+                candidate.inputStream().use { input ->
+                    temp.outputStream().use { output ->
+                        input.copyTo(output)
+                        output.flush()
+                        output.fd.sync()
+                    }
+                }
+                require(temp.length() > 0)
+                Os.chmod(temp.absolutePath, SingBoxExecutableMode)
+                try {
+                    Os.link(temp.absolutePath, target.absolutePath)
+                } catch (error: ErrnoException) {
+                    if (error.errno == OsConstants.EEXIST) return@synchronized false
+                    throw error
+                }
+                syncDirectory(dataDir)
+                true
+            } finally {
+                temp.delete()
+            }
+        }
+    }
+
+    private fun writeSingBoxCoreCandidate(input: java.io.InputStream): File {
+        val candidate = createSingBoxCoreCandidateFile("sing-box-core-")
+        try {
+            candidate.outputStream().use { output ->
+                input.copyTo(output)
+                output.flush()
+                output.fd.sync()
+            }
+            require(candidate.length() > 0) { "sing-box core candidate is empty" }
+            return candidate
+        } catch (error: Throwable) {
+            candidate.delete()
+            throw error
+        }
+    }
+
+    private fun createSingBoxCoreCandidateFile(prefix: String): File {
+        require(appContext.cacheDir.exists() || appContext.cacheDir.mkdirs())
+        return File.createTempFile(prefix, ".candidate", appContext.cacheDir)
     }
 
     fun replaceCustom(customFile: CustomResourceFileState, uri: Uri) {
@@ -183,9 +258,12 @@ internal class AndroidResourceFileStore(
 
     fun preparePaths(): SingBoxResourceFilePaths {
         dataDir.mkdirs()
+        return currentPaths()
+    }
+
+    fun currentPaths(): SingBoxResourceFilePaths {
         return SingBoxResourceFilePaths(
             dataDir = dataDir.absolutePath,
-            setuidgidPath = File(appContext.applicationInfo.nativeLibraryDir, SetuidgidLibraryName).absolutePath,
             asteriskdPath = File(appContext.applicationInfo.nativeLibraryDir, AsteriskdLibraryName).absolutePath,
             bpfMatcherPath = File(appContext.applicationInfo.nativeLibraryDir, BpfMatcherLibraryName).absolutePath,
             bpf2socksPath = File(appContext.applicationInfo.nativeLibraryDir, Bpf2SocksLibraryName).absolutePath,
@@ -241,7 +319,6 @@ private fun File.needsBundledRestore(
 
 internal data class SingBoxResourceFilePaths(
     val dataDir: String,
-    val setuidgidPath: String,
     val asteriskdPath: String,
     val bpfMatcherPath: String,
     val bpf2socksPath: String,
@@ -257,6 +334,10 @@ internal fun Context.singBoxResourceFilesDir(): File {
 
 internal fun Context.prepareSingBoxResourceFilePaths(): SingBoxResourceFilePaths {
     return AndroidResourceFileStore(this).preparePaths()
+}
+
+internal fun Context.singBoxResourceFilePaths(): SingBoxResourceFilePaths {
+    return AndroidResourceFileStore(this).currentPaths()
 }
 
 internal fun Context.singBoxRuleSetFiles(
@@ -281,15 +362,45 @@ private fun Context.packageUpdatedAtMillis(): Long {
     }.getOrDefault(0L)
 }
 
-private const val SetuidgidLibraryName = "libsetuidgid.so"
 private const val AsteriskdLibraryName = "libasteriskd.so"
 private const val BpfMatcherLibraryName = "libbpf-matcher.so"
 private const val Bpf2SocksLibraryName = "libbpf2socks.so"
 private const val SingBoxCoreLibraryName = "libsing-box.so"
 private const val HevSocks5TunnelLibraryName = "libhev-socks5-tunnel-cli.so"
 private const val SingBoxHomeDirName = "sing-box"
+private const val SingBoxExecutableMode = 493
 
 private val SupportedAndroidAbis = setOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+
+internal enum class CoreCandidateInstallPath {
+    AtomicPublication,
+    InitialNoReplace,
+    Defer,
+}
+
+internal fun chooseCoreCandidateInstallPath(
+    hasRootAccess: Boolean,
+    targetExists: Boolean,
+): CoreCandidateInstallPath = when {
+    hasRootAccess -> CoreCandidateInstallPath.AtomicPublication
+    !targetExists -> CoreCandidateInstallPath.InitialNoReplace
+    else -> CoreCandidateInstallPath.Defer
+}
+
+private fun syncDirectory(directory: File) {
+    val descriptor = Os.open(directory.absolutePath, OsConstants.O_RDONLY, 0)
+    try {
+        Os.fsync(descriptor)
+    } finally {
+        Os.close(descriptor)
+    }
+}
+
+private val WriteLocks = mutableMapOf<String, Any>()
+
+private fun writeLockFor(target: File): Any = synchronized(WriteLocks) {
+    WriteLocks.getOrPut(target.absolutePath) { Any() }
+}
 
 private fun File.toStatus(): ResourceFileStatus {
     return ResourceFileStatus(

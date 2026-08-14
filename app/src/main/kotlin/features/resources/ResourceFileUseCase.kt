@@ -11,12 +11,15 @@ import app.ResourceFileUpdateSource
 import app.ResourceFilesStatus
 import features.resources.runtime.AndroidResourceFileRepository
 import features.resources.runtime.AndroidResourceCatalogRepository
+import system.AndroidRootShellGateway
+import system.RootShellGateway
 
 class ResourceFileUseCase(
     context: Context,
     private val resourceFilePicker: suspend () -> Uri?,
+    rootShell: RootShellGateway = AndroidRootShellGateway(),
 ) {
-    private val repository = AndroidResourceFileRepository(context.applicationContext)
+    private val repository = AndroidResourceFileRepository(context.applicationContext, rootShell)
     private val catalogRepository = AndroidResourceCatalogRepository()
 
     internal suspend fun loadCatalog(
