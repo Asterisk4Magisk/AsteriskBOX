@@ -18,6 +18,7 @@ import app.ResourceFilesStatus
 import app.sanitizeCustomResourceFileName
 import features.resources.ResourceFileSourceDefault
 import features.resources.hasSingBoxRuleSetExtension
+import features.resources.singBoxRuleSetFormatOrNull
 import utils.writeAtomically
 import java.io.File
 import java.io.FileNotFoundException
@@ -237,6 +238,51 @@ internal class AndroidResourceFileStore(
         replaceFile(replaceTempFile, target)
     }
 
+    fun readCustomText(customFile: CustomResourceFileState): String {
+        val target = file(customFile)
+        require(target.isFile && target.length() > 0L) { "${customFile.name} is unavailable" }
+        return target.readText()
+    }
+
+    fun stageCustomCandidate(customFile: CustomResourceFileState, uri: Uri): File {
+        return appContext.contentResolver.openInputStream(uri)?.use { input ->
+            writeCustomCandidate(customFile, input)
+        } ?: throw FileNotFoundException(uri.toString())
+    }
+
+    fun stageCustomCandidate(customFile: CustomResourceFileState, content: String): File {
+        return content.byteInputStream().use { input -> writeCustomCandidate(customFile, input) }
+    }
+
+    fun stageCustomCandidate(customFile: CustomResourceFileState, source: File): File {
+        return source.inputStream().use { input -> writeCustomCandidate(customFile, input) }
+    }
+
+    fun createCustomDownloadCandidate(customFile: CustomResourceFileState): File {
+        require(appContext.cacheDir.exists() || appContext.cacheDir.mkdirs())
+        val suffix = customFile.name.singBoxRuleSetFormatOrNull()?.fileExtension ?: ".candidate"
+        return File.createTempFile("resource-${customFile.id}-", suffix, appContext.cacheDir)
+    }
+
+    private fun writeCustomCandidate(
+        customFile: CustomResourceFileState,
+        input: java.io.InputStream,
+    ): File {
+        val candidate = createCustomDownloadCandidate(customFile)
+        try {
+            candidate.outputStream().use { output ->
+                input.copyTo(output)
+                output.flush()
+                output.fd.sync()
+            }
+            require(candidate.length() > 0L) { "${customFile.name} candidate is empty" }
+            return candidate
+        } catch (error: Throwable) {
+            candidate.delete()
+            throw error
+        }
+    }
+
     fun applyPermissions(kind: ResourceFileKind) {
         kind.applyPermissions(file(kind))
     }
@@ -245,15 +291,6 @@ internal class AndroidResourceFileStore(
         val target = file(customFile)
         if (ResourceFileKind.entries.any { kind -> kind.fileName == target.name }) return
         deleteResourceFile(target)
-    }
-
-    fun renameCustom(previousFile: CustomResourceFileState, customFile: CustomResourceFileState) {
-        val source = file(previousFile)
-        val target = file(customFile)
-        if (ResourceFileKind.entries.any { kind -> kind.fileName == source.name || kind.fileName == target.name }) return
-        if (source.absolutePath == target.absolutePath) return
-        dataDir.mkdirs()
-        renameResourceFile(source, target)
     }
 
     fun preparePaths(): SingBoxResourceFilePaths {
@@ -278,30 +315,6 @@ internal class AndroidResourceFileStore(
 internal fun deleteResourceFile(target: File) {
     if (target.exists() && !target.delete()) {
         throw IOException("Failed to delete resource file: ${target.absolutePath}")
-    }
-}
-
-internal fun renameResourceFile(
-    source: File,
-    target: File,
-) {
-    if (!source.isFile || source.length() <= 0) {
-        throw FileNotFoundException(source.absolutePath)
-    }
-    if (!target.exists() && source.renameTo(target)) {
-        check(target.isFile && target.length() > 0) {
-            "Renamed resource file is unavailable: ${target.absolutePath}"
-        }
-        return
-    }
-    source.inputStream().use { input ->
-        writeAtomically(target) { output -> input.copyTo(output) }
-    }
-    if (!target.isFile || target.length() <= 0) {
-        throw IOException("Renamed resource file is unavailable: ${target.absolutePath}")
-    }
-    if (!source.delete()) {
-        throw IOException("Failed to remove renamed resource file: ${source.absolutePath}")
     }
 }
 

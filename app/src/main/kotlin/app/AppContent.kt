@@ -76,6 +76,7 @@ import features.singbox.SingBoxDashboardPage
 import features.singbox.SingBoxProxyPage
 import features.proxy.app.ProxyAppListPage
 import features.resources.ResourceManagementPage
+import features.resources.ResourceJsonEditorPage
 import features.routing.RouteRuleEditorPage
 import features.routing.RoutingManagementPage
 import features.settings.SettingsPage
@@ -162,6 +163,14 @@ fun AppContent(
                 }
                 entry<Route.ResourceManagement> {
                     ResourceManagementPage(padding = padding)
+                }
+                entry<Route.ResourceJsonEdit> { route ->
+                    key(route.resourceId) {
+                        ResourceJsonEditorPage(
+                            padding = padding,
+                            resourceId = route.resourceId,
+                        )
+                    }
                 }
                 entry<Route.OutboundGroupList> {
                     OutboundGroupListPage(padding = padding)

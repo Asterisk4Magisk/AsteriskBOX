@@ -43,11 +43,11 @@ import app.LocalUpdateAppState
 import app.ResourceFileKind
 import app.ResourceFilesStatus
 import app.collectAppState
-import app.customResourceFileNameOrNull
 import app.nextAvailableCustomResourceFileId
 import app.resourceFileUpdateSource
 import app.statusOf
 import app.withRemovedManagedRuleSets
+import app.navigation.Route
 import engine.network.toPortOrNull
 import features.resources.runtime.ResourceFileBatchDownloadFailedException
 import kotlinx.coroutines.CompletableDeferred
@@ -199,11 +199,11 @@ fun ResourceManagementPage(
     }
 
     fun validatedCustomResourceFileName(name: String, reservedNames: Set<String>): String? {
-        val fileName = customResourceFileNameOrNull(name) ?: return null
-        if (!fileName.hasSingBoxRuleSetExtension()) return null
-        if (fileName.dropLast(".srs".length).isBlank()) return null
-        if (reservedNames.any { reserved -> reserved.equals(fileName, ignoreCase = true) }) return null
-        return fileName
+        return validateCustomResourceDraft(
+            name = name,
+            url = "",
+            reservedNames = reservedNames,
+        ).takeIf(CustomResourceDraftValidation::valid)?.name
     }
 
     fun addCustomResourceFile(name: String, url: String): Boolean {
@@ -578,6 +578,9 @@ fun ResourceManagementPage(
                             editCustomResourceFileNameState.setTextAndPlaceCursorAtEnd(file.name)
                             editCustomResourceFileUrlState.setTextAndPlaceCursorAtEnd(file.url)
                             editingCustomResourceFile = file
+                        },
+                        onModify = { file ->
+                            navigator.push(Route.ResourceJsonEdit(resourceId = file.id))
                         },
                         onDelete = { file ->
                             val remaining = appState.customResourceFiles

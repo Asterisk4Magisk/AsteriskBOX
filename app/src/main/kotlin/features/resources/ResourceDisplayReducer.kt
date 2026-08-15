@@ -16,7 +16,16 @@ internal enum class ResourceDisplayAction {
     Replace,
     Restore,
     Edit,
+    Modify,
     Delete,
+}
+
+internal enum class SingBoxRuleSetFileFormat(
+    val configValue: String,
+    val fileExtension: String,
+) {
+    Binary(configValue = "binary", fileExtension = ".srs"),
+    Source(configValue = "source", fileExtension = ".json"),
 }
 
 internal enum class ResourceVisualKind {
@@ -37,7 +46,7 @@ internal data class ResourceOverviewState(
 
 internal enum class CustomResourceDraftError {
     InvalidName,
-    InvalidSrsExtension,
+    UnsupportedExtension,
     DuplicateName,
     InvalidUrl,
 }
@@ -73,6 +82,7 @@ internal fun customResourceDisplayActions(file: CustomResourceFileState): List<R
         if (file.url.isNotBlank()) add(ResourceDisplayAction.Update)
         add(ResourceDisplayAction.Replace)
         add(ResourceDisplayAction.Edit)
+        if (file.name.isSingBoxJsonRuleSet()) add(ResourceDisplayAction.Modify)
         add(ResourceDisplayAction.Delete)
     }
 }
@@ -100,10 +110,11 @@ internal fun validateCustomResourceDraft(
     val cleanUrl = url.trim()
     val fileName = customResourceFileNameOrNull(cleanName)
         ?: return CustomResourceDraftValidation(cleanName, cleanUrl, CustomResourceDraftError.InvalidName)
-    if (!fileName.hasSingBoxRuleSetExtension()) {
-        return CustomResourceDraftValidation(fileName, cleanUrl, CustomResourceDraftError.InvalidSrsExtension)
+    val format = fileName.singBoxRuleSetFormatOrNull()
+    if (format == null) {
+        return CustomResourceDraftValidation(fileName, cleanUrl, CustomResourceDraftError.UnsupportedExtension)
     }
-    if (fileName.dropLast(SingBoxRuleSetFileExtension.length).isBlank()) {
+    if (fileName.dropLast(format.fileExtension.length).isBlank()) {
         return CustomResourceDraftValidation(fileName, cleanUrl, CustomResourceDraftError.InvalidName)
     }
     if (reservedNames.any { reserved -> reserved.equals(fileName, ignoreCase = true) }) {
@@ -116,7 +127,18 @@ internal fun validateCustomResourceDraft(
 }
 
 internal fun String.hasSingBoxRuleSetExtension(): Boolean =
-    endsWith(SingBoxRuleSetFileExtension, ignoreCase = true)
+    singBoxRuleSetFormatOrNull() != null
+
+internal fun String.singBoxRuleSetFormatOrNull(): SingBoxRuleSetFileFormat? = when {
+    endsWith(SingBoxRuleSetFileFormat.Binary.fileExtension, ignoreCase = true) ->
+        SingBoxRuleSetFileFormat.Binary
+    endsWith(SingBoxRuleSetFileFormat.Source.fileExtension, ignoreCase = true) ->
+        SingBoxRuleSetFileFormat.Source
+    else -> null
+}
+
+internal fun String.isSingBoxJsonRuleSet(): Boolean =
+    singBoxRuleSetFormatOrNull() == SingBoxRuleSetFileFormat.Source
 
 internal fun String.isValidHttpResourceUrl(): Boolean {
     return runCatching {
@@ -125,5 +147,3 @@ internal fun String.isValidHttpResourceUrl(): Boolean {
             !uri.host.isNullOrBlank()
     }.getOrDefault(false)
 }
-
-private const val SingBoxRuleSetFileExtension = ".srs"

@@ -41,7 +41,9 @@ import engine.root.RootModeEngine
 import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.singBoxControlConfig
 import engine.vpn.toTunOptions
+import features.resources.SingBoxRuleSetFileFormat
 import features.resources.runtime.singBoxRuleSetFiles
+import features.resources.singBoxRuleSetFormatOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -52,6 +54,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
+import java.io.File
 
 internal const val APP_GLOBAL_SELECTOR = ManagedGlobalSelectorTag
 internal const val APP_LOCAL_INBOUND = ManagedLocalInboundTag
@@ -62,6 +65,7 @@ internal const val APP_ROOT_INBOUND = ManagedRootInboundTag
 internal data class SingBoxLocalRuleSet(
     val tag: String,
     val path: String,
+    val format: SingBoxRuleSetFileFormat,
 )
 
 internal object SingBoxConfigCompiler {
@@ -70,19 +74,27 @@ internal object SingBoxConfigCompiler {
         appState: AppState,
         runMode: Int = appState.runMode,
         exposePorts: Boolean = true,
+        customRuleSetFileOverrides: Map<Int, File> = emptyMap(),
     ): String {
         val canonicalState = appState.withCanonicalManagedTagReferences()
-        val files = context.singBoxRuleSetFiles(canonicalState.customResourceFiles)
+        val filesByName = context.singBoxRuleSetFiles(canonicalState.customResourceFiles)
+            .associateByTo(linkedMapOf()) { file -> file.name.lowercase() }
+        canonicalState.customResourceFiles.forEach { customFile ->
+            customRuleSetFileOverrides[customFile.id]
+                ?.takeIf { file -> file.isFile && file.length() > 0L }
+                ?.let { file -> filesByName[customFile.name.lowercase()] = file }
+        }
         val choicesByFileName = canonicalState
-            .managedRuleSetChoices(files.map { file -> file.name })
+            .managedRuleSetChoices(filesByName.keys)
             .associateBy { choice -> choice.fileName }
-        val localRuleSets = files.mapNotNull { file ->
-            choicesByFileName[file.name]?.let { choice ->
-                SingBoxLocalRuleSet(
-                    tag = choice.tag,
-                    path = file.absolutePath,
-                )
-            }
+        val localRuleSets = choicesByFileName.values.mapNotNull { choice ->
+            val file = filesByName[choice.fileName.lowercase()] ?: return@mapNotNull null
+            val format = choice.fileName.singBoxRuleSetFormatOrNull() ?: return@mapNotNull null
+            SingBoxLocalRuleSet(
+                tag = choice.tag,
+                path = file.absolutePath,
+                format = format,
+            )
         }.distinctBy(SingBoxLocalRuleSet::tag)
         val runtimeState = canonicalState
             .withUnavailableManagedRuleSetsDisabled(
@@ -186,7 +198,7 @@ internal fun JsonObject.withLocalRuleSets(localRuleSets: List<SingBoxLocalRuleSe
         buildJsonObject {
             put("type", "local")
             put("tag", ruleSet.tag)
-            put("format", "binary")
+            put("format", ruleSet.format.configValue)
             put("path", ruleSet.path)
         }
     }

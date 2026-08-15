@@ -73,10 +73,11 @@ fun App(
     val networkInterfaces = remember(rootAccess) {
         AndroidNetworkInterfaceProvider(rootAccess)
     }
-    val resourceFileUseCase = remember(appContext, resourceFilePicker, rootAccess) {
+    val resourceFileUseCase = remember(appContext, resourceFilePicker, rootAccess, stateStore) {
         ResourceFileUseCase(
             context = appContext,
             resourceFilePicker = resourceFilePicker,
+            currentAppState = { stateStore.state.value },
             rootShell = rootAccess,
         )
     }

@@ -5,6 +5,7 @@ package features.resources
 
 import android.content.Context
 import android.net.Uri
+import app.AppState
 import app.CustomResourceFileState
 import app.ResourceFileKind
 import app.ResourceFileUpdateSource
@@ -17,9 +18,14 @@ import system.RootShellGateway
 class ResourceFileUseCase(
     context: Context,
     private val resourceFilePicker: suspend () -> Uri?,
+    currentAppState: () -> AppState,
     rootShell: RootShellGateway = AndroidRootShellGateway(),
 ) {
-    private val repository = AndroidResourceFileRepository(context.applicationContext, rootShell)
+    private val repository = AndroidResourceFileRepository(
+        context = context.applicationContext,
+        currentAppState = currentAppState,
+        rootShell = rootShell,
+    )
     private val catalogRepository = AndroidResourceCatalogRepository()
 
     internal suspend fun loadCatalog(
@@ -92,6 +98,18 @@ class ResourceFileUseCase(
     ): ResourceFilesStatus? {
         val uri = resourceFilePicker() ?: return null
         return repository.replaceCustom(customFile, uri, customResourceFiles)
+    }
+
+    suspend fun readCustomJson(customFile: CustomResourceFileState): String {
+        return repository.readCustomJson(customFile)
+    }
+
+    suspend fun saveCustomJson(
+        customFile: CustomResourceFileState,
+        content: String,
+        expectedContent: String,
+    ): ResourceFilesStatus {
+        return repository.saveCustomJson(customFile, content, expectedContent)
     }
 
     suspend fun restoreBundled(

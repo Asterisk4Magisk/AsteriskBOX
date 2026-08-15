@@ -364,6 +364,7 @@ internal fun CustomResourceFileCard(
     onUpdate: (CustomResourceFileState) -> Unit,
     onReplace: (CustomResourceFileState) -> Unit,
     onEdit: (CustomResourceFileState) -> Unit,
+    onModify: (CustomResourceFileState) -> Unit,
     onDelete: (CustomResourceFileState) -> Unit,
     modifier: Modifier = Modifier,
     updateState: ResourceFileUpdateDisplayState = ResourceFileUpdateDisplayState.Idle,
@@ -374,6 +375,7 @@ internal fun CustomResourceFileCard(
         ResourceDisplayAction.Update to { onUpdate(file) },
         ResourceDisplayAction.Replace to { onReplace(file) },
         ResourceDisplayAction.Edit to { onEdit(file) },
+        ResourceDisplayAction.Modify to { onModify(file) },
         ResourceDisplayAction.Delete to { onDelete(file) },
     )
     ResourceFileCardSurface(
@@ -555,6 +557,7 @@ private fun ResourceDisplayAction.icon(): ImageVector {
         ResourceDisplayAction.Replace -> Icons.Rounded.FileUpload
         ResourceDisplayAction.Restore -> Icons.Rounded.History
         ResourceDisplayAction.Edit -> Icons.Rounded.Edit
+        ResourceDisplayAction.Modify -> Icons.Rounded.Code
         ResourceDisplayAction.Delete -> Icons.Rounded.Delete
     }
 }
@@ -567,6 +570,7 @@ private fun ResourceDisplayAction.label(): String {
             ResourceDisplayAction.Replace -> R.string.common_replace
             ResourceDisplayAction.Restore -> R.string.common_restore
             ResourceDisplayAction.Edit -> R.string.common_edit
+            ResourceDisplayAction.Modify -> R.string.settings_resource_files_modify
             ResourceDisplayAction.Delete -> R.string.common_delete
         },
     )
@@ -627,7 +631,7 @@ internal fun CustomResourceFileEditorSheet(
                 label = { Text(stringResource(R.string.settings_resource_files_custom_name)) },
                 lineLimits = TextFieldLineLimits.SingleLine,
                 isError = error == CustomResourceDraftError.InvalidName ||
-                    error == CustomResourceDraftError.InvalidSrsExtension ||
+                    error == CustomResourceDraftError.UnsupportedExtension ||
                     error == CustomResourceDraftError.DuplicateName,
                 supportingText = error.nameErrorText(),
                 shape = AsteriskShapeTokens.InnerContainer,
@@ -654,8 +658,8 @@ internal fun CustomResourceFileEditorSheet(
 private fun CustomResourceDraftError?.nameErrorText(): (@Composable () -> Unit)? {
     val text = when (this) {
         CustomResourceDraftError.InvalidName -> stringResource(R.string.settings_resource_files_custom_name_invalid)
-        CustomResourceDraftError.InvalidSrsExtension ->
-            stringResource(R.string.settings_resource_files_custom_name_srs_required)
+        CustomResourceDraftError.UnsupportedExtension ->
+            stringResource(R.string.settings_resource_files_custom_name_rule_set_required)
         CustomResourceDraftError.DuplicateName -> stringResource(R.string.settings_resource_files_custom_name_duplicate)
         else -> return null
     }

@@ -16,6 +16,7 @@ import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.config.APP_LOCAL_INBOUND
 import engine.singbox.config.APP_ROOT_INBOUND
 import engine.singbox.config.APP_TUN_INBOUND
+import features.resources.hasSingBoxRuleSetExtension
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -464,7 +465,7 @@ internal fun AppState.managedRuleSetChoices(
     val custom = customResourceFiles.mapNotNull { file ->
         file.name
             .takeIf { fileName ->
-                fileName.endsWith(SingBoxRuleSetExtension, ignoreCase = true) &&
+                fileName.hasSingBoxRuleSetExtension() &&
                     fileName.lowercase() in available
             }
             ?.let { fileName ->

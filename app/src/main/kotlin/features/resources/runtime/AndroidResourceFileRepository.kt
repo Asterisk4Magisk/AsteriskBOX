@@ -6,6 +6,7 @@ package features.resources.runtime
 import android.content.Context
 import android.net.Uri
 import org.asterisk.zcc.abox.R
+import app.AppState
 import app.CustomResourceFileState
 import app.ResourceFileKind
 import app.ResourceFileUpdateSource
@@ -16,17 +17,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import features.resources.ResourceFileUpdateOptions
 import engine.root.runtime.RootCorePublicationCoordinator
+import engine.singbox.config.validateSingBoxRuntimeConfiguration
+import features.resources.isSingBoxJsonRuleSet
+import features.resources.InvalidSingBoxJsonRuleSetException
+import features.resources.requireValidJsonRuleSetStructure
 import system.AndroidRootShellGateway
 import system.RootShellGateway
 
 internal class AndroidResourceFileRepository(
     context: Context,
+    private val currentAppState: () -> AppState,
     private val rootShell: RootShellGateway = AndroidRootShellGateway(),
 ) {
     private val appContext = context.applicationContext
     private val store = AndroidResourceFileStore(appContext)
     private val downloader = AndroidResourceFileDownloader()
     private val corePublication = RootCorePublicationCoordinator(appContext, rootShell)
+    private val customResourceMutationLock = Any()
 
     suspend fun status(customResourceFiles: List<CustomResourceFileState> = emptyList()): ResourceFilesStatus =
         withContext(Dispatchers.IO) {
@@ -45,7 +52,9 @@ internal class AndroidResourceFileRepository(
         customFile: CustomResourceFileState,
         customResourceFiles: List<CustomResourceFileState>,
     ): ResourceFilesStatus = withContext(Dispatchers.IO) {
-        store.deleteCustom(customFile)
+        synchronized(customResourceMutationLock) {
+            store.deleteCustom(customFile)
+        }
         store.currentStatus(customResourceFiles)
     }
 
@@ -54,7 +63,26 @@ internal class AndroidResourceFileRepository(
         customFile: CustomResourceFileState,
         customResourceFiles: List<CustomResourceFileState>,
     ): ResourceFilesStatus = withContext(Dispatchers.IO) {
-        store.renameCustom(previousFile, customFile)
+        synchronized(customResourceMutationLock) {
+            val source = store.file(previousFile)
+            val target = store.file(customFile)
+            if (source.absolutePath != target.absolutePath) {
+                val candidate = store.stageCustomCandidate(customFile, source)
+                publishCustomCandidate(
+                    customFile = customFile,
+                    candidate = candidate,
+                    requireCurrentMetadata = false,
+                    expectedLiveFile = previousFile,
+                )
+                try {
+                    requireCurrentCustomFile(previousFile, currentAppState())
+                    store.deleteCustom(previousFile)
+                } catch (error: Throwable) {
+                    runCatching { store.deleteCustom(customFile) }
+                    throw error
+                }
+            }
+        }
         store.currentStatus(customResourceFiles)
     }
 
@@ -130,9 +158,10 @@ internal class AndroidResourceFileRepository(
         fun downloadOnly(indexed: IndexedValue<ResourceFileDownloadTarget>) {
             val index = indexed.index
             val download = indexed.value
+            val workingFile = download.candidateFactory?.invoke() ?: download.targetFile
             try {
                 notifier.showProgress(download.displayName, progress = null, force = true)
-                downloader.download(download.url, download.targetFile, downloadProxy) { downloadedBytes, totalBytes ->
+                downloader.download(download.url, workingFile, downloadProxy) { downloadedBytes, totalBytes ->
                     notifier.showProgress(
                         fileName = download.displayName,
                         progress = overallProgress(
@@ -143,11 +172,13 @@ internal class AndroidResourceFileRepository(
                         ),
                     )
                 }
-                download.applyPermissions()
+                download.publishCandidate?.invoke(workingFile) ?: download.applyPermissions()
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 if (error is AndroidResourceFileDownloadCancelledException) throw error
                 throw ResourceFileDownloadFailedException(download.displayName, error)
+            } finally {
+                if (download.candidateFactory != null) workingFile.delete()
             }
         }
         suspend fun download(indexed: IndexedValue<ResourceFileDownloadTarget>) {
@@ -214,10 +245,26 @@ internal class AndroidResourceFileRepository(
         if (ResourceFileKind.entries.any { kind -> kind.fileName == target.name }) return null
         val updateUrl = url.trim()
         if (updateUrl.isBlank()) return null
+        if (!name.isSingBoxJsonRuleSet()) {
+            return ResourceFileDownloadTarget(
+                displayName = name,
+                url = updateUrl,
+                targetFile = target,
+            )
+        }
+        val expectedTargetRevision = target.resourceFileRevision()
         return ResourceFileDownloadTarget(
             displayName = name,
             url = updateUrl,
             targetFile = target,
+            candidateFactory = { store.createCustomDownloadCandidate(this) },
+            publishCandidate = { candidate ->
+                publishCustomCandidate(
+                    customFile = this,
+                    candidate = candidate,
+                    expectedTargetRevision = expectedTargetRevision,
+                )
+            },
         )
     }
 
@@ -239,8 +286,37 @@ internal class AndroidResourceFileRepository(
         uri: Uri,
         customResourceFiles: List<CustomResourceFileState> = emptyList(),
     ): ResourceFilesStatus = withContext(Dispatchers.IO) {
-        store.replaceCustom(customFile, uri)
+        if (customFile.name.isSingBoxJsonRuleSet()) {
+            val expectedTargetRevision = store.file(customFile).resourceFileRevision()
+            publishCustomCandidate(
+                customFile = customFile,
+                candidate = store.stageCustomCandidate(customFile, uri),
+                expectedTargetRevision = expectedTargetRevision,
+            )
+        } else {
+            store.replaceCustom(customFile, uri)
+        }
         store.currentStatus(customResourceFiles)
+    }
+
+    suspend fun readCustomJson(customFile: CustomResourceFileState): String = withContext(Dispatchers.IO) {
+        require(customFile.name.isSingBoxJsonRuleSet()) { "${customFile.name} is not a JSON rule set" }
+        store.readCustomText(customFile)
+    }
+
+    suspend fun saveCustomJson(
+        customFile: CustomResourceFileState,
+        content: String,
+        expectedContent: String,
+    ): ResourceFilesStatus = withContext(Dispatchers.IO) {
+        require(customFile.name.isSingBoxJsonRuleSet()) { "${customFile.name} is not a JSON rule set" }
+        val liveFiles = currentAppState().customResourceFiles
+        publishCustomCandidate(
+            customFile = customFile,
+            candidate = store.stageCustomCandidate(customFile, content),
+            expectedTargetRevision = expectedContent.resourceFileRevision(),
+        )
+        store.currentStatus(liveFiles)
     }
 
     suspend fun replace(
@@ -322,6 +398,63 @@ internal class AndroidResourceFileRepository(
             candidate.delete()
         }
     }
+
+    private fun publishCustomCandidate(
+        customFile: CustomResourceFileState,
+        candidate: java.io.File,
+        requireCurrentMetadata: Boolean = true,
+        expectedTargetRevision: ResourceFileRevision? = null,
+        expectedLiveFile: CustomResourceFileState? = if (requireCurrentMetadata) customFile else null,
+    ) {
+        synchronized(customResourceMutationLock) {
+            val target = store.file(customFile)
+            publishValidatedResourceCandidate(candidate, target) { stagedFile ->
+                expectedLiveFile?.let { expected ->
+                    requireCurrentCustomFile(expected, currentAppState())
+                }
+                val validationState = if (requireCurrentMetadata) {
+                    currentAppState()
+                } else {
+                    val expected = checkNotNull(expectedLiveFile)
+                    val liveState = currentAppState()
+                    requireCurrentCustomFile(expected, liveState)
+                    liveState.copy(
+                        customResourceFiles = liveState.customResourceFiles.map { liveFile ->
+                            if (liveFile.id == expected.id) customFile else liveFile
+                        },
+                    )
+                }
+                expectedTargetRevision?.let { expected ->
+                    requireResourceFileRevisionUnchanged(target, expected)
+                }
+                if (customFile.name.isSingBoxJsonRuleSet()) {
+                    requireValidJsonRuleSetStructure(stagedFile.readText())
+                }
+                try {
+                    validateSingBoxRuntimeConfiguration(
+                        context = appContext,
+                        state = validationState,
+                        customRuleSetFileOverrides = mapOf(customFile.id to stagedFile),
+                    )
+                } catch (error: Throwable) {
+                    if (!customFile.name.isSingBoxJsonRuleSet()) throw error
+                    throw InvalidSingBoxJsonRuleSetException(error)
+                }
+                expectedLiveFile?.let { expected ->
+                    requireCurrentCustomFile(expected, currentAppState())
+                }
+            }
+        }
+    }
+
+    private fun requireCurrentCustomFile(
+        customFile: CustomResourceFileState,
+        state: AppState,
+    ) {
+        check(state.customResourceFiles.any { liveFile -> liveFile == customFile }) {
+            "${customFile.name} is no longer the current resource file"
+        }
+    }
 }
 
 private data class ResourceFileDownloadTarget(
@@ -330,6 +463,8 @@ private data class ResourceFileDownloadTarget(
     val targetFile: java.io.File,
     val applyPermissions: () -> Unit = {},
     val coreCandidate: Boolean = false,
+    val candidateFactory: (() -> java.io.File)? = null,
+    val publishCandidate: ((java.io.File) -> Unit)? = null,
 )
 
 private class ResourceFileDownloadFailedException(
