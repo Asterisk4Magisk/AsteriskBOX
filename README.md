@@ -39,7 +39,7 @@ An Android sing-box GUI client. VPN Service mode uses [AndroidLibBoxLite](https:
 
 - Uses the reF1nd sing-box eBPF inbound to attach cgroup socket-address programs directly.
 - Does not use a TUN device, TProxy, iptables, policy routing, a Bridge helper, or a local SOCKS5 intermediary.
-- The direct-bypass switch copies rule sets routed to the direct outbound into `bypass_rule_set`.
+- Bypass direct addresses lets you select managed local `.srs` files for the inbound `bypass_rule_set`.
 - Optional shared-network TC uses exact downstream interface names. Wildcards and interface prefixes are not supported.
 - Availability depends on device kernel, cgroup v2, and eBPF support.
 

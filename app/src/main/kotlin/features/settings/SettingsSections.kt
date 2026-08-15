@@ -9,6 +9,7 @@ import app.modes.RunModeTun
 import app.modes.RunModeTun2Socks
 import app.modes.RunModeVpnService
 import app.modes.isRootRunMode
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import engine.singbox.DefaultSingBoxLogLevel
 import org.asterisk.zcc.abox.R
 import ui.icons.AsteriskIcons as Icons
@@ -234,6 +236,7 @@ internal fun SettingsProxyModeSections(
     enableRootBootScript: Boolean,
     enableRootEbpfRules: Boolean,
     enableRootEbpfDirectCidrBypass: Boolean,
+    ebpfBypassRuleSetsSummary: String,
     enableIpv6: Boolean,
     enableRootIpv6Disabler: Boolean,
     externalInterfacesSummary: String,
@@ -247,11 +250,14 @@ internal fun SettingsProxyModeSections(
     onEnableRootBootScriptChange: (Boolean) -> Unit,
     onEnableRootEbpfRulesChange: (Boolean) -> Unit,
     onEnableRootEbpfDirectCidrBypassChange: (Boolean) -> Unit,
+    onOpenEbpfBypassRuleSets: () -> Unit,
     onEnableRootIpv6DisablerChange: (Boolean) -> Unit,
     onOpenExternalInterfaces: () -> Unit,
     onOpenIgnoredInterfaces: () -> Unit,
     onOpenPrivateAddresses: () -> Unit,
 ) {
+    val bypassControlEffectsMotion = AsteriskMotion.fastEffects<Float>()
+    val bypassControlSizeMotion = AsteriskMotion.fastSpatial<IntSize>()
     AnimatedVisibility(
         visible = runMode == RunModeVpnService,
         enter = AsteriskMotion.contentEnter(),
@@ -347,19 +353,38 @@ internal fun SettingsProxyModeSections(
             enter = AsteriskMotion.contentEnter(),
             exit = AsteriskMotion.contentExit(),
                 ) {
-                    SwitchPreference(
-                        title = stringResource(R.string.settings_root_ebpf_bypass_direct_cidrs),
-                        icon = Icons.Rounded.Route,
-                        summary = stringResource(
-                            if (runMode == RunModeEbpf) {
-                                R.string.settings_ebpf_bypass_direct_rule_sets_summary
-                            } else {
-                                R.string.settings_root_ebpf_bypass_direct_cidrs_summary
-                            },
+                    AnimatedContent(
+                        targetState = runMode == RunModeEbpf,
+                        modifier = Modifier.fillMaxWidth(),
+                        transitionSpec = AsteriskMotion.fadeThrough(
+                            effectsSpec = bypassControlEffectsMotion,
+                            sizeSpec = bypassControlSizeMotion,
                         ),
-                        checked = enableRootEbpfDirectCidrBypass,
-                        onCheckedChange = onEnableRootEbpfDirectCidrBypassChange,
-                    )
+                        label = "settings-ebpf-bypass-control",
+                    ) { useRuleSetSelector ->
+                        if (useRuleSetSelector) {
+                            ArrowPreference(
+                                title = stringResource(
+                                    R.string.settings_root_ebpf_bypass_direct_cidrs,
+                                ),
+                                icon = Icons.Rounded.Route,
+                                summary = ebpfBypassRuleSetsSummary,
+                                onClick = onOpenEbpfBypassRuleSets,
+                            )
+                        } else {
+                            SwitchPreference(
+                                title = stringResource(
+                                    R.string.settings_root_ebpf_bypass_direct_cidrs,
+                                ),
+                                icon = Icons.Rounded.Route,
+                                summary = stringResource(
+                                    R.string.settings_root_ebpf_bypass_direct_cidrs_summary,
+                                ),
+                                checked = enableRootEbpfDirectCidrBypass,
+                                onCheckedChange = onEnableRootEbpfDirectCidrBypassChange,
+                            )
+                        }
+                    }
                 }
                 AnimatedVisibility(
                     visible = !enableIpv6,

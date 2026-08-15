@@ -103,6 +103,7 @@ internal data class AppBackupSettings(
     val dnsTimeout: String = BackupDefaults.dnsTimeout,
     val transparentProxyPort: String = BackupDefaults.transparentProxyPort,
     val enableRootEbpfDirectCidrBypass: Boolean = BackupDefaults.enableRootEbpfDirectCidrBypass,
+    val ebpfBypassRuleSetTags: List<String> = BackupDefaults.ebpfBypassRuleSetTags,
     val enableRootIpv6Disabler: Boolean = BackupDefaults.enableRootIpv6Disabler,
     val socks5ProxyPort: String = BackupDefaults.socks5ProxyPort,
     val bpf2SocksBridgePort: String = BackupDefaults.bpf2SocksBridgePort,

@@ -16,10 +16,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import engine.singbox.config.APP_LOCAL_INBOUND
+import engine.singbox.SingBoxSnifferProtocols
 import engine.singbox.config.APP_ROOT_INBOUND
 import engine.singbox.config.APP_TUN_INBOUND
-import engine.singbox.SingBoxSnifferProtocols
 import org.asterisk.zcc.abox.R
 
 @Composable
@@ -31,6 +30,7 @@ internal fun <T> ReferenceSelectionCard(
     onToggle: (T) -> Unit,
     modifier: Modifier = Modifier,
     staleLabel: ((T) -> String)? = null,
+    enabled: Boolean = true,
 ) {
     val unavailableLabel = stringResource(R.string.common_unavailable)
     val selectableChoices = choices + selected
@@ -67,6 +67,7 @@ internal fun <T> ReferenceSelectionCard(
                             selected = value in selected,
                             onClick = { onToggle(value) },
                             label = label,
+                            enabled = enabled,
                         )
                     }
                 }

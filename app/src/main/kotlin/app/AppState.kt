@@ -117,6 +117,7 @@ data class AppState(
     val enableRootBootScript: Boolean = false,
     val enableRootEbpfRules: Boolean = false,
     val enableRootEbpfDirectCidrBypass: Boolean = false,
+    val ebpfBypassRuleSetTags: List<String> = emptyList(),
     val enableRootIpv6Disabler: Boolean = false,
     val socks5ProxyPort: String = RootModeEngine.DefaultTun2SocksProxyPort.toString(),
     val bpf2SocksBridgePort: String = RootModeEngine.DefaultBpf2SocksBridgePort.toString(),

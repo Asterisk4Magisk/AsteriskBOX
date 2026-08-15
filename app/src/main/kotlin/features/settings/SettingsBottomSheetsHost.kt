@@ -21,6 +21,7 @@ import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.logs.FailureLogContext
 import features.logs.reportFailure
 import features.settings.sheets.EbpfSharedNetworkBottomSheet
+import features.settings.sheets.EbpfBypassRuleSetBottomSheet
 import features.settings.sheets.ExternalInterfacesBottomSheet
 import features.settings.sheets.IgnoredInterfacesBottomSheet
 import features.settings.sheets.LocalProxySettingsBottomSheet
@@ -29,6 +30,7 @@ import features.settings.sheets.SnifferSettingsBottomSheet
 import features.settings.sheets.TunSettingsBottomSheet
 import features.settings.sheets.orderedBy
 import features.settings.sheets.sanitizeEbpfSharedNetworkInterfaces
+import features.settings.sheets.sanitizeEbpfBypassRuleSetTags
 import features.settings.sheets.sanitizeExternalInterfaces
 import features.settings.sheets.sanitizePrivateAddressCidrs
 import kotlinx.coroutines.CancellationException
@@ -42,6 +44,7 @@ internal fun SettingsBottomSheetsHost(
     appState: AppState,
     sheetState: SettingsSheetState,
     tunStackOptions: List<String>,
+    ebpfBypassRuleSetChoices: List<Pair<String, String>>,
     updateAppState: ((AppState) -> AppState) -> Unit,
 ) {
     val context = LocalContext.current
@@ -280,6 +283,25 @@ internal fun SettingsBottomSheetsHost(
         onSave = { cidrs ->
             updateAppState { state -> state.copy(privateAddressCidrs = cidrs.sanitizePrivateAddressCidrs()) }
             sheetState.showPrivateAddresses = false
+        },
+    )
+    EbpfBypassRuleSetBottomSheet(
+        show = sheetState.showEbpfBypassRuleSets,
+        saving = validating,
+        choices = ebpfBypassRuleSetChoices,
+        selectedTags = sheetState.ebpfBypassRuleSetTagsDraft,
+        onSelectedTagsChange = { tags ->
+            sheetState.ebpfBypassRuleSetTagsDraft = sanitizeEbpfBypassRuleSetTags(tags)
+        },
+        onDismissRequest = { sheetState.showEbpfBypassRuleSets = false },
+        onSave = { tags ->
+            validateAndCommit(
+                operation = "save_ebpf_bypass_rule_sets",
+                transform = { state ->
+                    state.copy(ebpfBypassRuleSetTags = sanitizeEbpfBypassRuleSetTags(tags))
+                },
+                close = { sheetState.showEbpfBypassRuleSets = false },
+            )
         },
     )
     EbpfSharedNetworkBottomSheet(

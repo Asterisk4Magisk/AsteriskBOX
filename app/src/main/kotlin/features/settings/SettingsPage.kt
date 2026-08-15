@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -35,6 +36,7 @@ import app.LocalUpdateAppState
 import app.ProjectInfo
 import org.asterisk.zcc.abox.R
 import app.collectAppState
+import app.managedRuleSetChoices
 import app.withPrunedManagedInboundReferences
 import app.modes.RunModeBpf2Socks
 import app.modes.RunModeEbpf
@@ -48,11 +50,13 @@ import data.backup.AppBackupRestorePreview
 import engine.proxy.ProxyServiceResult
 import engine.proxy.withResolvedDynamicLocalProxyPort
 import features.settings.sheets.externalInterfacesSummary
+import features.settings.sheets.ebpfBypassRuleSetSummary
 import features.settings.sheets.ebpfSharedNetworkInterfacesSummary
 import features.settings.sheets.ignoredInterfacesSummary
 import features.settings.sheets.privateAddressCidrsSummary
 import features.settings.sheets.snifferSettingsSummary
 import features.settings.sheets.tunSettingsSummary
+import features.resources.runtime.singBoxRuleSetFiles
 import features.settings.usecase.RootBootScriptResult
 import features.settings.usecase.RootEbpfProbeResult
 import features.settings.usecase.SwitchRunModeResult
@@ -119,6 +123,7 @@ private fun SettingsContent(
 ) {
     val stateStore = LocalAppStateStore.current
     val appState by stateStore.collectAppState()
+    val context = LocalContext.current
     val isWideScreen = LocalIsWideScreen.current
     val updateAppState = LocalUpdateAppState.current
     val navigator = LocalNavigator.current
@@ -256,6 +261,15 @@ private fun SettingsContent(
         bpf2SocksBridgePort = appState.bpf2SocksBridgePort,
         socks5ProxyPort = appState.socks5ProxyPort,
     )
+    val ebpfBypassRuleSetChoices = remember(appState.customResourceFiles) {
+        appState.managedRuleSetChoices(
+            context.singBoxRuleSetFiles(appState.customResourceFiles).map { file -> file.name },
+        ).map { choice -> choice.tag to choice.remarks }
+    }
+    val ebpfBypassRuleSetsSummary = ebpfBypassRuleSetSummary(
+        selectedTags = appState.ebpfBypassRuleSetTags,
+        choices = ebpfBypassRuleSetChoices,
+    )
     val externalInterfacesSummary = if (appState.runMode == RunModeEbpf) {
         ebpfSharedNetworkInterfacesSummary(appState.ebpfSharedNetworkInterfaces)
     } else {
@@ -319,6 +333,7 @@ private fun SettingsContent(
         snifferSummary = snifferSummary,
         localProxySummary = localProxySettingsSummary,
         tunSummary = tunSettingsSummary,
+        ebpfBypassRuleSetsSummary = ebpfBypassRuleSetsSummary,
         externalInterfacesSummary = externalInterfacesSummary,
         ignoredInterfacesSummary = ignoredInterfacesSummary,
         privateAddressesSummary = privateAddressCidrsSummary,
@@ -466,6 +481,7 @@ private fun SettingsContent(
                     enableRootBootScript = appState.enableRootBootScript,
                     enableRootEbpfRules = appState.enableRootEbpfRules,
                     enableRootEbpfDirectCidrBypass = appState.enableRootEbpfDirectCidrBypass,
+                    ebpfBypassRuleSetsSummary = ebpfBypassRuleSetsSummary,
                     enableIpv6 = appState.enableIpv6,
                     enableRootIpv6Disabler = appState.enableRootIpv6Disabler,
                     externalInterfacesSummary = externalInterfacesSummary,
@@ -568,6 +584,9 @@ private fun SettingsContent(
                     onEnableRootEbpfDirectCidrBypassChange = { enabled ->
                         updateAppState { state -> state.copy(enableRootEbpfDirectCidrBypass = enabled) }
                     },
+                    onOpenEbpfBypassRuleSets = {
+                        sheetState.openEbpfBypassRuleSets(appState)
+                    },
                     onEnableRootIpv6DisablerChange = { enabled ->
                         updateAppState { state -> state.copy(enableRootIpv6Disabler = enabled) }
                     },
@@ -650,6 +669,7 @@ private fun SettingsContent(
             appState = appState,
             sheetState = sheetState,
             tunStackOptions = tunStackOptions,
+            ebpfBypassRuleSetChoices = ebpfBypassRuleSetChoices,
             updateAppState = updateAppState,
         )
         SettingsRestoreConfirmDialog(

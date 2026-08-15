@@ -270,7 +270,9 @@
     <string name="settings_root_ebpf_matcher_summary">Improve performance for large app lists and support address filtering</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs">Bypass direct addresses</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs_summary">Uses China address lists by default; adjust them in Resource Management</string>
-    <string name="settings_ebpf_bypass_direct_rule_sets_summary">Write rule sets referenced by routing rules targeting the direct outbound to bypass_rule_set</string>
+    <string name="settings_ebpf_bypass_rule_sets_summary_none">No rule sets selected</string>
+    <string name="settings_ebpf_bypass_rule_sets_summary_selected">Selected: {ruleSets}</string>
+    <string name="settings_ebpf_bypass_rule_sets_picker_title">Local rule sets</string>
     <string name="settings_root_ebpf_matcher_failed">Failed to probe eBPF matcher support</string>
     <string name="settings_root_ebpf_matcher_unsupported">This device does not support eBPF matcher</string>
     <string name="settings_root_ebpf_selinux_policy_warning_title">Enable eBPF matcher?</string>

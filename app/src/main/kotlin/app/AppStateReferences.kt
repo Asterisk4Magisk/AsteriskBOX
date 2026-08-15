@@ -253,6 +253,7 @@ internal fun AppState.withCanonicalManagedTagReferences(): AppState {
             }
         },
         routeFinal = resolve(routeFinal),
+        ebpfBypassRuleSetTags = ebpfBypassRuleSetTags.map(resolve),
         routeRules = routeRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
         dnsFinal = resolve(dnsFinal),
         routeDefaultDomainResolver = resolve(routeDefaultDomainResolver),
@@ -486,6 +487,7 @@ internal fun AppState.withRemovedManagedRuleSets(
         .mapTo(mutableSetOf()) { file -> managedCustomRuleSetTag(file.id, file.name) }
     if (removedTags.isEmpty()) return this
     return copy(
+        ebpfBypassRuleSetTags = ebpfBypassRuleSetTags.filterNot(removedTags::contains),
         routeRules = routeRules.map { rule ->
             rule.updateManagedRuleSetReferences { tag -> tag.takeUnless(removedTags::contains) }
         },

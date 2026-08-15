@@ -14,6 +14,7 @@ import features.settings.sheets.outletInterfaceOptions
 import features.settings.sheets.sanitizeExternalInterfaces
 import features.settings.sheets.sanitizePrivateAddressCidrs
 import features.settings.sheets.sanitizeEbpfSharedNetworkInterfaces
+import features.settings.sheets.sanitizeEbpfBypassRuleSetTags
 import system.AndroidNetworkInterfaceProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -45,6 +46,9 @@ internal class SettingsSheetState(
 
     var showEbpfSharedNetwork by mutableStateOf(false)
     var ebpfSharedNetworkInterfacesDraft by mutableStateOf(emptyList<String>())
+
+    var showEbpfBypassRuleSets by mutableStateOf(false)
+    var ebpfBypassRuleSetTagsDraft by mutableStateOf(emptyList<String>())
 
     fun openLocalProxySettings(appState: AppState) {
         localProxySettingsDraft = appState.toLocalProxySettingsDraft()
@@ -130,6 +134,12 @@ internal class SettingsSheetState(
         ebpfSharedNetworkInterfacesDraft =
             appState.ebpfSharedNetworkInterfaces.sanitizeEbpfSharedNetworkInterfaces()
         showEbpfSharedNetwork = true
+    }
+
+    fun openEbpfBypassRuleSets(appState: AppState) {
+        ebpfBypassRuleSetTagsDraft =
+            sanitizeEbpfBypassRuleSetTags(appState.ebpfBypassRuleSetTags)
+        showEbpfBypassRuleSets = true
     }
 }
 

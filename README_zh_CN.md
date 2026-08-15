@@ -39,7 +39,7 @@
 
 - 使用 reF1nd sing-box eBPF 入站直接挂载 cgroup socket-address 程序。
 - 不使用 TUN、TProxy、iptables、策略路由、Bridge 辅助程序或本地 SOCKS5 中间层。
-- “绕过直连地址”开关会把路由到直连出站的 Rule Set 写入 `bypass_rule_set`。
+- “绕过直连地址”可选择资源管理中的本地 `.srs` 文件，并写入入站 `bypass_rule_set`。
 - 可选热点共享 TC 仅接受输入下游接口的完整名称，不支持通配符或接口前缀。
 - 是否可用取决于设备内核、cgroup v2 与 eBPF 支持情况。
 

@@ -43,6 +43,7 @@ internal fun settingsTopLevelSearchItems(
     snifferSummary: String,
     localProxySummary: String,
     tunSummary: String,
+    ebpfBypassRuleSetsSummary: String,
     externalInterfacesSummary: String,
     ignoredInterfacesSummary: String,
     privateAddressesSummary: String,
@@ -167,13 +168,11 @@ internal fun settingsTopLevelSearchItems(
         SettingsSearchItem(
             SettingsSectionId.Tproxy,
             stringResource(R.string.settings_root_ebpf_bypass_direct_cidrs),
-            stringResource(
-                if (useEbpfSharedNetwork) {
-                    R.string.settings_ebpf_bypass_direct_rule_sets_summary
-                } else {
-                    R.string.settings_root_ebpf_bypass_direct_cidrs_summary
-                },
-            ),
+            if (useEbpfSharedNetwork) {
+                ebpfBypassRuleSetsSummary
+            } else {
+                stringResource(R.string.settings_root_ebpf_bypass_direct_cidrs_summary)
+            },
         ),
         SettingsSearchItem(
             SettingsSectionId.Tproxy,
