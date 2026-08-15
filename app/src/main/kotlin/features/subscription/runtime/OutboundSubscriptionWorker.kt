@@ -8,6 +8,8 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import app.AppState
 import app.AsteriskApplication
+import features.importing.ImportStage
+import features.subscription.isTransientSubscriptionFailure
 import features.subscription.usecase.OutboundSubscriptionUpdateResult
 import features.subscription.usecase.SubscriptionUpdateTrigger
 
@@ -32,15 +34,15 @@ internal class OutboundSubscriptionWorkerRunner(
             is OutboundSubscriptionUpdateResult.Cancelled,
             -> SubscriptionWorkerResult.SUCCESS
 
-            is OutboundSubscriptionUpdateResult.DeferredProxy ->
-                if (result.backgroundRetry) {
+            is OutboundSubscriptionUpdateResult.Failed ->
+                if (
+                    result.stage == ImportStage.DOWNLOAD &&
+                    isTransientSubscriptionFailure(result.error)
+                ) {
                     SubscriptionWorkerResult.RETRY
                 } else {
                     SubscriptionWorkerResult.FAILURE
                 }
-
-            is OutboundSubscriptionUpdateResult.Failed ->
-                SubscriptionWorkerResult.FAILURE
         }
     }
 }

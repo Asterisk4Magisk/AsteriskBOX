@@ -6,8 +6,8 @@
 package features.outbound
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -51,7 +51,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -123,7 +122,6 @@ internal fun OutboundGroupListPage(
     val updateAppState = LocalUpdateAppState.current
     val navigator = LocalNavigator.current
     val services = LocalAppServices.current
-    val context = LocalContext.current
     val resources = LocalResources.current
     val isWideScreen = LocalIsWideScreen.current
     val scope = rememberCoroutineScope()
@@ -194,13 +192,6 @@ internal fun OutboundGroupListPage(
                     stage = result.stage,
                     error = result.error,
                     presentation = result.outcome?.toImportResultPresentation(committed = false),
-                )
-            is OutboundSubscriptionUpdateResult.DeferredProxy ->
-                OutboundGroupUpdateResult.Failure(
-                    stage = ImportStage.DOWNLOAD,
-                    error = IllegalStateException(
-                        "The local proxy must be running before this subscription can update",
-                    ),
                 )
             is OutboundSubscriptionUpdateResult.Cancelled ->
                 OutboundGroupUpdateResult.Failure(

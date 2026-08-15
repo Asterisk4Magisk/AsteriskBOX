@@ -63,8 +63,8 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
                     ageSecretKey = group.ageSecretKey,
                     localContent = null,
                     subscriptionPreparer = subscriptionPreparer,
-                    fetchOptions = state.toSubscriptionFetchOptions(
-                        useRunningProxy = group.updateViaProxy,
+                    fetchOptions = toSubscriptionFetchOptions(
+                        useRunningProxy = group.updateViaProxy && state.proxyRunning,
                         hwid = group.hwid,
                     ),
                     etag = group.subscriptionEtag,

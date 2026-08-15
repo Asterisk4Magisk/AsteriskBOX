@@ -52,12 +52,6 @@ internal sealed interface OutboundSubscriptionUpdateResult {
         override val isSuccessfulCheck: Boolean = false
     }
 
-    data class DeferredProxy(
-        val backgroundRetry: Boolean,
-    ) : OutboundSubscriptionUpdateResult {
-        override val isSuccessfulCheck: Boolean = false
-    }
-
     data class Cancelled(
         val reason: String,
     ) : OutboundSubscriptionUpdateResult {
@@ -80,7 +74,6 @@ internal class OutboundSubscriptionUpdater(
     private val parse: (String) -> ImportOutcome<ImportedSingBoxOutbound>,
     private val validate: suspend (AppState) -> Unit,
     private val nowMillis: () -> Long = System::currentTimeMillis,
-    private val proxyAvailable: (AppState) -> Boolean = AppState::proxyRunning,
     private val preparePermits: Semaphore = Semaphore(2),
     private val validationCommitMutex: Mutex = Mutex(),
 ) {
@@ -111,12 +104,6 @@ internal class OutboundSubscriptionUpdater(
                     "Disabled subscription group was not updated",
                 )
             }
-            if (group.updateViaProxy && !proxyAvailable(initialState)) {
-                return OutboundSubscriptionUpdateResult.DeferredProxy(
-                    backgroundRetry = trigger == SubscriptionUpdateTrigger.BACKGROUND,
-                )
-            }
-
             val prepared = try {
                 onStage(ImportStage.DOWNLOAD)
                 preparePermits.withPermit {
@@ -129,7 +116,7 @@ internal class OutboundSubscriptionUpdater(
                     groupId = groupId,
                     trigger = trigger,
                     stage = ImportStage.DOWNLOAD,
-                    message = error.message ?: "Subscription download failed",
+                    error = error,
                 )
             }
 
@@ -139,7 +126,7 @@ internal class OutboundSubscriptionUpdater(
                         groupId = groupId,
                         trigger = trigger,
                         stage = prepared.stage.toImportStage(),
-                        message = prepared.error.message ?: "Subscription update failed",
+                        error = prepared.error,
                     )
                 }
 
@@ -170,7 +157,7 @@ internal class OutboundSubscriptionUpdater(
                             groupId = groupId,
                             trigger = trigger,
                             stage = ImportStage.PARSE,
-                            message = error.message ?: "Subscription parsing failed",
+                            error = error,
                         )
                     }
                     val commit = validationCommitMutex.withLock {
@@ -344,10 +331,11 @@ internal class OutboundSubscriptionUpdater(
         groupId: Int,
         trigger: SubscriptionUpdateTrigger,
         stage: ImportStage,
-        message: String,
+        error: Throwable,
         skippedCount: Int = 0,
         duplicateCount: Int = 0,
     ): OutboundSubscriptionUpdateResult = validationCommitMutex.withLock {
+        val message = error.message ?: "Subscription update failed"
         repeat(MaxCommitAttempts) {
             val snapshot = stateGateway.snapshot()
             if (snapshot.currentGroupOrCancelled(groupId, trigger) == null) {
@@ -363,10 +351,9 @@ internal class OutboundSubscriptionUpdater(
                 duplicateCount = duplicateCount,
             )
             if (stateGateway.compareAndSet(snapshot, candidate)) {
-                val summary = sanitizePersistedImportSummary(message)
                 return@withLock OutboundSubscriptionUpdateResult.Failed(
                     stage = stage,
-                    error = IllegalStateException(summary),
+                    error = error,
                 )
             }
         }
