@@ -128,7 +128,6 @@ private fun SettingsContent(
     val updateAppState = LocalUpdateAppState.current
     val navigator = LocalNavigator.current
     val services = LocalAppServices.current
-    val networkInterfaces = services.networkInterfaces
     val switchRunModeUseCase = services.switchRunModeUseCase
     val rootBootScriptUseCase = services.rootBootScriptUseCase
     val rootEbpfProbeUseCase = services.rootEbpfProbeUseCase
@@ -197,7 +196,6 @@ private fun SettingsContent(
     val rootEbpfSelinuxPolicyWarningConfirm = stringResource(R.string.settings_root_ebpf_selinux_policy_warning_confirm)
     val serviceStoppedMessage = stringResource(R.string.proxy_service_stopped)
     val logLevelFailedMessage = stringResource(R.string.settings_log_level)
-    val ignoredInterfacesErrorDetail = stringResource(R.string.settings_ignored_interfaces_error_detail)
     val backupExportedMessage = stringResource(R.string.settings_backup_exported)
     val backupExportFailedMessage = stringResource(R.string.settings_backup_export_failed)
     val restoreReadFailedMessage = stringResource(R.string.settings_restore_read_failed)
@@ -307,16 +305,7 @@ private fun SettingsContent(
                 sheetState.openExternalInterfaces(appState)
             }
         },
-        onOpenIgnoredInterfaces = {
-            sheetState.openIgnoredInterfaces(appState)
-            scope.launch {
-                sheetState.loadIgnoredInterfaces(
-                    appState = appState,
-                    networkInterfaces = networkInterfaces,
-                    errorDetail = ignoredInterfacesErrorDetail,
-                )
-            }
-        },
+        onOpenIgnoredInterfaces = { sheetState.openIgnoredInterfaces(appState) },
         onOpenPrivateAddresses = { sheetState.openPrivateAddresses(appState) },
     )
     val topLevelSearchItems = settingsTopLevelSearchItems(
@@ -597,16 +586,7 @@ private fun SettingsContent(
                             sheetState.openExternalInterfaces(appState)
                         }
                     },
-                    onOpenIgnoredInterfaces = {
-                        sheetState.openIgnoredInterfaces(appState)
-                        scope.launch {
-                            sheetState.loadIgnoredInterfaces(
-                                appState = appState,
-                                networkInterfaces = networkInterfaces,
-                                errorDetail = ignoredInterfacesErrorDetail,
-                            )
-                        }
-                    },
+                    onOpenIgnoredInterfaces = { sheetState.openIgnoredInterfaces(appState) },
                     onOpenPrivateAddresses = { sheetState.openPrivateAddresses(appState) },
                 )
             }

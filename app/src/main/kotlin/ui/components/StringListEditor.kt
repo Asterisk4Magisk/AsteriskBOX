@@ -4,6 +4,7 @@
 package ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -77,7 +78,7 @@ internal fun StringListEditor(
     val sanitizedValues = values.toTrimmedNonEmptyList()
     val inputError = input.trim().takeIf(String::isNotEmpty)?.let(validateInput)
     val canAdd = input.trim().isNotEmpty() && inputError == null
-    val hasPendingInput = input.isNotBlank() || editingIndex >= 0
+    val hasPendingInput = hasPendingStringListEdit(input, editingIndex)
     val currentOnPendingChange by rememberUpdatedState(onPendingChange)
 
     LaunchedEffect(hasPendingInput) {
@@ -129,7 +130,12 @@ internal fun StringListEditor(
                     Icon(Icons.Rounded.Add, stringResource(R.string.common_add))
                 }
             }
-            if (hasPendingInput && onPendingChange != null) {
+            AnimatedVisibility(
+                visible = hasPendingInput && onPendingChange != null,
+                enter = AsteriskMotion.contentEnter(),
+                exit = AsteriskMotion.contentExit(),
+                label = "string-list-pending-value",
+            ) {
                 StringListStatusText(stringResource(R.string.string_list_pending_value))
             }
             if (sanitizedValues.isEmpty()) StringListStatusText(emptyText)

@@ -28,10 +28,10 @@ import features.settings.sheets.LocalProxySettingsBottomSheet
 import features.settings.sheets.PrivateAddressBottomSheet
 import features.settings.sheets.SnifferSettingsBottomSheet
 import features.settings.sheets.TunSettingsBottomSheet
-import features.settings.sheets.orderedBy
 import features.settings.sheets.sanitizeEbpfSharedNetworkInterfaces
 import features.settings.sheets.sanitizeEbpfBypassRuleSetTags
 import features.settings.sheets.sanitizeExternalInterfaces
+import features.settings.sheets.sanitizeIgnoredInterfaceSelectors
 import features.settings.sheets.sanitizePrivateAddressCidrs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -260,17 +260,14 @@ internal fun SettingsBottomSheetsHost(
     )
     IgnoredInterfacesBottomSheet(
         show = sheetState.showIgnoredInterfaces,
-        interfaces = sheetState.ignoredInterfaceOptions,
         selectedInterfaces = sheetState.ignoredInterfacesDraft,
-        loading = sheetState.ignoredInterfacesLoading,
-        errorMessage = sheetState.ignoredInterfacesError,
         onSelectedInterfacesChange = {
-            sheetState.ignoredInterfacesDraft = it.orderedBy(sheetState.ignoredInterfaceOptions)
+            sheetState.ignoredInterfacesDraft = it.sanitizeIgnoredInterfaceSelectors()
         },
         onDismissRequest = { sheetState.closeIgnoredInterfaces() },
         onSave = { interfaces ->
             updateAppState { state ->
-                state.copy(ignoredInterfaces = interfaces.orderedBy(sheetState.ignoredInterfaceOptions))
+                state.copy(ignoredInterfaces = interfaces.sanitizeIgnoredInterfaceSelectors())
             }
             sheetState.closeIgnoredInterfaces()
         },
