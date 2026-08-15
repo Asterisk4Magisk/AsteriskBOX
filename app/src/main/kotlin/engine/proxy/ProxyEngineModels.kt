@@ -5,7 +5,6 @@ package engine.proxy
 
 import app.AppState
 import engine.root.runtime.model.RootRuntimeOwner
-import engine.root.runtime.model.RootRuntimePhase
 import engine.root.runtime.model.RootRuntimeSnapshot
 
 internal data class ProxyEngineStartRequest(
@@ -16,7 +15,6 @@ data class ProxyEngineStatus(
     val running: Boolean,
     val runMode: Int? = null,
     val appState: AppState? = null,
-    val activeRootOwner: RootRuntimeOwner? = null,
     val rootSnapshot: RootRuntimeSnapshot? = null,
 ) {
     companion object {
@@ -25,9 +23,8 @@ data class ProxyEngineStatus(
             runMode: Int,
             snapshot: RootRuntimeSnapshot,
         ): ProxyEngineStatus = ProxyEngineStatus(
-            running = snapshot.owner == localOwner && snapshot.phase == RootRuntimePhase.Running,
+            running = snapshot.owner == localOwner && snapshot.running,
             runMode = runMode,
-            activeRootOwner = snapshot.owner,
             rootSnapshot = snapshot,
         )
     }
