@@ -27,17 +27,21 @@ internal fun selectorTargetChoices(
     excludedTag = state.selectors.firstOrNull { selector -> selector.id == selectorId }?.tag.orEmpty(),
     excludedSelectorId = selectorId,
     includeGlobalSelector = false,
-)
-
-internal fun selectorTargetTags(
-    state: AppState,
-    selectorId: Int = 0,
-): List<String> = selectorTargetChoices(
-    state = state,
-    selectorId = selectorId,
-).map { choice -> choice.tag }
+).sortedBy(ManagedOutboundChoice::selectorTargetPriority)
 
 internal fun selectorCardMemberCount(memberTags: Iterable<String>): Int = memberTags.count()
+
+internal fun selectorCardMemberCount(
+    state: AppState,
+    selector: SingBoxSelectorState,
+): Int {
+    val targets = selectorTargetChoices(state = state, selectorId = selector.id)
+    return selectorEffectiveMemberTags(
+        state = state,
+        memberReferences = selector.outbounds,
+        targets = targets,
+    ).size
+}
 
 internal fun List<SingBoxSelectorState>.moveSelector(
     fromIndex: Int,
@@ -97,7 +101,7 @@ internal fun validateSelectorDraft(
     val remarks = draft.remarks.trim()
     require(remarks.isNotEmpty()) { "Selector remarks are required" }
 
-    val available = selectorTargetTags(
+    val availableTargets = selectorTargetChoices(
         state = state,
         selectorId = draft.id,
     )
@@ -105,9 +109,18 @@ internal fun validateSelectorDraft(
         .map(String::trim)
         .filter(String::isNotEmpty)
         .toSet()
-    val members = available.filter(requestedMembers::contains)
+    val memberReferences = availableTargets
+        .map(ManagedOutboundChoice::tag)
+        .filter(requestedMembers::contains)
+    require(memberReferences.size == requestedMembers.size) {
+        "Selector contains an unavailable outbound"
+    }
+    val members = selectorEffectiveMemberTags(
+        state = state,
+        memberReferences = memberReferences,
+        targets = availableTargets,
+    )
     require(members.isNotEmpty()) { "Selector requires at least one outbound" }
-    require(members.size == requestedMembers.size) { "Selector contains an unavailable outbound" }
     return when (type) {
         SingBoxSelectorTypeSelector -> {
             val default = draft.default.trim().ifBlank { members.first() }
@@ -115,7 +128,7 @@ internal fun validateSelectorDraft(
             draft.copy(
                 type = type,
                 remarks = remarks,
-                outbounds = members,
+                outbounds = memberReferences,
                 default = default,
             )
         }
@@ -136,7 +149,7 @@ internal fun validateSelectorDraft(
             draft.copy(
                 type = type,
                 remarks = remarks,
-                outbounds = members,
+                outbounds = memberReferences,
                 default = "",
                 url = url,
                 interval = interval,

@@ -21,6 +21,8 @@ internal fun ManagedOutboundChoice.localizedLabel(includeGroupName: Boolean = tr
         stringResource(R.string.outbound_choice_with_group, label, group)
     } ?: label
     val typeLabel = when (kind) {
+        ManagedOutboundChoiceKind.Group ->
+            stringResource(R.string.selector_target_group)
         ManagedOutboundChoiceKind.Selector ->
             stringResource(R.string.selector_type_selector)
         ManagedOutboundChoiceKind.UrlTest ->

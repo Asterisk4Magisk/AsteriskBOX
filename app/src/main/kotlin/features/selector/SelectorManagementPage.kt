@@ -64,6 +64,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -89,6 +90,7 @@ import app.SingBoxSelectorTypeUrlTest
 import app.SupportedSingBoxSelectorTypes
 import app.collectAppState
 import app.selectableManagedOutbounds
+import app.selectorGroupLockedOutboundTags
 import app.withRemovedManagedOutboundTags
 import engine.singbox.SingBoxUnsigned16Max
 import engine.singbox.isSingBoxDurationNotGreaterThan
@@ -354,6 +356,7 @@ internal fun SelectorManagementPage(padding: PaddingValues) {
                         animateItemModifier = Modifier.animateItem(),
                     ) { isDragging ->
                         CustomSelectorCard(
+                            state = appState,
                             selector = selector,
                             isDragging = isDragging && reorderEnabled,
                             onEdit = { openEditor(selector) },
@@ -440,6 +443,7 @@ private fun ManagedSelectorCard(
 
 @Composable
 private fun CustomSelectorCard(
+    state: AppState,
     selector: SingBoxSelectorState,
     isDragging: Boolean,
     onEdit: () -> Unit,
@@ -448,6 +452,7 @@ private fun CustomSelectorCard(
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val isUrlTest = selector.type == SingBoxSelectorTypeUrlTest
+    val memberCount = selectorCardMemberCount(state, selector)
     SelectorCard(
         modifier = modifier,
         title = selector.remarks,
@@ -458,9 +463,13 @@ private fun CustomSelectorCard(
                 else R.string.selector_type_selector,
             ),
         ),
-        memberCount = selectorCardMemberCount(selector.outbounds),
-        status = null,
-        enabled = selector.outbounds.isNotEmpty(),
+        memberCount = memberCount,
+        status = if (memberCount == 0) {
+            stringResource(R.string.selector_no_members)
+        } else {
+            null
+        },
+        enabled = memberCount > 0,
         isDragging = isDragging,
         onClick = onEdit,
         menu = {
@@ -676,6 +685,7 @@ private data class SelectorTargetUi(
 )
 
 private enum class SelectorTargetKind {
+    Group,
     Selector,
     UrlTest,
     Outbound,
@@ -699,7 +709,7 @@ internal fun SelectorEditorScaffold(
         mutableStateOf(selector?.type ?: SingBoxSelectorTypeSelector)
     }
     var remarks by remember(selector?.id) { mutableStateOf(selector?.remarks.orEmpty()) }
-    var members by remember(selector?.id) {
+    var memberReferences by remember(selector?.id) {
         mutableStateOf(selector?.outbounds.orEmpty())
     }
     var default by remember(selector?.id) { mutableStateOf(selector?.default.orEmpty()) }
@@ -723,18 +733,20 @@ internal fun SelectorEditorScaffold(
     var query by remember(selector?.id) { mutableStateOf("") }
     var regexEnabled by remember(selector?.id) { mutableStateOf(false) }
     val normalizedRemarks = remarks.trim()
-    val targets = remember(
+    val targetChoices = remember(
         state.outboundGroups,
         state.outbounds,
         state.endpoints,
         state.selectors,
         selector?.id,
-        selector?.outbounds,
     ) {
-        val available = buildSelectorTargets(
+        selectorTargetChoices(
             state = state,
             selectorId = selector?.id ?: 0,
         )
+    }
+    val targets = remember(targetChoices, selector?.outbounds) {
+        val available = buildSelectorTargets(targetChoices)
         available + selector?.outbounds
             .orEmpty()
             .filterNot { member -> available.any { target -> target.tag == member } }
@@ -764,8 +776,32 @@ internal fun SelectorEditorScaffold(
         val visibleTargetTagSet = visibleTargetTags.toSet()
         targets.filter { target -> target.tag in visibleTargetTagSet }
     }
+    val effectiveMembers = remember(state, memberReferences, targetChoices) {
+        selectorEffectiveMemberTags(
+            state = state,
+            memberReferences = memberReferences,
+            targets = targetChoices,
+        )
+    }
+    val lockedOutboundTags = remember(state, memberReferences) {
+        state.selectorGroupLockedOutboundTags(memberReferences)
+    }
+    val interactiveVisibleTargetTags = remember(
+        state,
+        memberReferences,
+        visibleTargetTags,
+    ) {
+        selectorInteractiveTargetTags(
+            state = state,
+            memberReferences = memberReferences,
+            targetTags = visibleTargetTags,
+        )
+    }
     val searchInvalid = searchResult is SelectorTargetSearchResult.InvalidRegex
-    val selectionState = selectorTargetSelectionState(members, visibleTargetTags)
+    val selectionState = selectorTargetSelectionState(
+        memberReferences,
+        interactiveVisibleTargetTags,
+    )
     val urlInvalid = url.isNotBlank() && !isValidUrlTestUrl(url)
     val intervalInvalid = interval.isNotBlank() && !isValidSingBoxDuration(interval)
     val toleranceValue = tolerance.toIntOrNull()
@@ -784,8 +820,9 @@ internal fun SelectorEditorScaffold(
     val draft = SingBoxSelectorState(
         id = selector?.id ?: 0,
         remarks = normalizedRemarks,
-        outbounds = members,
-        default = default,
+        outbounds = memberReferences,
+        default = default.takeIf(effectiveMembers::contains)
+            ?: effectiveMembers.firstOrNull().orEmpty(),
         type = type,
         url = url,
         interval = interval,
@@ -817,7 +854,8 @@ internal fun SelectorEditorScaffold(
     val memberHeader = editorSections
         .filterIsInstance<SelectorEditorSection.MemberHeader>()
         .single()
-    val defaultOptionTags = selectorDefaultOptionTags(members)
+    val resolvedDefault = draft.default
+    val defaultOptionTags = selectorDefaultOptionTags(effectiveMembers)
     val toggleableState = when (selectionState) {
         SelectorTargetSelectionState.None -> ToggleableState.Off
         SelectorTargetSelectionState.Partial -> ToggleableState.Indeterminate
@@ -838,22 +876,41 @@ internal fun SelectorEditorScaffold(
         },
     )
 
-    fun toggleMember(target: String) {
-        members = if (target in members) {
-            members - target
-        } else {
-            members + target
+    fun updateMemberReferences(updated: List<String>) {
+        memberReferences = updated
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .distinct()
+        val nextEffectiveMembers = selectorEffectiveMemberTags(
+            state = state,
+            memberReferences = memberReferences,
+            targets = targetChoices,
+        )
+        if (default !in nextEffectiveMembers) {
+            default = nextEffectiveMembers.firstOrNull().orEmpty()
         }
-        if (default !in members) default = members.firstOrNull().orEmpty()
+    }
+
+    fun toggleMember(target: String) {
+        if (target in lockedOutboundTags) return
+        updateMemberReferences(
+            if (target in memberReferences) {
+                memberReferences - target
+            } else {
+                memberReferences + target
+            },
+        )
     }
 
     fun toggleVisibleMembers() {
-        members = updateSelectorMembersForMatches(
-            members = members,
-            matchedTags = visibleTargetTags,
-            select = selectionState != SelectorTargetSelectionState.All,
+        updateMemberReferences(
+            updateSelectorMemberReferencesForMatches(
+                state = state,
+                memberReferences = memberReferences,
+                matchedTags = visibleTargetTags,
+                select = selectionState != SelectorTargetSelectionState.All,
+            ),
         )
-        if (default !in members) default = members.firstOrNull().orEmpty()
     }
 
     EditorPageScaffold(
@@ -1071,10 +1128,10 @@ internal fun SelectorEditorScaffold(
                                         ?.displayLabel()
                                 } ?: stringResource(R.string.selector_target_unavailable)
                             },
-                            selectedIndex = if (members.isEmpty()) {
+                            selectedIndex = if (effectiveMembers.isEmpty()) {
                                 0
                             } else {
-                                selectorDefaultMemberIndex(members, default)
+                                selectorDefaultMemberIndex(effectiveMembers, resolvedDefault)
                             },
                             onSelectedIndexChange = { index ->
                                 defaultOptionTags.getOrNull(index)?.let { member ->
@@ -1082,7 +1139,7 @@ internal fun SelectorEditorScaffold(
                                 }
                             },
                             modifier = Modifier.padding(bottom = 14.dp),
-                            enabled = members.isNotEmpty(),
+                            enabled = effectiveMembers.isNotEmpty(),
                         )
                     }
                     Text(
@@ -1145,7 +1202,8 @@ internal fun SelectorEditorScaffold(
                         TriStateCheckbox(
                             state = toggleableState,
                             onClick = ::toggleVisibleMembers,
-                            enabled = !searchInvalid && visibleTargetTags.isNotEmpty(),
+                            enabled = !searchInvalid &&
+                                interactiveVisibleTargetTags.isNotEmpty(),
                             modifier = Modifier.semantics {
                                 contentDescription = bulkSelectionDescription
                             },
@@ -1155,7 +1213,7 @@ internal fun SelectorEditorScaffold(
             }
             item(key = "members-required") {
                 AnimatedVisibility(
-                    visible = members.isEmpty(),
+                    visible = effectiveMembers.isEmpty(),
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
@@ -1169,7 +1227,9 @@ internal fun SelectorEditorScaffold(
             items(visibleTargets, key = SelectorTargetUi::tag) { target ->
                 SelectorTargetRow(
                     target = target,
-                    selected = target.tag in members,
+                    selected = target.tag in memberReferences || target.tag in effectiveMembers,
+                    enabled = target.tag !in lockedOutboundTags,
+                    lockedByGroup = target.tag in lockedOutboundTags,
                     onClick = { toggleMember(target.tag) },
                 )
             }
@@ -1181,25 +1241,41 @@ internal fun SelectorEditorScaffold(
 private fun SelectorTargetRow(
     target: SelectorTargetUi,
     selected: Boolean,
+    enabled: Boolean,
+    lockedByGroup: Boolean,
     onClick: () -> Unit,
 ) {
+    val containerColor by animateColorAsState(
+        targetValue = if (selected) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainer
+        },
+        animationSpec = AsteriskMotion.effects(),
+        label = "selector-target-color",
+    )
+    val lockedStateDescription = stringResource(R.string.selector_target_locked_by_group)
     Card(
         onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.semantics {
+            if (lockedByGroup) stateDescription = lockedStateDescription
+        },
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) {
-                MaterialTheme.colorScheme.secondaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceContainer
-            },
+            containerColor = containerColor,
+            disabledContainerColor = containerColor,
         ),
         shape = AsteriskShapeTokens.InnerContainer,
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
                 when (target.kind) {
+                    SelectorTargetKind.Group -> Icons.Rounded.Folder
                     SelectorTargetKind.Selector -> Icons.Rounded.Tune
                     SelectorTargetKind.UrlTest -> Icons.Rounded.Speed
                     SelectorTargetKind.Outbound -> Icons.Rounded.Router
@@ -1211,7 +1287,11 @@ private fun SelectorTargetRow(
                 contentDescription = null,
             )
             Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .animateContentSize(AsteriskMotion.contentSpatial()),
+            ) {
                 Text(
                     target.displayLabel(),
                     style = MaterialTheme.typography.bodyLarge,
@@ -1221,6 +1301,7 @@ private fun SelectorTargetRow(
                 Text(
                     stringResource(
                         when (target.kind) {
+                            SelectorTargetKind.Group -> R.string.selector_target_group
                             SelectorTargetKind.Selector -> R.string.selector_type_selector
                             SelectorTargetKind.UrlTest -> R.string.selector_type_urltest
                             SelectorTargetKind.Outbound -> R.string.selector_target_outbound
@@ -1233,24 +1314,36 @@ private fun SelectorTargetRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                AnimatedVisibility(
+                    visible = lockedByGroup,
+                    enter = AsteriskMotion.contentEnter(),
+                    exit = AsteriskMotion.contentExit(),
+                ) {
+                    Text(
+                        stringResource(R.string.selector_target_included_by_group),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
-            Checkbox(checked = selected, onCheckedChange = null)
+            Checkbox(
+                checked = selected,
+                onCheckedChange = null,
+                enabled = enabled,
+            )
         }
     }
 }
 
 private fun buildSelectorTargets(
-    state: AppState,
-    selectorId: Int,
-): List<SelectorTargetUi> = selectorTargetChoices(
-    state = state,
-    selectorId = selectorId,
-).map { choice ->
+    choices: List<ManagedOutboundChoice>,
+): List<SelectorTargetUi> = choices.map { choice ->
     SelectorTargetUi(
         tag = choice.tag,
         label = choice.label,
         groupName = choice.groupName,
         kind = when (choice.kind) {
+            ManagedOutboundChoiceKind.Group -> SelectorTargetKind.Group
             ManagedOutboundChoiceKind.Selector -> SelectorTargetKind.Selector
             ManagedOutboundChoiceKind.UrlTest -> SelectorTargetKind.UrlTest
             ManagedOutboundChoiceKind.Outbound -> SelectorTargetKind.Outbound

@@ -24,6 +24,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 
 internal enum class ManagedOutboundChoiceKind {
+    Group,
     Selector,
     UrlTest,
     Outbound,
@@ -119,7 +120,7 @@ internal fun selectableManagedOutbounds(
                     ManagedOutboundChoice(
                         tag = tag,
                         label = group.name.trim(),
-                        kind = ManagedOutboundChoiceKind.Selector,
+                        kind = ManagedOutboundChoiceKind.Group,
                     ),
                 )
             }
@@ -741,6 +742,7 @@ private fun AppState.outboundDependsOn(
 
 private val ManagedOutboundChoiceKind.priority: Int
     get() = when (this) {
+        ManagedOutboundChoiceKind.Group -> 0
         ManagedOutboundChoiceKind.Selector -> 0
         ManagedOutboundChoiceKind.UrlTest -> 1
         ManagedOutboundChoiceKind.Endpoint -> 2

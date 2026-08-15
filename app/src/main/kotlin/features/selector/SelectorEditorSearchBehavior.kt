@@ -68,15 +68,3 @@ internal fun selectorTargetSelectionState(
         else -> SelectorTargetSelectionState.Partial
     }
 }
-
-internal fun updateSelectorMembersForMatches(
-    members: List<String>,
-    matchedTags: List<String>,
-    select: Boolean,
-): List<String> = if (select) {
-    val known = members.toMutableSet()
-    members + matchedTags.filter(known::add)
-} else {
-    val matches = matchedTags.toSet()
-    members.filterNot(matches::contains)
-}

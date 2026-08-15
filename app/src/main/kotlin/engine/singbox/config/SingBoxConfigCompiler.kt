@@ -19,6 +19,7 @@ import app.SingBoxRouteRuleState
 import app.SingBoxRouteRuleTypeLogical
 import app.SingBoxSelectorTypeSelector
 import app.SingBoxSelectorTypeUrlTest
+import app.expandSelectorMemberReferences
 import app.isManagedSingBoxTag
 import app.managedOutboundGroupSelectorTag
 import app.managedRuleSetChoices
@@ -479,9 +480,10 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
             .any { selector ->
                 val availableMembers = baseAvailableCustomMembers +
                     emittableManagedSelectorTags
-                val canEmit = selector.outbounds.any { member ->
-                    member != selector.tag && member in availableMembers
-                }
+                val canEmit = appState.expandSelectorMemberReferences(
+                    references = selector.outbounds,
+                    availableMemberTags = availableMembers,
+                ).any { member -> member != selector.tag }
                 if (canEmit) emittableManagedSelectorTags += selector.tag
                 canEmit
             }
@@ -519,12 +521,10 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
         .asSequence()
         .filter { selector -> selector.tag in emittableManagedSelectorTags }
         .forEach { selector ->
-            val requestedMembers = selector.outbounds
-                .map(String::trim)
-                .filter(String::isNotEmpty)
-                .toSet()
-            val members = availableCustomMembers
-                .filter { member -> member != selector.tag && member in requestedMembers }
+            val members = appState.expandSelectorMemberReferences(
+                references = selector.outbounds,
+                availableMemberTags = availableCustomMembers,
+            ).filter { member -> member != selector.tag }
             if (members.isNotEmpty()) {
                 when (selector.type) {
                     SingBoxSelectorTypeSelector -> {
