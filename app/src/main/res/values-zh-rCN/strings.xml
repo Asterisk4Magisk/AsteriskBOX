@@ -392,6 +392,7 @@
     <string name="settings_resource_json_editor_summary">sing-box 源格式规则集</string>
     <string name="settings_resource_json_editor_loading">正在加载规则集…</string>
     <string name="settings_resource_json_editor_missing">该 JSON 规则集不可用</string>
+    <string name="settings_resource_json_editor_draft">该文件尚未创建，保存后创建。</string>
     <string name="settings_resource_json_editor_content">JSON 规则集</string>
     <string name="settings_resource_json_editor_content_summary">直接编辑源规则；保存时会校验 sing-box 规则集结构及完整运行配置。</string>
     <string name="settings_resource_json_editor_format">格式化 JSON</string>

@@ -16,10 +16,13 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import features.resources.ResourceFileUpdateOptions
+import features.resources.ResourceJsonEditorSnapshot
+import features.resources.ResourceJsonFileOrigin
 import engine.root.runtime.RootCorePublicationCoordinator
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.resources.isSingBoxJsonRuleSet
 import features.resources.InvalidSingBoxJsonRuleSetException
+import features.resources.resourceJsonEditorSnapshot
 import features.resources.requireValidJsonRuleSetStructure
 import system.AndroidRootShellGateway
 import system.RootShellGateway
@@ -299,22 +302,24 @@ internal class AndroidResourceFileRepository(
         store.currentStatus(customResourceFiles)
     }
 
-    suspend fun readCustomJson(customFile: CustomResourceFileState): String = withContext(Dispatchers.IO) {
+    suspend fun readCustomJson(
+        customFile: CustomResourceFileState,
+    ): ResourceJsonEditorSnapshot = withContext(Dispatchers.IO) {
         require(customFile.name.isSingBoxJsonRuleSet()) { "${customFile.name} is not a JSON rule set" }
-        store.readCustomText(customFile)
+        resourceJsonEditorSnapshot(store.readCustomTextOrNull(customFile))
     }
 
     suspend fun saveCustomJson(
         customFile: CustomResourceFileState,
         content: String,
-        expectedContent: String,
+        expectedOrigin: ResourceJsonFileOrigin,
     ): ResourceFilesStatus = withContext(Dispatchers.IO) {
         require(customFile.name.isSingBoxJsonRuleSet()) { "${customFile.name} is not a JSON rule set" }
         val liveFiles = currentAppState().customResourceFiles
         publishCustomCandidate(
             customFile = customFile,
             candidate = store.stageCustomCandidate(customFile, content),
-            expectedTargetRevision = expectedContent.resourceFileRevision(),
+            expectedTargetRevision = expectedOrigin.expectedResourceFileRevision(),
         )
         store.currentStatus(liveFiles)
     }
@@ -408,7 +413,11 @@ internal class AndroidResourceFileRepository(
     ) {
         synchronized(customResourceMutationLock) {
             val target = store.file(customFile)
-            publishValidatedResourceCandidate(candidate, target) { stagedFile ->
+            publishValidatedResourceCandidate(
+                candidate = candidate,
+                target = target,
+                mode = expectedTargetRevision.publicationMode(),
+            ) { stagedFile ->
                 expectedLiveFile?.let { expected ->
                     requireCurrentCustomFile(expected, currentAppState())
                 }
@@ -454,6 +463,14 @@ internal class AndroidResourceFileRepository(
         check(state.customResourceFiles.any { liveFile -> liveFile == customFile }) {
             "${customFile.name} is no longer the current resource file"
         }
+    }
+}
+
+private fun ResourceFileRevision?.publicationMode(): ResourceFilePublicationMode {
+    return if (this?.exists == false) {
+        ResourceFilePublicationMode.CreateNew
+    } else {
+        ResourceFilePublicationMode.Replace
     }
 }
 

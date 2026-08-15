@@ -26,6 +26,40 @@ internal class InvalidSingBoxJsonRuleSetException(
     cause: Throwable,
 ) : IllegalArgumentException(cause.message, cause)
 
+internal sealed interface ResourceJsonFileOrigin {
+    data object Missing : ResourceJsonFileOrigin
+
+    data class Existing(
+        val content: String,
+    ) : ResourceJsonFileOrigin
+}
+
+internal data class ResourceJsonEditorSnapshot(
+    val content: String,
+    val origin: ResourceJsonFileOrigin,
+) {
+    val isDraft: Boolean
+        get() = origin == ResourceJsonFileOrigin.Missing
+}
+
+internal val DefaultJsonRuleSetDraft = """
+    {
+      "version": 5,
+      "rules": []
+    }
+""".trimIndent() + "\n"
+
+internal fun resourceJsonEditorSnapshot(existingContent: String?): ResourceJsonEditorSnapshot {
+    val origin = existingContent
+        ?.let(ResourceJsonFileOrigin::Existing)
+        ?: ResourceJsonFileOrigin.Missing
+    return ResourceJsonEditorSnapshot(
+        content = (origin as? ResourceJsonFileOrigin.Existing)?.content
+            ?: DefaultJsonRuleSetDraft,
+        origin = origin,
+    )
+}
+
 internal fun validateJsonRuleSetStructure(content: String): JsonRuleSetValidationError? {
     if (content.isBlank()) return JsonRuleSetValidationError.Empty
 

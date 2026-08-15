@@ -397,6 +397,7 @@
     <string name="settings_resource_json_editor_summary">sing-box source rule set</string>
     <string name="settings_resource_json_editor_loading">Loading rule set…</string>
     <string name="settings_resource_json_editor_missing">This JSON rule set is unavailable</string>
+    <string name="settings_resource_json_editor_draft">This file has not been created. Save to create it.</string>
     <string name="settings_resource_json_editor_content">JSON rule set</string>
     <string name="settings_resource_json_editor_content_summary">Edit the source rules directly. Saving checks the sing-box rule-set structure and runtime configuration.</string>
     <string name="settings_resource_json_editor_format">Format JSON</string>

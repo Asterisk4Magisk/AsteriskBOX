@@ -238,10 +238,8 @@ internal class AndroidResourceFileStore(
         replaceFile(replaceTempFile, target)
     }
 
-    fun readCustomText(customFile: CustomResourceFileState): String {
-        val target = file(customFile)
-        require(target.isFile && target.length() > 0L) { "${customFile.name} is unavailable" }
-        return target.readText()
+    fun readCustomTextOrNull(customFile: CustomResourceFileState): String? {
+        return file(customFile).readResourceTextOrNull()
     }
 
     fun stageCustomCandidate(customFile: CustomResourceFileState, uri: Uri): File {
@@ -309,6 +307,14 @@ internal class AndroidResourceFileStore(
             directCidrIpv6Path = file(ResourceFileKind.DirectCidrIpv6).absolutePath,
             hevSocks5TunnelPath = File(appContext.applicationInfo.nativeLibraryDir, HevSocks5TunnelLibraryName).absolutePath,
         )
+    }
+}
+
+internal fun File.readResourceTextOrNull(): String? {
+    return when (resourceFilePathKind()) {
+        ResourceFilePathKind.Missing -> null
+        ResourceFilePathKind.RegularFile -> readText()
+        ResourceFilePathKind.Occupied -> error("$name is not a regular file")
     }
 }
 

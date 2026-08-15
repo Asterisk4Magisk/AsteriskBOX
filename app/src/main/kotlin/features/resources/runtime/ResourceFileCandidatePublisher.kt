@@ -3,9 +3,12 @@
 
 package features.resources.runtime
 
+import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
+import features.resources.ResourceJsonFileOrigin
 import java.io.File
+import java.io.IOException
 import java.security.MessageDigest
 
 internal class ResourceFileChangedException(
@@ -18,8 +21,54 @@ internal data class ResourceFileRevision(
     val sha256: String,
 )
 
+internal enum class ResourceFilePathKind {
+    Missing,
+    RegularFile,
+    Occupied,
+}
+
+internal enum class ResourceFilePublicationMode {
+    Replace,
+    CreateNew,
+}
+
+internal interface ResourceFileAtomicOperations {
+    fun replace(stagedFile: File, target: File)
+
+    fun createNewLink(stagedFile: File, target: File): Boolean
+
+    fun syncDirectory(directory: File)
+}
+
+internal fun File.resourceFilePathKind(): ResourceFilePathKind {
+    return if (System.getProperty("java.runtime.name") == AndroidRuntimeName) {
+        try {
+            val status = Os.lstat(absolutePath)
+            if (OsConstants.S_ISREG(status.st_mode)) {
+                ResourceFilePathKind.RegularFile
+            } else {
+                ResourceFilePathKind.Occupied
+            }
+        } catch (error: ErrnoException) {
+            if (error.errno == OsConstants.ENOENT) {
+                ResourceFilePathKind.Missing
+            } else {
+                throw IOException("Failed to inspect $absolutePath", error)
+            }
+        }
+    } else {
+        hostResourceFilePathKind()
+    }
+}
+
 internal fun File.resourceFileRevision(): ResourceFileRevision {
-    if (!isFile) return ResourceFileRevision(exists = false, sizeBytes = 0L, sha256 = "")
+    when (resourceFilePathKind()) {
+        ResourceFilePathKind.Missing ->
+            return ResourceFileRevision(exists = false, sizeBytes = 0L, sha256 = "")
+        ResourceFilePathKind.Occupied ->
+            return ResourceFileRevision(exists = true, sizeBytes = 0L, sha256 = "")
+        ResourceFilePathKind.RegularFile -> Unit
+    }
     val digest = MessageDigest.getInstance("SHA-256")
     inputStream().use { input ->
         val buffer = ByteArray(DefaultDigestBufferSize)
@@ -45,6 +94,13 @@ internal fun String.resourceFileRevision(): ResourceFileRevision {
     )
 }
 
+internal fun ResourceJsonFileOrigin.expectedResourceFileRevision(): ResourceFileRevision =
+    when (this) {
+        ResourceJsonFileOrigin.Missing ->
+            ResourceFileRevision(exists = false, sizeBytes = 0L, sha256 = "")
+        is ResourceJsonFileOrigin.Existing -> content.resourceFileRevision()
+    }
+
 internal fun requireResourceFileRevisionUnchanged(
     target: File,
     expectedRevision: ResourceFileRevision,
@@ -57,6 +113,8 @@ internal fun requireResourceFileRevisionUnchanged(
 internal fun publishValidatedResourceCandidate(
     candidate: File,
     target: File,
+    mode: ResourceFilePublicationMode = ResourceFilePublicationMode.Replace,
+    atomicOperations: ResourceFileAtomicOperations = AndroidResourceFileAtomicOperations,
     validate: (File) -> Unit,
 ) {
     synchronized(publicationLockFor(target)) {
@@ -78,8 +136,18 @@ internal fun publishValidatedResourceCandidate(
                     output.fd.sync()
                 }
             }
-            replaceStagedFile(staged, target)
-            stagedFile = null
+            when (mode) {
+                ResourceFilePublicationMode.Replace -> {
+                    atomicOperations.replace(staged, target)
+                    stagedFile = null
+                }
+                ResourceFilePublicationMode.CreateNew -> {
+                    if (!atomicOperations.createNewLink(staged, target)) {
+                        throw ResourceFileChangedException(target.name)
+                    }
+                }
+            }
+            atomicOperations.syncDirectory(parent)
         } finally {
             stagedFile?.delete()
             candidate.delete()
@@ -87,17 +155,27 @@ internal fun publishValidatedResourceCandidate(
     }
 }
 
-private fun replaceStagedFile(stagedFile: File, target: File) {
-    Os.rename(stagedFile.absolutePath, target.absolutePath)
-    syncDirectory(target.parentFile ?: return)
-}
+private object AndroidResourceFileAtomicOperations : ResourceFileAtomicOperations {
+    override fun replace(stagedFile: File, target: File) {
+        Os.rename(stagedFile.absolutePath, target.absolutePath)
+    }
 
-private fun syncDirectory(directory: File) {
-    val descriptor = Os.open(directory.absolutePath, OsConstants.O_RDONLY, 0)
-    try {
-        Os.fsync(descriptor)
-    } finally {
-        Os.close(descriptor)
+    override fun createNewLink(stagedFile: File, target: File): Boolean {
+        return try {
+            Os.link(stagedFile.absolutePath, target.absolutePath)
+            true
+        } catch (error: ErrnoException) {
+            if (error.errno == OsConstants.EEXIST) false else throw error
+        }
+    }
+
+    override fun syncDirectory(directory: File) {
+        val descriptor = Os.open(directory.absolutePath, OsConstants.O_RDONLY, 0)
+        try {
+            Os.fsync(descriptor)
+        } finally {
+            Os.close(descriptor)
+        }
     }
 }
 
@@ -115,5 +193,21 @@ private fun ByteArray.toHexString(): String = buildString(size * 2) {
     }
 }
 
+private fun File.hostResourceFilePathKind(): ResourceFilePathKind {
+    if (exists()) {
+        return if (isFile) {
+            ResourceFilePathKind.RegularFile
+        } else {
+            ResourceFilePathKind.Occupied
+        }
+    }
+    val parent = absoluteFile.parentFile ?: return ResourceFilePathKind.Missing
+    if (!parent.exists()) return ResourceFilePathKind.Missing
+    if (!parent.isDirectory) return ResourceFilePathKind.Occupied
+    val children = parent.list() ?: throw IOException("Failed to inspect ${parent.absolutePath}")
+    return if (name in children) ResourceFilePathKind.Occupied else ResourceFilePathKind.Missing
+}
+
 private const val DefaultDigestBufferSize = 8192
 private const val HexDigits = "0123456789abcdef"
+private const val AndroidRuntimeName = "Android Runtime"

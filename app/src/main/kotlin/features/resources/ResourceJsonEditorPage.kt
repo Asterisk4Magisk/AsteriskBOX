@@ -6,10 +6,12 @@
 package features.resources
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -67,7 +69,9 @@ internal fun ResourceJsonEditorPage(
         mutableStateOf<ResourceJsonEditorLoadState>(ResourceJsonEditorLoadState.Loading)
     }
     var saving by remember(resourceId) { mutableStateOf(false) }
-    var loadedContent by remember(resourceId) { mutableStateOf<String?>(null) }
+    var loadedSnapshot by remember(resourceId) {
+        mutableStateOf<ResourceJsonEditorSnapshot?>(null)
+    }
     val transitionSpec = AsteriskMotion.fadeThrough<ResourceJsonEditorLoadState>(
         AsteriskMotion.fastEffects(),
     )
@@ -94,15 +98,15 @@ internal fun ResourceJsonEditorPage(
 
     LaunchedEffect(resourceId, file?.name) {
         loadState = ResourceJsonEditorLoadState.Loading
-        loadedContent = null
+        loadedSnapshot = null
         if (file == null) {
             loadState = ResourceJsonEditorLoadState.Unavailable
             return@LaunchedEffect
         }
         try {
-            val content = services.resourceFileUseCase.readCustomJson(file)
-            editorState.replaceText(content)
-            loadedContent = content
+            val snapshot = services.resourceFileUseCase.readCustomJson(file)
+            editorState.replaceText(snapshot.content)
+            loadedSnapshot = snapshot
             loadState = ResourceJsonEditorLoadState.Ready
         } catch (error: CancellationException) {
             throw error
@@ -124,7 +128,7 @@ internal fun ResourceJsonEditorPage(
 
     fun save() {
         val currentFile = file ?: return
-        val expectedContent = loadedContent ?: return
+        val snapshot = loadedSnapshot ?: return
         if (saving || loadState != ResourceJsonEditorLoadState.Ready) return
         val content = editorState.snapshotText()
         validateJsonRuleSetStructure(content)?.let { error ->
@@ -137,7 +141,7 @@ internal fun ResourceJsonEditorPage(
                 services.resourceFileUseCase.saveCustomJson(
                     customFile = currentFile,
                     content = content,
-                    expectedContent = expectedContent,
+                    expectedOrigin = snapshot.origin,
                 )
                 services.tipNotifier.show(savedMessage)
                 navigator.pop()
@@ -215,6 +219,35 @@ internal fun ResourceJsonEditorPage(
                         stringResource(R.string.settings_resource_json_editor_content),
                         style = MaterialTheme.typography.titleMedium,
                     )
+                    AnimatedVisibility(
+                        visible = loadedSnapshot?.isDraft == true,
+                        enter = AsteriskMotion.contentEnter(),
+                        exit = AsteriskMotion.contentExit(),
+                    ) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            shape = AsteriskShapeTokens.InnerContainer,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Icons.Rounded.Description,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                                Text(
+                                    stringResource(R.string.settings_resource_json_editor_draft),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                            }
+                        }
+                    }
                     Text(
                         stringResource(R.string.settings_resource_json_editor_content_summary),
                         style = MaterialTheme.typography.bodySmall,
