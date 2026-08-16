@@ -4,6 +4,10 @@
 package data.backup
 
 import app.AppState
+import app.ServiceControlSchedule
+import app.ServiceControlSettings
+import app.ServiceControlWifi
+import app.ServiceControlWifiRule
 import app.CustomResourceFileState
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
@@ -120,9 +124,50 @@ private fun AppState.toBackupSettings(): AppBackupSettings =
         externalInterfaces = externalInterfaces,
         ebpfSharedNetworkInterfaces = ebpfSharedNetworkInterfaces,
         ignoredInterfaces = ignoredInterfaces,
+        serviceControl = serviceControl.toBackup(),
         privateAddressCidrs = privateAddressCidrs,
         proxyAppListMode = proxyAppListMode,
     )
+
+private fun ServiceControlSettings.toBackup(): AppBackupServiceControl =
+    AppBackupServiceControl(
+        enabled = enabled,
+        schedule = AppBackupServiceControlSchedule(
+            enabled = schedule.enabled,
+            startCron = schedule.startCron,
+            stopCron = schedule.stopCron,
+        ),
+        wifi = AppBackupServiceControlWifi(
+            enabled = wifi.enabled,
+            connectStart = wifi.connectStart.toBackup(),
+            connectStop = wifi.connectStop.toBackup(),
+            disconnectStart = wifi.disconnectStart.toBackup(),
+            disconnectStop = wifi.disconnectStop.toBackup(),
+        ),
+    )
+
+private fun ServiceControlWifiRule.toBackup(): AppBackupServiceControlWifiRule =
+    AppBackupServiceControlWifiRule(enabled = enabled, ssids = ssids, bssids = bssids)
+
+private fun AppBackupServiceControl.toState(): ServiceControlSettings =
+    ServiceControlSettings(
+        enabled = enabled,
+        schedule = ServiceControlSchedule(
+            enabled = schedule.enabled,
+            startCron = schedule.startCron,
+            stopCron = schedule.stopCron,
+        ),
+        wifi = ServiceControlWifi(
+            enabled = wifi.enabled,
+            connectStart = wifi.connectStart.toState(),
+            connectStop = wifi.connectStop.toState(),
+            disconnectStart = wifi.disconnectStart.toState(),
+            disconnectStop = wifi.disconnectStop.toState(),
+        ),
+    )
+
+private fun AppBackupServiceControlWifiRule.toState(): ServiceControlWifiRule =
+    ServiceControlWifiRule(enabled = enabled, ssids = ssids, bssids = bssids)
 
 private fun OutboundGroupState.toBackup(): AppBackupOutboundGroup =
     AppBackupOutboundGroup(
@@ -284,6 +329,7 @@ private fun AppBackupData.toAppState(): AppState {
         externalInterfaces = settings.externalInterfaces,
         ebpfSharedNetworkInterfaces = settings.ebpfSharedNetworkInterfaces,
         ignoredInterfaces = settings.ignoredInterfaces,
+        serviceControl = settings.serviceControl.toState(),
         privateAddressCidrs = settings.privateAddressCidrs,
         proxyAppListMode = settings.proxyAppListMode,
         proxyAppListSelectedApps = proxyAppListSelectedApps,

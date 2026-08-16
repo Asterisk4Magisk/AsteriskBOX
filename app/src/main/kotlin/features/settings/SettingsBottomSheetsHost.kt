@@ -27,6 +27,7 @@ import features.settings.sheets.IgnoredInterfacesBottomSheet
 import features.settings.sheets.LocalProxySettingsBottomSheet
 import features.settings.sheets.PrivateAddressBottomSheet
 import features.settings.sheets.SnifferSettingsBottomSheet
+import features.settings.sheets.ServiceControlBottomSheet
 import features.settings.sheets.TunSettingsBottomSheet
 import features.settings.sheets.sanitizeEbpfSharedNetworkInterfaces
 import features.settings.sheets.sanitizeEbpfBypassRuleSetTags
@@ -52,6 +53,10 @@ internal fun SettingsBottomSheetsHost(
     val scope = rememberCoroutineScope()
     val validationFailedMessage = stringResource(R.string.settings_sing_box_validation_failed)
     var validating by remember { mutableStateOf(false) }
+    var serviceControlSaving by remember { mutableStateOf(false) }
+    var serviceControlError by remember { mutableStateOf<String?>(null) }
+    val applyServiceControl = LocalAppServices.current.applyServiceControlUseCase
+    val serviceControlFailedMessage = stringResource(R.string.settings_service_control_save_failed)
 
     fun validateAndCommit(
         operation: String,
@@ -256,6 +261,52 @@ internal fun SettingsBottomSheetsHost(
         onSave = { interfaces ->
             updateAppState { state -> state.copy(externalInterfaces = interfaces.sanitizeExternalInterfaces()) }
             sheetState.showExternalInterfaces = false
+        },
+    )
+    ServiceControlBottomSheet(
+        show = sheetState.showServiceControl,
+        saving = serviceControlSaving,
+        draft = sheetState.serviceControlDraft,
+        runtimeError = serviceControlError,
+        onDraftChange = {
+            serviceControlError = null
+            sheetState.serviceControlDraft = it
+        },
+        onDismissRequest = {
+            if (!serviceControlSaving) sheetState.showServiceControl = false
+        },
+        onSave = { draft ->
+            if (!serviceControlSaving) {
+                val baseState = appState
+                serviceControlSaving = true
+                serviceControlError = null
+                scope.launch {
+                    try {
+                        val applied = applyServiceControl.apply(baseState, draft)
+                        updateAppState { current ->
+                            current.copy(
+                                serviceControl = applied.serviceControl,
+                                proxyRunning = applied.proxyRunning,
+                                localProxyPort = applied.localProxyPort,
+                            )
+                        }
+                        sheetState.showServiceControl = false
+                    } catch (error: Throwable) {
+                        if (error is CancellationException) throw error
+                        reportFailure(
+                            context = FailureLogContext(
+                                operation = "save_service_control",
+                                stage = "restart_asteriskd",
+                            ),
+                            error = error,
+                        )
+                        serviceControlError = error.message?.takeIf(String::isNotBlank)
+                            ?: serviceControlFailedMessage
+                    } finally {
+                        serviceControlSaving = false
+                    }
+                }
+            }
         },
     )
     IgnoredInterfacesBottomSheet(

@@ -3,6 +3,7 @@
 
 package engine.root.config
 
+import app.ServiceControlSettings
 import engine.proxy.LocalProxyOptions
 import engine.network.NetworkLimits
 import engine.root.daemon.config.AsteriskdConfig
@@ -33,6 +34,7 @@ internal data class RootStartConfig(
     val enableFakeIp: Boolean,
     val fakeIpIpv4Pool: String,
     val enableBoot: Boolean,
+    val serviceControl: ServiceControlSettings,
 ) {
     val configPath: String
         get() = runtimePaths.coreConfigPath
@@ -50,7 +52,8 @@ internal data class RootStartConfig(
             enableLocalDns == other.enableLocalDns &&
             enableFakeIp == other.enableFakeIp &&
             fakeIpIpv4Pool == other.fakeIpIpv4Pool &&
-            enableBoot == other.enableBoot
+            enableBoot == other.enableBoot &&
+            serviceControl == other.serviceControl
     }
 
     override fun hashCode(): Int {
@@ -65,6 +68,7 @@ internal data class RootStartConfig(
         result = 31 * result + enableFakeIp.hashCode()
         result = 31 * result + fakeIpIpv4Pool.hashCode()
         result = 31 * result + enableBoot.hashCode()
+        result = 31 * result + serviceControl.hashCode()
         return result
     }
 }

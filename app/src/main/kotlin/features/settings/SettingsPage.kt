@@ -217,7 +217,7 @@ private fun SettingsContent(
     ) {
         SettingsBackupRestoreExecutor(
             stopProxy = { runMode ->
-                when (val result = proxyServiceUseCase.stop(runMode)) {
+                when (val result = proxyServiceUseCase.shutdown(runMode)) {
                     is ProxyServiceResult.Success -> {
                         updateAppState { state -> state.copy(proxyRunning = false) }
                         SettingsBackupCleanupResult.Success
@@ -305,6 +305,7 @@ private fun SettingsContent(
                 sheetState.openExternalInterfaces(appState)
             }
         },
+        onOpenServiceControl = { sheetState.openServiceControl(appState) },
         onOpenIgnoredInterfaces = { sheetState.openIgnoredInterfaces(appState) },
         onOpenPrivateAddresses = { sheetState.openPrivateAddresses(appState) },
     )
@@ -586,6 +587,7 @@ private fun SettingsContent(
                             sheetState.openExternalInterfaces(appState)
                         }
                     },
+                    onOpenServiceControl = { sheetState.openServiceControl(appState) },
                     onOpenIgnoredInterfaces = { sheetState.openIgnoredInterfaces(appState) },
                     onOpenPrivateAddresses = { sheetState.openPrivateAddresses(appState) },
                 )
