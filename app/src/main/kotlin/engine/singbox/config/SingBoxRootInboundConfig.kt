@@ -16,8 +16,6 @@ import system.toAndroidUserId
 import utils.toTrimmedNonEmptyDistinctList
 
 internal const val SingBoxTunDevice = "asterisk0"
-internal const val EbpfRedirectIpv4Prefix = "127.128.0.0/9"
-internal const val EbpfRedirectIpv6Prefix = "fd53:696e:672d:626f::/64"
 
 internal data class EbpfUidPolicy(
     val includeUids: List<Int> = emptyList(),

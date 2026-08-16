@@ -265,45 +265,45 @@ private fun compileInbounds(
     return JsonArray(retained)
 }
 
-private fun compileEbpfInbound(
+internal fun compileEbpfInbound(
     appState: AppState,
     uidPolicy: EbpfUidPolicy,
     availableRuleSetTags: Set<String>,
-): JsonObject = buildJsonObject {
-    put("type", "ebpf")
-    put("tag", APP_ROOT_INBOUND)
-    put("dns_mode", if (appState.enableLocalDns) "hijack" else "off")
-    putJsonArray("redirect_address") {
-        add(EbpfRedirectIpv4Prefix)
-        if (appState.enableIpv6) add(EbpfRedirectIpv6Prefix)
-    }
-    if (uidPolicy.includeUids.isNotEmpty()) {
-        putJsonArray("include_uid") {
-            uidPolicy.includeUids.distinct().sorted().forEach(::add)
-        }
-    }
-    if (uidPolicy.excludeUids.isNotEmpty()) {
-        putJsonArray("exclude_uid") {
-            uidPolicy.excludeUids.distinct().sorted().forEach(::add)
-        }
-    }
-    val bypassRuleSets = appState.availableEbpfBypassRuleSetTags(availableRuleSetTags)
-    if (bypassRuleSets.isNotEmpty()) {
-        putJsonArray("bypass_rule_set") {
-            bypassRuleSets.forEach(::add)
-        }
-    }
+): JsonObject {
     val sharedInterfaces = normalizeEbpfSharedNetworkInterfaces(appState.ebpfSharedNetworkInterfaces)
-    if (sharedInterfaces.isNotEmpty()) {
-        put(
-            "shared_network",
-            buildJsonObject {
-                put("enabled", true)
-                putJsonArray("include_interface") {
+    val ipv6Mode = if (appState.enableIpv6) "always" else "off"
+    return buildJsonObject {
+        put("type", "ebpf")
+        put("tag", APP_ROOT_INBOUND)
+        put("mode", if (sharedInterfaces.isEmpty()) "local" else "hybrid")
+        put("dns_mode", if (appState.enableLocalDns) "hijack" else "off")
+        putJsonObject("local") {
+            put("ipv6_mode", ipv6Mode)
+            if (uidPolicy.includeUids.isNotEmpty()) {
+                putJsonArray("include_uid") {
+                    uidPolicy.includeUids.distinct().sorted().forEach(::add)
+                }
+            }
+            if (uidPolicy.excludeUids.isNotEmpty()) {
+                putJsonArray("exclude_uid") {
+                    uidPolicy.excludeUids.distinct().sorted().forEach(::add)
+                }
+            }
+        }
+        val bypassRuleSets = appState.availableEbpfBypassRuleSetTags(availableRuleSetTags)
+        if (bypassRuleSets.isNotEmpty()) {
+            putJsonArray("bypass_rule_set") {
+                bypassRuleSets.forEach(::add)
+            }
+        }
+        if (sharedInterfaces.isNotEmpty()) {
+            putJsonObject("shared") {
+                putJsonArray("interface") {
                     sharedInterfaces.forEach(::add)
                 }
-            },
-        )
+                put("ipv6_mode", ipv6Mode)
+            }
+        }
     }
 }
 

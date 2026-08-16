@@ -15,7 +15,7 @@
         },
         {
             "uniqueId": "com.github.asterisk4magisk:libbox",
-            "artifactVersion": "v1.14.0-beta.14-reF1nd",
+            "artifactVersion": "v1.14.0-beta.15-reF1nd",
             "name": "AndroidLibBoxLite",
             "description": "Pinned Android JNI and command API bindings for sing-box.",
             "website": "https://github.com/Asterisk4Magisk/AndroidLibBoxLite",
@@ -314,7 +314,7 @@
         },
         {
             "uniqueId": "github:reF1nd/sing-box-releases",
-            "artifactVersion": "v1.14.0-beta.14-reF1nd",
+            "artifactVersion": "v1.14.0-beta.15-reF1nd",
             "name": "sing-box reF1nd build",
             "description": "A reF1nd build of the sing-box proxy platform used by AsteriskBOX ROOT modes.",
             "website": "https://github.com/reF1nd/sing-box-releases",
