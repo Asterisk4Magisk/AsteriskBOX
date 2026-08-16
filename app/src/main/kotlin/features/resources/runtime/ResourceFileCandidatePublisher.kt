@@ -35,9 +35,64 @@ internal enum class ResourceFilePublicationMode {
 internal interface ResourceFileAtomicOperations {
     fun replace(stagedFile: File, target: File)
 
-    fun createNewLink(stagedFile: File, target: File): Boolean
+    fun createNew(stagedFile: File, target: File): Boolean
 
     fun syncDirectory(directory: File)
+}
+
+internal data class ResourceFileIdentity(
+    val deviceId: Long,
+    val inode: Long,
+)
+
+internal interface ExclusiveResourceFileHandle : AutoCloseable {
+    val identity: ResourceFileIdentity
+
+    fun copyFromAndSync(stagedFile: File)
+}
+
+internal interface ExclusiveResourceFileOperations {
+    fun open(target: File): ExclusiveResourceFileHandle?
+
+    fun identity(target: File): ResourceFileIdentity?
+
+    fun delete(target: File)
+}
+
+internal fun createNewResourceFile(
+    stagedFile: File,
+    target: File,
+    operations: ExclusiveResourceFileOperations,
+): Boolean {
+    val handle = operations.open(target) ?: return false
+    var failure: Throwable? = null
+    try {
+        handle.copyFromAndSync(stagedFile)
+    } catch (error: Throwable) {
+        failure = error
+    }
+    try {
+        handle.close()
+    } catch (error: Throwable) {
+        val previousFailure = failure
+        if (previousFailure == null) {
+            failure = error
+        } else {
+            previousFailure.addSuppressed(error)
+        }
+    }
+    val resultFailure = failure
+    if (resultFailure != null) {
+        try {
+            if (operations.identity(target) == handle.identity) {
+                operations.delete(target)
+            }
+        } catch (cleanupError: Throwable) {
+            resultFailure.addSuppressed(cleanupError)
+        }
+        throw resultFailure
+    }
+    return true
 }
 
 internal fun File.resourceFilePathKind(): ResourceFilePathKind {
@@ -142,7 +197,7 @@ internal fun publishValidatedResourceCandidate(
                     stagedFile = null
                 }
                 ResourceFilePublicationMode.CreateNew -> {
-                    if (!atomicOperations.createNewLink(staged, target)) {
+                    if (!atomicOperations.createNew(staged, target)) {
                         throw ResourceFileChangedException(target.name)
                     }
                 }
@@ -160,13 +215,12 @@ private object AndroidResourceFileAtomicOperations : ResourceFileAtomicOperation
         Os.rename(stagedFile.absolutePath, target.absolutePath)
     }
 
-    override fun createNewLink(stagedFile: File, target: File): Boolean {
-        return try {
-            Os.link(stagedFile.absolutePath, target.absolutePath)
-            true
-        } catch (error: ErrnoException) {
-            if (error.errno == OsConstants.EEXIST) false else throw error
-        }
+    override fun createNew(stagedFile: File, target: File): Boolean {
+        return createNewResourceFile(
+            stagedFile = stagedFile,
+            target = target,
+            operations = AndroidExclusiveResourceFileOperations,
+        )
     }
 
     override fun syncDirectory(directory: File) {
@@ -178,6 +232,91 @@ private object AndroidResourceFileAtomicOperations : ResourceFileAtomicOperation
         }
     }
 }
+
+private object AndroidExclusiveResourceFileOperations : ExclusiveResourceFileOperations {
+    override fun open(target: File): ExclusiveResourceFileHandle? {
+        val flags = OsConstants.O_WRONLY or
+            OsConstants.O_CREAT or
+            OsConstants.O_EXCL or
+            LinuxOpenCloseOnExecFlag or
+            OsConstants.O_NOFOLLOW
+        val descriptor = try {
+            Os.open(target.absolutePath, flags, OwnerReadWriteMode)
+        } catch (error: ErrnoException) {
+            if (error.errno == OsConstants.EEXIST) return null
+            throw IOException("Failed to create ${target.absolutePath}", error)
+        }
+        return try {
+            AndroidExclusiveResourceFileHandle(
+                descriptor = descriptor,
+                targetPath = target.absolutePath,
+                identity = Os.fstat(descriptor).toResourceFileIdentity(),
+            )
+        } catch (error: ErrnoException) {
+            runCatching { Os.close(descriptor) }
+                .exceptionOrNull()
+                ?.let(error::addSuppressed)
+            throw IOException("Failed to inspect ${target.absolutePath}", error)
+        }
+    }
+
+    override fun identity(target: File): ResourceFileIdentity? {
+        return try {
+            Os.lstat(target.absolutePath).toResourceFileIdentity()
+        } catch (error: ErrnoException) {
+            if (error.errno == OsConstants.ENOENT) return null
+            throw IOException("Failed to inspect ${target.absolutePath}", error)
+        }
+    }
+
+    override fun delete(target: File) {
+        try {
+            Os.remove(target.absolutePath)
+        } catch (error: ErrnoException) {
+            throw IOException("Failed to delete ${target.absolutePath}", error)
+        }
+    }
+}
+
+private class AndroidExclusiveResourceFileHandle(
+    private val descriptor: java.io.FileDescriptor,
+    private val targetPath: String,
+    override val identity: ResourceFileIdentity,
+) : ExclusiveResourceFileHandle {
+    override fun copyFromAndSync(stagedFile: File) {
+        try {
+            stagedFile.inputStream().use { input ->
+                val buffer = ByteArray(DefaultCopyBufferSize)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    var offset = 0
+                    while (offset < count) {
+                        val written = Os.write(descriptor, buffer, offset, count - offset)
+                        if (written <= 0) {
+                            throw IOException("Failed to write $targetPath")
+                        }
+                        offset += written
+                    }
+                }
+            }
+            Os.fsync(descriptor)
+        } catch (error: ErrnoException) {
+            throw IOException("Failed to write $targetPath", error)
+        }
+    }
+
+    override fun close() {
+        try {
+            Os.close(descriptor)
+        } catch (error: ErrnoException) {
+            throw IOException("Failed to close $targetPath", error)
+        }
+    }
+}
+
+private fun android.system.StructStat.toResourceFileIdentity(): ResourceFileIdentity =
+    ResourceFileIdentity(deviceId = st_dev, inode = st_ino)
 
 private val PublicationLocks = mutableMapOf<String, Any>()
 
@@ -209,5 +348,9 @@ private fun File.hostResourceFilePathKind(): ResourceFilePathKind {
 }
 
 private const val DefaultDigestBufferSize = 8192
+private const val DefaultCopyBufferSize = 8192
 private const val HexDigits = "0123456789abcdef"
 private const val AndroidRuntimeName = "Android Runtime"
+private const val OwnerReadWriteMode = 384
+// O_CLOEXEC is stable Linux UAPI, but OsConstants does not expose it before API 27.
+private const val LinuxOpenCloseOnExecFlag = 524288

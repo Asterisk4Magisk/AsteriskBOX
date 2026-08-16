@@ -225,7 +225,7 @@ internal fun ResourceJsonEditorPage(
                         exit = AsteriskMotion.contentExit(),
                     ) {
                         Surface(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                             shape = AsteriskShapeTokens.InnerContainer,
                             color = MaterialTheme.colorScheme.primaryContainer,
                         ) {
