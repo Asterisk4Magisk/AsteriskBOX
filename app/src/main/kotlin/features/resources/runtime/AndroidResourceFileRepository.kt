@@ -20,7 +20,6 @@ import features.resources.ResourceFileUpdateOptions
 import features.resources.ResourceJsonEditorSnapshot
 import features.resources.ResourceJsonFileOrigin
 import engine.root.publication.RootCoreRemovalCommand
-import engine.root.runtime.RootSupervisorController
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.resources.isSingBoxJsonRuleSet
 import features.resources.InvalidSingBoxJsonRuleSetException
@@ -38,7 +37,6 @@ internal class AndroidResourceFileRepository(
     private val appContext = context.applicationContext
     private val store = AndroidResourceFileStore(appContext)
     private val downloader = AndroidResourceFileDownloader()
-    private val rootSupervisor = RootSupervisorController(appContext, rootShell)
     private val customResourceMutationLock = Any()
 
     suspend fun status(customResourceFiles: List<CustomResourceFileState> = emptyList()): ResourceFilesStatus =
@@ -356,31 +354,35 @@ internal class AndroidResourceFileRepository(
     }
 
     private suspend fun publishBundledCoreIfPossible() {
-        when (coreCandidateInstallPath()) {
-            CoreCandidateInstallPath.ReplaceWithRoot -> {
-                if (!rootSupervisor.isUnbound()) return
-                replaceCoreCandidateWithRoot(store.stageBundledSingBoxCoreCandidate())
-            }
-            CoreCandidateInstallPath.ReplaceAppOwned -> replaceAppOwnedCoreCandidate(
-                store.stageBundledSingBoxCoreCandidate(),
+        executeCoreCandidateInstall(store::stageBundledSingBoxCoreCandidate) {
+            AndroidResourceFileLogger.info(
+                "Bundled sing-box core replacement deferred because the existing core is ROOT-owned",
             )
-            CoreCandidateInstallPath.InitialNoReplace -> {
-                installInitialCoreCandidate(store.stageBundledSingBoxCoreCandidate())
-            }
         }
     }
 
     private suspend fun installOrPublishCoreCandidate(
         candidateFactory: () -> java.io.File,
     ) {
-        when (coreCandidateInstallPath()) {
-            CoreCandidateInstallPath.ReplaceWithRoot -> {
-                rootSupervisor.requireUnbound()
-                replaceCoreCandidateWithRoot(candidateFactory())
-            }
-            CoreCandidateInstallPath.ReplaceAppOwned -> replaceAppOwnedCoreCandidate(candidateFactory())
-            CoreCandidateInstallPath.InitialNoReplace -> installInitialCoreCandidate(candidateFactory())
+        executeCoreCandidateInstall(candidateFactory) {
+            error(appContext.getString(R.string.settings_root_required))
         }
+    }
+
+    private suspend fun executeCoreCandidateInstall(
+        candidateFactory: () -> java.io.File,
+        deferRootOwned: suspend () -> Unit,
+    ) {
+        val target = store.file(ResourceFileKind.SingBoxCore)
+        sharedCoreReplacementCoordinator.execute(
+            targetOwnerUid = target::coreBinaryOwnerUidOrNull,
+            rootModeActive = { currentAppState().runMode.isRootRunMode() },
+            candidateFactory = candidateFactory,
+            installInitial = { candidate -> installInitialCoreCandidate(candidate) },
+            replaceAppOwned = { candidate -> replaceAppOwnedCoreCandidate(candidate) },
+            replaceWithRoot = { candidate -> replaceCoreCandidateWithRoot(candidate) },
+            deferRootOwned = deferRootOwned,
+        )
     }
 
     private fun installInitialCoreCandidate(candidate: java.io.File) {
@@ -391,13 +393,6 @@ internal class AndroidResourceFileRepository(
             }
         } finally {
             candidate.delete()
-        }
-    }
-
-    private suspend fun coreCandidateInstallPath(): CoreCandidateInstallPath {
-        val targetExists = store.file(ResourceFileKind.SingBoxCore).exists()
-        return resolveCoreCandidateInstallPath(targetExists) {
-            currentAppState().runMode.isRootRunMode()
         }
     }
 
