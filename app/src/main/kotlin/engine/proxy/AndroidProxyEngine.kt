@@ -191,9 +191,13 @@ internal class AndroidProxyEngine(
         return activeEngine
             ?: preferredEngine?.takeIf { it.status().running }
             ?: preferredEngine?.takeIf { it.ownsRootRuntime() }
-            ?: rootEngines.firstOrNull { engine -> engine.status().running }
+            ?: withRootRuntimeProbe(preferredRunMode) {
+                rootEngines.firstOrNull { engine -> engine.status().running }
+            }
             ?: vpnSingBoxEngine.takeIf { it.status().running }
-            ?: rootEngines.firstOrNull { engine -> engine.ownsRuntime() }
+            ?: withRootRuntimeProbe(preferredRunMode) {
+                rootEngines.firstOrNull { engine -> engine.ownsRuntime() }
+            }
     }
 
     private suspend fun statusUnlocked(
@@ -237,11 +241,14 @@ internal class AndroidProxyEngine(
         }
 
         if (rootStatus == null) {
-            val probeEngine = rootEngines.first()
-            val status = probeRoot(probeEngine)
-            if (status.running) return@withContext accept(status, probeEngine)
-            if (status.rootSnapshot != null && fallbackStatus?.rootSnapshot == null) {
-                fallbackStatus = status
+            withRootRuntimeProbe(preferredRunMode) {
+                val probeEngine = rootEngines.first()
+                probeEngine to probeRoot(probeEngine)
+            }?.let { (probeEngine, status) ->
+                if (status.running) return@withContext accept(status, probeEngine)
+                if (status.rootSnapshot != null && fallbackStatus?.rootSnapshot == null) {
+                    fallbackStatus = status
+                }
             }
         }
 
@@ -298,6 +305,11 @@ internal fun normalizeRootRuntimeStatus(
         snapshot = snapshot,
     )
 }
+
+internal suspend fun <T> withRootRuntimeProbe(
+    preferredRunMode: Int?,
+    probe: suspend () -> T,
+): T? = if (preferredRunMode == RunModeVpnService) null else probe()
 
 internal fun shouldResumeRootBeforeResolvingPorts(
     explicitRestart: Boolean,

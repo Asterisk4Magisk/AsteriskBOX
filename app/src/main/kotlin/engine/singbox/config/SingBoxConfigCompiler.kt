@@ -277,6 +277,7 @@ internal fun compileEbpfInbound(
         put("tag", APP_ROOT_INBOUND)
         put("mode", if (sharedInterfaces.isEmpty()) "local" else "hybrid")
         put("dns_mode", if (appState.enableLocalDns) "hijack" else "off")
+        put("bypass_private_address", false)
         putJsonObject("local") {
             put("ipv6_mode", ipv6Mode)
             if (uidPolicy.includeUids.isNotEmpty()) {
