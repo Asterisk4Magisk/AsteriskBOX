@@ -81,6 +81,7 @@ import features.home.HomeNetworkRowKind
 import features.home.HomeServiceStatus
 import features.home.buildHomeControllerState
 import features.home.buildHomeModeChange
+import features.home.buildHomeModeOperationState
 import features.home.buildHomeMonitoringOverviewState
 import features.home.buildHomeNetworkActivityState
 import features.home.formatHomeRuntimeBytes
@@ -154,7 +155,8 @@ fun SingBoxDashboardPage(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     ObserveMonitoring(MonitoringIntent.Home)
-    var operationInProgress by rememberSaveable { mutableStateOf(false) }
+    var serviceOperationInProgress by rememberSaveable { mutableStateOf(false) }
+    var modeOperationInProgress by rememberSaveable { mutableStateOf(false) }
     val controllerState = remember(appState.proxyRunning, appState.runMode, appState.singBoxMode) {
         buildHomeControllerState(appState)
     }
@@ -197,10 +199,10 @@ fun SingBoxDashboardPage(
     }
 
     fun toggleService() {
-        if (operationInProgress) return
+        if (serviceOperationInProgress || modeOperationInProgress) return
         val stateSnapshot = appState
         val wasRunning = stateSnapshot.proxyRunning
-        operationInProgress = true
+        serviceOperationInProgress = true
         val operationJob = services.appScope.launch {
             handleProxyServiceResult(services.proxyServiceUseCase.toggle(stateSnapshot), wasRunning)
         }
@@ -208,13 +210,13 @@ fun SingBoxDashboardPage(
             try {
                 operationJob.join()
             } finally {
-                operationInProgress = false
+                serviceOperationInProgress = false
             }
         }
     }
 
     fun changeMode(mode: Int) {
-        if (operationInProgress) return
+        if (serviceOperationInProgress || modeOperationInProgress) return
         val stateSnapshot = latestAppState.value
         val modeChange = buildHomeModeChange(
             appState = stateSnapshot,
@@ -226,7 +228,9 @@ fun SingBoxDashboardPage(
             updateAppState { state -> state.copy(singBoxMode = mode) }
         }
         if (modeChange.runtimeAction != HomeModeRuntimeAction.None) {
-            operationInProgress = true
+            val operationState = buildHomeModeOperationState(modeChange.runtimeAction)
+            serviceOperationInProgress = operationState.serviceOperationInProgress
+            modeOperationInProgress = operationState.modeOperationInProgress
             val operationJob = services.appScope.launch {
                 val failure = when (modeChange.runtimeAction) {
                     HomeModeRuntimeAction.None -> null
@@ -266,7 +270,8 @@ fun SingBoxDashboardPage(
                 try {
                     operationJob.join()
                 } finally {
-                    operationInProgress = false
+                    serviceOperationInProgress = false
+                    modeOperationInProgress = false
                 }
             }
         }
@@ -297,7 +302,8 @@ fun SingBoxDashboardPage(
                 HomeControllerCard(
                     controllerState = controllerState,
                     networkActivityState = networkActivityState,
-                    operationInProgress = operationInProgress,
+                    serviceOperationInProgress = serviceOperationInProgress,
+                    modeOperationInProgress = modeOperationInProgress,
                     onToggleService = ::toggleService,
                     onModeSelected = ::changeMode,
                 )
@@ -362,13 +368,14 @@ fun SingBoxDashboardPage(
 private fun HomeControllerCard(
     controllerState: HomeControllerState,
     networkActivityState: HomeNetworkActivityState,
-    operationInProgress: Boolean,
+    serviceOperationInProgress: Boolean,
+    modeOperationInProgress: Boolean,
     onToggleService: () -> Unit,
     onModeSelected: (Int) -> Unit,
 ) {
     val serviceMotion = AsteriskMotion.fastEffects<Float>()
     val serviceSwitchAlpha by animateFloatAsState(
-        targetValue = if (operationInProgress) 0f else 1f,
+        targetValue = if (serviceOperationInProgress) 0f else 1f,
         animationSpec = serviceMotion,
         label = "home-service-switch-alpha",
     )
@@ -406,10 +413,10 @@ private fun HomeControllerCard(
                     checked = controllerState.serviceStatus == HomeServiceStatus.Enabled,
                     onCheckedChange = { onToggleService() },
                     modifier = Modifier.alpha(serviceSwitchAlpha),
-                    enabled = !operationInProgress,
+                    enabled = !serviceOperationInProgress,
                 )
                 AnimatedVisibility(
-                    visible = operationInProgress,
+                    visible = serviceOperationInProgress,
                     enter = AsteriskMotion.fadeEnter(serviceMotion),
                     exit = AsteriskMotion.fadeExit(serviceMotion),
                     label = "home-service-loading",
@@ -427,7 +434,7 @@ private fun HomeControllerCard(
                 },
                 selectedValue = controllerState.singBoxMode,
                 onSelected = onModeSelected,
-                enabled = !operationInProgress,
+                enabled = !serviceOperationInProgress && !modeOperationInProgress,
             )
         }
     }

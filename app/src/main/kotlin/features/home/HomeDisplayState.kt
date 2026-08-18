@@ -51,6 +51,11 @@ internal enum class HomeModeRuntimeAction {
     RestartService,
 }
 
+internal data class HomeModeOperationState(
+    val serviceOperationInProgress: Boolean,
+    val modeOperationInProgress: Boolean,
+)
+
 internal data class HomeNetworkActivityState(
     val accumulatedUploadBytes: Long?,
     val accumulatedDownloadBytes: Long?,
@@ -93,6 +98,23 @@ internal fun buildHomeModeChange(
             appState.runMode.isRootRunMode() -> HomeModeRuntimeAction.RestartService
             else -> HomeModeRuntimeAction.PatchRuntime
         },
+    )
+}
+
+internal fun buildHomeModeOperationState(
+    runtimeAction: HomeModeRuntimeAction,
+): HomeModeOperationState = when (runtimeAction) {
+    HomeModeRuntimeAction.None -> HomeModeOperationState(
+        serviceOperationInProgress = false,
+        modeOperationInProgress = false,
+    )
+    HomeModeRuntimeAction.PatchRuntime -> HomeModeOperationState(
+        serviceOperationInProgress = false,
+        modeOperationInProgress = true,
+    )
+    HomeModeRuntimeAction.RestartService -> HomeModeOperationState(
+        serviceOperationInProgress = true,
+        modeOperationInProgress = true,
     )
 }
 
