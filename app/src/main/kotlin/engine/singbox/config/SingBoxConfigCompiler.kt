@@ -277,9 +277,9 @@ internal fun compileEbpfInbound(
         put("tag", APP_ROOT_INBOUND)
         put("mode", if (sharedInterfaces.isEmpty()) "local" else "hybrid")
         put("dns_mode", if (appState.enableLocalDns) "hijack" else "off")
-        put("bypass_private_address", false)
         putJsonObject("local") {
             put("ipv6_mode", ipv6Mode)
+            put("bypass_private_address", false)
             if (uidPolicy.includeUids.isNotEmpty()) {
                 putJsonArray("include_uid") {
                     uidPolicy.includeUids.distinct().sorted().forEach(::add)
@@ -302,6 +302,7 @@ internal fun compileEbpfInbound(
                 putJsonArray("interface") {
                     sharedInterfaces.forEach(::add)
                 }
+                put("bypass_private_address", false)
                 put("ipv6_mode", ipv6Mode)
             }
         }
