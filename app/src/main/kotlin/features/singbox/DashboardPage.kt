@@ -75,6 +75,7 @@ import engine.singbox.runtime.SingBoxTrafficSample
 import engine.singbox.runtime.SingBoxTrafficState
 import features.home.HomeControllerState
 import features.home.HomeMonitoringOverviewState
+import features.home.HomeModeRuntimeAction
 import features.home.HomeNetworkActivityState
 import features.home.HomeNetworkRowKind
 import features.home.HomeServiceStatus
@@ -224,22 +225,42 @@ fun SingBoxDashboardPage(
         if (modeChange.persistSelection) {
             updateAppState { state -> state.copy(singBoxMode = mode) }
         }
-        if (modeChange.patchRuntime) {
+        if (modeChange.runtimeAction != HomeModeRuntimeAction.None) {
             operationInProgress = true
             val operationJob = services.appScope.launch {
-                services.singBoxRuntime.patchMode(modeChange.runtimeAppState)
-                    .onFailure { error ->
-                        if (modeChange.persistSelection) {
-                            updateAppState { state ->
-                                if (state.singBoxMode == mode) {
-                                    state.copy(singBoxMode = previousMode)
-                                } else {
-                                    state
+                val failure = when (modeChange.runtimeAction) {
+                    HomeModeRuntimeAction.None -> null
+                    HomeModeRuntimeAction.PatchRuntime ->
+                        services.singBoxRuntime.patchMode(modeChange.runtimeAppState).exceptionOrNull()
+                    HomeModeRuntimeAction.RestartService ->
+                        when (val result = services.proxyServiceUseCase.restart(modeChange.runtimeAppState)) {
+                            is ProxyServiceResult.Success -> {
+                                updateAppState { state ->
+                                    state.copy(
+                                        proxyRunning = result.proxyRunning,
+                                        localProxyPort = result.appState?.localProxyPort ?: state.localProxyPort,
+                                        singBoxControlPort =
+                                            result.appState?.singBoxControlPort ?: state.singBoxControlPort,
+                                    )
                                 }
+                                null
+                            }
+                            is ProxyServiceResult.Failed -> result.error
+                        }
+
+                }
+                failure?.let { error ->
+                    if (modeChange.persistSelection) {
+                        updateAppState { state ->
+                            if (state.singBoxMode == mode) {
+                                state.copy(singBoxMode = previousMode)
+                            } else {
+                                state
                             }
                         }
-                        services.tipNotifier.showError(error, modeFailedMessage)
                     }
+                    services.tipNotifier.showError(error, modeFailedMessage)
+                }
             }
             scope.launch {
                 try {

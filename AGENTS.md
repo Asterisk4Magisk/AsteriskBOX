@@ -28,6 +28,15 @@ VPN Service is an independent non-ROOT execution path. Even on a rooted device, 
 - When switching from ROOT to VPN, any active ROOT cycle must be stopped by the ROOT lifecycle boundary before entering VPN. The VPN runtime itself must not perform ROOT cleanup.
 - Changes to proxy orchestration, mode selection, or lifecycle handling must include a regression check that the entire VPN lifecycle performs zero ROOT operations.
 
+### Respect Core API Stability and Product-Specific Control Paths
+
+- As a rule, do not introduce or depend on an experimental core feature. An exception exists only when this repository already uses that feature or a developer explicitly authorizes its use; adoption by a sibling app is not authorization for this app.
+- AsteriskBOX does not adopt sing-box `experimental.clash_api`. Do not enable it or rely on its HTTP control endpoints for mode switching or other runtime control unless a developer explicitly changes this product boundary.
+- In VPN Service mode, Rule/Global/Direct changes use the stable sing-box Command API (`setClashMode`) exposed by the embedded mobile runtime.
+- A running ROOT service has no approved stable mode-patch path in AsteriskBOX. Persist the new mode, rebuild the sing-box configuration, and call `ProxyServiceUseCase.restart` so asteriskd performs a supervised restart. Do not route this through `SingBoxRuntimeRepository.patchMode`, an experimental Clash API, or direct signal/process management.
+- When the service is stopped, changing Rule/Global/Direct only persists the selection; it must not start or restart the service.
+- This supervised-restart behavior is BOX-specific. Do not copy it into AsteriskMETA, whose first-class Mihomo Clash API must handle every supported hot runtime change, including ROOT mode changes, directly.
+
 ## Repository Structure and Product Boundaries
 
 - Application ID: `org.asterisk.zcc.abox`.
