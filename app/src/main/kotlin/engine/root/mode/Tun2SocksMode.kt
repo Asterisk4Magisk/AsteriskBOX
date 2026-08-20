@@ -8,24 +8,17 @@ import engine.root.daemon.config.AsteriskdHevSocks5TunnelHelper
 import engine.root.daemon.config.AsteriskdMode
 import engine.root.daemon.config.AsteriskdModeOptions
 import engine.root.config.RootConfigBuildContext
-import engine.root.config.RootIptablesConfig
 import engine.root.config.RootModeStartConfig
 import engine.root.config.buildAsteriskdConfig
 import engine.root.config.tun2SocksInternalProxyPortValue
 import engine.vpn.toTunOptions
-
-internal val Tun2SocksBaseIptablesConfig = RootIptablesConfig(
-    mark = Tun2SocksFwmark,
-    ipv4Table = Tun2SocksRouteTable,
-    ipv6Table = Tun2SocksRouteTable,
-)
 
 internal fun RootConfigBuildContext.buildTun2SocksStartConfig(): RootModeStartConfig {
     val appState = appState
     val tunOptions = appState.toTunOptions()
     val socksPort = appState.tun2SocksInternalProxyPortValue()
     val rootStartConfig = buildRootStartConfig()
-    val iptablesConfig = buildRootIptablesConfig(Tun2SocksBaseIptablesConfig)
+    val iptablesConfig = buildRootIptablesConfig()
     return RootModeStartConfig(
         root = rootStartConfig,
         localProxyOptions = appState.toLocalProxyOptions(),
@@ -51,5 +44,3 @@ internal fun RootConfigBuildContext.buildTun2SocksStartConfig(): RootModeStartCo
 
 internal const val Tun2SocksListenAddress = "127.0.0.1"
 internal const val DefaultTun2SocksProxyPort = 65534
-private const val Tun2SocksFwmark = "0x20000000/0x60000000"
-private const val Tun2SocksRouteTable = "168"

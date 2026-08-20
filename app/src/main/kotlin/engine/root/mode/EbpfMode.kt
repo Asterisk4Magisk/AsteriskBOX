@@ -19,15 +19,9 @@ internal fun RootConfigBuildContext.buildEbpfStartConfig(): RootModeStartConfig 
         localProxyOptions = appState.toLocalProxyOptions(),
         asteriskdConfig = rootStartConfig.buildAsteriskdConfig(
             mode = AsteriskdMode.Ebpf,
-            iptablesConfig = EbpfAsteriskdBaseConfig,
+            iptablesConfig = RootIptablesConfig(),
             virtualInterfaces = emptyList(),
             modeOptions = AsteriskdModeOptions(transparentPort = null, tunnelName = null),
         ),
     )
 }
-
-private val EbpfAsteriskdBaseConfig = RootIptablesConfig(
-    mark = "",
-    ipv4Table = "",
-    ipv6Table = "",
-)

@@ -3,19 +3,15 @@
 
 package engine.root.mode
 
-import engine.proxy.LocalProxyOptions
 import engine.proxy.toLocalProxyOptions
-import engine.root.daemon.config.AsteriskdBpf2SocksHelper
-import engine.root.daemon.config.AsteriskdConfig
-import engine.root.daemon.config.AsteriskdMode
-import engine.root.daemon.config.AsteriskdModeOptions
 import engine.root.config.RootConfigBuildContext
-import engine.root.config.RootIptablesConfig
 import engine.root.config.RootModeStartConfig
-import engine.root.config.RootStartConfig
 import engine.root.config.bpf2SocksBridgePortValue
 import engine.root.config.buildAsteriskdConfig
 import engine.root.config.tun2SocksInternalProxyPortValue
+import engine.root.daemon.config.AsteriskdBpf2SocksHelper
+import engine.root.daemon.config.AsteriskdMode
+import engine.root.daemon.config.AsteriskdModeOptions
 
 private const val RootBpf2SocksListenAddress = "0.0.0.0"
 private const val RootBpf2SocksSocksInboundAddress = "127.0.0.1"
@@ -24,7 +20,7 @@ internal fun RootConfigBuildContext.buildBpf2SocksStartConfig(): RootModeStartCo
     val appState = appState
     val socksPort = appState.tun2SocksInternalProxyPortValue()
     val rootStartConfig = buildRootStartConfig()
-    val iptablesConfig = buildRootIptablesConfig(Bpf2SocksBasePolicyConfig).copy(enableEbpfRules = true)
+    val iptablesConfig = buildRootIptablesConfig().copy(enableEbpfRules = true)
     return RootModeStartConfig(
         root = rootStartConfig,
         localProxyOptions = appState.toLocalProxyOptions(),
@@ -43,9 +39,3 @@ internal fun RootConfigBuildContext.buildBpf2SocksStartConfig(): RootModeStartCo
         ),
     )
 }
-
-private val Bpf2SocksBasePolicyConfig = RootIptablesConfig(
-    mark = "",
-    ipv4Table = "",
-    ipv6Table = "",
-)
