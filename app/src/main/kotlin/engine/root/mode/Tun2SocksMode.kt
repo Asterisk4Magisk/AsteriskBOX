@@ -3,16 +3,13 @@
 
 package engine.root.mode
 
-import engine.proxy.LocalProxyOptions
 import engine.proxy.toLocalProxyOptions
-import engine.root.daemon.config.AsteriskdConfig
 import engine.root.daemon.config.AsteriskdHevSocks5TunnelHelper
 import engine.root.daemon.config.AsteriskdMode
 import engine.root.daemon.config.AsteriskdModeOptions
 import engine.root.config.RootConfigBuildContext
 import engine.root.config.RootIptablesConfig
 import engine.root.config.RootModeStartConfig
-import engine.root.config.RootStartConfig
 import engine.root.config.buildAsteriskdConfig
 import engine.root.config.tun2SocksInternalProxyPortValue
 import engine.vpn.toTunOptions
@@ -56,9 +53,3 @@ internal const val Tun2SocksListenAddress = "127.0.0.1"
 internal const val DefaultTun2SocksProxyPort = 65534
 private const val Tun2SocksFwmark = "0x20000000/0x60000000"
 private const val Tun2SocksRouteTable = "168"
-internal const val Tun2SocksPreroutingChain = "ASTERISK_TUN_PREROUTING"
-internal const val Tun2SocksOutputChain = "ASTERISK_TUN_OUTPUT"
-internal const val Tun2SocksForwardChain = "ASTERISK_TUN_FORWARD"
-internal const val Tun2SocksPrerouting6Chain = "ASTERISK_TUN6_PREROUTING"
-internal const val Tun2SocksOutput6Chain = "ASTERISK_TUN6_OUTPUT"
-internal const val Tun2SocksForward6Chain = "ASTERISK_TUN6_FORWARD"
