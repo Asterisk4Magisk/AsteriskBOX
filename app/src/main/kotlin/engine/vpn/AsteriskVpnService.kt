@@ -17,12 +17,13 @@ import org.asterisk.zcc.abox.R
 import app.modes.ProxyAppListModeBlacklist
 import app.modes.ProxyAppListModeGlobal
 import app.modes.ProxyAppListModeWhitelist
-import engine.singbox.clearCoreLogs
+import engine.singbox.logDirectoryPath
 import engine.network.NetworkDefaults
 import engine.proxy.LocalProxyLoopbackAddress
 import engine.proxy.LocalProxyRuntime
 import engine.vpn.hevtun.HevTunRuntime
 import features.logs.AndroidAppLogger
+import features.logs.clearServiceLogsAsApp
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +34,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import system.getInstalledApplicationsCompat
 import utils.toTrimmedNonEmptyDistinctList
+import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
 
 @SuppressLint("VpnServicePolicy")
@@ -134,7 +136,7 @@ class AsteriskVpnService : VpnService() {
 
     private fun startVpn(config: VpnServiceStartConfig) {
         stopVpn()
-        config.coreLogPaths.clearCoreLogs(LogTag)
+        clearServiceLogsAsApp(File(config.coreLogPaths.logDirectoryPath()), LogTag)
         val hevConfig = config.hevSocks5TunnelConfig
         if (hevConfig == null) {
             libboxRuntime.start(config)

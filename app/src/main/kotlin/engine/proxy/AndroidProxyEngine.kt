@@ -129,6 +129,7 @@ internal class AndroidProxyEngine(
         try {
             val status = when {
                 explicitRestart && nextEngine is RootModeEngine -> nextEngine.restart(resolvedRequest)
+                explicitRestart && nextEngine is VpnSingBoxEngine -> nextEngine.restart(resolvedRequest)
                 shouldUsePreResolvedRootStart(
                     explicitRestart = explicitRestart,
                     resumeChecked = rootResumeChecked,
