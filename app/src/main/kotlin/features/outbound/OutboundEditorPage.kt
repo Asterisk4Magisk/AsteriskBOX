@@ -323,11 +323,7 @@ internal fun EditorSectionCard(
     description: String,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = AsteriskMotion.contentSize()),
-    ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         SettingsSectionTitle(title)
         SettingsSectionCard(bottomPadding = 0.dp) {
             if (description.isNotBlank()) {

@@ -314,9 +314,15 @@ internal object AsteriskMotion {
         effectsSpec: FiniteAnimationSpec<Float>,
         sizeSpec: FiniteAnimationSpec<IntSize>? = null,
     ): AnimatedContentTransitionScope<S>.() -> ContentTransform = {
+        fadeThroughTransform(effectsSpec, sizeSpec)
+    }
+
+    fun fadeThroughTransform(
+        effectsSpec: FiniteAnimationSpec<Float>,
+        sizeSpec: FiniteAnimationSpec<IntSize>? = null,
+    ): ContentTransform =
         (fadeIn(animationSpec = effectsSpec) togetherWith fadeOut(animationSpec = effectsSpec))
             .withSizeSpec(sizeSpec)
-    }
 
     fun fadeEnter(spec: FiniteAnimationSpec<Float>): EnterTransition =
         fadeIn(animationSpec = spec)

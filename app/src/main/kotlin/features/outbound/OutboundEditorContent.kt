@@ -4,12 +4,15 @@
 package features.outbound
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntSize
 import ui.theme.AsteriskMotion
 
 internal data class OutboundEditorContentState(
@@ -28,6 +31,14 @@ internal data class OutboundReferenceOption(
 private data class VisibleOutboundEditorSection(
     val section: OutboundEditorSection,
     val fields: List<OutboundFieldSpec>,
+)
+
+internal fun outboundEditorFieldsContentTransform(
+    effectsSpec: FiniteAnimationSpec<Float>,
+    sizeSpec: FiniteAnimationSpec<IntSize>,
+): ContentTransform = AsteriskMotion.fadeThroughTransform(
+    effectsSpec = effectsSpec,
+    sizeSpec = sizeSpec,
 )
 
 internal fun LazyListScope.outboundEditorContent(state: OutboundEditorContentState) {
@@ -71,9 +82,15 @@ internal fun LazyListScope.outboundEditorSections(state: OutboundEditorContentSt
             description = section.section.localizedSummary(),
         ) {
             val effectsMotion = AsteriskMotion.fastEffects<Float>()
+            val sizeMotion = AsteriskMotion.contentSize()
             AnimatedContent(
                 targetState = section.fields,
-                transitionSpec = AsteriskMotion.fadeThrough(effectsMotion),
+                transitionSpec = {
+                    outboundEditorFieldsContentTransform(
+                        effectsSpec = effectsMotion,
+                        sizeSpec = sizeMotion,
+                    )
+                },
                 label = "outbound-${section.section.name.lowercase()}-fields",
             ) { fields ->
                 Column(
