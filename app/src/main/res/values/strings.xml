@@ -833,7 +833,6 @@
     <string name="selector_target_group">Application group</string>
     <string name="selector_target_endpoint">Managed endpoint</string>
     <string name="selector_target_direct">Direct connection</string>
-    <string name="selector_target_included_by_group">Included by selected group</string>
     <string name="selector_target_locked_by_group">Selected and locked by an application group</string>
     <string name="selector_target_unavailable">Unavailable outbound</string>
     <string name="outbound_choice_with_group">%1$s (%2$s)</string>

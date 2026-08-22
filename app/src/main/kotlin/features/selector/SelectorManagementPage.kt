@@ -1313,17 +1313,6 @@ private fun SelectorTargetRow(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                AnimatedVisibility(
-                    visible = lockedByGroup,
-                    enter = AsteriskMotion.contentEnter(),
-                    exit = AsteriskMotion.contentExit(),
-                ) {
-                    Text(
-                        stringResource(R.string.selector_target_included_by_group),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
             }
             Checkbox(
                 checked = selected,

@@ -819,7 +819,6 @@
     <string name="selector_target_group">应用分组</string>
     <string name="selector_target_endpoint">托管端点</string>
     <string name="selector_target_direct">直连</string>
-    <string name="selector_target_included_by_group">由已选分组包含</string>
     <string name="selector_target_locked_by_group">已由应用分组选中并锁定</string>
     <string name="selector_target_unavailable">不可用出站</string>
     <string name="outbound_choice_with_group">%1$s（%2$s）</string>
