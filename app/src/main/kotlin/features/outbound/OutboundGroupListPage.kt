@@ -810,7 +810,7 @@ private fun OutboundGroupCard(
                 color = MaterialTheme.colorScheme.primary,
                 cornerRadius = AsteriskShapeTokens.ListCardRadius,
             )
-            .animateContentSize(animationSpec = AsteriskMotion.contentSpatial()),
+            .animateContentSize(animationSpec = AsteriskMotion.contentSize()),
         shape = AsteriskShapeTokens.ListCard,
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {

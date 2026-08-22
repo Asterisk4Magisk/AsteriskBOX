@@ -6,7 +6,6 @@
 package features.endpoint
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -122,7 +121,6 @@ internal fun EndpointEditorPage(
     val invalidJsonMessage = stringResource(R.string.endpoint_editor_json_invalid)
     val formatJsonContentDescription = stringResource(R.string.endpoint_editor_format_json)
     val copiedMessage = stringResource(R.string.common_copied)
-    val editorSpatialMotion = AsteriskMotion.contentSpatial<androidx.compose.ui.unit.IntSize>()
     val density = LocalDensity.current
     val showProperties = endpointEditorShowsProperties(
         editorFocused = editorState.isFocused,
@@ -281,8 +279,7 @@ internal fun EndpointEditorPage(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding)
-                    .padding(vertical = 12.dp)
-                    .animateContentSize(editorSpatialMotion),
+                    .padding(vertical = 12.dp),
             ) {
                 AnimatedVisibility(
                     visible = showProperties,

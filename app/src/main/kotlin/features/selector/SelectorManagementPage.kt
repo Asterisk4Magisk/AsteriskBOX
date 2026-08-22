@@ -551,7 +551,7 @@ private fun SelectorCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp)
-                .animateContentSize(AsteriskMotion.contentSpatial()),
+                .animateContentSize(AsteriskMotion.contentSize()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1289,8 +1289,7 @@ private fun SelectorTargetRow(
             Spacer(Modifier.width(12.dp))
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .animateContentSize(AsteriskMotion.contentSpatial()),
+                    .weight(1f),
             ) {
                 Text(
                     target.displayLabel(),

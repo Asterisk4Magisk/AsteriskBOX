@@ -326,7 +326,7 @@ internal fun EditorSectionCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = AsteriskMotion.contentSpatial()),
+            .animateContentSize(animationSpec = AsteriskMotion.contentSize()),
     ) {
         SettingsSectionTitle(title)
         SettingsSectionCard(bottomPadding = 0.dp) {
@@ -436,7 +436,7 @@ private fun OutboundKeyValueField(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .animateContentSize(animationSpec = AsteriskMotion.contentSpatial()),
+            .animateContentSize(animationSpec = AsteriskMotion.contentSize()),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
@@ -541,7 +541,7 @@ private fun OutboundMultiSelectField(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .animateContentSize(animationSpec = AsteriskMotion.contentSpatial()),
+            .animateContentSize(animationSpec = AsteriskMotion.contentSize()),
     ) {
         Text(
             text = field.localizedLabel(),

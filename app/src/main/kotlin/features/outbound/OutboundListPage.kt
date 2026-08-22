@@ -9,7 +9,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -916,8 +915,7 @@ private fun OutboundCard(
                 alpha = shadowAlpha,
                 color = MaterialTheme.colorScheme.primary,
                 cornerRadius = AsteriskShapeTokens.PageCardRadius,
-            )
-            .animateContentSize(animationSpec = AsteriskMotion.contentSpatial()),
+            ),
         containerColor = containerColor,
     ) {
         Column(

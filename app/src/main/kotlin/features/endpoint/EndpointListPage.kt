@@ -10,7 +10,6 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -447,10 +446,9 @@ private fun EndpointCard(
     modifier: Modifier = Modifier,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    val cardSpatialMotion = AsteriskMotion.contentSpatial<androidx.compose.ui.unit.IntSize>()
     Card(
         onClick = onEdit,
-        modifier = modifier.animateContentSize(cardSpatialMotion),
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Row(

@@ -41,7 +41,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.ManagedOutboundChoice
@@ -79,9 +78,9 @@ import org.asterisk.zcc.abox.R
 import ui.components.AsteriskInfoChip
 import ui.components.EditorPageScaffold
 import ui.components.ReferenceSelectionCard
+import ui.components.RuleEditorChipGroupCard
 import ui.components.RuleEditorChoice
 import ui.components.RuleEditorChoiceCard
-import ui.components.RuleEditorChipGroupCard
 import ui.components.RuleEditorSectionTitle
 import ui.components.RuleEditorSwitchCard
 import ui.components.RuleEditorTextField
@@ -569,7 +568,7 @@ private fun DnsServerEditorSheet(
         groupServerError,
         portError,
     ).all { it == null }
-    val fieldSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
+    val fieldSizeMotion = AsteriskMotion.contentSize()
     val fieldEffectsMotion = AsteriskMotion.effects<Float>()
 
     SettingsModalBottomSheet(
@@ -964,9 +963,9 @@ internal fun DnsRuleEditorScaffold(
     ) &&
         ruleTreeValid(rule) &&
         listOf(serverError, timeoutError, ttlError, subnetError, rcodeError).all { it == null }
-    val actionSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
+    val actionSizeMotion = AsteriskMotion.contentSize()
     val actionEffectsMotion = AsteriskMotion.effects<Float>()
-    val fieldSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
+    val fieldSizeMotion = AsteriskMotion.contentSize()
     val fieldEffectsMotion = AsteriskMotion.effects<Float>()
 
     EditorPageScaffold(

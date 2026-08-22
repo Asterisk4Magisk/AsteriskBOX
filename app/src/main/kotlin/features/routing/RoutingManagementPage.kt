@@ -57,7 +57,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import app.AppState
@@ -92,31 +91,31 @@ import kotlinx.coroutines.withContext
 import org.asterisk.zcc.abox.R
 import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskExpressiveCard
-import ui.components.EditorPageScaffold
-import ui.components.localizedLabel
 import ui.components.AsteriskInfoChip
+import ui.components.EditorPageScaffold
 import ui.components.ReferenceSelectionCard
+import ui.components.RuleEditorChipGroupCard
 import ui.components.RuleEditorChoice
 import ui.components.RuleEditorChoiceCard
-import ui.components.RuleEditorChipGroupCard
 import ui.components.RuleEditorSectionTitle
 import ui.components.RuleEditorSwitchCard
 import ui.components.RuleEditorTextField
 import ui.components.StringListEditor
 import ui.components.WarningConfirmDialog
 import ui.components.draggedCardShadow
+import ui.components.localizedLabel
 import ui.components.longPressReorderDragHandle
+import ui.components.managedInboundChoices
 import ui.components.rememberAsteriskReorderableLazyGridState
 import ui.components.ruleEditorAnimatedListContentKey
 import ui.components.singBoxOptionLabel
-import ui.components.managedInboundChoices
 import ui.components.singBoxProtocolChoices
 import ui.components.verticalReorderScrollThresholdPadding
-import ui.icons.AsteriskIcons as Icons
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
+import ui.icons.AsteriskIcons as Icons
 
 @Composable
 internal fun RoutingManagementPage(
@@ -640,7 +639,7 @@ internal fun RouteRuleEditorScaffold(
         pendingChildDelete = null
     }
     val fieldEffectsMotion = AsteriskMotion.effects<Float>()
-    val fieldSizeMotion = AsteriskMotion.contentSpatial<IntSize>()
+    val fieldSizeMotion = AsteriskMotion.contentSize()
     val unavailableLabel = stringResource(R.string.common_unavailable)
     val outboundLabels = outboundChoices.associate { choice -> choice.value to choice.label }
     EditorPageScaffold(
