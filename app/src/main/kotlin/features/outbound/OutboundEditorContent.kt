@@ -3,16 +3,13 @@
 
 package features.outbound
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.IntSize
 import ui.theme.AsteriskMotion
 
 internal data class OutboundEditorContentState(
@@ -28,18 +25,35 @@ internal data class OutboundReferenceOption(
     val label: String,
 )
 
-private data class VisibleOutboundEditorSection(
-    val section: OutboundEditorSection,
-    val fields: List<OutboundFieldSpec>,
+internal data class OutboundEditorFieldSlot(
+    val field: OutboundFieldSpec,
+    val visible: Boolean,
 )
 
-internal fun outboundEditorFieldsContentTransform(
-    effectsSpec: FiniteAnimationSpec<Float>,
-    sizeSpec: FiniteAnimationSpec<IntSize>,
-): ContentTransform = AsteriskMotion.fadeThroughTransform(
-    effectsSpec = effectsSpec,
-    sizeSpec = sizeSpec,
+internal data class OutboundEditorSectionSlot(
+    val section: OutboundEditorSection,
+    val fields: List<OutboundEditorFieldSlot>,
 )
+
+internal fun resolveOutboundEditorSections(
+    schema: OutboundEditorSchema,
+    document: OutboundEditorDocument,
+): List<OutboundEditorSectionSlot> = schema.sections.mapNotNull { section ->
+    section.fields
+        .map { field ->
+            OutboundEditorFieldSlot(
+                field = field,
+                visible = document.isVisible(field),
+            )
+        }
+        .takeIf { fields -> fields.any(OutboundEditorFieldSlot::visible) }
+        ?.let { fields ->
+            OutboundEditorSectionSlot(
+                section = section.section,
+                fields = fields,
+            )
+        }
+}
 
 internal fun LazyListScope.outboundEditorContent(state: OutboundEditorContentState) {
     when (state.schema.type) {
@@ -62,17 +76,7 @@ internal fun LazyListScope.outboundEditorContent(state: OutboundEditorContentSta
 }
 
 internal fun LazyListScope.outboundEditorSections(state: OutboundEditorContentState) {
-    val visibleSections = state.schema.sections.mapNotNull { section ->
-        section.fields
-            .filter(state.document::isVisible)
-            .takeIf(List<OutboundFieldSpec>::isNotEmpty)
-            ?.let { fields ->
-                VisibleOutboundEditorSection(
-                    section = section.section,
-                    fields = fields,
-                )
-            }
-    }
+    val visibleSections = resolveOutboundEditorSections(state.schema, state.document)
     items(
         items = visibleSections,
         key = { section -> section.section.name },
@@ -81,28 +85,24 @@ internal fun LazyListScope.outboundEditorSections(state: OutboundEditorContentSt
             title = section.section.localizedTitle(),
             description = section.section.localizedSummary(),
         ) {
-            val effectsMotion = AsteriskMotion.fastEffects<Float>()
-            val sizeMotion = AsteriskMotion.contentSize()
-            AnimatedContent(
-                targetState = section.fields,
-                transitionSpec = {
-                    outboundEditorFieldsContentTransform(
-                        effectsSpec = effectsMotion,
-                        sizeSpec = sizeMotion,
-                    )
-                },
-                label = "outbound-${section.section.name.lowercase()}-fields",
-            ) { fields ->
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    fields.forEach { field ->
-                        key(field.path) {
+            val fieldEnter = AsteriskMotion.contentEnter()
+            val fieldExit = AsteriskMotion.contentExit()
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                section.fields.forEach { slot ->
+                    key(slot.field.path) {
+                        AnimatedVisibility(
+                            visible = slot.visible,
+                            enter = fieldEnter,
+                            exit = fieldExit,
+                            label = "outbound-${slot.field.path}-visibility",
+                        ) {
                             OutboundEditorField(
-                                field = field,
+                                field = slot.field,
                                 document = state.document,
-                                error = state.errors[field.path],
-                                referenceOptions = state.referenceOptions[field.path].orEmpty(),
+                                error = state.errors[slot.field.path],
+                                referenceOptions = state.referenceOptions[slot.field.path].orEmpty(),
                                 onDocumentChange = state.onDocumentChange,
                             )
                         }
