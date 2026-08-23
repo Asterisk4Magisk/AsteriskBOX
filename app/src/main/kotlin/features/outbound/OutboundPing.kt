@@ -5,7 +5,6 @@ package features.outbound
 
 import app.OutboundState
 import engine.singbox.config.SingBoxJson
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -16,7 +15,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import java.util.concurrent.TimeUnit
 import kotlin.math.roundToLong
+import kotlin.time.Duration.Companion.milliseconds
 
 internal fun OutboundState.pingHostOrNull(): String? {
     val outbound = runCatching {
@@ -27,20 +28,6 @@ internal fun OutboundState.pingHostOrNull(): String? {
         ?.trim()
         ?.removeSurrounding("[", "]")
         ?.takeIf(String::isNotEmpty)
-}
-
-internal fun measureBestPingMillis(
-    attempts: Int,
-    ping: () -> Long,
-): Long {
-    var bestMillis = FailedPingMillis
-    repeat(attempts.coerceAtLeast(0)) {
-        val elapsedMillis = ping()
-        if (elapsedMillis >= 0L && (bestMillis < 0L || elapsedMillis < bestMillis)) {
-            bestMillis = elapsedMillis
-        }
-    }
-    return bestMillis
 }
 
 internal fun parsePingMillis(output: String): Long? {
@@ -71,14 +58,18 @@ internal suspend fun pingOrFailure(ping: suspend () -> Long): Long {
     }
 }
 
-internal class AndroidOutboundPinger {
-    suspend fun ping(outbound: OutboundState): Long {
+internal fun interface OutboundPinger {
+    suspend fun ping(outbound: OutboundState): Long
+}
+
+internal class AndroidOutboundPinger : OutboundPinger {
+    override suspend fun ping(outbound: OutboundState): Long {
         val host = outbound.pingHostOrNull() ?: return FailedPingMillis
         var bestMillis = FailedPingMillis
         repeat(PingAttempts) {
             currentCoroutineContext().ensureActive()
             val elapsedMillis = pingOnce(host)
-            if (elapsedMillis >= 0L && (bestMillis < 0L || elapsedMillis < bestMillis)) {
+            if (elapsedMillis >= 0L && (bestMillis !in 0L..elapsedMillis)) {
                 bestMillis = elapsedMillis
             }
         }
@@ -86,7 +77,7 @@ internal class AndroidOutboundPinger {
     }
 
     private suspend fun pingOnce(host: String): Long {
-        return withTimeoutOrNull(PingProcessTimeoutMillis) {
+        return withTimeoutOrNull(PingProcessTimeoutMillis.milliseconds) {
             withContext(Dispatchers.IO) {
                 var process: Process? = null
                 try {

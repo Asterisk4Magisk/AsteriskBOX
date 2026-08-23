@@ -8,9 +8,6 @@ import app.modes.OutboundListLayoutAuto
 import app.modes.OutboundListLayoutDouble
 import app.modes.OutboundListLayoutMultiple
 import app.modes.OutboundListLayoutSingle
-import app.modes.OutboundListSortLatency
-import app.modes.OutboundListSortName
-import app.modes.OutboundListSortType
 import engine.singbox.config.SingBoxJson
 import features.importing.ImportOutcome
 import kotlinx.serialization.json.JsonObject
@@ -20,6 +17,22 @@ import kotlinx.serialization.json.contentOrNull
 internal const val OutboundListBaseBottomExtraDp = 12
 internal const val OutboundGridSpacingDp = 10
 internal const val OutboundCardHeightDp = 112
+
+internal class ReorderPreviewOwnership<K> {
+    private var nextGeneration = 0L
+    private val generations = mutableMapOf<K, Long>()
+
+    fun claim(key: K): Long {
+        nextGeneration += 1L
+        return nextGeneration.also { generation -> generations[key] = generation }
+    }
+
+    fun releaseIfOwned(key: K, generation: Long): Boolean {
+        if (generations[key] != generation) return false
+        generations.remove(key)
+        return true
+    }
+}
 
 internal data class OutboundCardMenuIconOffsetDp(
     val x: Int,
@@ -63,55 +76,30 @@ internal fun parseOutboundImportContent(
     )
 }
 
-internal fun List<OutboundState>.sortedForOutboundList(sort: Int): List<OutboundState> {
-    return when (sort) {
-        OutboundListSortName -> sortedWith(
-            compareBy(String.CASE_INSENSITIVE_ORDER, OutboundState::remarks),
-        )
-        OutboundListSortLatency -> sortedWith(
-            compareBy<OutboundState> { outbound -> outbound.pingMillis.toOutboundPingSortKey() }
-                .thenBy(String.CASE_INSENSITIVE_ORDER, OutboundState::remarks),
-        )
-        OutboundListSortType -> sortedWith(
-            compareBy(String.CASE_INSENSITIVE_ORDER, OutboundState::type)
-                .thenBy(String.CASE_INSENSITIVE_ORDER, OutboundState::remarks),
-        )
-        else -> this
+internal data class OutboundParsedMetadata(
+    val pingHost: String?,
+    val endpointSummary: String?,
+)
+
+internal fun parseOutboundListMetadata(outbound: OutboundState): OutboundParsedMetadata {
+    val json = runCatching { SingBoxJson.parseToJsonElement(outbound.json) as? JsonObject }.getOrNull()
+        ?: return OutboundParsedMetadata(pingHost = null, endpointSummary = null)
+    val server = (json["server"] as? JsonPrimitive)?.contentOrNull
+        ?: return OutboundParsedMetadata(pingHost = null, endpointSummary = null)
+    val pingHost = server.trim().removeSurrounding("[", "]").takeIf(String::isNotEmpty)
+    val port = (json["server_port"] as? JsonPrimitive)?.contentOrNull
+    val endpointSummary = when {
+        port.isNullOrBlank() -> server
+        ':' in server && !server.startsWith('[') -> "[$server]:$port"
+        else -> "$server:$port"
     }
+    return OutboundParsedMetadata(
+        pingHost = pingHost,
+        endpointSummary = endpointSummary,
+    )
 }
 
-internal fun List<OutboundState>.reorderVisibleOutbounds(
-    visibleOutbounds: List<OutboundState>,
-    fromIndex: Int,
-    toIndex: Int,
-): List<OutboundState> {
-    val fromId = visibleOutbounds.getOrNull(fromIndex)?.id ?: return this
-    val toId = visibleOutbounds.getOrNull(toIndex)?.id ?: return this
-    val sourceIndex = indexOfFirst { outbound -> outbound.id == fromId }
-    val destinationIndex = indexOfFirst { outbound -> outbound.id == toId }
-    if (sourceIndex !in indices || destinationIndex !in indices || sourceIndex == destinationIndex) {
-        return this
-    }
-    return toMutableList().apply {
-        add(destinationIndex, removeAt(sourceIndex))
-    }
-}
-
-internal fun OutboundState.cardEndpointSummary(compact: Boolean): String? {
-    return if (compact) null else endpointSummary()
-}
-
-internal fun OutboundState.endpointSummary(): String? {
-    val outbound = runCatching { SingBoxJson.parseToJsonElement(json) as? JsonObject }.getOrNull()
-        ?: return null
-    val server = (outbound["server"] as? JsonPrimitive)?.contentOrNull ?: return null
-    val port = (outbound["server_port"] as? JsonPrimitive)?.contentOrNull
-    if (port.isNullOrBlank()) return server
-    val displayServer = if (':' in server && !server.startsWith('[')) "[$server]" else server
-    return "$displayServer:$port"
-}
-
-private fun Long?.toOutboundPingSortKey(): Long {
+internal fun Long?.toOutboundPingSortKey(): Long {
     return when {
         this == null -> Long.MAX_VALUE
         this < 0L -> Long.MAX_VALUE - 1L

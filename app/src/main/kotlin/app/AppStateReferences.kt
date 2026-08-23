@@ -99,112 +99,14 @@ internal fun selectableManagedOutbounds(
     includeEndpoints: Boolean = true,
     includeDirect: Boolean = true,
     includeGlobalSelector: Boolean = true,
-): List<ManagedOutboundChoice> {
-    val enabledGroups = state.outboundGroups.filter(OutboundGroupState::enabled)
-    val enabledGroupIds = enabledGroups.mapTo(mutableSetOf(), OutboundGroupState::id)
-    val originalExcludedTag = state.selectors
-        .firstOrNull { selector -> selector.id == excludedSelectorId }
-        ?.tag
-        .orEmpty()
-    val excludedTargets = setOf(excludedTag.trim(), originalExcludedTag.trim())
-        .filterTo(mutableSetOf(), String::isNotEmpty)
-    val excludedManagedGroupTag = state.outboundGroups
-        .firstOrNull { group -> group.id == excludedManagedGroupId }
-        ?.let { group -> managedOutboundGroupSelectorTag(group.id, group.name) }
-        .orEmpty()
-    return buildList {
-        enabledGroups.forEach { group ->
-            if (state.outbounds.any { outbound -> outbound.groupId == group.id }) {
-                val tag = managedOutboundGroupSelectorTag(group.id, group.name)
-                add(
-                    ManagedOutboundChoice(
-                        tag = tag,
-                        label = group.name.trim(),
-                        kind = ManagedOutboundChoiceKind.Group,
-                    ),
-                )
-            }
-        }
-        state.selectors
-            .filter { selector -> selector.outbounds.isNotEmpty() }
-            .forEach { selector ->
-                add(
-                    ManagedOutboundChoice(
-                        tag = selector.tag,
-                        label = selector.remarks,
-                        kind = if (selector.type == SingBoxSelectorTypeUrlTest) {
-                            ManagedOutboundChoiceKind.UrlTest
-                        } else {
-                            ManagedOutboundChoiceKind.Selector
-                        },
-                    ),
-                )
-            }
-        state.outbounds
-            .filter { outbound -> outbound.groupId in enabledGroupIds }
-            .forEach { outbound ->
-                add(
-                    ManagedOutboundChoice(
-                        tag = outbound.tag,
-                        label = outbound.remarks,
-                        kind = when (outbound.type) {
-                            SingBoxSelectorTypeSelector -> ManagedOutboundChoiceKind.Selector
-                            SingBoxSelectorTypeUrlTest -> ManagedOutboundChoiceKind.UrlTest
-                            else -> ManagedOutboundChoiceKind.Outbound
-                        },
-                        groupName = enabledGroups
-                            .firstOrNull { group -> group.id == outbound.groupId }
-                            ?.name
-                            ?.trim()
-                            ?.takeIf(String::isNotEmpty),
-                    ),
-                )
-            }
-        if (includeEndpoints) {
-            state.endpoints.forEach { endpoint ->
-                add(
-                    ManagedOutboundChoice(
-                        tag = endpoint.tag,
-                        label = endpoint.remarks,
-                        kind = ManagedOutboundChoiceKind.Endpoint,
-                    ),
-                )
-            }
-        }
-        if (includeDirect) {
-            add(
-                ManagedOutboundChoice(
-                    tag = APP_DIRECT_OUTBOUND,
-                    label = APP_DIRECT_OUTBOUND,
-                    kind = ManagedOutboundChoiceKind.Direct,
-                ),
-            )
-        }
-        if (includeGlobalSelector) {
-            add(
-                ManagedOutboundChoice(
-                    tag = APP_GLOBAL_SELECTOR,
-                    label = APP_GLOBAL_SELECTOR,
-                    kind = ManagedOutboundChoiceKind.GlobalSelector,
-                ),
-            )
-        }
-    }
-        .map { choice -> choice.copy(tag = choice.tag.trim(), label = choice.label.trim()) }
-        .filter { choice -> choice.tag.isNotEmpty() }
-        .distinctBy(ManagedOutboundChoice::tag)
-        .filterNot { choice ->
-            (
-                excludedManagedGroupId != 0 &&
-                    choice.tag == excludedManagedGroupTag
-                ) ||
-                choice.tag in excludedTargets ||
-                excludedTargets.any { target ->
-                    state.outboundDependsOn(choice.tag, target, mutableSetOf())
-                }
-        }
-        .sortedBy { choice -> choice.kind.priority }
-}
+): List<ManagedOutboundChoice> = ManagedOutboundReferenceIndex(state).selectableChoices(
+    excludedTag = excludedTag,
+    excludedSelectorId = excludedSelectorId,
+    excludedManagedGroupId = excludedManagedGroupId,
+    includeEndpoints = includeEndpoints,
+    includeDirect = includeDirect,
+    includeGlobalSelector = includeGlobalSelector,
+)
 
 internal fun selectableDetourOutbounds(
     state: AppState,
@@ -212,21 +114,17 @@ internal fun selectableDetourOutbounds(
     excludedManagedGroupId: Int = 0,
     includeGlobalSelector: Boolean = true,
 ): List<ManagedOutboundChoice> {
-    return selectableManagedOutbounds(
-        state = state,
+    val index = ManagedOutboundReferenceIndex(state)
+    val choices = index.selectableChoices(
         excludedTag = excludedTag,
         excludedManagedGroupId = excludedManagedGroupId,
         includeEndpoints = true,
         includeDirect = true,
         includeGlobalSelector = includeGlobalSelector,
-    ).filterNot { choice ->
-        !includeGlobalSelector &&
-            state.outboundDependsOn(
-                tag = choice.tag,
-                targetTag = APP_GLOBAL_SELECTOR,
-                visited = mutableSetOf(),
-            )
-    }
+    )
+    if (includeGlobalSelector) return choices
+    val globalDependents = index.tagsDependingOn(setOf(APP_GLOBAL_SELECTOR))
+    return choices.filterNot { choice -> choice.tag in globalDependents }
 }
 
 internal fun AppState.withCanonicalManagedTagReferences(): AppState {
@@ -272,7 +170,44 @@ internal fun AppState.withCanonicalManagedTagReferences(): AppState {
     return if (canonical == this) this else canonical
 }
 
-private fun AppState.currentManagedTagsByIdentity(): Map<ManagedTagIdentity, String> = buildMap {
+internal fun AppState.withReplacedManagedTag(
+    previousTag: String,
+    replacementTag: String,
+): AppState {
+    if (previousTag == replacementTag) return this
+    val resolve: (String) -> String = { value ->
+        if (value == previousTag) replacementTag else value
+    }
+    val replaced = copy(
+        outbounds = outbounds.map { outbound -> outbound.withCanonicalManagedReferences(resolve) },
+        endpoints = endpoints.map { endpoint -> endpoint.withCanonicalManagedReferences(resolve) },
+        selectors = selectors.map { selector ->
+            selector.copy(
+                outbounds = selector.outbounds.map(resolve),
+                default = resolve(selector.default),
+            )
+        },
+        selectorSelections = selectorSelections.mapKeys { entry -> resolve(entry.key) }
+            .mapValues { entry -> resolve(entry.value) },
+        routeFinal = resolve(routeFinal),
+        ebpfBypassRuleSetTags = ebpfBypassRuleSetTags.map(resolve),
+        routeRules = routeRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
+        dnsFinal = resolve(dnsFinal),
+        routeDefaultDomainResolver = resolve(routeDefaultDomainResolver),
+        dnsServers = dnsServers.map { server ->
+            server.copy(
+                endpoint = resolve(server.endpoint),
+                detour = resolve(server.detour),
+                domainResolver = resolve(server.domainResolver),
+                servers = server.servers.map(resolve),
+            )
+        },
+        dnsRules = dnsRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
+    )
+    return if (replaced == this) this else replaced
+}
+
+internal fun AppState.currentManagedTagsByIdentity(): Map<ManagedTagIdentity, String> = buildMap {
     fun add(tag: String) {
         managedTagIdentityOrNull(tag)?.let { identity -> put(identity, tag) }
     }
@@ -300,7 +235,7 @@ private fun AppState.currentManagedTagsByIdentity(): Map<ManagedTagIdentity, Str
         .forEach { kind -> add(managedBundledRuleSetTag(kind)) }
 }
 
-private fun SingBoxRouteRuleState.withCanonicalManagedReferences(
+internal fun SingBoxRouteRuleState.withCanonicalManagedReferences(
     resolve: (String) -> String,
 ): SingBoxRouteRuleState = copy(
     logicalRules = logicalRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
@@ -309,7 +244,7 @@ private fun SingBoxRouteRuleState.withCanonicalManagedReferences(
     outbound = resolve(outbound),
 )
 
-private fun SingBoxDnsRuleState.withCanonicalManagedReferences(
+internal fun SingBoxDnsRuleState.withCanonicalManagedReferences(
     resolve: (String) -> String,
 ): SingBoxDnsRuleState = copy(
     logicalRules = logicalRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
@@ -323,7 +258,7 @@ private fun SingBoxDnsRuleState.withCanonicalManagedReferences(
     },
 )
 
-private fun OutboundState.withCanonicalManagedReferences(
+internal fun OutboundState.withCanonicalManagedReferences(
     resolve: (String) -> String,
 ): OutboundState {
     val root = jsonObject() ?: return this
@@ -336,7 +271,7 @@ private fun OutboundState.withCanonicalManagedReferences(
     )
 }
 
-private fun SingBoxEndpointState.withCanonicalManagedReferences(
+internal fun SingBoxEndpointState.withCanonicalManagedReferences(
     resolve: (String) -> String,
 ): SingBoxEndpointState {
     val root = jsonObject() ?: return this
@@ -533,6 +468,75 @@ internal fun List<OutboundState>.replaceManagedReference(
     outbound.updateManagedReference(field, previousTag, replacementTag)
 }
 
+internal data class RawGroupedOutboundPruneResult(
+    val outbounds: List<OutboundState>,
+    val newlyUnavailableTags: Set<String>,
+)
+
+internal fun List<OutboundState>.withPrunedUnavailableGroupedMembers(
+    unavailableTags: Set<String>,
+): RawGroupedOutboundPruneResult {
+    val newlyUnavailableTags = mutableSetOf<String>()
+    val updated = map { outbound ->
+        val pruned = outbound.withPrunedUnavailableGroupedMembers(unavailableTags)
+            ?: return@map outbound
+        if (pruned.becameEmpty) newlyUnavailableTags += outbound.tag
+        pruned.outbound
+    }
+    return RawGroupedOutboundPruneResult(
+        outbounds = updated,
+        newlyUnavailableTags = newlyUnavailableTags,
+    )
+}
+
+private fun OutboundState.withPrunedUnavailableGroupedMembers(
+    unavailableTags: Set<String>,
+): PrunedRawGroupedOutbound? {
+    if (type !in CanonicalJsonSelectorTypes) return null
+    val root = jsonObject() ?: return null
+    val rawMembers = root["outbounds"] as? JsonArray ?: return null
+    val members = rawMembers.map { element ->
+        (element as? JsonPrimitive)
+            ?.takeIf(JsonPrimitive::isString)
+            ?.content
+            ?: return null
+    }
+    val rawDefault = root["default"]
+    val default = when (rawDefault) {
+        null -> null
+        is JsonPrimitive -> rawDefault.takeIf(JsonPrimitive::isString)?.content ?: return null
+        else -> return null
+    }
+    val retainedMembers = members.filterNot(unavailableTags::contains)
+    val retainedDefault = if (type == SingBoxSelectorTypeUrlTest) {
+        null
+    } else {
+        default?.takeIf(retainedMembers::contains) ?: retainedMembers.firstOrNull()
+    }
+    if (retainedMembers == members && retainedDefault == default) {
+        return PrunedRawGroupedOutbound(outbound = this, becameEmpty = false)
+    }
+    val updatedRoot = JsonObject(
+        root.toMutableMap().apply {
+            put("outbounds", JsonArray(retainedMembers.map(::JsonPrimitive)))
+            if (retainedDefault == null) {
+                remove("default")
+            } else {
+                put("default", JsonPrimitive(retainedDefault))
+            }
+        },
+    )
+    return PrunedRawGroupedOutbound(
+        outbound = copy(json = updatedRoot.encoded()),
+        becameEmpty = members.isNotEmpty() && retainedMembers.isEmpty(),
+    )
+}
+
+private data class PrunedRawGroupedOutbound(
+    val outbound: OutboundState,
+    val becameEmpty: Boolean,
+)
+
 internal fun List<OutboundState>.clearUnavailableManagedReferences(
     field: String,
     availableTags: Set<String>,
@@ -673,53 +677,234 @@ private fun SingBoxDnsServerState.requiresManagedDomainResolver(): Boolean {
     return !isIpAddress(unwrapped)
 }
 
-private fun AppState.outboundDependsOn(
-    tag: String,
-    targetTag: String,
-    visited: MutableSet<String>,
-): Boolean {
-    if (!visited.add(tag)) return false
-    val dependencies = when {
-        tag == APP_DIRECT_OUTBOUND -> emptyList()
-        tag == APP_GLOBAL_SELECTOR -> {
-            val enabledGroupIds = outboundGroups
-                .filter(OutboundGroupState::enabled)
-                .mapTo(mutableSetOf(), OutboundGroupState::id)
-            val validManagedGroupIds = outbounds
-                .filter { outbound ->
-                    outbound.groupId in enabledGroupIds &&
-                        outbound.jsonObject() != null
+private class ManagedOutboundReferenceIndex(state: AppState) {
+    private val groups = state.outboundGroups.map { group ->
+        IndexedOutboundGroup(
+            value = group,
+            tag = managedOutboundGroupSelectorTag(group.id, group.name),
+        )
+    }
+    private val selectors = state.selectors.map { selector ->
+        IndexedSelector(value = selector, tag = selector.tag)
+    }
+    private val outbounds = state.outbounds.map { outbound ->
+        IndexedOutbound(
+            value = outbound,
+            tag = outbound.tag,
+        )
+    }
+    private val endpoints = state.endpoints.map { endpoint ->
+        IndexedEndpoint(
+            value = endpoint,
+            tag = endpoint.tag,
+        )
+    }
+
+    private val groupsById = buildMap {
+        groups.forEach { group ->
+            if (group.value.id !in this) put(group.value.id, group)
+        }
+    }
+    private val groupsByTag = buildMap {
+        groups.forEach { group ->
+            if (group.tag !in this) put(group.tag, group)
+        }
+    }
+    private val selectorsByTag = buildMap {
+        selectors.forEach { selector ->
+            if (selector.tag !in this) put(selector.tag, selector)
+        }
+    }
+    private val outboundsByTag = buildMap {
+        outbounds.forEach { outbound ->
+            if (outbound.tag !in this) put(outbound.tag, outbound)
+        }
+    }
+    private val endpointsByTag = buildMap {
+        endpoints.forEach { endpoint ->
+            if (endpoint.tag !in this) put(endpoint.tag, endpoint)
+        }
+    }
+    private val outboundsByGroup = outbounds.groupBy { outbound -> outbound.value.groupId }
+    private val enabledGroups = groups.filter { group -> group.value.enabled }
+    private val enabledGroupIds = enabledGroups.mapTo(mutableSetOf()) { group -> group.value.id }
+    private val enabledGroupsById = buildMap {
+        enabledGroups.forEach { group ->
+            if (group.value.id !in this) put(group.value.id, group)
+        }
+    }
+    private val globalDependencies by lazy(LazyThreadSafetyMode.NONE) {
+        val validManagedGroupIds = outbounds
+            .filter { outbound ->
+                outbound.value.groupId in enabledGroupIds && outbound.json != null
+            }
+            .mapTo(mutableSetOf()) { outbound -> outbound.value.groupId }
+        groups
+            .filter { group -> group.value.enabled && group.value.id in validManagedGroupIds }
+            .map(IndexedOutboundGroup::tag) +
+            endpoints
+                .filter { endpoint ->
+                    endpoint.value.type in SupportedSingBoxEndpointTypes && endpoint.json != null
                 }
-                .mapTo(mutableSetOf(), OutboundState::groupId)
-            outboundGroups
-                .filter { group -> group.enabled && group.id in validManagedGroupIds }
-                .map { group -> managedOutboundGroupSelectorTag(group.id, group.name) } +
-                endpoints
-                    .filter { endpoint ->
-                        endpoint.type in SupportedSingBoxEndpointTypes &&
-                            endpoint.jsonObject() != null
-                    }
-                    .map(SingBoxEndpointState::tag)
-        }
-        selectors.any { selector -> selector.tag == tag } ->
-            selectors.first { selector -> selector.tag == tag }.outbounds
-        outboundGroups.any { group ->
-            managedOutboundGroupSelectorTag(group.id, group.name) == tag
-        } -> {
-            val groupId = outboundGroups.first { group ->
-                managedOutboundGroupSelectorTag(group.id, group.name) == tag
-            }.id
+                .map(IndexedEndpoint::tag)
+    }
+    private val reverseDependencies: Map<String, Set<String>> by lazy(LazyThreadSafetyMode.NONE) {
+        buildReverseDependencies()
+    }
+
+    fun selectableChoices(
+        excludedTag: String,
+        excludedSelectorId: Int = 0,
+        excludedManagedGroupId: Int = 0,
+        includeEndpoints: Boolean,
+        includeDirect: Boolean,
+        includeGlobalSelector: Boolean,
+    ): List<ManagedOutboundChoice> {
+        val originalExcludedTag = selectors
+            .firstOrNull { selector -> selector.value.id == excludedSelectorId }
+            ?.tag
+            .orEmpty()
+        val excludedTargets = setOf(excludedTag.trim(), originalExcludedTag.trim())
+            .filterTo(mutableSetOf(), String::isNotEmpty)
+        val excludedManagedGroupTag = groupsById[excludedManagedGroupId]?.tag.orEmpty()
+        val dependentTags = tagsDependingOn(excludedTargets)
+
+        return buildList {
+            enabledGroups.forEach { group ->
+                if (outboundsByGroup[group.value.id].orEmpty().isNotEmpty()) {
+                    add(
+                        ManagedOutboundChoice(
+                            tag = group.tag,
+                            label = group.value.name.trim(),
+                            kind = ManagedOutboundChoiceKind.Group,
+                        ),
+                    )
+                }
+            }
+            selectors
+                .filter { selector -> selector.value.outbounds.isNotEmpty() }
+                .forEach { selector ->
+                    add(
+                        ManagedOutboundChoice(
+                            tag = selector.tag,
+                            label = selector.value.remarks,
+                            kind = if (selector.value.type == SingBoxSelectorTypeUrlTest) {
+                                ManagedOutboundChoiceKind.UrlTest
+                            } else {
+                                ManagedOutboundChoiceKind.Selector
+                            },
+                        ),
+                    )
+                }
             outbounds
-                .filter { outbound -> outbound.groupId == groupId }
-                .map(OutboundState::tag)
+                .filter { outbound -> outbound.value.groupId in enabledGroupIds }
+                .forEach { outbound ->
+                    add(
+                        ManagedOutboundChoice(
+                            tag = outbound.tag,
+                            label = outbound.value.remarks,
+                            kind = when (outbound.value.type) {
+                                SingBoxSelectorTypeSelector -> ManagedOutboundChoiceKind.Selector
+                                SingBoxSelectorTypeUrlTest -> ManagedOutboundChoiceKind.UrlTest
+                                else -> ManagedOutboundChoiceKind.Outbound
+                            },
+                            groupName = enabledGroupsById[outbound.value.groupId]
+                                ?.value
+                                ?.name
+                                ?.trim()
+                                ?.takeIf(String::isNotEmpty),
+                        ),
+                    )
+                }
+            if (includeEndpoints) {
+                endpoints.forEach { endpoint ->
+                    add(
+                        ManagedOutboundChoice(
+                            tag = endpoint.tag,
+                            label = endpoint.value.remarks,
+                            kind = ManagedOutboundChoiceKind.Endpoint,
+                        ),
+                    )
+                }
+            }
+            if (includeDirect) {
+                add(
+                    ManagedOutboundChoice(
+                        tag = APP_DIRECT_OUTBOUND,
+                        label = APP_DIRECT_OUTBOUND,
+                        kind = ManagedOutboundChoiceKind.Direct,
+                    ),
+                )
+            }
+            if (includeGlobalSelector) {
+                add(
+                    ManagedOutboundChoice(
+                        tag = APP_GLOBAL_SELECTOR,
+                        label = APP_GLOBAL_SELECTOR,
+                        kind = ManagedOutboundChoiceKind.GlobalSelector,
+                    ),
+                )
+            }
         }
+            .map { choice -> choice.copy(tag = choice.tag.trim(), label = choice.label.trim()) }
+            .filter { choice -> choice.tag.isNotEmpty() }
+            .distinctBy(ManagedOutboundChoice::tag)
+            .filterNot { choice ->
+                (
+                    excludedManagedGroupId != 0 &&
+                        choice.tag == excludedManagedGroupTag
+                    ) ||
+                    choice.tag in excludedTargets ||
+                    choice.tag in dependentTags
+            }
+            .stableSortedByKindPriority()
+    }
+
+    fun tagsDependingOn(targets: Set<String>): Set<String> {
+        if (targets.isEmpty()) return emptySet()
+        val pending = ArrayDeque<String>()
+        targets.forEach(pending::addLast)
+        val dependents = mutableSetOf<String>()
+        while (pending.isNotEmpty()) {
+            reverseDependencies[pending.removeFirst()].orEmpty().forEach { dependent ->
+                if (dependents.add(dependent)) pending.addLast(dependent)
+            }
+        }
+        return dependents
+    }
+
+    private fun buildReverseDependencies(): Map<String, Set<String>> {
+        val reverse = mutableMapOf<String, MutableSet<String>>()
+        buildList {
+            add(APP_DIRECT_OUTBOUND)
+            add(APP_GLOBAL_SELECTOR)
+            addAll(selectors.map(IndexedSelector::tag))
+            addAll(groups.map(IndexedOutboundGroup::tag))
+            addAll(outbounds.map(IndexedOutbound::tag))
+            addAll(endpoints.map(IndexedEndpoint::tag))
+        }
+            .distinct()
+            .forEach { source ->
+                dependenciesOf(source).forEach { dependency ->
+                    reverse.getOrPut(dependency, ::mutableSetOf).add(source)
+                }
+            }
+        return reverse
+    }
+
+    private fun dependenciesOf(tag: String): List<String> = when {
+        tag == APP_DIRECT_OUTBOUND -> emptyList()
+        tag == APP_GLOBAL_SELECTOR -> globalDependencies
+        tag in selectorsByTag -> selectorsByTag.getValue(tag).value.outbounds
+        tag in groupsByTag -> outboundsByGroup[groupsByTag.getValue(tag).value.id]
+            .orEmpty()
+            .map(IndexedOutbound::tag)
         else -> {
-            val managedOutbound = outbounds.firstOrNull { outbound -> outbound.tag == tag }
-            val managedJson = managedOutbound?.jsonObject()
-                ?: endpoints.firstOrNull { endpoint -> endpoint.tag == tag }?.jsonObject()
+            val managedOutbound = outboundsByTag[tag]
+            val managedJson = managedOutbound?.json ?: endpointsByTag[tag]?.json
             if (
-                managedOutbound?.type == SingBoxSelectorTypeSelector ||
-                managedOutbound?.type == SingBoxSelectorTypeUrlTest
+                managedOutbound?.value?.type == SingBoxSelectorTypeSelector ||
+                managedOutbound?.value?.type == SingBoxSelectorTypeUrlTest
             ) {
                 (managedJson?.get("outbounds") as? JsonArray)
                     .orEmpty()
@@ -735,9 +920,30 @@ private fun AppState.outboundDependsOn(
             }
         }
     }
-    return dependencies.any { dependency ->
-        dependency == targetTag || outboundDependsOn(dependency, targetTag, visited)
-    }
+}
+
+private data class IndexedOutboundGroup(
+    val value: OutboundGroupState,
+    val tag: String,
+)
+
+private data class IndexedSelector(
+    val value: SingBoxSelectorState,
+    val tag: String,
+)
+
+private class IndexedOutbound(
+    val value: OutboundState,
+    val tag: String,
+) {
+    val json: JsonObject? by lazy(LazyThreadSafetyMode.NONE, value::jsonObject)
+}
+
+private class IndexedEndpoint(
+    val value: SingBoxEndpointState,
+    val tag: String,
+) {
+    val json: JsonObject? by lazy(LazyThreadSafetyMode.NONE, value::jsonObject)
 }
 
 private val ManagedOutboundChoiceKind.priority: Int
@@ -750,6 +956,20 @@ private val ManagedOutboundChoiceKind.priority: Int
         ManagedOutboundChoiceKind.GlobalSelector -> 4
         ManagedOutboundChoiceKind.Outbound -> 5
     }
+
+internal fun List<ManagedOutboundChoice>.stableSortedByKindPriority(): List<ManagedOutboundChoice> {
+    if (size < 2) return this
+
+    val buckets = Array(ManagedOutboundChoiceKind.entries.size) {
+        mutableListOf<ManagedOutboundChoice>()
+    }
+    for (choice in this) {
+        buckets[choice.kind.priority].add(choice)
+    }
+    return buildList(size) {
+        buckets.forEach(::addAll)
+    }
+}
 
 private fun SingBoxRouteRuleState.updateManagedRuleSetReferences(
     transform: (String) -> String?,
@@ -839,6 +1059,11 @@ internal fun SingBoxDnsRuleState.updateManagedMatchReferences(
         enabled = enabled && !lostRequiredReference && !lostEnabledChild,
     )
 }
+
+internal fun requiresManagedTagCanonicalization(
+    previous: AppState,
+    next: AppState,
+): Boolean = previous.currentManagedTagsByIdentity() != next.currentManagedTagsByIdentity()
 
 private fun SingBoxDnsRuleState.disableUnavailableDnsMatchReferences(
     field: String,

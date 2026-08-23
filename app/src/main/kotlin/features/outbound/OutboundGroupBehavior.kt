@@ -7,8 +7,8 @@ import app.AppState
 import app.OutboundGroupState
 import app.managedOutboundGroupSelectorTag
 import app.nextAvailableOutboundGroupId
-import app.withCanonicalManagedTagReferences
 import app.withRemovedManagedOutboundTags
+import app.withReplacedManagedTag
 
 internal fun AppState.withSavedOutboundGroup(group: OutboundGroupState): AppState {
     val previous = outboundGroups.firstOrNull { item -> item.id == group.id }
@@ -28,23 +28,21 @@ internal fun AppState.withSavedOutboundGroup(group: OutboundGroupState): AppStat
             nextOutboundGroupId = id + 1,
         )
     }
-    val canonicalUpdated = updated.withCanonicalManagedTagReferences()
-    if (previous?.enabled != true || savedGroup.enabled) return canonicalUpdated
+    val previousSelectorTag = previous?.let { group ->
+        managedOutboundGroupSelectorTag(group.id, group.name)
+    }
+    val savedSelectorTag = managedOutboundGroupSelectorTag(savedGroup.id, savedGroup.name)
+    val referenceUpdated = if (
+        previousSelectorTag != null && previousSelectorTag != savedSelectorTag
+    ) {
+        updated.withReplacedManagedTag(previousSelectorTag, savedSelectorTag)
+    } else updated
+    if (previous?.enabled != true || savedGroup.enabled) return referenceUpdated
 
     val removedTags = outbounds
         .filter { outbound -> outbound.groupId == savedGroup.id }
         .mapTo(mutableSetOf()) { outbound -> outbound.tag }
     removedTags += managedOutboundGroupSelectorTag(savedGroup.id, savedGroup.name)
     removedTags += managedOutboundGroupSelectorTag(previous.id, previous.name)
-    return canonicalUpdated.withRemovedManagedOutboundTags(removedTags)
-}
-
-internal fun List<OutboundGroupState>.moveOutboundGroup(
-    fromIndex: Int,
-    toIndex: Int,
-): List<OutboundGroupState> {
-    if (fromIndex !in indices || toIndex !in indices || fromIndex == toIndex) return this
-    return toMutableList().apply {
-        add(toIndex, removeAt(fromIndex))
-    }
+    return referenceUpdated.withRemovedManagedOutboundTags(removedTags)
 }

@@ -10,11 +10,15 @@ internal class AppStatePersistenceTracker(
 ) {
     private var lastPersistedState = initialPersistedState
 
-    fun plan(nextState: AppState, hasPersistedRoomState: Boolean): AppStatePersistencePlan {
+    fun plan(
+        nextState: AppState,
+        hasPersistedRoomState: Boolean,
+        forceReplaceAll: Boolean = false,
+    ): AppStatePersistencePlan {
         return AppStatePersistencePlan(
             previousState = lastPersistedState,
             nextState = nextState,
-            replaceAll = !hasPersistedRoomState,
+            replaceAll = forceReplaceAll || !hasPersistedRoomState,
         )
     }
 

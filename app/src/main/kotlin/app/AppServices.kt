@@ -11,6 +11,9 @@ import engine.proxy.ProxyServiceUseCase
 import engine.singbox.runtime.SingBoxRuntimeRepository
 import features.logs.CoreLogRepository
 import features.monitoring.MonitoringRepository
+import features.outbound.OutboundListProjectionCache
+import features.outbound.OutboundPingRuntimeRepository
+import features.outbound.OutboundRepository
 import features.resources.ResourceFileUpdateCoordinator
 import features.resources.ResourceFileUseCase
 import features.settings.usecase.SwitchRunModeUseCase
@@ -39,6 +42,9 @@ internal data class AppServices(
     val qrCodeScanner: suspend () -> String?,
     val importFilePicker: suspend () -> Uri?,
     val singBoxRuntime: SingBoxRuntimeRepository,
+    val outboundPingRuntime: OutboundPingRuntimeRepository,
+    val outboundRepository: OutboundRepository,
+    val outboundListProjectionCache: OutboundListProjectionCache,
     val monitoring: MonitoringRepository,
     val proxyServiceUseCase: ProxyServiceUseCase,
     val switchRunModeUseCase: SwitchRunModeUseCase,

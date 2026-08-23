@@ -11,6 +11,7 @@ import app.ManagedGlobalSelectorTag
 import app.ManagedLocalInboundTag
 import app.ManagedRootInboundTag
 import app.ManagedTunInboundTag
+import app.OutboundState
 import app.SingBoxRouteNetworkStrategies
 import app.SingBoxRouteNetworkTypes
 import app.SingBoxRouteRuleActionReject
@@ -122,11 +123,9 @@ internal object SingBoxConfigCompiler {
         localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
         ebpfUidPolicy: EbpfUidPolicy = EbpfUidPolicy(),
     ): String {
-        val canonicalState = appState.withCanonicalManagedTagReferences()
         val encoded = encodeSingBoxJson(
-            generateRoot(
-                sourceRoot = JsonObject(emptyMap()),
-                appState = canonicalState,
+            compileGeneratedRoot(
+                appState = appState,
                 runMode = runMode,
                 exposePorts = exposePorts,
                 localRuleSets = localRuleSets,
@@ -136,6 +135,21 @@ internal object SingBoxConfigCompiler {
         SingBoxConfigChecker.check(encoded)
         return encoded
     }
+
+    internal fun compileGeneratedRoot(
+        appState: AppState,
+        runMode: Int = appState.runMode,
+        exposePorts: Boolean = true,
+        localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
+        ebpfUidPolicy: EbpfUidPolicy = EbpfUidPolicy(),
+    ): JsonObject = generateRoot(
+        sourceRoot = JsonObject(emptyMap()),
+        appState = appState.withCanonicalManagedTagReferences(),
+        runMode = runMode,
+        exposePorts = exposePorts,
+        localRuleSets = localRuleSets,
+        ebpfUidPolicy = ebpfUidPolicy,
+    )
 
     private fun generateRoot(
         sourceRoot: JsonObject,
@@ -166,11 +180,24 @@ internal object SingBoxConfigCompiler {
             .updated("services", compileServices(managedSourceRoot, appState, runMode, exposePorts))
 
         runtime = runtime.updated("dns", dnsResult?.dns)
+        val availableOutboundTags = sequenceOf(
+            runtime["endpoints"] as? JsonArray,
+            runtime["outbounds"] as? JsonArray,
+        )
+            .filterNotNull()
+            .flatMap(JsonArray::asSequence)
+            .mapNotNull { target ->
+                ((target as? JsonObject)?.get("tag") as? JsonPrimitive)
+                    ?.contentOrNull
+                    ?.takeIf(String::isNotBlank)
+            }
+            .toSet()
         runtime = runtime.updated(
             "route",
             compileRoute(
                 sourceRoute = managedSourceRoot["route"] as? JsonObject,
                 appState = appState,
+                availableOutboundTags = availableOutboundTags,
                 dnsEnabled = runtime["dns"] is JsonObject,
                 defaultDomainResolver = dnsResult?.defaultDomainResolver,
             ),
@@ -382,6 +409,7 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
         .mapNotNull { outbound ->
             runCatching { parseSingBoxJson(outbound.json) }
                 .getOrNull()
+                ?.takeIf { parsed -> outbound.shouldRetainRawGroupedOutbound(parsed) }
                 ?.let { parsed ->
                     outbound.groupId to JsonObject(
                         buildMap {
@@ -570,6 +598,18 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
     return JsonArray(retained)
 }
 
+private fun OutboundState.shouldRetainRawGroupedOutbound(parsed: JsonObject): Boolean {
+    if (
+        type != SingBoxSelectorTypeSelector &&
+        type != SingBoxSelectorTypeUrlTest
+    ) {
+        return true
+    }
+    // Malformed shapes stay on the existing compiler/validation path. Only cleanup's [] is silent.
+    val members = parsed["outbounds"] as? JsonArray ?: return true
+    return members.isNotEmpty()
+}
+
 private fun AppState.selectorDefault(
     selectorTag: String,
     members: List<String>,
@@ -674,10 +714,11 @@ private fun compileServices(
 internal fun compileRoute(
     sourceRoute: JsonObject?,
     appState: AppState,
+    availableOutboundTags: Set<String>,
     dnsEnabled: Boolean,
     defaultDomainResolver: String?,
 ): JsonObject {
-    val finalOutbound = appState.routeFinal.trim().ifBlank { APP_GLOBAL_SELECTOR }
+    val finalOutbound = resolveRouteFinal(appState, availableOutboundTags)
     val networkStrategy = appState.routeDefaultNetworkStrategy
         .trim()
         .lowercase()
@@ -797,6 +838,14 @@ internal fun compileRoute(
         },
     )
 }
+
+internal fun resolveRouteFinal(
+    appState: AppState,
+    availableOutboundTags: Set<String>,
+): String = appState.routeFinal
+    .trim()
+    .takeIf(availableOutboundTags::contains)
+    ?: APP_GLOBAL_SELECTOR
 
 private val ManagedRouteSettingKeys = setOf(
     "auto_detect_interface",

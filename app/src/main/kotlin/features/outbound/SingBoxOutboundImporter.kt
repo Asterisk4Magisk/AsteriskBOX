@@ -276,14 +276,15 @@ internal fun AppState.withImportedOutbounds(
     if (imported.isEmpty()) return this
 
     val previousGroup = outbounds.filter { outbound -> replaceGroup && outbound.groupId == groupId }
-    val reusableIds = previousGroup
-        .groupBy { outbound -> outbound.remarks to outbound.type }
-        .mapValues { (_, values) -> ArrayDeque(values.map(OutboundState::id)) }
+    val reusableIds = if (replaceGroup) {
+        matchImportedOutbounds(previousGroup, imported)
+    } else {
+        emptyMap()
+    }
     val usedIds = outbounds.mapTo(mutableSetOf()) { outbound -> outbound.id }
     var candidate = nextOutboundId.coerceAtLeast(1)
-    val assigned = imported.map { item ->
-        val reusable = reusableIds[item.remarks.trim() to item.type]
-            ?.removeFirstOrNull()
+    val assigned = imported.mapIndexed { importedIndex, item ->
+        val reusable = reusableIds[importedIndex]
         val id = reusable ?: run {
             while (candidate in usedIds) candidate += 1
             candidate.also { candidate += 1 }
@@ -565,5 +566,3 @@ internal val SupportedSingBoxProxyOutboundTypes = linkedSetOf(
     "snell",
     "ssh",
 )
-
-internal val ManualSingBoxOutboundTypes = SupportedSingBoxProxyOutboundTypes.toList()

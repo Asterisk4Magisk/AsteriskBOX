@@ -102,7 +102,7 @@ internal data class OutboundGroupEntity(
     tableName = "outbounds",
     indices = [
         Index("groupId"),
-        Index("position"),
+        Index(value = ["groupId", "position"]),
     ],
 )
 internal data class OutboundEntity(
@@ -112,7 +112,6 @@ internal data class OutboundEntity(
     val remarks: String,
     val type: String,
     val json: String,
-    val pingMillis: Long?,
 ) {
     fun toState(): OutboundState =
         OutboundState(
@@ -121,7 +120,6 @@ internal data class OutboundEntity(
             remarks = remarks,
             type = type,
             json = json,
-            pingMillis = pingMillis,
         )
 
     companion object {
@@ -133,8 +131,18 @@ internal data class OutboundEntity(
                 remarks = outbound.remarks,
                 type = outbound.type,
                 json = outbound.json,
-                pingMillis = outbound.pingMillis,
             )
+    }
+}
+
+internal fun outboundEntitiesForReplacement(
+    outbounds: List<OutboundState>,
+): List<OutboundEntity> {
+    val nextPositionByGroup = mutableMapOf<Int, Int>()
+    return outbounds.map { outbound ->
+        val position = nextPositionByGroup.getOrDefault(outbound.groupId, 0)
+        nextPositionByGroup[outbound.groupId] = position + 1
+        OutboundEntity.from(position, outbound)
     }
 }
 

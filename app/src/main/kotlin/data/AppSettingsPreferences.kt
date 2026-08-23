@@ -271,95 +271,26 @@ internal class AppSettingsPreferences(
     fun save(state: AppState) {
         preferences.edit {
             remove(ObsoleteSettingsPayloadKey)
-            putInt(KeyColorMode, state.colorMode)
-            putInt(KeyLanguageMode, state.languageMode)
-            putInt(KeySeedIndex, state.seedIndex)
-            putInt(KeyOutboundListLayout, state.outboundListLayout)
-            putInt(KeyOutboundListSort, state.outboundListSort)
-            putStringMap(KeySelectorSelections, state.selectorSelections)
-            putBoolean(KeyRouteAutoDetectInterface, state.routeAutoDetectInterface)
-            putBoolean(KeyRouteOverrideAndroidVpn, state.routeOverrideAndroidVpn)
-            putString(KeyRouteDefaultNetworkStrategy, state.routeDefaultNetworkStrategy)
-            putStringList(KeyRouteDefaultNetworkTypes, state.routeDefaultNetworkTypes)
-            putStringList(
-                KeyRouteDefaultFallbackNetworkTypes,
-                state.routeDefaultFallbackNetworkTypes,
-            )
-            putString(KeyRouteDefaultFallbackDelay, state.routeDefaultFallbackDelay)
-            putBoolean(KeyRouteFindProcess, state.routeFindProcess)
-            putString(KeyRouteFinal, state.routeFinal)
-            putInt(KeyRunMode, state.runMode)
-            putInt(KeySingBoxMode, state.singBoxMode)
-            putInt(KeySingBoxProxyLayout, state.singBoxProxyLayout)
-            putInt(KeySingBoxProxySort, state.singBoxProxySort)
-            putInt(KeySingBoxTunStack, state.singBoxTunStack)
-            putString(KeySingBoxControlPort, state.singBoxControlPort)
-            putString(KeySingBoxControlSecret, state.singBoxControlSecret)
-            putBoolean(KeyEnableLocalDns, state.enableLocalDns)
-            putString(KeyLocalProxyPort, state.localProxyPort)
-            putBoolean(KeyEnableDynamicLocalProxyPort, state.enableDynamicLocalProxyPort)
-            putBoolean(KeyLocalProxyListenAllInterfaces, state.localProxyListenAllInterfaces)
-            putString(KeyLocalProxyUsername, state.localProxyUsername)
-            putString(KeyLocalProxyPassword, state.localProxyPassword)
-            putBoolean(KeyEnableVpnAppendHttpProxy, state.enableVpnAppendHttpProxy)
-            putBoolean(KeyEnableVpnHevTun, state.enableVpnHevTun)
-            putString(KeyTunMtu, state.tunMtu)
-            putString(KeyTunVpnDns, state.tunVpnDns)
-            putString(KeyTunIpv4Cidr, state.tunIpv4Cidr)
-            putString(KeyTunIpv6Cidr, state.tunIpv6Cidr)
-            putString(KeyCoreLogLevel, state.coreLogLevel)
-            putBoolean(KeyEnableTrafficStatsNotification, state.enableTrafficStatsNotification)
-            putBoolean(KeyEnableBroadcastControl, state.enableBroadcastControl)
-            putInt(KeyResourceFileSource, state.resourceFileSource)
-            putString(
-                KeyCustomResourceFileGeositeCategoryAdsAllUrl,
-                state.customResourceFileGeositeCategoryAdsAllUrl,
-            )
-            putString(
-                KeyCustomResourceFileGeositeGoogleUrl,
-                state.customResourceFileGeositeGoogleUrl,
-            )
-            putString(KeyCustomResourceFileGeositeCnUrl, state.customResourceFileGeositeCnUrl)
-            putString(KeyCustomResourceFileGeoipCnUrl, state.customResourceFileGeoipCnUrl)
-            putString(
-                KeyCustomResourceFileDirectCidrIpv4Url,
-                state.customResourceFileDirectCidrIpv4Url,
-            )
-            putString(
-                KeyCustomResourceFileDirectCidrIpv6Url,
-                state.customResourceFileDirectCidrIpv6Url,
-            )
-            putBoolean(KeyEnableSniffer, state.enableSniffer)
-            putStringList(KeySnifferProtocols, state.snifferProtocols)
-            putString(KeySnifferTimeout, state.snifferTimeout)
-            putBoolean(KeyEnableIpv6, state.enableIpv6)
-            putBoolean(KeyEnableIpv6Prefer, state.enableIpv6Prefer)
-            putString(KeyDnsFinal, state.dnsFinal)
-            putString(KeyRouteDefaultDomainResolver, state.routeDefaultDomainResolver)
-            putString(KeyDnsCacheCapacity, state.dnsCacheCapacity)
-            putBoolean(KeyDnsOptimisticCache, state.dnsOptimisticCache)
-            putBoolean(KeyDnsDisableCache, state.dnsDisableCache)
-            putBoolean(KeyDnsDisableExpire, state.dnsDisableExpire)
-            putString(KeyDnsTimeout, state.dnsTimeout)
-            putBoolean(KeyStoreFakeIp, state.storeFakeIp)
-            putBoolean(KeyStoreDns, state.storeDns)
-            putString(KeyTransparentProxyPort, state.transparentProxyPort)
-            putBoolean(KeyEnableRootBootScript, state.enableRootBootScript)
-            putBoolean(KeyEnableRootEbpfRules, state.enableRootEbpfRules)
-            putBoolean(
-                KeyEnableRootEbpfDirectCidrBypass,
-                state.enableRootEbpfDirectCidrBypass,
-            )
-            putStringList(KeyEbpfBypassRuleSetTags, state.ebpfBypassRuleSetTags)
-            putBoolean(KeyEnableRootIpv6Disabler, state.enableRootIpv6Disabler)
-            putString(KeySocks5ProxyPort, state.socks5ProxyPort)
-            putString(KeyBpf2SocksBridgePort, state.bpf2SocksBridgePort)
-            putServiceControl(state.serviceControl)
-            putStringList(KeyExternalInterfaces, state.externalInterfaces)
-            putStringList(KeyEbpfSharedNetworkInterfaces, state.ebpfSharedNetworkInterfaces)
-            putStringList(KeyIgnoredInterfaces, state.ignoredInterfaces)
-            putStringList(KeyPrivateAddressCidrs, state.privateAddressCidrs)
-            putInt(KeyProxyAppListMode, state.proxyAppListMode)
+            state.preferenceValues().forEach { (key, value) -> putPreferenceValue(key, value) }
+        }
+    }
+
+    fun saveChanged(previous: AppState, next: AppState) {
+        val changed = changedPreferenceValues(previous, next)
+        if (changed.isEmpty()) return
+        preferences.edit {
+            changed.forEach { (key, value) -> putPreferenceValue(key, value) }
+        }
+    }
+
+    private fun SharedPreferences.Editor.putPreferenceValue(
+        key: String,
+        value: AppPreferenceValue,
+    ) {
+        when (value) {
+            is AppPreferenceValue.BooleanValue -> putBoolean(key, value.value)
+            is AppPreferenceValue.IntValue -> putInt(key, value.value)
+            is AppPreferenceValue.StringValue -> putString(key, value.value)
         }
     }
 
@@ -416,61 +347,11 @@ internal class AppSettingsPreferences(
         bssids = getStringList(bssidsKey, defaults.bssids),
     )
 
-    private fun SharedPreferences.Editor.putServiceControl(
-        value: ServiceControlSettings,
-    ): SharedPreferences.Editor =
-        putBoolean(KeyServiceControlEnabled, value.enabled)
-            .putBoolean(KeyServiceControlScheduleEnabled, value.schedule.enabled)
-            .putString(KeyServiceControlScheduleStartCron, value.schedule.startCron)
-            .putString(KeyServiceControlScheduleStopCron, value.schedule.stopCron)
-            .putBoolean(KeyServiceControlWifiEnabled, value.wifi.enabled)
-            .putServiceControlWifiRule(
-                value.wifi.connectStart,
-                KeyServiceControlWifiConnectStartEnabled,
-                KeyServiceControlWifiConnectStartSsids,
-                KeyServiceControlWifiConnectStartBssids,
-            )
-            .putServiceControlWifiRule(
-                value.wifi.connectStop,
-                KeyServiceControlWifiConnectStopEnabled,
-                KeyServiceControlWifiConnectStopSsids,
-                KeyServiceControlWifiConnectStopBssids,
-            )
-            .putServiceControlWifiRule(
-                value.wifi.disconnectStart,
-                KeyServiceControlWifiDisconnectStartEnabled,
-                KeyServiceControlWifiDisconnectStartSsids,
-                KeyServiceControlWifiDisconnectStartBssids,
-            )
-            .putServiceControlWifiRule(
-                value.wifi.disconnectStop,
-                KeyServiceControlWifiDisconnectStopEnabled,
-                KeyServiceControlWifiDisconnectStopSsids,
-                KeyServiceControlWifiDisconnectStopBssids,
-            )
-
-    private fun SharedPreferences.Editor.putServiceControlWifiRule(
-        value: ServiceControlWifiRule,
-        enabledKey: String,
-        ssidsKey: String,
-        bssidsKey: String,
-    ): SharedPreferences.Editor =
-        putBoolean(enabledKey, value.enabled)
-            .putStringList(ssidsKey, value.ssids)
-            .putStringList(bssidsKey, value.bssids)
-
     private fun SharedPreferences.getStringList(
         key: String,
         defaultValue: List<String>,
     ): List<String> {
         return getString(key, null)?.let(StringListJson::decode) ?: defaultValue
-    }
-
-    private fun SharedPreferences.Editor.putStringList(
-        key: String,
-        values: List<String>,
-    ): SharedPreferences.Editor {
-        return putString(key, StringListJson.encode(values))
     }
 
     private fun SharedPreferences.getStringMap(
@@ -480,107 +361,101 @@ internal class AppSettingsPreferences(
         return getString(key, null)?.let(StringMapJson::decode) ?: defaultValue
     }
 
-    private fun SharedPreferences.Editor.putStringMap(
-        key: String,
-        values: Map<String, String>,
-    ): SharedPreferences.Editor {
-        return putString(key, StringMapJson.encode(values))
-    }
 }
 
 private const val PreferencesName = "asteriskbox_settings"
 private const val ObsoleteSettingsPayloadKey = "settings"
-private const val KeyColorMode = "color_mode"
-private const val KeyLanguageMode = "language_mode"
-private const val KeySeedIndex = "seed_index"
+internal const val KeyColorMode = "color_mode"
+internal const val KeyLanguageMode = "language_mode"
+internal const val KeySeedIndex = "seed_index"
 private const val KeySubscriptionHwid = "subscription_hwid"
-private const val KeyOutboundListLayout = "outbound_list_layout"
-private const val KeyOutboundListSort = "outbound_list_sort"
-private const val KeySelectorSelections = "selector_selections"
-private const val KeyRouteAutoDetectInterface = "route_auto_detect_interface"
-private const val KeyRouteOverrideAndroidVpn = "route_override_android_vpn"
-private const val KeyRouteDefaultNetworkStrategy = "route_default_network_strategy"
-private const val KeyRouteDefaultNetworkTypes = "route_default_network_types"
-private const val KeyRouteDefaultFallbackNetworkTypes = "route_default_fallback_network_types"
-private const val KeyRouteDefaultFallbackDelay = "route_default_fallback_delay"
-private const val KeyRouteFindProcess = "route_find_process"
-private const val KeyRouteFinal = "route_final"
-private const val KeyRunMode = "run_mode"
-private const val KeySingBoxMode = "sing_box_mode"
-private const val KeySingBoxProxyLayout = "sing_box_proxy_layout"
-private const val KeySingBoxProxySort = "sing_box_proxy_sort"
-private const val KeySingBoxTunStack = "sing_box_tun_stack"
-private const val KeySingBoxControlPort = "sing_box_control_port"
-private const val KeySingBoxControlSecret = "sing_box_control_secret"
-private const val KeyEnableLocalDns = "enable_local_dns"
-private const val KeyLocalProxyPort = "local_proxy_port"
-private const val KeyEnableDynamicLocalProxyPort = "enable_dynamic_local_proxy_port"
-private const val KeyLocalProxyListenAllInterfaces = "local_proxy_listen_all_interfaces"
-private const val KeyLocalProxyUsername = "local_proxy_username"
-private const val KeyLocalProxyPassword = "local_proxy_password"
-private const val KeyEnableVpnAppendHttpProxy = "enable_vpn_append_http_proxy"
-private const val KeyEnableVpnHevTun = "enable_vpn_hev_tun"
-private const val KeyTunMtu = "tun_mtu"
-private const val KeyTunVpnDns = "tun_vpn_dns"
-private const val KeyTunIpv4Cidr = "tun_ipv4_cidr"
-private const val KeyTunIpv6Cidr = "tun_ipv6_cidr"
-private const val KeyCoreLogLevel = "core_log_level"
-private const val KeyEnableTrafficStatsNotification = "enable_traffic_stats_notification"
-private const val KeyEnableBroadcastControl = "enable_broadcast_control"
-private const val KeyResourceFileSource = "resource_file_source"
-private const val KeyCustomResourceFileGeositeCategoryAdsAllUrl =
+internal const val KeyOutboundListLayout = "outbound_list_layout"
+internal const val KeyOutboundListSort = "outbound_list_sort"
+internal const val KeySelectorSelections = "selector_selections"
+internal const val KeyRouteAutoDetectInterface = "route_auto_detect_interface"
+internal const val KeyRouteOverrideAndroidVpn = "route_override_android_vpn"
+internal const val KeyRouteDefaultNetworkStrategy = "route_default_network_strategy"
+internal const val KeyRouteDefaultNetworkTypes = "route_default_network_types"
+internal const val KeyRouteDefaultFallbackNetworkTypes = "route_default_fallback_network_types"
+internal const val KeyRouteDefaultFallbackDelay = "route_default_fallback_delay"
+internal const val KeyRouteFindProcess = "route_find_process"
+internal const val KeyRouteFinal = "route_final"
+internal const val KeyRunMode = "run_mode"
+internal const val KeySingBoxMode = "sing_box_mode"
+internal const val KeySingBoxProxyLayout = "sing_box_proxy_layout"
+internal const val KeySingBoxProxySort = "sing_box_proxy_sort"
+internal const val KeySingBoxTunStack = "sing_box_tun_stack"
+internal const val KeySingBoxControlPort = "sing_box_control_port"
+internal const val KeySingBoxControlSecret = "sing_box_control_secret"
+internal const val KeyEnableLocalDns = "enable_local_dns"
+internal const val KeyLocalProxyPort = "local_proxy_port"
+internal const val KeyEnableDynamicLocalProxyPort = "enable_dynamic_local_proxy_port"
+internal const val KeyLocalProxyListenAllInterfaces = "local_proxy_listen_all_interfaces"
+internal const val KeyLocalProxyUsername = "local_proxy_username"
+internal const val KeyLocalProxyPassword = "local_proxy_password"
+internal const val KeyEnableVpnAppendHttpProxy = "enable_vpn_append_http_proxy"
+internal const val KeyEnableVpnHevTun = "enable_vpn_hev_tun"
+internal const val KeyTunMtu = "tun_mtu"
+internal const val KeyTunVpnDns = "tun_vpn_dns"
+internal const val KeyTunIpv4Cidr = "tun_ipv4_cidr"
+internal const val KeyTunIpv6Cidr = "tun_ipv6_cidr"
+internal const val KeyCoreLogLevel = "core_log_level"
+internal const val KeyEnableTrafficStatsNotification = "enable_traffic_stats_notification"
+internal const val KeyEnableBroadcastControl = "enable_broadcast_control"
+internal const val KeyResourceFileSource = "resource_file_source"
+internal const val KeyCustomResourceFileGeositeCategoryAdsAllUrl =
     "custom_resource_file_geosite_category_ads_all_url"
-private const val KeyCustomResourceFileGeositeGoogleUrl =
+internal const val KeyCustomResourceFileGeositeGoogleUrl =
     "custom_resource_file_geosite_google_url"
-private const val KeyCustomResourceFileGeositeCnUrl = "custom_resource_file_geosite_cn_url"
-private const val KeyCustomResourceFileGeoipCnUrl = "custom_resource_file_geoip_cn_url"
-private const val KeyCustomResourceFileDirectCidrIpv4Url =
+internal const val KeyCustomResourceFileGeositeCnUrl = "custom_resource_file_geosite_cn_url"
+internal const val KeyCustomResourceFileGeoipCnUrl = "custom_resource_file_geoip_cn_url"
+internal const val KeyCustomResourceFileDirectCidrIpv4Url =
     "custom_resource_file_direct_cidr_ipv4_url"
-private const val KeyCustomResourceFileDirectCidrIpv6Url =
+internal const val KeyCustomResourceFileDirectCidrIpv6Url =
     "custom_resource_file_direct_cidr_ipv6_url"
-private const val KeyEnableSniffer = "enable_sniffer"
-private const val KeySnifferProtocols = "sniffer_protocols"
-private const val KeySnifferTimeout = "sniffer_timeout"
-private const val KeyEnableIpv6 = "enable_ipv6"
-private const val KeyEnableIpv6Prefer = "enable_ipv6_prefer"
-private const val KeyDnsFinal = "dns_final"
-private const val KeyRouteDefaultDomainResolver = "route_default_domain_resolver"
-private const val KeyDnsCacheCapacity = "dns_cache_capacity"
-private const val KeyDnsOptimisticCache = "dns_optimistic_cache"
-private const val KeyDnsDisableCache = "dns_disable_cache"
-private const val KeyDnsDisableExpire = "dns_disable_expire"
-private const val KeyDnsTimeout = "dns_timeout"
-private const val KeyStoreFakeIp = "store_fake_ip"
-private const val KeyStoreDns = "store_dns"
-private const val KeyTransparentProxyPort = "transparent_proxy_port"
-private const val KeyEnableRootBootScript = "enable_root_boot_script"
-private const val KeyEnableRootEbpfRules = "enable_root_ebpf_rules"
-private const val KeyEnableRootEbpfDirectCidrBypass = "enable_root_ebpf_direct_cidr_bypass"
-private const val KeyEbpfBypassRuleSetTags = "ebpf_bypass_rule_set_tags"
-private const val KeyEnableRootIpv6Disabler = "enable_root_ipv6_disabler"
-private const val KeySocks5ProxyPort = "socks5_proxy_port"
-private const val KeyBpf2SocksBridgePort = "bpf2socks_bridge_port"
-private const val KeyServiceControlEnabled = "service_control_enabled"
-private const val KeyServiceControlScheduleEnabled = "service_control_schedule_enabled"
-private const val KeyServiceControlScheduleStartCron = "service_control_schedule_start_cron"
-private const val KeyServiceControlScheduleStopCron = "service_control_schedule_stop_cron"
-private const val KeyServiceControlWifiEnabled = "service_control_wifi_enabled"
-private const val KeyServiceControlWifiConnectStartEnabled = "service_control_wifi_connect_start_enabled"
-private const val KeyServiceControlWifiConnectStartSsids = "service_control_wifi_connect_start_ssids"
-private const val KeyServiceControlWifiConnectStartBssids = "service_control_wifi_connect_start_bssids"
-private const val KeyServiceControlWifiConnectStopEnabled = "service_control_wifi_connect_stop_enabled"
-private const val KeyServiceControlWifiConnectStopSsids = "service_control_wifi_connect_stop_ssids"
-private const val KeyServiceControlWifiConnectStopBssids = "service_control_wifi_connect_stop_bssids"
-private const val KeyServiceControlWifiDisconnectStartEnabled = "service_control_wifi_disconnect_start_enabled"
-private const val KeyServiceControlWifiDisconnectStartSsids = "service_control_wifi_disconnect_start_ssids"
-private const val KeyServiceControlWifiDisconnectStartBssids = "service_control_wifi_disconnect_start_bssids"
-private const val KeyServiceControlWifiDisconnectStopEnabled = "service_control_wifi_disconnect_stop_enabled"
-private const val KeyServiceControlWifiDisconnectStopSsids = "service_control_wifi_disconnect_stop_ssids"
-private const val KeyServiceControlWifiDisconnectStopBssids = "service_control_wifi_disconnect_stop_bssids"
-private const val KeyExternalInterfaces = "external_interfaces"
-private const val KeyEbpfSharedNetworkInterfaces = "ebpf_shared_network_interfaces"
-private const val KeyIgnoredInterfaces = "ignored_interfaces"
-private const val KeyPrivateAddressCidrs = "private_address_cidrs"
-private const val KeyProxyAppListMode = "proxy_app_list_mode"
+internal const val KeyEnableSniffer = "enable_sniffer"
+internal const val KeySnifferProtocols = "sniffer_protocols"
+internal const val KeySnifferTimeout = "sniffer_timeout"
+internal const val KeyEnableIpv6 = "enable_ipv6"
+internal const val KeyEnableIpv6Prefer = "enable_ipv6_prefer"
+internal const val KeyDnsFinal = "dns_final"
+internal const val KeyRouteDefaultDomainResolver = "route_default_domain_resolver"
+internal const val KeyDnsCacheCapacity = "dns_cache_capacity"
+internal const val KeyDnsOptimisticCache = "dns_optimistic_cache"
+internal const val KeyDnsDisableCache = "dns_disable_cache"
+internal const val KeyDnsDisableExpire = "dns_disable_expire"
+internal const val KeyDnsTimeout = "dns_timeout"
+internal const val KeyStoreFakeIp = "store_fake_ip"
+internal const val KeyStoreDns = "store_dns"
+internal const val KeyTransparentProxyPort = "transparent_proxy_port"
+internal const val KeyEnableRootBootScript = "enable_root_boot_script"
+internal const val KeyEnableRootEbpfRules = "enable_root_ebpf_rules"
+internal const val KeyEnableRootEbpfDirectCidrBypass = "enable_root_ebpf_direct_cidr_bypass"
+internal const val KeyEbpfBypassRuleSetTags = "ebpf_bypass_rule_set_tags"
+internal const val KeyEnableRootIpv6Disabler = "enable_root_ipv6_disabler"
+internal const val KeySocks5ProxyPort = "socks5_proxy_port"
+internal const val KeyBpf2SocksBridgePort = "bpf2socks_bridge_port"
+internal const val KeyServiceControlEnabled = "service_control_enabled"
+internal const val KeyServiceControlScheduleEnabled = "service_control_schedule_enabled"
+internal const val KeyServiceControlScheduleStartCron = "service_control_schedule_start_cron"
+internal const val KeyServiceControlScheduleStopCron = "service_control_schedule_stop_cron"
+internal const val KeyServiceControlWifiEnabled = "service_control_wifi_enabled"
+internal const val KeyServiceControlWifiConnectStartEnabled = "service_control_wifi_connect_start_enabled"
+internal const val KeyServiceControlWifiConnectStartSsids = "service_control_wifi_connect_start_ssids"
+internal const val KeyServiceControlWifiConnectStartBssids = "service_control_wifi_connect_start_bssids"
+internal const val KeyServiceControlWifiConnectStopEnabled = "service_control_wifi_connect_stop_enabled"
+internal const val KeyServiceControlWifiConnectStopSsids = "service_control_wifi_connect_stop_ssids"
+internal const val KeyServiceControlWifiConnectStopBssids = "service_control_wifi_connect_stop_bssids"
+internal const val KeyServiceControlWifiDisconnectStartEnabled = "service_control_wifi_disconnect_start_enabled"
+internal const val KeyServiceControlWifiDisconnectStartSsids = "service_control_wifi_disconnect_start_ssids"
+internal const val KeyServiceControlWifiDisconnectStartBssids = "service_control_wifi_disconnect_start_bssids"
+internal const val KeyServiceControlWifiDisconnectStopEnabled = "service_control_wifi_disconnect_stop_enabled"
+internal const val KeyServiceControlWifiDisconnectStopSsids = "service_control_wifi_disconnect_stop_ssids"
+internal const val KeyServiceControlWifiDisconnectStopBssids = "service_control_wifi_disconnect_stop_bssids"
+internal const val KeyExternalInterfaces = "external_interfaces"
+internal const val KeyEbpfSharedNetworkInterfaces = "ebpf_shared_network_interfaces"
+internal const val KeyIgnoredInterfaces = "ignored_interfaces"
+internal const val KeyPrivateAddressCidrs = "private_address_cidrs"
+internal const val KeyProxyAppListMode = "proxy_app_list_mode"
 
 private val SubscriptionHwidLock = Any()

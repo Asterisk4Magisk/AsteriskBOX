@@ -64,12 +64,9 @@ import app.LocalAppServices
 import app.LocalAppStateStore
 import app.LocalIsWideScreen
 import app.LocalNavigator
-import app.LocalUpdateAppState
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
 import app.collectAppState
-import app.managedOutboundGroupSelectorTag
-import app.withRemovedManagedOutboundTags
 import features.importing.ImportOperation
 import features.importing.ImportResultDetail
 import features.importing.ImportResultDialog
@@ -80,6 +77,7 @@ import features.importing.importFailureResultPresentation
 import features.importing.reportImportFailure
 import features.importing.sanitizeImportMessage
 import features.importing.toImportResultPresentation
+import features.logs.FailureLogContext
 import features.settings.SettingsDropdownRow
 import features.settings.SettingsSwitchRow
 import features.subscription.SubscriptionSchedule
@@ -95,6 +93,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.asterisk.zcc.abox.R
 import sh.calvin.reorderable.ReorderableItem
@@ -119,7 +119,6 @@ internal fun OutboundGroupListPage(
 ) {
     val stateStore = LocalAppStateStore.current
     val appState by stateStore.collectAppState()
-    val updateAppState = LocalUpdateAppState.current
     val navigator = LocalNavigator.current
     val services = LocalAppServices.current
     val resources = LocalResources.current
@@ -128,7 +127,14 @@ internal fun OutboundGroupListPage(
     var editorGroup by remember { mutableStateOf<OutboundGroupState?>(null) }
     var showGroupEditor by remember { mutableStateOf(false) }
     var groupEditorSession by remember { mutableIntStateOf(0) }
+    var savingGroupEditorSession by remember { mutableStateOf<Int?>(null) }
     var pendingDelete by remember { mutableStateOf<OutboundGroupState?>(null) }
+    var deletingGroupId by remember { mutableStateOf<Int?>(null) }
+    var enabledChangingGroupIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    var groupOrderPreviewIds by remember { mutableStateOf<List<Int>?>(null) }
+    var groupOrderPreviewGeneration by remember { mutableStateOf<Long?>(null) }
+    var nextGroupOrderGeneration by remember { mutableStateOf(0L) }
+    val groupReorderMutex = remember { Mutex() }
     var syncingGroupIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var batchSyncJob by remember { mutableStateOf<Job?>(null) }
     var batchSyncProgress by remember { mutableStateOf<OutboundGroupBatchProgress?>(null) }
@@ -140,23 +146,42 @@ internal fun OutboundGroupListPage(
         mutableStateOf<ImportResultPresentation?>(null)
     }
     val importFailedMessage = stringResource(R.string.outbound_group_sync_failed)
+    val stateChangedMessage = stringResource(R.string.outbound_group_sync_failed)
     val subscriptionGroups = appState.outboundGroups.outboundSubscriptionGroups()
 
     fun saveGroup(group: OutboundGroupState) {
-        updateAppState { state -> state.withSavedOutboundGroup(group) }
-        showGroupEditor = false
-    }
-
-    fun deleteGroup(group: OutboundGroupState) {
-        updateAppState { state ->
-            val removedTags = state.outbounds
-                .filter { outbound -> outbound.groupId == group.id }
-                .mapTo(mutableSetOf()) { outbound -> outbound.tag }
-                .apply { add(managedOutboundGroupSelectorTag(group.id, group.name)) }
-            state.copy(
-                outboundGroups = state.outboundGroups.filterNot { item -> item.id == group.id },
-                outbounds = state.outbounds.filterNot { outbound -> outbound.groupId == group.id },
-            ).withRemovedManagedOutboundTags(removedTags)
+        val session = groupEditorSession
+        if (savingGroupEditorSession != null) return
+        val expected = editorGroup
+        savingGroupEditorSession = session
+        scope.launch {
+            try {
+                when (val result = services.outboundRepository.saveGroup(expected, group)) {
+                    is OutboundCommandResult.GroupSaved -> {
+                        if (groupEditorSession == session) showGroupEditor = false
+                    }
+                    OutboundCommandResult.Conflict ->
+                        services.tipNotifier.show(stateChangedMessage)
+                    is OutboundCommandResult.Invalid ->
+                        services.tipNotifier.show(importFailedMessage)
+                    is OutboundCommandResult.PersistenceFailed ->
+                        services.tipNotifier.showError(
+                            result.error,
+                            importFailedMessage,
+                            FailureLogContext(operation = "outbound_group_save", stage = "persist"),
+                        )
+                    OutboundCommandResult.Deleted,
+                    OutboundCommandResult.GroupDeleted,
+                    OutboundCommandResult.GroupEnabledChanged,
+                    OutboundCommandResult.GroupsReordered,
+                    OutboundCommandResult.ImportPersisted,
+                    OutboundCommandResult.Reordered,
+                    is OutboundCommandResult.Saved,
+                    -> error("Unexpected outbound group save result: $result")
+                }
+            } finally {
+                if (savingGroupEditorSession == session) savingGroupEditorSession = null
+            }
         }
     }
 
@@ -399,18 +424,75 @@ internal fun OutboundGroupListPage(
         )
         val listContentPadding = pageListPadding(contentPadding)
         val listState = rememberLazyListState()
+        val displayedGroups = groupOrderPreviewIds?.let { previewIds ->
+            val groupsById = appState.outboundGroups.associateBy(OutboundGroupState::id)
+            previewIds.mapNotNull(groupsById::get).takeIf { groups ->
+                groups.size == appState.outboundGroups.size
+            }
+        } ?: appState.outboundGroups
         val reorderableState = rememberAsteriskReorderableLazyListState(
             lazyListState = listState,
-            itemCount = appState.outboundGroups.size,
+            itemCount = displayedGroups.size,
             scrollThresholdPadding = verticalReorderScrollThresholdPadding(listContentPadding),
             onMove = { fromIndex, toIndex ->
-                updateAppState { state ->
-                    state.copy(
-                        outboundGroups = state.outboundGroups.moveOutboundGroup(
-                            fromIndex,
-                            toIndex,
-                        ),
-                    )
+                val currentIds = groupOrderPreviewIds
+                    ?.takeIf { ids ->
+                        ids.size == displayedGroups.size &&
+                            ids.toSet() == displayedGroups.mapTo(mutableSetOf(), OutboundGroupState::id)
+                    }
+                    ?: displayedGroups.map(OutboundGroupState::id)
+                val reorderedIds = currentIds.toMutableList().apply {
+                    if (fromIndex in indices && toIndex in indices && fromIndex != toIndex) {
+                        add(toIndex, removeAt(fromIndex))
+                    }
+                }
+                if (reorderedIds == currentIds) return@rememberAsteriskReorderableLazyListState
+                nextGroupOrderGeneration += 1L
+                val generation = nextGroupOrderGeneration
+                groupOrderPreviewIds = reorderedIds
+                groupOrderPreviewGeneration = generation
+                scope.launch {
+                    groupReorderMutex.withLock {
+                        when (val result = services.outboundRepository.reorderGroups(reorderedIds)) {
+                            OutboundCommandResult.GroupsReordered -> {
+                                if (groupOrderPreviewGeneration == generation) {
+                                    groupOrderPreviewIds = null
+                                    groupOrderPreviewGeneration = null
+                                }
+                            }
+                            OutboundCommandResult.Conflict -> {
+                                services.tipNotifier.show(stateChangedMessage)
+                                if (groupOrderPreviewGeneration == generation) {
+                                    groupOrderPreviewIds = null
+                                    groupOrderPreviewGeneration = null
+                                }
+                            }
+                            is OutboundCommandResult.PersistenceFailed -> {
+                                services.tipNotifier.showError(
+                                    result.error,
+                                    importFailedMessage,
+                                    FailureLogContext(
+                                        operation = "outbound_group_reorder",
+                                        stage = "persist",
+                                    ),
+                                )
+                                if (groupOrderPreviewGeneration == generation) {
+                                    groupOrderPreviewIds = null
+                                    groupOrderPreviewGeneration = null
+                                }
+                            }
+                            is OutboundCommandResult.Invalid ->
+                                services.tipNotifier.show(importFailedMessage)
+                            OutboundCommandResult.Deleted,
+                            OutboundCommandResult.GroupDeleted,
+                            OutboundCommandResult.GroupEnabledChanged,
+                            OutboundCommandResult.ImportPersisted,
+                            OutboundCommandResult.Reordered,
+                            is OutboundCommandResult.Saved,
+                            is OutboundCommandResult.GroupSaved,
+                            -> error("Unexpected outbound group reorder result: $result")
+                        }
+                    }
                 }
             },
         )
@@ -420,7 +502,7 @@ internal fun OutboundGroupListPage(
             contentPadding = listContentPadding,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (appState.outboundGroups.isEmpty()) {
+            if (displayedGroups.isEmpty()) {
                 item(key = "empty") {
                     OutboundGroupEmptyState(
                         onAdd = {
@@ -432,7 +514,7 @@ internal fun OutboundGroupListPage(
                 }
             }
             items(
-                items = appState.outboundGroups,
+                items = displayedGroups,
                 key = OutboundGroupState::id,
                 contentType = { "outbound-group" },
             ) { group ->
@@ -449,25 +531,44 @@ internal fun OutboundGroupListPage(
                         },
                         syncing = group.id in syncingGroupIds,
                         isDragging = isDragging,
+                        enabledChangeBusy = group.id in enabledChangingGroupIds,
                         onEnabledChange = { enabled ->
-                            updateAppState { state ->
-                                val groupTags = state.outbounds
-                                    .filter { outbound -> outbound.groupId == group.id }
-                                    .mapTo(mutableSetOf()) { outbound -> outbound.tag }
-                                    .apply {
-                                        add(managedOutboundGroupSelectorTag(group.id, group.name))
+                            val groupId = group.id
+                            if (groupId in enabledChangingGroupIds) return@OutboundGroupCard
+                            enabledChangingGroupIds += groupId
+                            scope.launch {
+                                try {
+                                    when (
+                                        val result = services.outboundRepository.setGroupEnabled(
+                                            groupId,
+                                            enabled,
+                                        )
+                                    ) {
+                                        OutboundCommandResult.GroupEnabledChanged -> Unit
+                                        OutboundCommandResult.Conflict ->
+                                            services.tipNotifier.show(stateChangedMessage)
+                                        is OutboundCommandResult.PersistenceFailed ->
+                                            services.tipNotifier.showError(
+                                                result.error,
+                                                importFailedMessage,
+                                                FailureLogContext(
+                                                    operation = "outbound_group_enabled",
+                                                    stage = "persist",
+                                                ),
+                                            )
+                                        is OutboundCommandResult.Invalid ->
+                                            services.tipNotifier.show(importFailedMessage)
+                                        OutboundCommandResult.Deleted,
+                                        OutboundCommandResult.GroupDeleted,
+                                        OutboundCommandResult.GroupsReordered,
+                                        OutboundCommandResult.ImportPersisted,
+                                        OutboundCommandResult.Reordered,
+                                        is OutboundCommandResult.Saved,
+                                        is OutboundCommandResult.GroupSaved,
+                                        -> error("Unexpected outbound group enable result: $result")
                                     }
-                                state.copy(
-                                    outboundGroups = state.outboundGroups.map { item ->
-                                        if (item.id == group.id) {
-                                            item.copy(enabled = enabled)
-                                        } else {
-                                            item
-                                        }
-                                    },
-                                ).let { updated ->
-                                    if (enabled) updated
-                                    else updated.withRemovedManagedOutboundTags(groupTags)
+                                } finally {
+                                    enabledChangingGroupIds -= groupId
                                 }
                             }
                         },
@@ -482,7 +583,7 @@ internal fun OutboundGroupListPage(
                             .fillMaxWidth()
                             .longPressReorderDragHandle(
                                 scope = this,
-                                enabled = appState.outboundGroups.size > 1,
+                                enabled = displayedGroups.size > 1,
                                 state = reorderableState,
                             ),
                     )
@@ -495,7 +596,10 @@ internal fun OutboundGroupListPage(
         show = showGroupEditor,
         group = editorGroup,
         editorSession = groupEditorSession,
-        onDismissRequest = { showGroupEditor = false },
+        busy = savingGroupEditorSession == groupEditorSession,
+        onDismissRequest = {
+            if (savingGroupEditorSession != groupEditorSession) showGroupEditor = false
+        },
         onSave = ::saveGroup,
     )
 
@@ -521,9 +625,43 @@ internal fun OutboundGroupListPage(
         confirmText = stringResource(R.string.common_delete),
         onDismissRequest = { pendingDelete = null },
         onConfirm = {
-            pendingDelete?.let(::deleteGroup)
-            pendingDelete = null
+            val groupId = pendingDelete?.id ?: return@WarningConfirmDialog
+            if (deletingGroupId != null) return@WarningConfirmDialog
+            deletingGroupId = groupId
+            scope.launch {
+                try {
+                    when (val result = services.outboundRepository.deleteGroup(groupId)) {
+                        OutboundCommandResult.GroupDeleted -> {
+                            if (pendingDelete?.id == groupId) pendingDelete = null
+                        }
+                        OutboundCommandResult.Conflict ->
+                            services.tipNotifier.show(stateChangedMessage)
+                        is OutboundCommandResult.PersistenceFailed ->
+                            services.tipNotifier.showError(
+                                result.error,
+                                importFailedMessage,
+                                FailureLogContext(
+                                    operation = "outbound_group_delete",
+                                    stage = "persist",
+                                ),
+                            )
+                        is OutboundCommandResult.Invalid ->
+                            services.tipNotifier.show(importFailedMessage)
+                        OutboundCommandResult.Deleted,
+                        OutboundCommandResult.GroupEnabledChanged,
+                        OutboundCommandResult.GroupsReordered,
+                        OutboundCommandResult.ImportPersisted,
+                        OutboundCommandResult.Reordered,
+                        is OutboundCommandResult.Saved,
+                        is OutboundCommandResult.GroupSaved,
+                        -> error("Unexpected outbound group delete result: $result")
+                    }
+                } finally {
+                    if (deletingGroupId == groupId) deletingGroupId = null
+                }
+            }
         },
+        busy = deletingGroupId != null,
     )
     importResultPresentation?.let { presentation ->
         ImportResultDialog(
@@ -770,6 +908,7 @@ private fun OutboundGroupCard(
     outboundCount: Int,
     syncing: Boolean,
     isDragging: Boolean,
+    enabledChangeBusy: Boolean,
     onEnabledChange: (Boolean) -> Unit,
     onSync: () -> Unit,
     onEdit: () -> Unit,
@@ -797,6 +936,7 @@ private fun OutboundGroupCard(
     )
     Card(
         onClick = onEdit,
+        enabled = !enabledChangeBusy,
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 128.dp)
@@ -933,6 +1073,7 @@ private fun OutboundGroupCard(
                 Switch(
                     checked = group.enabled,
                     onCheckedChange = onEnabledChange,
+                    enabled = !enabledChangeBusy,
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
@@ -954,12 +1095,12 @@ private fun OutboundGroupCard(
                         Text(stringResource(R.string.common_update))
                     }
                 }
-                TextButton(onClick = onEdit) {
+                TextButton(onClick = onEdit, enabled = !enabledChangeBusy) {
                     Icon(Icons.Rounded.Edit, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.common_edit))
                 }
-                TextButton(onClick = onDelete) {
+                TextButton(onClick = onDelete, enabled = !enabledChangeBusy) {
                     Icon(Icons.Rounded.Delete, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.common_delete))
@@ -974,6 +1115,7 @@ private fun OutboundGroupEditorSheet(
     show: Boolean,
     group: OutboundGroupState?,
     editorSession: Int,
+    busy: Boolean,
     onDismissRequest: () -> Unit,
     onSave: (OutboundGroupState) -> Unit,
 ) {
@@ -1015,19 +1157,22 @@ private fun OutboundGroupEditorSheet(
         title = stringResource(
             if (group == null) R.string.outbound_group_add else R.string.outbound_group_edit,
         ),
+        dismissEnabled = !busy,
         onDismissRequest = onDismissRequest,
         startAction = {
             AsteriskActionButton(
                 text = stringResource(R.string.common_cancel),
                 icon = Icons.Rounded.Close,
                 onClick = onDismissRequest,
+                enabled = !busy,
             )
         },
         endAction = {
             AsteriskActionButton(
                 text = stringResource(R.string.common_save),
                 icon = Icons.Rounded.Save,
-                enabled = canSave,
+                enabled = canSave && !busy,
+                loading = busy,
                 onClick = {
                     val trimmedUrl = url.trim()
                     val trimmedHwid = hwid.trim()

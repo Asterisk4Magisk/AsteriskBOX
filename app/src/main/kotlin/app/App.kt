@@ -125,6 +125,9 @@ fun App(
     val outboundSubscriptionUpdater =
         remember(application) { application.outboundSubscriptionUpdater }
     val singBoxRuntime = application.singBoxRuntime
+    val outboundPingRuntime = remember(application) { application.outboundPingRuntime }
+    val outboundRepository = remember(application) { application.outboundRepository }
+    val outboundListProjectionCache = remember(application) { application.outboundListProjectionCache }
     val monitoring = remember(appScope, appContext, rootAccess, stateStore, singBoxRuntime) {
         MonitoringRepository(appScope, appContext, rootAccess, stateStore, singBoxRuntime)
     }
@@ -176,6 +179,9 @@ fun App(
         qrCodeScanner,
         resourceFilePicker,
         singBoxRuntime,
+        outboundPingRuntime,
+        outboundRepository,
+        outboundListProjectionCache,
         monitoring,
         proxyServiceUseCase,
         switchRunModeUseCase,
@@ -199,6 +205,9 @@ fun App(
             qrCodeScanner = qrCodeScanner,
             importFilePicker = resourceFilePicker,
             singBoxRuntime = singBoxRuntime,
+            outboundPingRuntime = outboundPingRuntime,
+            outboundRepository = outboundRepository,
+            outboundListProjectionCache = outboundListProjectionCache,
             monitoring = monitoring,
             proxyServiceUseCase = proxyServiceUseCase,
             switchRunModeUseCase = switchRunModeUseCase,

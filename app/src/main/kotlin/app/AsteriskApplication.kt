@@ -8,6 +8,13 @@ import data.AndroidAppStateStore
 import data.AppSettingsPreferences
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.outbound.parseOutboundImportContent
+import features.outbound.AndroidOutboundPinger
+import features.outbound.OutboundListProjectionCache
+import features.outbound.OutboundCommandResult
+import features.outbound.OutboundPingRuntimeRepository
+import features.outbound.OutboundRepository
+import features.outbound.OutboundStateGateway
+import features.logs.AndroidAppLogger
 import features.logs.AndroidCoreLogRepository
 import features.logs.AndroidAsteriskdLogRepository
 import features.logs.AndroidLogcatRepository
@@ -27,6 +34,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import system.AndroidAppIconFetcher
 import engine.singbox.runtime.SingBoxRuntimeRepository
 import engine.vpn.AndroidLibboxRuntime
@@ -34,8 +42,43 @@ import engine.vpn.AndroidLibboxRuntime
 class AsteriskApplication : Application(), SingletonImageLoader.Factory {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     internal val singBoxRuntime: SingBoxRuntimeRepository by lazy { SingBoxRuntimeRepository(appScope, this) }
+    internal val outboundPingRuntime: OutboundPingRuntimeRepository by lazy {
+        OutboundPingRuntimeRepository(
+            scope = appScope,
+            pinger = AndroidOutboundPinger(),
+        )
+    }
+    internal val outboundListProjectionCache: OutboundListProjectionCache by lazy {
+        OutboundListProjectionCache()
+    }
     internal val stateStore: AndroidAppStateStore by lazy {
         AndroidAppStateStore.get(applicationContext)
+    }
+    internal val outboundRepository: OutboundRepository by lazy {
+        OutboundRepository(
+            gateway = object : OutboundStateGateway {
+                override fun snapshot(): AppState = stateStore.state.value
+
+                override suspend fun commitPreparedAndAwaitPersistence(
+                    expected: AppState,
+                    updated: AppState,
+                ): Result<Boolean> = stateStore.commitPreparedAndAwaitPersistence(expected, updated)
+            },
+            validate = { state ->
+                withContext(Dispatchers.IO) {
+                    validateSingBoxRuntimeConfiguration(applicationContext, state)
+                }
+            },
+            onOutboundChanged = { id, json -> outboundPingRuntime.invalidate(id, json) },
+            onOutboundRemoved = outboundPingRuntime::remove,
+            reportRuntimeCallbackFailure = { operation, error ->
+                AndroidAppLogger.error(
+                    tag = "OutboundRepository",
+                    message = "Runtime callback failed ($operation)",
+                    error = error,
+                )
+            },
+        )
     }
     internal val subscriptionPreparer: AndroidSubscriptionPreparer by lazy {
         AndroidSubscriptionPreparer(
@@ -53,8 +96,20 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
             stateGateway = object : SubscriptionStateGateway {
                 override fun snapshot(): AppState = stateStore.state.value
 
-                override fun compareAndSet(expected: AppState, updated: AppState): Boolean =
-                    stateStore.compareAndSet(expected, updated)
+                override suspend fun compareAndSet(
+                    expected: AppState,
+                    updated: AppState,
+                ): Result<Boolean> = when (
+                    val result = outboundRepository.persistImport(expected, updated)
+                ) {
+                    OutboundCommandResult.ImportPersisted -> Result.success(true)
+                    OutboundCommandResult.Conflict -> Result.success(false)
+                    is OutboundCommandResult.Invalid -> Result.failure(result.error)
+                    is OutboundCommandResult.PersistenceFailed -> Result.failure(result.error)
+                    else -> Result.failure(
+                        IllegalStateException("Unexpected subscription persistence result: $result"),
+                    )
+                }
             },
             prepare = { group, state ->
                 prepareSubscription(

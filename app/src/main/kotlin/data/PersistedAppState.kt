@@ -4,6 +4,7 @@
 package data
 
 import app.AppState
+import app.OutboundState
 import app.withCanonicalManagedTagReferences
 
 internal data class PersistedAppState(
@@ -24,9 +25,12 @@ internal data class PersistedAppState(
         val identity = requireNotNull(metadata)
         val restoredOutboundGroups = outboundGroups
             .map(OutboundGroupEntity::toState)
-        val restoredOutbounds = outbounds
+        val outboundStatesByGroup = outbounds
             .map(OutboundEntity::toState)
-            .filter { outbound -> restoredOutboundGroups.any { group -> group.id == outbound.groupId } }
+            .groupBy(OutboundState::groupId)
+        val restoredOutbounds = restoredOutboundGroups.flatMap { group ->
+            outboundStatesByGroup[group.id].orEmpty()
+        }
         val restoredEndpoints = endpoints.map(EndpointEntity::toState)
         val restoredSelectors = selectors.map(SelectorEntity::toState)
 

@@ -46,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -90,7 +91,6 @@ import app.modes.OutboundListSortLatency
 import app.modes.OutboundListSortName
 import app.modes.OutboundListSortType
 import app.navigation.Route
-import app.withRemovedManagedOutbound
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.importing.ImportOperation
 import features.importing.ImportResultDialog
@@ -102,15 +102,13 @@ import features.importing.importFailureResultPresentation
 import features.importing.readImportUtf8WithinLimit
 import features.importing.reportImportFailure
 import features.importing.toImportResultPresentation
+import features.logs.FailureLogContext
 import features.singbox.displaySingBoxProtocolName
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.asterisk.zcc.abox.R
 import sh.calvin.reorderable.ReorderableItem
@@ -158,7 +156,8 @@ private data class OutboundQrDialogState(
 internal fun OutboundListPage(
     padding: PaddingValues,
 ) {
-    val appState by LocalAppStateStore.current.collectAppState()
+    val stateStore = LocalAppStateStore.current
+    val appState by stateStore.collectAppState()
     val updateAppState = LocalUpdateAppState.current
     val navigator = LocalNavigator.current
     val services = LocalAppServices.current
@@ -167,6 +166,10 @@ internal fun OutboundListPage(
     val resources = LocalResources.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
+    val pingState by services.outboundPingRuntime.state.collectAsState()
+    val outboundIndex = remember(appState.outbounds) {
+        services.outboundListProjectionCache.build(appState.outbounds)
+    }
     val groups = appState.outboundGroups
     val pagerState = rememberPagerState(pageCount = { groups.size.coerceAtLeast(1) })
     var importMenuExpanded by remember { mutableStateOf(false) }
@@ -179,21 +182,37 @@ internal fun OutboundListPage(
     }
     var query by rememberSaveable { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<OutboundState?>(null) }
+    var deletingOutboundId by remember { mutableStateOf<Int?>(null) }
+    var dragPreviewIds by remember { mutableStateOf<Map<Int, List<Int>>>(emptyMap()) }
+    val dragPreviewOwnership = remember { ReorderPreviewOwnership<Int>() }
+    val reorderMutex = remember { Mutex() }
     var qrCodeDialogState by remember { mutableStateOf<OutboundQrDialogState?>(null) }
     var importResultPresentation by remember {
         mutableStateOf<ImportResultPresentation?>(null)
     }
-    var pingingOutboundIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
-    val outboundPinger = remember { AndroidOutboundPinger() }
     val selectedGroup = groups.getOrNull(pagerState.currentPage) ?: groups.firstOrNull()
-    val selectedOutbounds = appState.outbounds.filter { it.groupId == selectedGroup?.id }
-    val visibleCount = selectedOutbounds.count { it.matchesQuery(query) }
+    val selectedOutbounds = outboundIndex.visible(
+        groupId = selectedGroup?.id ?: Int.MIN_VALUE,
+        query = "",
+        sort = OutboundListSortDefault,
+        pingState = pingState,
+    ).map(OutboundListItem::outbound)
+    val visibleCount = outboundIndex.visible(
+        groupId = selectedGroup?.id ?: Int.MIN_VALUE,
+        query = query,
+        sort = appState.outboundListSort,
+        pingState = pingState,
+    ).size
     val columns = resolveOutboundListColumns(appState.outboundListLayout, isWideScreen)
     val importFailedMessage = stringResource(R.string.outbound_import_failed)
+    val stateChangedMessage = stringResource(R.string.outbound_group_sync_failed)
     val emptyClipboardMessage = stringResource(R.string.outbound_import_empty_clipboard)
     val copiedMessage = stringResource(R.string.common_copied)
     val noPingTargetsMessage = stringResource(R.string.outbound_ping_no_targets)
-    val pingFailedMessage = stringResource(R.string.outbound_ping_failed)
+
+    LaunchedEffect(appState.outbounds) {
+        services.outboundPingRuntime.reconcile(appState.outbounds)
+    }
 
     LaunchedEffect(groups.map(OutboundGroupState::id)) {
         if (pagerState.currentPage > groups.lastIndex && groups.isNotEmpty()) {
@@ -208,7 +227,8 @@ internal fun OutboundListPage(
             val result = withContext(Dispatchers.Default) {
                 parseOutboundImportContent(content)
             }
-            val plan = appState.planOutboundImport(
+            val snapshot = stateStore.state.value
+            val plan = snapshot.planOutboundImport(
                 groupId = targetGroupId,
                 parsed = result,
                 replaceGroup = false,
@@ -226,36 +246,52 @@ internal fun OutboundListPage(
                 validateSingBoxRuntimeConfiguration(context, candidateState)
             }
             stage = ImportStage.COMMIT
-            var committed = false
-            updateAppState { state ->
-                if (state === appState) {
-                    committed = true
-                    candidateState
-                } else {
-                    state
+            when (val persistResult = services.outboundRepository.persistImport(snapshot, candidateState)) {
+                OutboundCommandResult.ImportPersisted -> {
+                    val presentation = plan.outcome.toImportResultPresentation(committed = true)
+                    if (presentation.showDialog) {
+                        importResultPresentation = presentation
+                    } else {
+                        services.tipNotifier.show(
+                            resources.getQuantityString(
+                                R.plurals.outbound_import_success,
+                                plan.outcome.accepted.size,
+                                plan.outcome.accepted.size,
+                            ),
+                        )
+                    }
                 }
-            }
-            if (committed) {
-                val presentation = plan.outcome.toImportResultPresentation(committed = true)
-                if (presentation.showDialog) {
-                    importResultPresentation = presentation
-                } else {
-                    services.tipNotifier.show(
-                        resources.getQuantityString(
-                            R.plurals.outbound_import_success,
-                            plan.outcome.accepted.size,
-                            plan.outcome.accepted.size,
-                        ),
+                OutboundCommandResult.Conflict -> {
+                    reportImportFailure(
+                        operation = ImportOperation.OUTBOUND,
+                        source = source,
+                        stage = ImportStage.COMMIT,
+                    )
+                    importResultPresentation = importFailureResultPresentation(stateChangedMessage)
+                }
+                is OutboundCommandResult.Invalid -> {
+                    reportImportFailure(
+                        operation = ImportOperation.OUTBOUND,
+                        source = source,
+                        stage = ImportStage.VALIDATE,
+                        error = persistResult.error,
+                    )
+                    importResultPresentation = importFailureResultPresentation(
+                        persistResult.error.message ?: importFailedMessage,
                     )
                 }
-            } else {
-                reportImportFailure(
-                    operation = ImportOperation.OUTBOUND,
-                    source = source,
-                    stage = stage,
-                )
-                importResultPresentation =
-                    plan.outcome.toImportResultPresentation(committed = false)
+                is OutboundCommandResult.PersistenceFailed -> {
+                    reportImportFailure(
+                        operation = ImportOperation.OUTBOUND,
+                        source = source,
+                        stage = ImportStage.COMMIT,
+                        error = persistResult.error,
+                    )
+                    importResultPresentation = importFailureResultPresentation(
+                        persistResult.error.message ?: importFailedMessage,
+                    )
+                }
+                else -> error("Unexpected outbound import result: $persistResult")
             }
         } catch (error: CancellationException) {
             throw error
@@ -264,6 +300,7 @@ internal fun OutboundListPage(
                 operation = ImportOperation.OUTBOUND,
                 source = source,
                 stage = stage,
+                error = error,
             )
             importResultPresentation = importFailureResultPresentation(
                 error.message ?: importFailedMessage,
@@ -340,77 +377,33 @@ internal fun OutboundListPage(
 
     fun pingOutbounds(
         targets: List<OutboundState>,
-        showSingleResult: Boolean,
     ) {
-        val testable = targets.filter { outbound -> outbound.pingHostOrNull() != null }
+        val testable = targets.filter { outbound ->
+            outboundIndex.item(outbound.id)?.pingHost != null
+        }
         if (testable.isEmpty()) {
             scope.launch { services.tipNotifier.show(noPingTargetsMessage) }
             return
         }
-        val targetIds = testable.mapTo(mutableSetOf(), OutboundState::id)
-        if (targetIds.any { outboundId -> outboundId in pingingOutboundIds }) return
-        scope.launch {
-            pingingOutboundIds = pingingOutboundIds + targetIds
-            updateAppState { state ->
-                state.copy(
-                    outbounds = state.outbounds.map { outbound ->
-                        if (outbound.id in targetIds) outbound.copy(pingMillis = null) else outbound
-                    },
-                )
-            }
-            try {
-                val semaphore = Semaphore(OutboundPingConcurrency)
-                val results = supervisorScope {
-                    testable.map { outbound ->
-                        async {
-                            val latency = semaphore.withPermit {
-                                pingOrFailure { outboundPinger.ping(outbound) }
-                            }
-                            updateAppState { state ->
-                                state.copy(
-                                    outbounds = state.outbounds.map { current ->
-                                        if (
-                                            current.id == outbound.id &&
-                                            current.json == outbound.json
-                                        ) {
-                                            current.copy(pingMillis = latency)
-                                        } else {
-                                            current
-                                        }
-                                    },
-                                )
-                            }
-                            outbound to latency
-                        }
-                    }.awaitAll()
-                }
-                if (showSingleResult) {
-                    results.singleOrNull()?.let { (outbound, latency) ->
-                        val resultText = if (latency >= 0L) {
-                            resources.getString(R.string.outbound_ping_latency, latency)
-                        } else {
-                            pingFailedMessage
-                        }
-                        services.tipNotifier.show(
-                            resources.getString(
-                                R.string.outbound_ping_result,
-                                outbound.remarks,
-                                resultText,
-                            ),
-                        )
-                    }
-                } else {
-                    services.tipNotifier.show(
-                        resources.getQuantityString(
-                            R.plurals.outbound_ping_complete,
-                            testable.size,
-                            testable.size,
-                        ),
-                    )
-                }
-            } finally {
-                pingingOutboundIds = pingingOutboundIds - targetIds
-            }
+        services.outboundPingRuntime.start(testable)
+    }
+
+    suspend fun handleOutboundCommandResult(
+        result: OutboundCommandResult,
+        expectedSuccess: OutboundCommandResult,
+        operation: String,
+        onSuccess: () -> Unit = {},
+    ) {
+        when (result) {
+            expectedSuccess -> onSuccess()
+            OutboundCommandResult.Conflict -> services.tipNotifier.show(stateChangedMessage)
+            is OutboundCommandResult.Invalid -> services.tipNotifier.show(importFailedMessage)
+            is OutboundCommandResult.PersistenceFailed -> services.tipNotifier.showError(
+                result.error,
+                importFailedMessage,
+                FailureLogContext(operation = operation, stage = "persist"),
+            )
+            else -> error("Unexpected $operation result: $result")
         }
     }
 
@@ -593,12 +586,11 @@ internal fun OutboundListPage(
                             layout = appState.outboundListLayout,
                             sort = appState.outboundListSort,
                             pingRunning = selectedOutbounds.any { outbound ->
-                                outbound.id in pingingOutboundIds
+                                outbound.id in pingState.runningIds
                             },
                             onPing = {
                                 pingOutbounds(
                                     targets = selectedOutbounds,
-                                    showSingleResult = false,
                                 )
                             },
                             onLayoutChange = { layout ->
@@ -629,7 +621,7 @@ internal fun OutboundListPage(
                                     label = buildString {
                                         append(group.displayName())
                                         append(" · ")
-                                        append(appState.outbounds.count { it.groupId == group.id })
+                                        append(outboundIndex.count(group.id))
                                     },
                                 )
                             }
@@ -650,9 +642,18 @@ internal fun OutboundListPage(
             verticalAlignment = Alignment.Top,
         ) { page ->
             val group = groups.getOrNull(page)
-            val outbounds = appState.outbounds
-                .filter { outbound -> outbound.groupId == group?.id && outbound.matchesQuery(query) }
-                .sortedForOutboundList(appState.outboundListSort)
+            val groupOutbounds = outboundIndex.visible(
+                groupId = group?.id ?: Int.MIN_VALUE,
+                query = query,
+                sort = appState.outboundListSort,
+                pingState = pingState,
+            )
+            val outbounds = dragPreviewIds[group?.id]
+                ?.let { previewIds ->
+                    val itemsById = groupOutbounds.associateBy(OutboundListItem::id)
+                    previewIds.mapNotNull(itemsById::get).takeIf { it.size == groupOutbounds.size }
+                }
+                ?: groupOutbounds
             val reorderEnabled =
                 appState.outboundListSort == OutboundListSortDefault && query.isBlank()
             val dragScrollThresholdBottomPadding =
@@ -667,16 +668,43 @@ internal fun OutboundListPage(
                 hasQuery = query.isNotBlank(),
                 columns = columns,
                 reorderEnabled = reorderEnabled,
-                pingingOutboundIds = pingingOutboundIds,
+                pingState = pingState,
                 onMove = { fromIndex, toIndex ->
-                    updateAppState { state ->
-                        state.copy(
-                            outbounds = state.outbounds.reorderVisibleOutbounds(
-                                visibleOutbounds = outbounds,
-                                fromIndex = fromIndex,
-                                toIndex = toIndex,
-                            ),
-                        )
+                    val groupId = group?.id ?: return@OutboundPage
+                    val currentIds = dragPreviewIds[groupId]
+                        ?.takeIf { previewIds ->
+                            previewIds.size == outbounds.size &&
+                                previewIds.toSet() == outbounds.mapTo(mutableSetOf(), OutboundListItem::id)
+                        }
+                        ?: outbounds.map(OutboundListItem::id)
+                    val reorderedIds = currentIds.toMutableList().apply {
+                        if (fromIndex in indices && toIndex in indices && fromIndex != toIndex) {
+                            add(toIndex, removeAt(fromIndex))
+                        }
+                    }
+                    if (reorderedIds == currentIds) return@OutboundPage
+                    val generation = dragPreviewOwnership.claim(groupId)
+                    dragPreviewIds = dragPreviewIds + (groupId to reorderedIds)
+                    scope.launch {
+                        reorderMutex.withLock {
+                            val result = services.outboundRepository.reorder(groupId, reorderedIds)
+                            handleOutboundCommandResult(
+                                result = result,
+                                expectedSuccess = OutboundCommandResult.Reordered,
+                                operation = "outbound_reorder",
+                                onSuccess = {
+                                    if (dragPreviewOwnership.releaseIfOwned(groupId, generation)) {
+                                        dragPreviewIds = dragPreviewIds - groupId
+                                    }
+                                },
+                            )
+                            if (
+                                result !is OutboundCommandResult.Reordered &&
+                                    dragPreviewOwnership.releaseIfOwned(groupId, generation)
+                            ) {
+                                dragPreviewIds = dragPreviewIds - groupId
+                            }
+                        }
                     }
                 },
                 onEdit = { outbound ->
@@ -719,7 +747,7 @@ internal fun OutboundListPage(
                     }
                 },
                 onPing = { outbound ->
-                    pingOutbounds(targets = listOf(outbound), showSingleResult = true)
+                    pingOutbounds(targets = listOf(outbound))
                 },
                 onDelete = { pendingDelete = it },
             )
@@ -734,14 +762,29 @@ internal fun OutboundListPage(
         confirmText = stringResource(R.string.common_delete),
         onDismissRequest = { pendingDelete = null },
         onConfirm = {
-            val id = pendingDelete?.id
-            if (id != null) {
-                updateAppState { state ->
-                    state.withRemovedManagedOutbound(id)
+            val id = pendingDelete?.id ?: return@WarningConfirmDialog
+            if (deletingOutboundId != null) return@WarningConfirmDialog
+            deletingOutboundId = id
+            scope.launch {
+                try {
+                    handleOutboundCommandResult(
+                        result = services.outboundRepository.delete(id),
+                        expectedSuccess = OutboundCommandResult.Deleted,
+                        operation = "outbound_delete",
+                        onSuccess = {
+                            if (pendingDelete?.id == id) {
+                                pendingDelete = null
+                            }
+                        },
+                    )
+                } finally {
+                    if (deletingOutboundId == id) {
+                        deletingOutboundId = null
+                    }
                 }
             }
-            pendingDelete = null
         },
+        busy = deletingOutboundId != null,
     )
 
     qrCodeDialogState?.let { state ->
@@ -762,13 +805,13 @@ internal fun OutboundListPage(
 
 @Composable
 private fun OutboundPage(
-    outbounds: List<OutboundState>,
+    outbounds: List<OutboundListItem>,
     contentPadding: PaddingValues,
     dragScrollThresholdBottomPadding: androidx.compose.ui.unit.Dp,
     hasQuery: Boolean,
     columns: Int,
     reorderEnabled: Boolean,
-    pingingOutboundIds: Set<Int>,
+    pingState: OutboundPingRuntimeState,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
     onEdit: (OutboundState) -> Unit,
     onShare: (OutboundState, OutboundShareAction, OutboundShareUrlResult) -> Unit,
@@ -834,9 +877,10 @@ private fun OutboundPage(
         } else {
             gridItems(
                 items = outbounds,
-                key = OutboundState::id,
+                key = OutboundListItem::id,
                 contentType = { "outbound" },
-            ) { outbound ->
+            ) { item ->
+                val outbound = item.outbound
                 ReorderableItem(
                     state = reorderableState.reorderableState,
                     key = outbound.id,
@@ -845,9 +889,9 @@ private fun OutboundPage(
                     animateItemModifier = Modifier.animateItem(),
                 ) { isDragging ->
                     OutboundCard(
-                        outbound = outbound,
+                        item = item,
                         compact = columns > 1,
-                        pinging = outbound.id in pingingOutboundIds,
+                        pingState = pingState,
                         isDragging = isDragging && reorderEnabled,
                         onEdit = { onEdit(outbound) },
                         onShare = { action, result -> onShare(outbound, action, result) },
@@ -869,9 +913,9 @@ private fun OutboundPage(
 
 @Composable
 private fun OutboundCard(
-    outbound: OutboundState,
+    item: OutboundListItem,
     compact: Boolean,
-    pinging: Boolean,
+    pingState: OutboundPingRuntimeState,
     isDragging: Boolean,
     onEdit: () -> Unit,
     onShare: (OutboundShareAction, OutboundShareUrlResult) -> Unit,
@@ -879,6 +923,8 @@ private fun OutboundCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val outbound = item.outbound
+    val pinging = outbound.id in pingState.runningIds
     val shareUrlResult = remember(outbound.json, outbound.remarks) {
         encodeOutboundShareUrl(outbound.json, outbound.remarks)
     }
@@ -943,7 +989,7 @@ private fun OutboundCard(
                         maxLines = if (compact) 2 else 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    outbound.cardEndpointSummary(compact)?.let { summary ->
+                    item.endpointSummary?.takeUnless { compact }?.let { summary ->
                         Text(
                             text = summary,
                             style = MaterialTheme.typography.bodySmall,
@@ -955,7 +1001,7 @@ private fun OutboundCard(
                     }
                 }
                 OutboundCardMenu(
-                    pingEnabled = outbound.pingHostOrNull() != null && !pinging,
+                    pingEnabled = item.pingHost != null && !pinging,
                     shareUrlResult = shareUrlResult,
                     onEdit = onEdit,
                     onShare = onShare,
@@ -980,7 +1026,7 @@ private fun OutboundCard(
                         MaterialTheme.typography.labelSmall
                     },
                 )
-                OutboundPingStatus(outbound.pingMillis, pinging)
+                OutboundPingStatus(item.pingLatencyMillis(pingState), pinging)
             }
         }
     }
@@ -1114,7 +1160,7 @@ private fun OutboundCardMenu(
 
 @Composable
 private fun OutboundPingStatus(
-    pingMillis: Long?,
+    latencyMillis: Long?,
     pinging: Boolean,
 ) {
     if (pinging) {
@@ -1127,27 +1173,27 @@ private fun OutboundPingStatus(
         )
         return
     }
-    pingMillis ?: return
+    latencyMillis ?: return
     Text(
-        text = if (pingMillis >= 0L) {
-            stringResource(R.string.outbound_ping_latency, pingMillis)
+        text = if (latencyMillis >= 0L) {
+            stringResource(R.string.outbound_ping_latency, latencyMillis)
         } else {
             stringResource(R.string.outbound_ping_failed)
         },
         style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.Medium,
-        color = outboundPingColor(pingMillis),
+        color = outboundPingColor(latencyMillis),
         maxLines = 1,
     )
 }
 
 @Composable
-private fun outboundPingColor(pingMillis: Long): Color {
+private fun outboundPingColor(latencyMillis: Long): Color {
     return when {
-        pingMillis < 0L -> MaterialTheme.colorScheme.error
-        pingMillis < 100L -> MaterialTheme.colorScheme.tertiary
-        pingMillis < 300L -> MaterialTheme.colorScheme.primary
-        pingMillis < 600L -> MaterialTheme.colorScheme.secondary
+        latencyMillis < 0L -> MaterialTheme.colorScheme.error
+        latencyMillis < 100L -> MaterialTheme.colorScheme.tertiary
+        latencyMillis < 300L -> MaterialTheme.colorScheme.primary
+        latencyMillis < 600L -> MaterialTheme.colorScheme.secondary
         else -> MaterialTheme.colorScheme.error
     }
 }
@@ -1397,7 +1443,6 @@ private val OutboundCardMenuIconOffset = outboundCardMenuIconOffsetDp(
     iconSizeDp = 24,
 )
 private val OutboundEmptyStateMinHeight = 320.dp
-private const val OutboundPingConcurrency = 8
 private const val OutboundImportManualMenuMaxHeightDp = 500
 // Mirrors Material3's 48dp window margin and 8dp content padding on both vertical edges.
 private const val OutboundImportMenuVerticalChromeDp = 2 * (48 + 8)
@@ -1417,11 +1462,4 @@ private fun Context.readOutboundImportFile(uri: Uri): String {
     } ?: error("Unable to open outbound file")
     require(content.isNotBlank()) { "Outbound file is empty" }
     return content
-}
-
-private fun OutboundState.matchesQuery(query: String): Boolean {
-    if (query.isBlank()) return true
-    return remarks.contains(query, ignoreCase = true) ||
-        type.contains(query, ignoreCase = true) ||
-        endpointSummary()?.contains(query, ignoreCase = true) == true
 }

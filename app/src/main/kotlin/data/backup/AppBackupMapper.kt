@@ -367,7 +367,6 @@ private fun AppBackupOutbound.toState(): OutboundState =
         remarks = remarks,
         type = type,
         json = json,
-        pingMillis = null,
     )
 
 private fun AppBackupEndpoint.toState(): SingBoxEndpointState =

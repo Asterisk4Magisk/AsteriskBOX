@@ -70,7 +70,6 @@ data class OutboundState(
     val remarks: String,
     val type: String,
     val json: String,
-    val pingMillis: Long? = null,
 ) {
     val tag: String
         get() = managedOutboundTag(id, remarks)
@@ -443,8 +442,35 @@ fun AppState.withRemovedManagedOutboundTags(
         .apply { addAll(endpoints.map(SingBoxEndpointState::tag)) }
     val unavailableTags = removedTags - availableTargetTags
     if (unavailableTags.isEmpty()) return this
-    val (updatedSelectors, transitivelyUnavailableTags) =
-        selectors.withPrunedUnavailableMembers(unavailableTags)
+    val unavailableWithDependencies = unavailableTags.toMutableSet()
+    var updatedSelectors = selectors
+    var updatedOutbounds = outbounds
+    while (true) {
+        updatedSelectors = updatedSelectors.map { selector ->
+            val members = selector.outbounds.filterNot(unavailableWithDependencies::contains)
+            selector.copy(
+                outbounds = members,
+                default = if (selector.type == SingBoxSelectorTypeUrlTest) {
+                    ""
+                } else {
+                    selector.default.takeIf(members::contains)
+                        ?: members.firstOrNull().orEmpty()
+                },
+            )
+        }
+        val prunedRaw = updatedOutbounds.withPrunedUnavailableGroupedMembers(
+            unavailableWithDependencies,
+        )
+        updatedOutbounds = prunedRaw.outbounds
+        val newlyUnavailableTags = updatedSelectors
+            .filter { selector -> selector.outbounds.isEmpty() }
+            .mapTo(mutableSetOf(), SingBoxSelectorState::tag)
+            .apply { addAll(prunedRaw.newlyUnavailableTags) }
+            .minus(unavailableWithDependencies)
+        if (newlyUnavailableTags.isEmpty()) break
+        unavailableWithDependencies += newlyUnavailableTags
+    }
+    val transitivelyUnavailableTags = unavailableWithDependencies
     val dependentDnsServerTags = dnsServers
         .filter { server ->
             server.type in EndpointBackedDnsServerTypes &&
@@ -452,8 +478,8 @@ fun AppState.withRemovedManagedOutboundTags(
         }
         .mapTo(mutableSetOf(), SingBoxDnsServerState::tag)
     return copy(
-        outbounds = transitivelyUnavailableTags.fold(outbounds) { updatedOutbounds, tag ->
-            updatedOutbounds.replaceManagedReference(
+        outbounds = transitivelyUnavailableTags.fold(updatedOutbounds) { currentOutbounds, tag ->
+            currentOutbounds.replaceManagedReference(
                 field = "detour",
                 previousTag = tag,
                 replacementTag = "",
@@ -488,35 +514,6 @@ fun AppState.withRemovedManagedOutboundTags(
             )
         },
     ).withRemovedManagedDnsServers(dependentDnsServerTags)
-}
-
-private fun List<SingBoxSelectorState>.withPrunedUnavailableMembers(
-    initiallyUnavailableTags: Set<String>,
-): Pair<List<SingBoxSelectorState>, Set<String>> {
-    val unavailableTags = initiallyUnavailableTags.toMutableSet()
-    var updatedSelectors = this
-    while (true) {
-        updatedSelectors = updatedSelectors.map { selector ->
-            val members = selector.outbounds.filterNot(unavailableTags::contains)
-            selector.copy(
-                outbounds = members,
-                default = if (selector.type == SingBoxSelectorTypeUrlTest) {
-                    ""
-                } else {
-                    selector.default.takeIf(members::contains)
-                        ?: members.firstOrNull().orEmpty()
-                },
-            )
-        }
-        val newlyUnavailableTags = updatedSelectors
-            .filter { selector -> selector.outbounds.isEmpty() }
-            .mapTo(mutableSetOf(), SingBoxSelectorState::tag)
-            .minus(unavailableTags)
-        if (newlyUnavailableTags.isEmpty()) {
-            return updatedSelectors to unavailableTags
-        }
-        unavailableTags += newlyUnavailableTags
-    }
 }
 
 fun AppState.withRemovedManagedOutbound(outboundId: Int): AppState {

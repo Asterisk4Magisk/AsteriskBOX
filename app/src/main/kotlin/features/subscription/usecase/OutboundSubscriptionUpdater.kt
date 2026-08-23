@@ -11,7 +11,6 @@ import features.importing.ImportStage
 import features.importing.sanitizePersistedImportSummary
 import features.outbound.ImportedSingBoxOutbound
 import features.outbound.planOutboundImport
-import app.withRemovedManagedOutboundTags
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.sync.Mutex
@@ -62,7 +61,7 @@ internal sealed interface OutboundSubscriptionUpdateResult {
 internal interface SubscriptionStateGateway {
     fun snapshot(): AppState
 
-    fun compareAndSet(expected: AppState, updated: AppState): Boolean
+    suspend fun compareAndSet(expected: AppState, updated: AppState): Result<Boolean>
 }
 
 internal class OutboundSubscriptionUpdater(
@@ -207,13 +206,20 @@ internal class OutboundSubscriptionUpdater(
                     lastUpdateErrorSummary = "",
                 )
             }
-            if (stateGateway.compareAndSet(snapshot, candidate)) {
-                return CommitResult.NotModified
+            when (val commit = commitState(snapshot, candidate)) {
+                PersistenceAttempt.Persisted -> return CommitResult.NotModified
+                PersistenceAttempt.Conflict -> Unit
+                is PersistenceAttempt.Failed -> {
+                    return CommitResult.Failed(
+                        stage = ImportStage.COMMIT,
+                        error = commit.error,
+                    )
+                }
             }
         }
         return CommitResult.Failed(
             stage = ImportStage.COMMIT,
-            message = StateChangedMessage,
+            error = IllegalStateException(StateChangedMessage),
         )
     }
 
@@ -248,20 +254,25 @@ internal class OutboundSubscriptionUpdater(
                     skippedCount = plan.outcome.skippedCount,
                     duplicateCount = plan.outcome.duplicateCount,
                 )
-                if (stateGateway.compareAndSet(snapshot, failed)) {
-                    return CommitResult.Failed(
-                        stage = ImportStage.VALIDATE,
-                        message = message,
-                        outcome = plan.outcome,
-                    )
+                when (val commit = commitState(snapshot, failed)) {
+                    PersistenceAttempt.Persisted -> {
+                        return CommitResult.Failed(
+                            stage = ImportStage.VALIDATE,
+                            error = IllegalStateException(message),
+                            outcome = plan.outcome,
+                        )
+                    }
+                    PersistenceAttempt.Conflict -> return@repeat
+                    is PersistenceAttempt.Failed -> {
+                        return CommitResult.Failed(
+                            stage = ImportStage.COMMIT,
+                            error = commit.error,
+                            outcome = plan.outcome,
+                        )
+                    }
                 }
-                return@repeat
             }
 
-            val previousTags = snapshot.outbounds
-                .asSequence()
-                .filter { outbound -> outbound.groupId == groupId }
-                .mapTo(mutableSetOf()) { outbound -> outbound.tag }
             val isPartial = plan.outcome.skippedCount > 0
             val now = nowMillis()
             val summary = if (isPartial) {
@@ -269,26 +280,24 @@ internal class OutboundSubscriptionUpdater(
             } else {
                 ""
             }
-            val candidate = plan.state
-                .withRemovedManagedOutboundTags(previousTags)
-                .withUpdatedGroup(groupId) { group ->
-                    group.copy(
-                        lastUpdateAttemptAtMillis = now,
-                        lastUpdatedAtMillis = now,
-                        lastUpdateStatus = if (isPartial) {
-                            OutboundGroupUpdateStatus.PARTIAL
-                        } else {
-                            OutboundGroupUpdateStatus.SUCCESS
-                        },
-                        lastUpdateImportedCount = plan.outcome.accepted.size,
-                        lastUpdateSkippedCount = plan.outcome.skippedCount,
-                        lastUpdateDuplicateCount = plan.outcome.duplicateCount,
-                        consecutiveUpdateFailures = 0,
-                        lastUpdateErrorSummary = sanitizePersistedImportSummary(summary),
-                        subscriptionEtag = prepared.etag,
-                        subscriptionLastModified = prepared.lastModified,
-                    )
-                }
+            val candidate = plan.state.withUpdatedGroup(groupId) { group ->
+                group.copy(
+                    lastUpdateAttemptAtMillis = now,
+                    lastUpdatedAtMillis = now,
+                    lastUpdateStatus = if (isPartial) {
+                        OutboundGroupUpdateStatus.PARTIAL
+                    } else {
+                        OutboundGroupUpdateStatus.SUCCESS
+                    },
+                    lastUpdateImportedCount = plan.outcome.accepted.size,
+                    lastUpdateSkippedCount = plan.outcome.skippedCount,
+                    lastUpdateDuplicateCount = plan.outcome.duplicateCount,
+                    consecutiveUpdateFailures = 0,
+                    lastUpdateErrorSummary = sanitizePersistedImportSummary(summary),
+                    subscriptionEtag = prepared.etag,
+                    subscriptionLastModified = prepared.lastModified,
+                )
+            }
             try {
                 onStage(ImportStage.VALIDATE)
                 validate(candidate)
@@ -302,27 +311,46 @@ internal class OutboundSubscriptionUpdater(
                     skippedCount = plan.outcome.skippedCount,
                     duplicateCount = plan.outcome.duplicateCount,
                 )
-                if (stateGateway.compareAndSet(snapshot, failed)) {
-                    return CommitResult.Failed(
-                        stage = ImportStage.VALIDATE,
-                        message = error.message ?: "Subscription validation failed",
-                        outcome = plan.outcome,
-                    )
+                when (val commit = commitState(snapshot, failed)) {
+                    PersistenceAttempt.Persisted -> {
+                        return CommitResult.Failed(
+                            stage = ImportStage.VALIDATE,
+                            error = error,
+                            outcome = plan.outcome,
+                        )
+                    }
+                    PersistenceAttempt.Conflict -> return@repeat
+                    is PersistenceAttempt.Failed -> {
+                        return CommitResult.Failed(
+                            stage = ImportStage.COMMIT,
+                            error = commit.error,
+                            outcome = plan.outcome,
+                        )
+                    }
                 }
-                return@repeat
             }
             onStage(ImportStage.COMMIT)
-            if (stateGateway.compareAndSet(snapshot, candidate)) {
-                return if (isPartial) {
-                    CommitResult.Partial(plan.outcome)
-                } else {
-                    CommitResult.Success(plan.outcome)
+            when (val commit = commitState(snapshot, candidate)) {
+                PersistenceAttempt.Persisted -> {
+                    return if (isPartial) {
+                        CommitResult.Partial(plan.outcome)
+                    } else {
+                        CommitResult.Success(plan.outcome)
+                    }
+                }
+                PersistenceAttempt.Conflict -> Unit
+                is PersistenceAttempt.Failed -> {
+                    return CommitResult.Failed(
+                        stage = ImportStage.COMMIT,
+                        error = commit.error,
+                        outcome = plan.outcome,
+                    )
                 }
             }
         }
         return CommitResult.Failed(
             stage = ImportStage.COMMIT,
-            message = StateChangedMessage,
+            error = IllegalStateException(StateChangedMessage),
             outcome = outcome,
         )
     }
@@ -350,11 +378,20 @@ internal class OutboundSubscriptionUpdater(
                 skippedCount = skippedCount,
                 duplicateCount = duplicateCount,
             )
-            if (stateGateway.compareAndSet(snapshot, candidate)) {
-                return@withLock OutboundSubscriptionUpdateResult.Failed(
-                    stage = stage,
-                    error = error,
-                )
+            when (val commit = commitState(snapshot, candidate)) {
+                PersistenceAttempt.Persisted -> {
+                    return@withLock OutboundSubscriptionUpdateResult.Failed(
+                        stage = stage,
+                        error = error,
+                    )
+                }
+                PersistenceAttempt.Conflict -> Unit
+                is PersistenceAttempt.Failed -> {
+                    return@withLock OutboundSubscriptionUpdateResult.Failed(
+                        stage = ImportStage.COMMIT,
+                        error = commit.error,
+                    )
+                }
             }
         }
         OutboundSubscriptionUpdateResult.Failed(
@@ -370,6 +407,20 @@ internal class OutboundSubscriptionUpdater(
         val group = outboundGroups.firstOrNull { it.id == groupId } ?: return null
         if (trigger == SubscriptionUpdateTrigger.BACKGROUND && !group.enabled) return null
         return group
+    }
+
+    private suspend fun commitState(
+        expected: AppState,
+        candidate: AppState,
+    ): PersistenceAttempt {
+        val result = stateGateway.compareAndSet(expected, candidate)
+        val error = result.exceptionOrNull()
+        if (error != null) return PersistenceAttempt.Failed(error)
+        return if (result.getOrThrow()) {
+            PersistenceAttempt.Persisted
+        } else {
+            PersistenceAttempt.Conflict
+        }
     }
 
     private fun AppState.withUpdatedGroup(
@@ -430,9 +481,15 @@ internal class OutboundSubscriptionUpdater(
 
         data class Failed(
             val stage: ImportStage,
-            val message: String,
+            val error: Throwable,
             val outcome: ImportOutcome<ImportedSingBoxOutbound>? = null,
         ) : CommitResult
+    }
+
+    private sealed interface PersistenceAttempt {
+        data object Persisted : PersistenceAttempt
+        data object Conflict : PersistenceAttempt
+        data class Failed(val error: Throwable) : PersistenceAttempt
     }
 
     private fun CommitResult.toPublicResult(): OutboundSubscriptionUpdateResult = when (this) {
@@ -447,7 +504,7 @@ internal class OutboundSubscriptionUpdater(
         )
         is CommitResult.Failed -> OutboundSubscriptionUpdateResult.Failed(
             stage = stage,
-            error = IllegalStateException(sanitizePersistedImportSummary(message)),
+            error = error,
             outcome = outcome,
         )
     }
