@@ -13,14 +13,14 @@ object ProjectConfig {
     const val PROJECT_NAME = "AsteriskBOX"
     const val VERSION_NAME = "1.1.4-dev"
     const val PACKAGE_NAME = "org.asterisk.zcc.abox"
-    const val ASTERISKD_VERSION = "v2.0.19"
+    const val ASTERISKD_VERSION = "v2.0.20"
     const val BPF2SOCKS_VERSION = "v1.0.6"
     const val BPF_MATCHER_VERSION = "v1.0.1"
     const val ANDROID_LIB_BOX_LITE_VERSION = "v1.14.0-rc.1-reF1nd"
     const val SING_BOX_VERSION = ANDROID_LIB_BOX_LITE_VERSION
     const val HEV_SOCKS5_TUNNEL_VERSION = "2.17.1"
     const val TARGET_SDK = 37
-    const val MIN_SDK = 24
+    const val MIN_SDK = 26
     val SUPPORTED_ANDROID_ABIS = listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 }
 

@@ -36,9 +36,7 @@ internal object AndroidLibboxRuntime {
                 basePath = baseDir.absolutePath
                 workingPath = workingDir.absolutePath
                 tempPath = tempDir.absolutePath
-                fixAndroidStack = debuggable ||
-                    Build.VERSION.SDK_INT in Build.VERSION_CODES.N..Build.VERSION_CODES.N_MR1 ||
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                fixAndroidStack = debuggable || Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
                 logMaxLines = 3_000
                 debug = debuggable
                 crashReportSource = "AsteriskBOX"
@@ -105,8 +103,6 @@ internal class AndroidLibboxServiceRuntime(
         }
         platformInterface.closeTun()
     }
-
-    fun isRunning(): Boolean = commandServer != null
 
     override fun serviceStop() {
         onStopRequested()

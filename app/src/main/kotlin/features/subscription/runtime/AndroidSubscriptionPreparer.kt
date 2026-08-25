@@ -3,7 +3,6 @@
 
 package features.subscription.runtime
 
-import android.os.Build
 import app.SubscriptionInfo
 import engine.singbox.config.SingBoxConfigChecker
 import features.importing.MaxImportErrorPreviewBytes
@@ -270,9 +269,6 @@ private fun String.decryptAgeIfNeeded(ageSecretKey: String): String {
         !trimmed.startsWith(ArmoredAgeHeader)
     ) {
         return this
-    }
-    check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        "AGE encrypted subscriptions require Android 8.0 or newer"
     }
     val decrypted = ByteArrayOutputStream()
     Age.decryptStream(
