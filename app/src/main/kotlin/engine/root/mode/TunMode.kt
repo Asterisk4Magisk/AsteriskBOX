@@ -4,6 +4,7 @@
 package engine.root.mode
 
 import app.AppState
+import app.rootIpv6DataPathEnabled
 import engine.proxy.toLocalProxyOptions
 import engine.root.config.RootConfigBuildContext
 import engine.root.config.RootModeStartConfig
@@ -49,7 +50,7 @@ private fun AppState.buildSingBoxTunConfig(tunOptions: TunOptions): SingBoxTunCo
         stack = SingBoxConfigFactory.tunStack(this),
         mtu = tunOptions.mtu,
         ipv4Address = "${tunOptions.ipv4Address.address}/${tunOptions.ipv4Address.prefixLength}",
-        ipv6Address = if (enableIpv6) {
+        ipv6Address = if (rootIpv6DataPathEnabled) {
             "${tunOptions.ipv6Address.address}/${tunOptions.ipv6Address.prefixLength}"
         } else {
             null

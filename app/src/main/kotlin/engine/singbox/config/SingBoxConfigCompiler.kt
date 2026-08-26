@@ -33,6 +33,7 @@ import app.modes.RunModeVpnService
 import app.modes.SingBoxModeDirect
 import app.modes.SingBoxModeGlobal
 import app.modes.isRootRunMode
+import app.rootIpv6DataPathEnabled
 import app.withCanonicalManagedTagReferences
 import app.withPrunedDnsServerReferences
 import app.withUnavailableManagedRuleSetsDisabled
@@ -273,7 +274,7 @@ private fun compileInbounds(
         RunModeTproxy -> retained += buildJsonObject {
             put("type", "tproxy")
             put("tag", APP_ROOT_INBOUND)
-            put("listen", "0.0.0.0")
+            put("listen", if (appState.rootIpv6DataPathEnabled) "::" else "0.0.0.0")
             put("listen_port", appState.transparentProxyPort.toPortOrNull() ?: RootModeEngine.DefaultTproxyPort)
         }
         RunModeTun2Socks, RunModeBpf2Socks -> retained += buildJsonObject {
@@ -379,7 +380,7 @@ private fun compileTunInbound(appState: AppState, rootMode: Boolean): JsonObject
         put("mtu", options.mtu)
         putJsonArray("address") {
             add("${options.ipv4Address.address}/${options.ipv4Address.prefixLength}")
-            if (appState.enableIpv6) {
+            if (appState.enableIpv6 || (rootMode && appState.rootIpv6DataPathEnabled)) {
                 add("${options.ipv6Address.address}/${options.ipv6Address.prefixLength}")
             }
         }
@@ -1041,7 +1042,7 @@ private fun kotlinx.serialization.json.JsonObjectBuilder.putPortArray(
 }
 
 private fun JsonArray?.orEmptyObjects(): List<JsonObject> =
-    this?.mapNotNull { element -> element as? JsonObject }.orEmpty()
+    this?.filterIsInstance<JsonObject>().orEmpty()
 
 private fun JsonObject.hasAppTag(): Boolean =
     isManagedSingBoxTag((this["tag"] as? JsonPrimitive)?.contentOrNull.orEmpty())

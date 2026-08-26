@@ -3,6 +3,7 @@
 
 package engine.root.mode
 
+import app.rootIpv6DataPathEnabled
 import engine.proxy.toLocalProxyOptions
 import engine.root.daemon.config.AsteriskdHevSocks5TunnelHelper
 import engine.root.daemon.config.AsteriskdMode
@@ -34,7 +35,9 @@ internal fun RootConfigBuildContext.buildTun2SocksStartConfig(): RootModeStartCo
                 tunnelName = "asterisk0",
                 mtu = tunOptions.mtu,
                 ipv4Address = tunOptions.ipv4Address.address,
-                ipv6Address = tunOptions.ipv6Address.address.takeIf { appState.enableIpv6 },
+                ipv6Address = tunOptions.ipv6Address.address.takeIf {
+                    appState.rootIpv6DataPathEnabled
+                },
                 multiQueue = true,
                 tcpFastOpen = true,
             ),
