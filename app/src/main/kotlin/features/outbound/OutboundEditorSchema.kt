@@ -18,7 +18,6 @@ import org.asterisk.zcc.abox.R
 
 internal enum class OutboundFieldKind {
     TEXT,
-    SECRET,
     INTEGER,
     BOOLEAN,
     SELECT,

@@ -8,7 +8,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 internal fun socksOutboundFields() = listOf(
     outboundSelect("version", "SOCKS version", listOf("5", "4", "4a")),
     outboundField("username", "Username"),
-    outboundField("password", "Password", OutboundFieldKind.SECRET),
+    outboundField("password", "Password"),
     outboundSelect("network", "Network", listOf("", "tcp", "udp")),
     outboundField("udp_over_tcp.enabled", "UDP over TCP", OutboundFieldKind.BOOLEAN),
     outboundField(
@@ -21,14 +21,14 @@ internal fun socksOutboundFields() = listOf(
 
 internal fun httpOutboundFields() = listOf(
     outboundField("username", "Username"),
-    outboundField("password", "Password", OutboundFieldKind.SECRET),
+    outboundField("password", "Password"),
     outboundField("path", "Request path"),
     outboundField("headers", "Headers", OutboundFieldKind.KEY_VALUE),
 )
 
 internal fun shadowsocksOutboundFields() = listOf(
     outboundSelect("method", "Encryption method", SingBoxShadowsocksMethods, required = true),
-    outboundField("password", "Password", OutboundFieldKind.SECRET, required = true),
+    outboundField("password", "Password", required = true),
     outboundSelect("plugin", "Plugin", listOf("", "obfs-local", "v2ray-plugin")),
     outboundField("plugin_opts", "Plugin options"),
     outboundSelect("network", "Network", listOf("", "tcp", "udp")),

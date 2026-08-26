@@ -7,7 +7,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 
 internal fun naiveOutboundFields() = listOf(
     outboundField("username", "Username"),
-    outboundField("password", "Password", OutboundFieldKind.SECRET),
+    outboundField("password", "Password"),
     outboundField("insecure_concurrency", "Insecure concurrency", OutboundFieldKind.INTEGER),
     outboundField("extra_headers", "Extra headers", OutboundFieldKind.KEY_VALUE),
     outboundField("udp_over_tcp.enabled", "UDP over TCP", OutboundFieldKind.BOOLEAN),
@@ -55,13 +55,12 @@ internal fun shadowTlsOutboundFields() = listOf(
     outboundField(
         "password",
         "Password",
-        OutboundFieldKind.SECRET,
         conditions = listOf(OutboundFieldCondition("version", setOf("2", "3"))),
     ),
 )
 
 internal fun anyTlsOutboundFields() = listOf(
-    outboundField("password", "Password", OutboundFieldKind.SECRET, required = true),
+    outboundField("password", "Password", required = true),
     outboundField("idle_session_check_interval", "Idle session check interval"),
     outboundField("idle_session_timeout", "Idle session timeout"),
     outboundField("min_idle_session", "Minimum idle sessions", OutboundFieldKind.INTEGER),
@@ -70,8 +69,8 @@ internal fun anyTlsOutboundFields() = listOf(
 
 internal fun snellOutboundFields() = listOf(
     outboundSelect("version", "Snell version", listOf("4", "6")),
-    outboundField("psk", "Pre-shared key", OutboundFieldKind.SECRET, required = true),
-    outboundField("userkey", "User key", OutboundFieldKind.SECRET),
+    outboundField("psk", "Pre-shared key", required = true),
+    outboundField("userkey", "User key"),
     outboundField("reuse", "Connection reuse", OutboundFieldKind.BOOLEAN),
     outboundSelect("network", "Network", listOf("", "tcp", "udp")),
     outboundSelect(
@@ -98,10 +97,10 @@ internal fun snellOutboundFields() = listOf(
 
 internal fun sshOutboundFields() = listOf(
     outboundField("user", "User"),
-    outboundField("password", "Password", OutboundFieldKind.SECRET),
+    outboundField("password", "Password"),
     outboundField("private_key", "Private key", OutboundFieldKind.MULTILINE),
     outboundField("private_key_path", "Private key path"),
-    outboundField("private_key_passphrase", "Private key passphrase", OutboundFieldKind.SECRET),
+    outboundField("private_key_passphrase", "Private key passphrase"),
     outboundField("host_key", "Host keys", OutboundFieldKind.TEXT_LIST),
     outboundField("host_key_algorithms", "Host key algorithms", OutboundFieldKind.TEXT_LIST),
     outboundField("client_version", "Client version"),

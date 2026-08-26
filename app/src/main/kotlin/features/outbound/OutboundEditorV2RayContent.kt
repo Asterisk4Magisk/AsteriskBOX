@@ -20,7 +20,7 @@ internal fun vmessOutboundFields() = listOf(
 )
 
 internal fun trojanOutboundFields() = listOf(
-    outboundField("password", "Password", OutboundFieldKind.SECRET, required = true),
+    outboundField("password", "Password", required = true),
     outboundSelect("network", "Network", listOf("", "tcp", "udp")),
 )
 

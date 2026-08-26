@@ -10,15 +10,15 @@ internal fun hysteriaOutboundFields() = listOf(
     outboundField("hop_interval", "Port hopping interval"),
     outboundField("up_mbps", "Upload bandwidth (Mbps)", OutboundFieldKind.INTEGER),
     outboundField("down_mbps", "Download bandwidth (Mbps)", OutboundFieldKind.INTEGER),
-    outboundField("obfs", "Obfuscation password", OutboundFieldKind.SECRET),
-    outboundField("auth", "Authentication bytes", OutboundFieldKind.SECRET),
-    outboundField("auth_str", "Authentication string", OutboundFieldKind.SECRET),
+    outboundField("obfs", "Obfuscation password"),
+    outboundField("auth", "Authentication bytes"),
+    outboundField("auth_str", "Authentication string"),
     outboundSelect("network", "Network", listOf("", "tcp", "udp")),
 )
 
 internal fun tuicOutboundFields() = listOf(
     outboundField("uuid", "UUID", required = true),
-    outboundField("password", "Password", OutboundFieldKind.SECRET, required = true),
+    outboundField("password", "Password", required = true),
     outboundSelect("congestion_control", "Congestion control", listOf("", "cubic", "new_reno", "bbr")),
     outboundSelect("udp_relay_mode", "UDP relay mode", listOf("", "native", "quic")),
     outboundField("udp_over_stream", "UDP over stream", OutboundFieldKind.BOOLEAN),
@@ -36,10 +36,9 @@ internal fun hysteria2OutboundFields() = listOf(
     outboundField(
         "obfs.password",
         "Obfuscation password",
-        OutboundFieldKind.SECRET,
         conditions = listOf(OutboundFieldCondition("obfs.type", setOf("salamander"))),
     ),
-    outboundField("password", "Password", OutboundFieldKind.SECRET, required = true),
+    outboundField("password", "Password", required = true),
     outboundSelect("network", "Network", listOf("", "tcp", "udp")),
 )
 

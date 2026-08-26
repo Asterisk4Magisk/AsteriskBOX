@@ -38,7 +38,6 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import app.LocalAppServices
 import app.LocalAppStateStore
@@ -354,11 +353,6 @@ internal fun OutboundEditorField(
             isError = error != null,
             singleLine = field.kind !in setOf(OutboundFieldKind.MULTILINE, OutboundFieldKind.TEXT_LIST),
             minLines = if (field.kind == OutboundFieldKind.MULTILINE) 3 else 1,
-            visualTransformation = if (field.kind == OutboundFieldKind.SECRET) {
-                PasswordVisualTransformation()
-            } else {
-                androidx.compose.ui.text.input.VisualTransformation.None
-            },
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (field.kind == OutboundFieldKind.INTEGER) {
                     KeyboardType.Number
