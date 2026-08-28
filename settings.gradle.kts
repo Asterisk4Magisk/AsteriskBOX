@@ -34,16 +34,20 @@ dependencyResolutionManagement {
         }
         mavenCentral()
         maven("https://jitpack.io")
-        ivy {
-            name = "AndroidLibBoxLiteGitHubRelease"
-            url = uri("https://github.com/Asterisk4Magisk/AndroidLibBoxLite/releases/download")
-            patternLayout {
-                artifact("[revision]/[artifact].[ext]")
+        exclusiveContent {
+            forRepository {
+                ivy {
+                    name = "AndroidLibBoxLiteGitHubRelease"
+                    url = uri("https://github.com/Asterisk4Magisk/AndroidLibBoxLite/releases/download")
+                    patternLayout {
+                        artifact("[revision]/[artifact].[ext]")
+                    }
+                    metadataSources {
+                        artifact()
+                    }
+                }
             }
-            metadataSources {
-                artifact()
-            }
-            content {
+            filter {
                 includeModule("com.github.asterisk4magisk", "libbox")
             }
         }
