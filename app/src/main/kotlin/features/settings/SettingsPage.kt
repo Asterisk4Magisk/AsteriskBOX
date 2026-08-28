@@ -592,12 +592,6 @@ private fun SettingsContent(
                     onOpenPrivateAddresses = { sheetState.openPrivateAddresses(appState) },
                 )
             }
-            item(key = "settings_logs") {
-                SettingsLogsSection(
-                    onOpenCoreLogs = { navigator.push(Route.CoreLogs) },
-                    onOpenLogcatLogs = { navigator.push(Route.LogcatLogs) },
-                )
-            }
             item(key = "settings_backup_restore") {
                 SettingsBackupRestoreSection(
                     progressText = backupRestoreProgressText,
@@ -638,6 +632,12 @@ private fun SettingsContent(
                             }
                         }
                     },
+                )
+            }
+            item(key = "settings_logs") {
+                SettingsLogsSection(
+                    onOpenCoreLogs = { navigator.push(Route.CoreLogs) },
+                    onOpenLogcatLogs = { navigator.push(Route.LogcatLogs) },
                 )
             }
             item(key = "settings_about") {
