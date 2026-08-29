@@ -14,7 +14,7 @@ object ProjectConfig {
     const val VERSION_NAME = "1.1.5-dev"
     const val PACKAGE_NAME = "org.asterisk.zcc.abox"
     const val ASTERISKD_VERSION = "v2.0.23"
-    const val BPF2SOCKS_VERSION = "v1.0.10"
+    const val BPF2SOCKS_VERSION = "v1.0.11"
     const val BPF_MATCHER_VERSION = "v1.0.1"
     const val ANDROID_LIB_BOX_LITE_VERSION = "v1.14.0-rc.1-reF1nd"
     const val SING_BOX_VERSION = ANDROID_LIB_BOX_LITE_VERSION
