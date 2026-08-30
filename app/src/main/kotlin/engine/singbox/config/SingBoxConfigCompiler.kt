@@ -299,14 +299,13 @@ internal fun compileEbpfInbound(
     availableRuleSetTags: Set<String>,
 ): JsonObject {
     val sharedInterfaces = normalizeEbpfSharedNetworkInterfaces(appState.ebpfSharedNetworkInterfaces)
-    val ipv6Mode = if (appState.enableIpv6) "always" else "off"
     return buildJsonObject {
         put("type", "ebpf")
         put("tag", APP_ROOT_INBOUND)
         put("mode", if (sharedInterfaces.isEmpty()) "local" else "hybrid")
         putJsonObject("local") {
             put("dns_mode", if (appState.enableLocalDns) "hijack" else "off")
-            put("ipv6_mode", ipv6Mode)
+            put("ipv6", appState.enableIpv6)
             put("bypass_private_address", false)
             if (uidPolicy.includeUids.isNotEmpty()) {
                 putJsonArray("include_uid") {
@@ -332,7 +331,7 @@ internal fun compileEbpfInbound(
                     sharedInterfaces.forEach(::add)
                 }
                 put("bypass_private_address", false)
-                put("ipv6_mode", ipv6Mode)
+                put("ipv6", appState.enableIpv6)
             }
         }
     }
