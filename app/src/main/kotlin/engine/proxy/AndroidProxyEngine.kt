@@ -280,14 +280,10 @@ internal class AndroidProxyEngine(
             SingBoxTrafficStatsNotificationService.reconcile(appContext, null)
             return this
         }
-        val activeRunMode = runMode ?: appState?.runMode
-        if (activeRunMode != RunModeVpnService) {
-            SingBoxTrafficStatsNotificationService.reconcile(appContext, null)
-            return this
-        }
         if (appState == null) {
             return this
         }
+        val activeRunMode = runMode ?: appState.runMode
         val runtime = appState.toSingBoxTrafficStatsRuntime(activeRunMode)
         SingBoxTrafficStatsNotificationService.reconcile(appContext, runtime)
         return this

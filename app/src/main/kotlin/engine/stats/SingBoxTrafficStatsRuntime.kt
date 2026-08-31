@@ -17,9 +17,8 @@ internal fun AppState.toSingBoxTrafficStatsRuntime(
     runMode: Int = this.runMode,
 ): SingBoxTrafficStatsRuntime? {
     if (!enableTrafficStatsNotification) return null
-    if (runMode != RunModeVpnService) return null
     return SingBoxTrafficStatsRuntime(
         control = singBoxControlConfig(),
-        local = true,
+        local = runMode == RunModeVpnService,
     )
 }
