@@ -323,7 +323,7 @@
     <string name="settings_external_interfaces_ethernet">Ethernet tethering</string>
     <string name="settings_ebpf_shared_network_input">Downstream interface names</string>
     <string name="settings_ebpf_shared_network">Tethering sharing</string>
-    <string name="settings_ebpf_shared_network_description">Enter one exact downstream interface name per item, such as ap0 or rndis0. Wildcard prefixes such as wlan+ are not supported. Do not enter lo, upstream network interfaces, TUN, WireGuard, PPP, IPIP, or other layer-3-only interfaces.</string>
+    <string name="settings_ebpf_shared_network_description">Enter one exact downstream interface name per item (for example ap0, rndis0, rmnet0, or ppp0). Wildcards and loopback are not supported.</string>
     <string name="settings_ebpf_shared_network_empty">No downstream interfaces configured</string>
     <string name="settings_ebpf_shared_network_none">Not enabled</string>
     <string name="settings_ebpf_shared_network_selected">Configured interfaces: {count}</string>

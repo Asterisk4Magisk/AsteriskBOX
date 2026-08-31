@@ -320,7 +320,7 @@
     <string name="settings_external_interfaces_ethernet">以太网热点共享</string>
     <string name="settings_ebpf_shared_network_input">下游接口名称</string>
     <string name="settings_ebpf_shared_network">热点共享设置</string>
-    <string name="settings_ebpf_shared_network_description">每项填写一个实际的下游接口名，例如 ap0 或 rndis0。不支持 wlan+ 等通配前缀；不要填写 lo、上游网络接口、TUN、WireGuard、PPP、IPIP 等纯三层接口。</string>
+    <string name="settings_ebpf_shared_network_description">每项填写一个实际的下游接口名（如 ap0、rndis0、rmnet0 或 ppp0）。不支持通配符和 loopback。</string>
     <string name="settings_ebpf_shared_network_empty">尚未配置下游接口</string>
     <string name="settings_ebpf_shared_network_none">未启用</string>
     <string name="settings_ebpf_shared_network_selected">已配置 {count} 个接口</string>
