@@ -10,6 +10,7 @@ internal fun naiveOutboundFields() = listOf(
     outboundField("password", "Password"),
     outboundField("insecure_concurrency", "Insecure concurrency", OutboundFieldKind.INTEGER),
     outboundField("extra_headers", "Extra headers", OutboundFieldKind.KEY_VALUE),
+    outboundField("stream_receive_window", "Stream receive window"),
     outboundField("udp_over_tcp.enabled", "UDP over TCP", OutboundFieldKind.BOOLEAN),
     outboundField(
         "udp_over_tcp.version",
@@ -22,6 +23,11 @@ internal fun naiveOutboundFields() = listOf(
         "quic_congestion_control",
         "QUIC congestion control",
         listOf("", "bbr", "bbr2", "cubic", "reno"),
+        conditions = listOf(OutboundFieldCondition("quic")),
+    ),
+    outboundField(
+        "quic_session_receive_window",
+        "QUIC session receive window",
         conditions = listOf(OutboundFieldCondition("quic")),
     ),
 )

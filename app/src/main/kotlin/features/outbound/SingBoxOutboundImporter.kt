@@ -94,6 +94,7 @@ internal object SingBoxOutboundImporter {
                 mutations = mutations,
             )
         }
+        var ignoredExpectedCount = 0
         val accepted = outbounds.mapIndexedNotNull { index, item ->
             val outbound = item as? JsonObject
             if (outbound == null) {
@@ -111,6 +112,10 @@ internal object SingBoxOutboundImporter {
                     sourceIndex = index,
                     message = "Outbound entry has no type",
                 )
+                return@mapIndexedNotNull null
+            }
+            if (type in ExpectedIgnoredSingBoxOutboundTypes) {
+                ignoredExpectedCount += 1
                 return@mapIndexedNotNull null
             }
             if (type !in SupportedSingBoxProxyOutboundTypes) {
@@ -136,9 +141,18 @@ internal object SingBoxOutboundImporter {
                 null
             }
         }
+        val detectedCount = outbounds.size - ignoredExpectedCount
+        if (detectedCount == 0) {
+            issues += ImportIssue(
+                reason = ImportIssueReason.NO_SUPPORTED_ITEMS,
+                severity = ImportIssueSeverity.ERROR,
+                stage = ImportStage.PARSE,
+                message = "No importable proxy outbounds were found",
+            )
+        }
         return ImportOutcome(
             format = OutboundImportFormat.JSON,
-            detectedCount = outbounds.size,
+            detectedCount = detectedCount,
             accepted = accepted,
             issues = issues,
             mutations = mutations,
@@ -565,4 +579,10 @@ internal val SupportedSingBoxProxyOutboundTypes = linkedSetOf(
     "anytls",
     "snell",
     "ssh",
+)
+
+private val ExpectedIgnoredSingBoxOutboundTypes = setOf(
+    "selector",
+    "urltest",
+    "direct",
 )

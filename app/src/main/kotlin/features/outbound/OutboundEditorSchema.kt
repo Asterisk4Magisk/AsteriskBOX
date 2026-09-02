@@ -212,6 +212,7 @@ internal object OutboundEditorRegistry {
 
     private fun tlsFields() = listOf(
         field("tls.enabled", "TLS", OutboundFieldKind.BOOLEAN),
+        field("tls.disable_sni", "Disable SNI", OutboundFieldKind.BOOLEAN, conditions = on("tls.enabled")),
         field("tls.server_name", "Server name", conditions = on("tls.enabled")),
         field("tls.insecure", "Allow insecure", OutboundFieldKind.BOOLEAN, conditions = on("tls.enabled")),
         field("tls.alpn", "ALPN", OutboundFieldKind.TEXT_LIST, conditions = on("tls.enabled")),
@@ -267,6 +268,53 @@ internal object OutboundEditorRegistry {
             "Client key",
             OutboundFieldKind.MULTILINE,
             conditions = on("tls.enabled"),
+        ),
+        field(
+            "tls.fragment",
+            "Fragment TLS handshake",
+            OutboundFieldKind.BOOLEAN,
+            conditions = on("tls.enabled"),
+        ),
+        field(
+            "tls.fragment_fallback_delay",
+            "TLS fragment fallback delay",
+            conditions = listOf(
+                OutboundFieldCondition("tls.enabled"),
+                OutboundFieldCondition("tls.fragment"),
+            ),
+        ),
+        field(
+            "tls.record_fragment",
+            "TLS record fragmentation",
+            OutboundFieldKind.BOOLEAN,
+            conditions = on("tls.enabled"),
+        ),
+        field("tls.handshake_timeout", "TLS handshake timeout", conditions = on("tls.enabled")),
+        field("tls.ech.enabled", "ECH", OutboundFieldKind.BOOLEAN, conditions = on("tls.enabled")),
+        field(
+            "tls.ech.config",
+            "ECH config",
+            OutboundFieldKind.TEXT_LIST,
+            conditions = listOf(
+                OutboundFieldCondition("tls.enabled"),
+                OutboundFieldCondition("tls.ech.enabled"),
+            ),
+        ),
+        field(
+            "tls.ech.config_path",
+            "ECH config path",
+            conditions = listOf(
+                OutboundFieldCondition("tls.enabled"),
+                OutboundFieldCondition("tls.ech.enabled"),
+            ),
+        ),
+        field(
+            "tls.ech.query_server_name",
+            "ECH query server name",
+            conditions = listOf(
+                OutboundFieldCondition("tls.enabled"),
+                OutboundFieldCondition("tls.ech.enabled"),
+            ),
         ),
         field("tls.utls.enabled", "uTLS", OutboundFieldKind.BOOLEAN, conditions = on("tls.enabled")),
         select(
@@ -408,9 +456,17 @@ internal object OutboundEditorRegistry {
     )
 
     private fun quicFields() = listOf(
-        select("congestion_control", "QUIC congestion control", listOf("", "cubic", "new_reno", "bbr")),
-        field("max_idle_timeout", "QUIC maximum idle timeout"),
+        field("idle_timeout", "Idle timeout"),
         field("keep_alive_period", "QUIC keep-alive period"),
+        field("stream_receive_window", "Stream receive window"),
+        field("connection_receive_window", "Connection receive window"),
+        field("max_concurrent_streams", "Maximum concurrent streams", OutboundFieldKind.INTEGER),
+        field("initial_packet_size", "Initial packet size", OutboundFieldKind.INTEGER),
+        field(
+            "disable_path_mtu_discovery",
+            "Disable path MTU discovery",
+            OutboundFieldKind.BOOLEAN,
+        ),
     )
 
     private fun dialFields() = listOf(
@@ -551,6 +607,7 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Authenticated length" -> R.string.outbound_field_authenticated_length
     "Authentication bytes" -> R.string.outbound_field_authentication_bytes
     "Authentication string" -> R.string.outbound_field_authentication_string
+    "BBR profile" -> R.string.outbound_field_bbr_profile
     "Bind address without port" -> R.string.outbound_field_bind_address_without_port
     "Bind interface" -> R.string.outbound_field_bind_interface
     "Brutal" -> R.string.outbound_field_brutal
@@ -569,13 +626,17 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Client version" -> R.string.outbound_field_client_version
     "Congestion control" -> R.string.outbound_field_congestion_control
     "Connect timeout" -> R.string.outbound_field_connect_timeout
+    "Connection receive window" -> R.string.outbound_field_connection_receive_window
     "Connection reuse" -> R.string.outbound_field_connection_reuse
     "Curve preferences" -> R.string.outbound_field_curve_preferences
     "Detour outbound" -> R.string.outbound_field_detour_outbound
     "Disable Chrome QUIC fingerprint parroting" ->
         R.string.outbound_field_disable_chrome_quic_fingerprint_parroting
+    "Disable path MTU discovery" -> R.string.outbound_field_disable_path_mtu_discovery
+    "Disable SNI" -> R.string.outbound_field_disable_sni
     "Disable TCP keep-alive" -> R.string.outbound_field_disable_tcp_keep_alive
     "Domain resolver" -> R.string.outbound_field_domain_resolver
+    "Download bandwidth" -> R.string.outbound_field_download_bandwidth
     "Download bandwidth (Mbps)" -> R.string.outbound_field_download_bandwidth_mbps
     "Early data header" -> R.string.outbound_field_early_data_header
     "ECH" -> R.string.outbound_field_ech
@@ -587,6 +648,7 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Fallback delay" -> R.string.outbound_field_fallback_delay
     "Fallback network types" -> R.string.outbound_field_fallback_network_types
     "Flow" -> R.string.outbound_field_flow
+    "Fragment TLS handshake" -> R.string.outbound_field_fragment_tls_handshake
     "Global padding" -> R.string.outbound_field_global_padding
     "gRPC service name" -> R.string.outbound_field_grpc_service_name
     "Headers" -> R.string.outbound_field_headers
@@ -598,16 +660,21 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Idle session check interval" -> R.string.outbound_field_idle_session_check_interval
     "Idle session timeout" -> R.string.outbound_field_idle_session_timeout
     "Idle timeout" -> R.string.outbound_field_idle_timeout
+    "Initial packet size" -> R.string.outbound_field_initial_packet_size
     "Insecure concurrency" -> R.string.outbound_field_insecure_concurrency
     "IPv4 bind address" -> R.string.outbound_field_ipv4_bind_address
     "IPv6 bind address" -> R.string.outbound_field_ipv6_bind_address
     "Key exchange algorithms" -> R.string.outbound_field_key_exchange_algorithms
     "MAC algorithms" -> R.string.outbound_field_mac_algorithms
     "Maximum connections" -> R.string.outbound_field_maximum_connections
+    "Maximum concurrent streams" -> R.string.outbound_field_maximum_concurrent_streams
     "Maximum early data" -> R.string.outbound_field_maximum_early_data
+    "Maximum packet size" -> R.string.outbound_field_maximum_packet_size
+    "Maximum port hopping interval" -> R.string.outbound_field_maximum_port_hopping_interval
     "Maximum streams" -> R.string.outbound_field_maximum_streams
     "Maximum TLS version" -> R.string.outbound_field_maximum_tls_version
     "Minimum idle sessions" -> R.string.outbound_field_minimum_idle_sessions
+    "Minimum packet size" -> R.string.outbound_field_minimum_packet_size
     "Minimum streams" -> R.string.outbound_field_minimum_streams
     "Minimum TLS version" -> R.string.outbound_field_minimum_tls_version
     "Multiplex" -> R.string.outbound_field_multiplex
@@ -634,7 +701,7 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Private key path" -> R.string.outbound_field_private_key_path
     "QUIC congestion control" -> R.string.outbound_field_quic_congestion_control
     "QUIC keep-alive period" -> R.string.outbound_field_quic_keep_alive_period
-    "QUIC maximum idle timeout" -> R.string.outbound_field_quic_maximum_idle_timeout
+    "QUIC session receive window" -> R.string.outbound_field_quic_session_receive_window
     "Reality" -> R.string.outbound_field_reality
     "Reality public key" -> R.string.outbound_field_reality_public_key
     "Reality short ID" -> R.string.outbound_field_reality_short_id
@@ -649,11 +716,15 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "ShadowTLS version" -> R.string.outbound_field_shadowtls_version
     "Snell version" -> R.string.outbound_field_snell_version
     "SOCKS version" -> R.string.outbound_field_socks_version
+    "Stream receive window" -> R.string.outbound_field_stream_receive_window
     "TCP Fast Open" -> R.string.outbound_field_tcp_fast_open
     "TCP keep-alive" -> R.string.outbound_field_tcp_keep_alive
     "TCP keep-alive interval" -> R.string.outbound_field_tcp_keep_alive_interval
     "TCP MultiPath" -> R.string.outbound_field_tcp_multipath
     "TLS" -> R.string.outbound_field_tls
+    "TLS fragment fallback delay" -> R.string.outbound_field_tls_fragment_fallback_delay
+    "TLS handshake timeout" -> R.string.outbound_field_tls_handshake_timeout
+    "TLS record fragmentation" -> R.string.outbound_field_tls_record_fragmentation
     "Traffic shaping mode" -> R.string.outbound_field_traffic_shaping_mode
     "Transport" -> R.string.outbound_field_transport
     "UDP fragmentation" -> R.string.outbound_field_udp_fragmentation
@@ -661,6 +732,7 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "UDP over TCP" -> R.string.outbound_field_udp_over_tcp
     "UDP over TCP version" -> R.string.outbound_field_udp_over_tcp_version
     "UDP relay mode" -> R.string.outbound_field_udp_relay_mode
+    "Upload bandwidth" -> R.string.outbound_field_upload_bandwidth
     "Upload bandwidth (Mbps)" -> R.string.outbound_field_upload_bandwidth_mbps
     "Use QUIC" -> R.string.outbound_field_use_quic
     "User" -> R.string.outbound_field_user
