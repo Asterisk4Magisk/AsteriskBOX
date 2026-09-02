@@ -44,6 +44,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -133,7 +134,7 @@ internal fun OutboundGroupListPage(
     var enabledChangingGroupIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var groupOrderPreviewIds by remember { mutableStateOf<List<Int>?>(null) }
     var groupOrderPreviewGeneration by remember { mutableStateOf<Long?>(null) }
-    var nextGroupOrderGeneration by remember { mutableStateOf(0L) }
+    var nextGroupOrderGeneration by remember { mutableLongStateOf(0L) }
     val groupReorderMutex = remember { Mutex() }
     var syncingGroupIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var batchSyncJob by remember { mutableStateOf<Job?>(null) }

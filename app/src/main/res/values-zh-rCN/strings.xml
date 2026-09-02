@@ -757,10 +757,6 @@
     <string name="outbound_ping_failed">失败</string>
     <string name="outbound_ping_no_targets">当前分组没有可 Ping 的服务器地址</string>
     <string name="outbound_ping_latency">%1$d ms</string>
-    <string name="outbound_ping_result">“%1$s”：%2$s</string>
-    <plurals name="outbound_ping_complete">
-        <item quantity="other">已完成 %1$d 个出站的 Ping</item>
-    </plurals>
     <string name="outbound_delete_title">删除出站？</string>
     <string name="outbound_delete_message">出站“%1$s”将被永久删除。</string>
     <string name="outbound_editor_list_hint">每行一项，也可以使用逗号分隔</string>
