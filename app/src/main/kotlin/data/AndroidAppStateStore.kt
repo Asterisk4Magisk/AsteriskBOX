@@ -342,7 +342,6 @@ private fun AppState.isCheapNoopUpdate(previous: AppState): Boolean {
         dnsServers === previous.dnsServers &&
         dnsRules === previous.dnsRules &&
         externalInterfaces === previous.externalInterfaces &&
-        ebpfSharedNetworkInterfaces === previous.ebpfSharedNetworkInterfaces &&
         tunSharedNetworkInterfaces === previous.tunSharedNetworkInterfaces &&
         ignoredInterfaces === previous.ignoredInterfaces &&
         privateAddressCidrs === previous.privateAddressCidrs &&

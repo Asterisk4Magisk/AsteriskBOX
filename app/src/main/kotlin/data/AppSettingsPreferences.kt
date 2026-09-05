@@ -230,12 +230,12 @@ internal class AppSettingsPreferences(
                 KeyEnableRootEbpfDirectCidrBypass,
                 defaults.enableRootEbpfDirectCidrBypass,
             ),
-            ebpfBypassRuleSetTags = preferences.getStringList(
-                KeyEbpfBypassRuleSetTags,
-                defaults.ebpfBypassRuleSetTags,
-            ),
             tunBypassRuleSetTags = preferences.getStringList(
-                KeyTunBypassRuleSetTags,
+                if (preferences.contains(KeyTunBypassRuleSetTags)) {
+                    KeyTunBypassRuleSetTags
+                } else {
+                    LegacyKeyEbpfBypassRuleSetTags
+                },
                 defaults.tunBypassRuleSetTags,
             ),
             enableRootIpv6Disabler = preferences.getBoolean(
@@ -253,12 +253,12 @@ internal class AppSettingsPreferences(
                 KeyExternalInterfaces,
                 defaults.externalInterfaces,
             ),
-            ebpfSharedNetworkInterfaces = preferences.getStringList(
-                KeyEbpfSharedNetworkInterfaces,
-                defaults.ebpfSharedNetworkInterfaces,
-            ),
             tunSharedNetworkInterfaces = preferences.getStringList(
-                KeyTunSharedNetworkInterfaces,
+                if (preferences.contains(KeyTunSharedNetworkInterfaces)) {
+                    KeyTunSharedNetworkInterfaces
+                } else {
+                    LegacyKeyEbpfSharedNetworkInterfaces
+                },
                 defaults.tunSharedNetworkInterfaces,
             ),
             ignoredInterfaces = preferences.getStringList(
@@ -439,8 +439,8 @@ internal const val KeyTransparentProxyPort = "transparent_proxy_port"
 internal const val KeyEnableRootBootScript = "enable_root_boot_script"
 internal const val KeyEnableRootEbpfRules = "enable_root_ebpf_rules"
 internal const val KeyEnableRootEbpfDirectCidrBypass = "enable_root_ebpf_direct_cidr_bypass"
-internal const val KeyEbpfBypassRuleSetTags = "ebpf_bypass_rule_set_tags"
 internal const val KeyTunBypassRuleSetTags = "tun_bypass_rule_set_tags"
+private const val LegacyKeyEbpfBypassRuleSetTags = "ebpf_bypass_rule_set_tags"
 internal const val KeyEnableRootIpv6Disabler = "enable_root_ipv6_disabler"
 internal const val KeySocks5ProxyPort = "socks5_proxy_port"
 internal const val KeyBpf2SocksBridgePort = "bpf2socks_bridge_port"
@@ -462,8 +462,8 @@ internal const val KeyServiceControlWifiDisconnectStopEnabled = "service_control
 internal const val KeyServiceControlWifiDisconnectStopSsids = "service_control_wifi_disconnect_stop_ssids"
 internal const val KeyServiceControlWifiDisconnectStopBssids = "service_control_wifi_disconnect_stop_bssids"
 internal const val KeyExternalInterfaces = "external_interfaces"
-internal const val KeyEbpfSharedNetworkInterfaces = "ebpf_shared_network_interfaces"
 internal const val KeyTunSharedNetworkInterfaces = "tun_shared_network_interfaces"
+private const val LegacyKeyEbpfSharedNetworkInterfaces = "ebpf_shared_network_interfaces"
 internal const val KeyIgnoredInterfaces = "ignored_interfaces"
 internal const val KeyPrivateAddressCidrs = "private_address_cidrs"
 internal const val KeyProxyAppListMode = "proxy_app_list_mode"

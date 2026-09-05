@@ -117,7 +117,6 @@ data class AppState(
     val enableRootBootScript: Boolean = false,
     val enableRootEbpfRules: Boolean = false,
     val enableRootEbpfDirectCidrBypass: Boolean = false,
-    val ebpfBypassRuleSetTags: List<String> = emptyList(),
     val tunBypassRuleSetTags: List<String> = emptyList(),
     val enableRootIpv6Disabler: Boolean = false,
     val socks5ProxyPort: String = RootModeEngine.DefaultTun2SocksProxyPort.toString(),
@@ -126,7 +125,6 @@ data class AppState(
     val serviceControl: ServiceControlSettings = ServiceControlSettings(),
 
     val externalInterfaces: List<String> = emptyList(),
-    val ebpfSharedNetworkInterfaces: List<String> = emptyList(),
     val tunSharedNetworkInterfaces: List<String> = emptyList(),
     val ignoredInterfaces: List<String> = emptyList(),
     val privateAddressCidrs: List<String> = emptyList(),

@@ -21,22 +21,22 @@ import ui.icons.AsteriskIcons as Icons
 import ui.text.formatTemplate
 import utils.toTrimmedNonEmptyDistinctList
 
-internal fun List<String>.sanitizeEbpfSharedNetworkInterfaces(): List<String> {
+internal fun List<String>.sanitizeTunSharedNetworkInterfaces(): List<String> {
     return toTrimmedNonEmptyDistinctList().filterNot { it == "lo" }
 }
 
 @Composable
-internal fun ebpfSharedNetworkInterfacesSummary(interfaces: List<String>): String {
-    val values = interfaces.sanitizeEbpfSharedNetworkInterfaces()
+internal fun tunSharedNetworkInterfacesSummary(interfaces: List<String>): String {
+    val values = interfaces.sanitizeTunSharedNetworkInterfaces()
     if (values.isEmpty()) {
-        return stringResource(R.string.settings_ebpf_shared_network_none)
+        return stringResource(R.string.settings_tun_shared_network_none)
     }
-    return stringResource(R.string.settings_ebpf_shared_network_selected)
+    return stringResource(R.string.settings_tun_shared_network_selected)
         .formatTemplate("count" to values.size)
 }
 
 @Composable
-internal fun EbpfSharedNetworkBottomSheet(
+internal fun TunSharedNetworkBottomSheet(
     show: Boolean,
     interfaces: List<String>,
     onInterfacesChange: (List<String>) -> Unit,
@@ -44,11 +44,11 @@ internal fun EbpfSharedNetworkBottomSheet(
     onSave: (List<String>) -> Unit,
 ) {
     var editorPending by remember(show) { mutableStateOf(false) }
-    val invalidMessage = stringResource(R.string.settings_ebpf_shared_network_invalid)
-    val normalizedInterfaces = interfaces.sanitizeEbpfSharedNetworkInterfaces()
+    val invalidMessage = stringResource(R.string.settings_tun_shared_network_invalid)
+    val normalizedInterfaces = interfaces.sanitizeTunSharedNetworkInterfaces()
     SettingsModalBottomSheet(
         show = show,
-        title = stringResource(R.string.settings_ebpf_shared_network),
+        title = stringResource(R.string.settings_tun_shared_network),
         startAction = {
             TextButton(
                 text = stringResource(R.string.common_cancel),
@@ -73,14 +73,14 @@ internal fun EbpfSharedNetworkBottomSheet(
         ) {
             item {
                 StringListEditor(
-                    editorKey = "ebpf-shared-network:$show",
-                    title = stringResource(R.string.settings_ebpf_shared_network_input),
-                    description = stringResource(R.string.settings_ebpf_shared_network_description),
+                    editorKey = "tun-shared-network:$show",
+                    title = stringResource(R.string.settings_tun_shared_network_input),
+                    description = stringResource(R.string.settings_tun_shared_network_description),
                     values = normalizedInterfaces,
                     onValuesChange = { values ->
-                        onInterfacesChange(values.sanitizeEbpfSharedNetworkInterfaces())
+                        onInterfacesChange(values.sanitizeTunSharedNetworkInterfaces())
                     },
-                    emptyText = stringResource(R.string.settings_ebpf_shared_network_empty),
+                    emptyText = stringResource(R.string.settings_tun_shared_network_empty),
                     validateInput = { value ->
                         if (isSingBoxSharedNetworkInterface(value)) null else invalidMessage
                     },

@@ -13,6 +13,9 @@ import app.SingBoxDnsRuleState
 import app.SingBoxDnsServerState
 import app.SingBoxRouteRuleState
 import app.SingBoxSelectorTypeSelector
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 internal const val AppBackupFormat = "asteriskbox-backup"
@@ -44,6 +47,7 @@ internal data class AppBackupData(
     val proxyAppListSelectedApps: List<String> = emptyList(),
 )
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 internal data class AppBackupSettings(
     val colorMode: Int = BackupDefaults.colorMode,
@@ -103,14 +107,18 @@ internal data class AppBackupSettings(
     val dnsTimeout: String = BackupDefaults.dnsTimeout,
     val transparentProxyPort: String = BackupDefaults.transparentProxyPort,
     val enableRootEbpfDirectCidrBypass: Boolean = BackupDefaults.enableRootEbpfDirectCidrBypass,
-    val ebpfBypassRuleSetTags: List<String> = BackupDefaults.ebpfBypassRuleSetTags,
-    val tunBypassRuleSetTags: List<String> = BackupDefaults.tunBypassRuleSetTags,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @SerialName("ebpfBypassRuleSetTags")
+    val legacyEbpfBypassRuleSetTags: List<String> = emptyList(),
+    val tunBypassRuleSetTags: List<String>? = null,
     val enableRootIpv6Disabler: Boolean = BackupDefaults.enableRootIpv6Disabler,
     val socks5ProxyPort: String = BackupDefaults.socks5ProxyPort,
     val bpf2SocksBridgePort: String = BackupDefaults.bpf2SocksBridgePort,
     val externalInterfaces: List<String> = BackupDefaults.externalInterfaces,
-    val ebpfSharedNetworkInterfaces: List<String> = BackupDefaults.ebpfSharedNetworkInterfaces,
-    val tunSharedNetworkInterfaces: List<String> = BackupDefaults.tunSharedNetworkInterfaces,
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    @SerialName("ebpfSharedNetworkInterfaces")
+    val legacyEbpfSharedNetworkInterfaces: List<String> = emptyList(),
+    val tunSharedNetworkInterfaces: List<String>? = null,
     val ignoredInterfaces: List<String> = BackupDefaults.ignoredInterfaces,
     val serviceControl: AppBackupServiceControl = AppBackupServiceControl(),
     val privateAddressCidrs: List<String> = BackupDefaults.privateAddressCidrs,

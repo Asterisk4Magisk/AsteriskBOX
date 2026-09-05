@@ -12,7 +12,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import app.AppState
-import app.modes.RunModeTun
 import app.LocalAppServices
 import app.modes.RunModeBpf2Socks
 import app.modes.RunModeTproxy
@@ -21,8 +20,8 @@ import app.modes.RunModeVpnService
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.logs.FailureLogContext
 import features.logs.reportFailure
-import features.settings.sheets.EbpfSharedNetworkBottomSheet
-import features.settings.sheets.EbpfBypassRuleSetBottomSheet
+import features.settings.sheets.TunBypassRuleSetBottomSheet
+import features.settings.sheets.TunSharedNetworkBottomSheet
 import features.settings.sheets.ExternalInterfacesBottomSheet
 import features.settings.sheets.IgnoredInterfacesBottomSheet
 import features.settings.sheets.LocalProxySettingsBottomSheet
@@ -30,8 +29,8 @@ import features.settings.sheets.PrivateAddressBottomSheet
 import features.settings.sheets.SnifferSettingsBottomSheet
 import features.settings.sheets.ServiceControlBottomSheet
 import features.settings.sheets.TunSettingsBottomSheet
-import features.settings.sheets.sanitizeEbpfSharedNetworkInterfaces
-import features.settings.sheets.sanitizeEbpfBypassRuleSetTags
+import features.settings.sheets.sanitizeTunBypassRuleSetTags
+import features.settings.sheets.sanitizeTunSharedNetworkInterfaces
 import features.settings.sheets.sanitizeExternalInterfaces
 import features.settings.sheets.sanitizeIgnoredInterfaceSelectors
 import features.settings.sheets.sanitizePrivateAddressCidrs
@@ -46,7 +45,7 @@ internal fun SettingsBottomSheetsHost(
     appState: AppState,
     sheetState: SettingsSheetState,
     tunStackOptions: List<String>,
-    ebpfBypassRuleSetChoices: List<Pair<String, String>>,
+    tunBypassRuleSetChoices: List<Pair<String, String>>,
     updateAppState: ((AppState) -> AppState) -> Unit,
 ) {
     val context = LocalContext.current
@@ -334,46 +333,38 @@ internal fun SettingsBottomSheetsHost(
             sheetState.showPrivateAddresses = false
         },
     )
-    EbpfBypassRuleSetBottomSheet(
-        show = sheetState.showEbpfBypassRuleSets,
+    TunBypassRuleSetBottomSheet(
+        show = sheetState.showTunBypassRuleSets,
         saving = validating,
-        choices = ebpfBypassRuleSetChoices,
-        selectedTags = sheetState.ebpfBypassRuleSetTagsDraft,
+        choices = tunBypassRuleSetChoices,
+        selectedTags = sheetState.tunBypassRuleSetTagsDraft,
         onSelectedTagsChange = { tags ->
-            sheetState.ebpfBypassRuleSetTagsDraft = sanitizeEbpfBypassRuleSetTags(tags)
+            sheetState.tunBypassRuleSetTagsDraft = sanitizeTunBypassRuleSetTags(tags)
         },
-        onDismissRequest = { sheetState.showEbpfBypassRuleSets = false },
+        onDismissRequest = { sheetState.showTunBypassRuleSets = false },
         onSave = { tags ->
             validateAndCommit(
                 operation = "save_root_bypass_rule_sets",
                 transform = { state ->
-                    if (appState.runMode == RunModeTun) {
-                        state.copy(tunBypassRuleSetTags = sanitizeEbpfBypassRuleSetTags(tags))
-                    } else {
-                        state.copy(ebpfBypassRuleSetTags = sanitizeEbpfBypassRuleSetTags(tags))
-                    }
+                    state.copy(tunBypassRuleSetTags = sanitizeTunBypassRuleSetTags(tags))
                 },
-                close = { sheetState.showEbpfBypassRuleSets = false },
+                close = { sheetState.showTunBypassRuleSets = false },
             )
         },
     )
-    EbpfSharedNetworkBottomSheet(
-        show = sheetState.showEbpfSharedNetwork,
-        interfaces = sheetState.ebpfSharedNetworkInterfacesDraft,
+    TunSharedNetworkBottomSheet(
+        show = sheetState.showTunSharedNetwork,
+        interfaces = sheetState.tunSharedNetworkInterfacesDraft,
         onInterfacesChange = { interfaces ->
-            sheetState.ebpfSharedNetworkInterfacesDraft =
-                interfaces.sanitizeEbpfSharedNetworkInterfaces()
+            sheetState.tunSharedNetworkInterfacesDraft =
+                interfaces.sanitizeTunSharedNetworkInterfaces()
         },
-        onDismissRequest = { sheetState.showEbpfSharedNetwork = false },
+        onDismissRequest = { sheetState.showTunSharedNetwork = false },
         onSave = { interfaces ->
             updateAppState { state ->
-                if (appState.runMode == RunModeTun) {
-                    state.copy(tunSharedNetworkInterfaces = interfaces.sanitizeEbpfSharedNetworkInterfaces())
-                } else {
-                    state.copy(ebpfSharedNetworkInterfaces = interfaces.sanitizeEbpfSharedNetworkInterfaces())
-                }
+                state.copy(tunSharedNetworkInterfaces = interfaces.sanitizeTunSharedNetworkInterfaces())
             }
-            sheetState.showEbpfSharedNetwork = false
+            sheetState.showTunSharedNetwork = false
         },
     )
 }

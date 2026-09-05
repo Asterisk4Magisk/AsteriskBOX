@@ -96,7 +96,6 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
     boolean(KeyEnableRootBootScript, enableRootBootScript)
     boolean(KeyEnableRootEbpfRules, enableRootEbpfRules)
     boolean(KeyEnableRootEbpfDirectCidrBypass, enableRootEbpfDirectCidrBypass)
-    stringList(KeyEbpfBypassRuleSetTags, ebpfBypassRuleSetTags)
     stringList(KeyTunBypassRuleSetTags, tunBypassRuleSetTags)
     boolean(KeyEnableRootIpv6Disabler, enableRootIpv6Disabler)
     string(KeySocks5ProxyPort, socks5ProxyPort)
@@ -131,7 +130,6 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
         KeyServiceControlWifiDisconnectStopBssids,
     )
     stringList(KeyExternalInterfaces, externalInterfaces)
-    stringList(KeyEbpfSharedNetworkInterfaces, ebpfSharedNetworkInterfaces)
     stringList(KeyTunSharedNetworkInterfaces, tunSharedNetworkInterfaces)
     stringList(KeyIgnoredInterfaces, ignoredInterfaces)
     stringList(KeyPrivateAddressCidrs, privateAddressCidrs)

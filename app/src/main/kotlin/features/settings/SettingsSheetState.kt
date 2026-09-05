@@ -7,12 +7,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import app.AppState
-import app.modes.RunModeTun
 import features.settings.sheets.sanitizeIgnoredInterfaceSelectors
 import features.settings.sheets.sanitizeExternalInterfaces
 import features.settings.sheets.sanitizePrivateAddressCidrs
-import features.settings.sheets.sanitizeEbpfSharedNetworkInterfaces
-import features.settings.sheets.sanitizeEbpfBypassRuleSetTags
+import features.settings.sheets.sanitizeTunBypassRuleSetTags
+import features.settings.sheets.sanitizeTunSharedNetworkInterfaces
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
@@ -40,11 +39,11 @@ internal class SettingsSheetState(
     var showPrivateAddresses by mutableStateOf(false)
     var privateAddressCidrsDraft by mutableStateOf(emptyList<String>())
 
-    var showEbpfSharedNetwork by mutableStateOf(false)
-    var ebpfSharedNetworkInterfacesDraft by mutableStateOf(emptyList<String>())
+    var showTunSharedNetwork by mutableStateOf(false)
+    var tunSharedNetworkInterfacesDraft by mutableStateOf(emptyList<String>())
 
-    var showEbpfBypassRuleSets by mutableStateOf(false)
-    var ebpfBypassRuleSetTagsDraft by mutableStateOf(emptyList<String>())
+    var showTunBypassRuleSets by mutableStateOf(false)
+    var tunBypassRuleSetTagsDraft by mutableStateOf(emptyList<String>())
 
     fun openLocalProxySettings(appState: AppState) {
         localProxySettingsDraft = appState.toLocalProxySettingsDraft()
@@ -93,19 +92,15 @@ internal class SettingsSheetState(
         showPrivateAddresses = true
     }
 
-    fun openEbpfSharedNetwork(appState: AppState) {
-        ebpfSharedNetworkInterfacesDraft =
-            (if (appState.runMode == RunModeTun) appState.tunSharedNetworkInterfaces else appState.ebpfSharedNetworkInterfaces)
-                .sanitizeEbpfSharedNetworkInterfaces()
-        showEbpfSharedNetwork = true
+    fun openTunSharedNetwork(appState: AppState) {
+        tunSharedNetworkInterfacesDraft =
+            appState.tunSharedNetworkInterfaces.sanitizeTunSharedNetworkInterfaces()
+        showTunSharedNetwork = true
     }
 
-    fun openEbpfBypassRuleSets(appState: AppState) {
-        ebpfBypassRuleSetTagsDraft =
-            sanitizeEbpfBypassRuleSetTags(
-                if (appState.runMode == RunModeTun) appState.tunBypassRuleSetTags else appState.ebpfBypassRuleSetTags,
-            )
-        showEbpfBypassRuleSets = true
+    fun openTunBypassRuleSets(appState: AppState) {
+        tunBypassRuleSetTagsDraft = sanitizeTunBypassRuleSetTags(appState.tunBypassRuleSetTags)
+        showTunBypassRuleSets = true
     }
 }
 

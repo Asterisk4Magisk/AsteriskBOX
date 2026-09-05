@@ -303,12 +303,13 @@ internal fun compileEbpfInbound(
     uidPolicy: RootInboundUidPolicy,
     availableRuleSetTags: Set<String>,
 ): JsonObject {
-    val sharedInterfaces = normalizeEbpfSharedNetworkInterfaces(appState.ebpfSharedNetworkInterfaces)
+    val sharedInterfaces = normalizeTunSharedNetworkInterfaces(appState.tunSharedNetworkInterfaces)
     return buildJsonObject {
         put("type", "ebpf")
         put("tag", APP_ROOT_INBOUND)
-        put("mode", if (sharedInterfaces.isEmpty()) "local" else "hybrid")
         putJsonObject("local") {
+            put("enabled", true)
+            put("data_plane", "tc")
             put("dns_mode", if (appState.enableLocalDns) "hijack" else "off")
             put("ipv6", appState.enableIpv6)
             put("bypass_private_address", false)
@@ -323,7 +324,7 @@ internal fun compileEbpfInbound(
                 }
             }
         }
-        val bypassRuleSets = appState.availableEbpfBypassRuleSetTags(availableRuleSetTags)
+        val bypassRuleSets = appState.availableTunBypassRuleSetTags(availableRuleSetTags)
         if (bypassRuleSets.isNotEmpty()) {
             putJsonArray("bypass_rule_set") {
                 bypassRuleSets.forEach(::add)
@@ -331,6 +332,8 @@ internal fun compileEbpfInbound(
         }
         if (sharedInterfaces.isNotEmpty()) {
             putJsonObject("shared") {
+                put("enabled", true)
+                put("data_plane", "socket_assign")
                 put("dns_mode", if (appState.enableLocalDns) "hijack" else "off")
                 putJsonArray("interface") {
                     sharedInterfaces.forEach(::add)
@@ -342,10 +345,10 @@ internal fun compileEbpfInbound(
     }
 }
 
-private fun AppState.availableEbpfBypassRuleSetTags(
+private fun AppState.availableTunBypassRuleSetTags(
     availableTags: Set<String>,
 ): List<String> =
-    ebpfBypassRuleSetTags
+    tunBypassRuleSetTags
         .map(String::trim)
         .filter(String::isNotEmpty)
         .distinct()
@@ -384,8 +387,8 @@ internal fun compileTunInbound(
         if (rootMode) {
             put("interface_name", SingBoxTunDevice)
             put("auto_redirect", true)
-            val sharedInterfaces = appState.tunSharedNetworkInterfaces
-                .map(String::trim).filter(String::isNotEmpty).filterNot { it == "lo" }.distinct()
+            val sharedInterfaces = normalizeTunSharedNetworkInterfaces(appState.tunSharedNetworkInterfaces)
+                .filterNot { it == "lo" }
             require(sharedInterfaces.all(::isSingBoxSharedNetworkInterface)) {
                 "TUN shared interfaces must be exact interface names"
             }
@@ -399,8 +402,7 @@ internal fun compileTunInbound(
             if (uidPolicy.excludeUids.isNotEmpty()) {
                 putJsonArray("exclude_uid") { uidPolicy.excludeUids.forEach(::add) }
             }
-            val bypassTags = appState.tunBypassRuleSetTags
-                .map(String::trim).distinct().filter(availableRuleSetTags::contains)
+            val bypassTags = appState.availableTunBypassRuleSetTags(availableRuleSetTags)
             if (bypassTags.isNotEmpty()) {
                 putJsonArray("route_exclude_address_set") { bypassTags.forEach(::add) }
             }

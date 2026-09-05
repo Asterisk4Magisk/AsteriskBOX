@@ -236,7 +236,7 @@ internal fun SettingsProxyModeSections(
     enableRootBootScript: Boolean,
     enableRootEbpfRules: Boolean,
     enableRootEbpfDirectCidrBypass: Boolean,
-    ebpfBypassRuleSetsSummary: String,
+    tunBypassRuleSetsSummary: String,
     enableIpv6: Boolean,
     enableRootIpv6Disabler: Boolean,
     externalInterfacesSummary: String,
@@ -250,7 +250,7 @@ internal fun SettingsProxyModeSections(
     onEnableRootBootScriptChange: (Boolean) -> Unit,
     onEnableRootEbpfRulesChange: (Boolean) -> Unit,
     onEnableRootEbpfDirectCidrBypassChange: (Boolean) -> Unit,
-    onOpenEbpfBypassRuleSets: () -> Unit,
+    onOpenTunBypassRuleSets: () -> Unit,
     onEnableRootIpv6DisablerChange: (Boolean) -> Unit,
     onOpenExternalInterfaces: () -> Unit,
     onOpenServiceControl: () -> Unit,
@@ -367,7 +367,7 @@ internal fun SettingsProxyModeSections(
                             effectsSpec = bypassControlEffectsMotion,
                             sizeSpec = bypassControlSizeMotion,
                         ),
-                        label = "settings-ebpf-bypass-control",
+                        label = "settings-tun-bypass-control",
                     ) { useRuleSetSelector ->
                         if (useRuleSetSelector) {
                             ArrowPreference(
@@ -375,8 +375,8 @@ internal fun SettingsProxyModeSections(
                                     R.string.settings_root_ebpf_bypass_direct_cidrs,
                                 ),
                                 icon = Icons.Rounded.Route,
-                                summary = ebpfBypassRuleSetsSummary,
-                                onClick = onOpenEbpfBypassRuleSets,
+                                summary = tunBypassRuleSetsSummary,
+                                onClick = onOpenTunBypassRuleSets,
                             )
                         } else {
                             SwitchPreference(
@@ -437,7 +437,7 @@ internal fun SettingsProxyModeSections(
                     exit = AsteriskMotion.contentExit(),
                 ) {
                     ArrowPreference(
-                        title = stringResource(R.string.settings_ebpf_shared_network),
+                        title = stringResource(R.string.settings_tun_shared_network),
                         icon = Icons.Rounded.Cable,
                         summary = externalInterfacesSummary,
                         onClick = onOpenExternalInterfaces,

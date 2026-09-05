@@ -22,7 +22,7 @@ internal data class RootInboundUidPolicy(
     val excludeUids: List<Int> = emptyList(),
 )
 
-internal fun normalizeEbpfSharedNetworkInterfaces(values: Iterable<String>): List<String> =
+internal fun normalizeTunSharedNetworkInterfaces(values: Iterable<String>): List<String> =
     values.toTrimmedNonEmptyDistinctList()
 
 internal fun buildRootInboundUidPolicy(

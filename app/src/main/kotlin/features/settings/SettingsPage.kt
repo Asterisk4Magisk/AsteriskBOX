@@ -50,8 +50,8 @@ import data.backup.AppBackupRestorePreview
 import engine.proxy.ProxyServiceResult
 import engine.proxy.withResolvedDynamicLocalProxyPort
 import features.settings.sheets.externalInterfacesSummary
-import features.settings.sheets.ebpfBypassRuleSetSummary
-import features.settings.sheets.ebpfSharedNetworkInterfacesSummary
+import features.settings.sheets.tunBypassRuleSetSummary
+import features.settings.sheets.tunSharedNetworkInterfacesSummary
 import features.settings.sheets.ignoredInterfacesSummary
 import features.settings.sheets.privateAddressCidrsSummary
 import features.settings.sheets.snifferSettingsSummary
@@ -259,19 +259,17 @@ private fun SettingsContent(
         bpf2SocksBridgePort = appState.bpf2SocksBridgePort,
         socks5ProxyPort = appState.socks5ProxyPort,
     )
-    val ebpfBypassRuleSetChoices = remember(appState.customResourceFiles) {
+    val tunBypassRuleSetChoices = remember(appState.customResourceFiles) {
         appState.managedRuleSetChoices(
             context.singBoxRuleSetFiles(appState.customResourceFiles).map { file -> file.name },
         ).map { choice -> choice.tag to choice.remarks }
     }
-    val ebpfBypassRuleSetsSummary = ebpfBypassRuleSetSummary(
-        selectedTags = if (appState.runMode == RunModeTun) appState.tunBypassRuleSetTags else appState.ebpfBypassRuleSetTags,
-        choices = ebpfBypassRuleSetChoices,
+    val tunBypassRuleSetsSummary = tunBypassRuleSetSummary(
+        selectedTags = appState.tunBypassRuleSetTags,
+        choices = tunBypassRuleSetChoices,
     )
     val externalInterfacesSummary = if (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun) {
-        ebpfSharedNetworkInterfacesSummary(
-            if (appState.runMode == RunModeTun) appState.tunSharedNetworkInterfaces else appState.ebpfSharedNetworkInterfaces,
-        )
+        tunSharedNetworkInterfacesSummary(appState.tunSharedNetworkInterfaces)
     } else {
         externalInterfacesSummary(appState.externalInterfaces)
     }
@@ -293,7 +291,7 @@ private fun SettingsContent(
     )
     val sheetState = rememberSettingsSheetState(updateAppState)
     val nestedSearchEntries = settingsNestedSearchEntries(
-        useEbpfSharedNetwork = (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun),
+        useTunSharedNetwork = (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun),
         onOpenDns = {
             navigator.push(Route.DnsManagement(openSettings = true))
         },
@@ -302,7 +300,7 @@ private fun SettingsContent(
         onOpenTun = { sheetState.openTunSettings(appState) },
         onOpenExternalInterfaces = {
             if (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun) {
-                sheetState.openEbpfSharedNetwork(appState)
+                sheetState.openTunSharedNetwork(appState)
             } else {
                 sheetState.openExternalInterfaces(appState)
             }
@@ -312,7 +310,7 @@ private fun SettingsContent(
         onOpenPrivateAddresses = { sheetState.openPrivateAddresses(appState) },
     )
     val topLevelSearchItems = settingsTopLevelSearchItems(
-        useEbpfSharedNetwork = (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun),
+        useTunSharedNetwork = (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun),
         colorModeOptions = colorModeOptions,
         colorMode = appState.colorMode,
         keyColorOptions = keyColorOptions,
@@ -325,7 +323,7 @@ private fun SettingsContent(
         snifferSummary = snifferSummary,
         localProxySummary = localProxySettingsSummary,
         tunSummary = tunSettingsSummary,
-        ebpfBypassRuleSetsSummary = ebpfBypassRuleSetsSummary,
+        tunBypassRuleSetsSummary = tunBypassRuleSetsSummary,
         externalInterfacesSummary = externalInterfacesSummary,
         ignoredInterfacesSummary = ignoredInterfacesSummary,
         privateAddressesSummary = privateAddressCidrsSummary,
@@ -473,7 +471,7 @@ private fun SettingsContent(
                     enableRootBootScript = appState.enableRootBootScript,
                     enableRootEbpfRules = appState.enableRootEbpfRules,
                     enableRootEbpfDirectCidrBypass = appState.enableRootEbpfDirectCidrBypass,
-                    ebpfBypassRuleSetsSummary = ebpfBypassRuleSetsSummary,
+                    tunBypassRuleSetsSummary = tunBypassRuleSetsSummary,
                     enableIpv6 = appState.enableIpv6,
                     enableRootIpv6Disabler = appState.enableRootIpv6Disabler,
                     externalInterfacesSummary = externalInterfacesSummary,
@@ -576,15 +574,15 @@ private fun SettingsContent(
                     onEnableRootEbpfDirectCidrBypassChange = { enabled ->
                         updateAppState { state -> state.copy(enableRootEbpfDirectCidrBypass = enabled) }
                     },
-                    onOpenEbpfBypassRuleSets = {
-                        sheetState.openEbpfBypassRuleSets(appState)
+                    onOpenTunBypassRuleSets = {
+                        sheetState.openTunBypassRuleSets(appState)
                     },
                     onEnableRootIpv6DisablerChange = { enabled ->
                         updateAppState { state -> state.copy(enableRootIpv6Disabler = enabled) }
                     },
                     onOpenExternalInterfaces = {
                         if (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun) {
-                            sheetState.openEbpfSharedNetwork(appState)
+                            sheetState.openTunSharedNetwork(appState)
                         } else {
                             sheetState.openExternalInterfaces(appState)
                         }
@@ -653,7 +651,7 @@ private fun SettingsContent(
             appState = appState,
             sheetState = sheetState,
             tunStackOptions = tunStackOptions,
-            ebpfBypassRuleSetChoices = ebpfBypassRuleSetChoices,
+            tunBypassRuleSetChoices = tunBypassRuleSetChoices,
             updateAppState = updateAppState,
         )
         SettingsRestoreConfirmDialog(

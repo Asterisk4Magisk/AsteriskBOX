@@ -30,7 +30,7 @@ internal fun filterSettingsSearchEntries(
 
 @Composable
 internal fun settingsTopLevelSearchItems(
-    useEbpfSharedNetwork: Boolean,
+    useTunSharedNetwork: Boolean,
     colorModeOptions: List<String>,
     colorMode: Int,
     keyColorOptions: List<String>,
@@ -43,7 +43,7 @@ internal fun settingsTopLevelSearchItems(
     snifferSummary: String,
     localProxySummary: String,
     tunSummary: String,
-    ebpfBypassRuleSetsSummary: String,
+    tunBypassRuleSetsSummary: String,
     externalInterfacesSummary: String,
     ignoredInterfacesSummary: String,
     privateAddressesSummary: String,
@@ -156,7 +156,7 @@ internal fun settingsTopLevelSearchItems(
             stringResource(R.string.settings_root_boot_script),
             stringResource(R.string.settings_root_boot_script_summary),
         ),
-        if (useEbpfSharedNetwork) {
+        if (useTunSharedNetwork) {
             null
         } else {
             SettingsSearchItem(
@@ -168,8 +168,8 @@ internal fun settingsTopLevelSearchItems(
         SettingsSearchItem(
             SettingsSectionId.Tproxy,
             stringResource(R.string.settings_root_ebpf_bypass_direct_cidrs),
-            if (useEbpfSharedNetwork) {
-                ebpfBypassRuleSetsSummary
+            if (useTunSharedNetwork) {
+                tunBypassRuleSetsSummary
             } else {
                 stringResource(R.string.settings_root_ebpf_bypass_direct_cidrs_summary)
             },
@@ -182,15 +182,15 @@ internal fun settingsTopLevelSearchItems(
         SettingsSearchItem(
             SettingsSectionId.Tproxy,
             stringResource(
-                if (useEbpfSharedNetwork) {
-                    R.string.settings_ebpf_shared_network
+                if (useTunSharedNetwork) {
+                    R.string.settings_tun_shared_network
                 } else {
                     R.string.settings_external_interfaces
                 },
             ),
             externalInterfacesSummary,
         ),
-        if (useEbpfSharedNetwork) {
+        if (useTunSharedNetwork) {
             null
         } else {
             SettingsSearchItem(
@@ -199,7 +199,7 @@ internal fun settingsTopLevelSearchItems(
                 ignoredInterfacesSummary,
             )
         },
-        if (useEbpfSharedNetwork) {
+        if (useTunSharedNetwork) {
             null
         } else {
             SettingsSearchItem(
@@ -252,7 +252,7 @@ internal fun SettingsNestedSearchResults(
 
 @Composable
 internal fun settingsNestedSearchEntries(
-    useEbpfSharedNetwork: Boolean,
+    useTunSharedNetwork: Boolean,
     onOpenDns: () -> Unit,
     onOpenSniffer: () -> Unit,
     onOpenLocalProxy: () -> Unit,
@@ -267,8 +267,8 @@ internal fun settingsNestedSearchEntries(
     val localProxy = stringResource(R.string.settings_local_proxy)
     val tun = stringResource(R.string.settings_tun)
     val externalInterfaces = stringResource(
-        if (useEbpfSharedNetwork) {
-            R.string.settings_ebpf_shared_network
+        if (useTunSharedNetwork) {
+            R.string.settings_tun_shared_network
         } else {
             R.string.settings_external_interfaces
         },
@@ -307,10 +307,10 @@ internal fun settingsNestedSearchEntries(
         stringResource(R.string.settings_tun_ipv4_cidr),
         stringResource(R.string.settings_tun_ipv6_cidr),
     )
-    val externalItems = if (useEbpfSharedNetwork) {
+    val externalItems = if (useTunSharedNetwork) {
         listOf(
-            stringResource(R.string.settings_ebpf_shared_network_input),
-            stringResource(R.string.settings_ebpf_shared_network_description),
+            stringResource(R.string.settings_tun_shared_network_input),
+            stringResource(R.string.settings_tun_shared_network_description),
         )
     } else {
         listOf(
@@ -328,7 +328,7 @@ internal fun settingsNestedSearchEntries(
         tunItems.forEach { add(SettingsSearchEntry(it, tun, Icons.Rounded.SettingsInputComponent, onOpenTun)) }
         externalItems.forEach { add(SettingsSearchEntry(it, externalInterfaces, Icons.Rounded.Cable, onOpenExternalInterfaces)) }
         add(SettingsSearchEntry(serviceControl, serviceControl, Icons.Rounded.PowerSettingsNew, onOpenServiceControl))
-        if (!useEbpfSharedNetwork) {
+        if (!useTunSharedNetwork) {
             add(SettingsSearchEntry(ignoredInterfaces, ignoredInterfaces, Icons.Rounded.Block, onOpenIgnoredInterfaces))
             add(SettingsSearchEntry(privateAddresses, privateAddresses, Icons.Rounded.HomeWork, onOpenPrivateAddresses))
         }
