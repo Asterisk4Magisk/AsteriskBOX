@@ -11,9 +11,9 @@ An Android sing-box GUI client. VPN Service mode uses [AndroidLibBoxLite](https:
 ## Features
 
 - VPN Service, TPROXY(ROOT), TUN(ROOT), eBPF(ROOT), TUN2SOCKS(ROOT), and BPF2SOCKS(ROOT) run modes
-- Strict sing-box JSON configurations from QR code, local file, or URL subscription
-- Official sing-box command API for status, traffic, connections, modes, proxy selection, and delay tests
-- ROOT start-on-boot script generation through Magisk `service.d`
+- Import and manage strict sing-box JSON configurations from QR codes, local files, or URL subscriptions
+- Outbound, DNS, routing, rule-set, and resource management
+- Live status, traffic, connections, proxy selection, and delay tests through the official sing-box command API
 - Material 3 Compose UI
 
 ## Run Modes
@@ -21,47 +21,50 @@ An Android sing-box GUI client. VPN Service mode uses [AndroidLibBoxLite](https:
 ### VPN Service
 
 - Works without root permission.
-- Runs sing-box in the app process through AndroidLibBoxLite JNI and its local command server.
-- Uses Android `VpnService`; the optional Hev TUN path continues to use `hev-socks5-tunnel`.
+- Runs sing-box in the app process through AndroidLibBoxLite and Android `VpnService`.
+- The optional Hev TUN path uses `hev-socks5-tunnel`.
 
 ### TPROXY(ROOT)
 
-- Runs the bundled sing-box Android binary with a TPROXY inbound.
+- Runs the bundled sing-box binary with a TPROXY inbound.
 - Uses iptables and policy routing for transparent proxy traffic.
 
 ### TUN(ROOT)
 
-- Runs the bundled sing-box Android binary with the fixed TUN device `asterisk0`.
-- Keeps sing-box `auto_route` disabled and applies app-managed iptables and policy routing rules.
+- Runs the bundled sing-box binary with the fixed TUN device `asterisk0`.
+- Uses sing-box-managed `auto_route` and `auto_redirect` instead of app-managed transparent routing.
 - Supports the System, gVisor, and Mixed TUN stacks.
+- Selected rule-set IP CIDRs are passed to `route_exclude_address_set`; domain rules do not apply.
+- Exact downstream interface names can be included for hotspot and tethering traffic.
 
 ### eBPF(ROOT)
 
-- Uses the reF1nd sing-box eBPF inbound to attach cgroup socket-address programs directly.
-- Does not use a TUN device, TProxy, iptables, policy routing, a Bridge helper, or a local SOCKS5 intermediary.
-- Bypass direct addresses lets you select managed local `.srs` files for the inbound `bypass_rule_set`.
-- Optional shared-network TC uses exact downstream interface names. Wildcards and interface prefixes are not supported.
+- Uses the reF1nd sing-box eBPF inbound without a TUN device or local SOCKS5 intermediary.
+- Uses the TC data plane for local traffic and optional `socket_assign` for exact downstream interfaces.
+- Shares TUN mode's rule-set selection and passes its IP CIDRs to `bypass_rule_set`; domain rules do not apply.
 - Availability depends on device kernel, cgroup v2, and eBPF support.
 
 ### TUN2SOCKS(ROOT)
 
-- Uses `hev-socks5-tunnel` to create `asterisk0`.
+- Uses `hev-socks5-tunnel` to create the fixed TUN device `asterisk0`.
 - Sends tunnel traffic to a local sing-box SOCKS5 inbound.
 
 ### BPF2SOCKS(ROOT)
 
-- Uses eBPF and the native `bpf2socks` helper to send TCP and UDP traffic to a local sing-box SOCKS5 inbound.
+- Uses eBPF and the native `bpf2socks` helper without creating a TUN device.
+- Sends captured TCP and UDP traffic to a local sing-box SOCKS5 inbound.
 - Requires the eBPF capability probe to pass before startup.
 
-### ROOT address monitor
+### asteriskd
 
-ROOT modes use the native `asteriskd` monitor to maintain local-address bypass rules and optional IPv6 state. Runtime binaries, configuration, PID files, helpers, and logs remain in the app-private `files/sing-box` directory. Only the boot entry script is installed outside it at `/data/adb/service.d/asteriskbox_start.sh`.
+- Watches local IPv4/IPv6 addresses and tethering interfaces, then refreshes the relevant iptables rules or BPF maps.
+- Cleans up networking rules owned by the active ROOT mode when the service stops.
 
 ## Resource Files
 
-- The bundled ROOT core is the reF1nd sing-box Android binary selected by `ProjectConfig.SING_BOX_VERSION` and may be manually replaced from the resource page.
-- Direct CIDR IPv4/IPv6 files and custom resource files can be replaced or updated from configured URLs.
-- Rule sets remain part of the sing-box JSON configuration.
+- ROOT runtime files are stored in the app-private `files/sing-box` directory.
+- The bundled reF1nd sing-box ROOT core can be replaced from Resource Management.
+- Direct CIDR and custom resource files can be replaced locally or updated from configured URLs; rule sets remain part of the sing-box JSON configuration.
 
 ## Development
 
@@ -77,9 +80,15 @@ Build with Android Studio or the Gradle wrapper:
 .\gradlew.bat assembleDebug
 ```
 
-The build resolves the AndroidLibBoxLite version configured by `ProjectConfig.ANDROID_LIB_BOX_LITE_VERSION`, downloads the reF1nd ROOT core version configured by `ProjectConfig.SING_BOX_VERSION` for all supported ABIs, builds the native helper submodules, and produces ABI split APKs plus a universal APK.
+On macOS or Linux:
 
-If Gradle cannot find Android NDK, set `ndk.dir` in `local.properties`, set `ANDROID_NDK_HOME`, or install an NDK under the Android SDK.
+```bash
+./gradlew assembleDebug
+```
+
+The build resolves the configured AndroidLibBoxLite and reF1nd sing-box versions, builds the native helper submodules, and produces ABI split APKs plus a universal APK.
+
+If Gradle cannot find the Android NDK, configure it through Android Studio, `ndk.dir` in `local.properties`, or `ANDROID_NDK_HOME`.
 
 ## WSA
 
