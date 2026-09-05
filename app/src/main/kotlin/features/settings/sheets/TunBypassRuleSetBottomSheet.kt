@@ -76,17 +76,8 @@ internal fun TunBypassRuleSetBottomSheet(
         onDismissRequest = onDismissRequest,
     ) {
         LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            item {
-                Text(
-                    text = stringResource(R.string.settings_tun_bypass_rule_sets_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
-            }
             item {
                 ReferenceSelectionCard(
                     title = stringResource(R.string.settings_tun_bypass_rule_sets_picker_title),
@@ -97,6 +88,15 @@ internal fun TunBypassRuleSetBottomSheet(
                         onSelectedTagsChange(toggleTunBypassRuleSetTag(selected, tag))
                     },
                     enabled = !saving,
+                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp),
+                )
+            }
+            item {
+                Text(
+                    text = stringResource(R.string.settings_tun_bypass_rule_sets_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
                 )
             }
         }
