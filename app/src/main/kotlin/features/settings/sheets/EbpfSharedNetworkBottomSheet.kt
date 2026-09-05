@@ -7,6 +7,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import engine.singbox.config.isSingBoxSharedNetworkInterface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -17,7 +22,7 @@ import ui.text.formatTemplate
 import utils.toTrimmedNonEmptyDistinctList
 
 internal fun List<String>.sanitizeEbpfSharedNetworkInterfaces(): List<String> {
-    return toTrimmedNonEmptyDistinctList()
+    return toTrimmedNonEmptyDistinctList().filterNot { it == "lo" }
 }
 
 @Composable
@@ -38,6 +43,8 @@ internal fun EbpfSharedNetworkBottomSheet(
     onDismissRequest: () -> Unit,
     onSave: (List<String>) -> Unit,
 ) {
+    var editorPending by remember(show) { mutableStateOf(false) }
+    val invalidMessage = stringResource(R.string.settings_ebpf_shared_network_invalid)
     val normalizedInterfaces = interfaces.sanitizeEbpfSharedNetworkInterfaces()
     SettingsModalBottomSheet(
         show = show,
@@ -54,6 +61,7 @@ internal fun EbpfSharedNetworkBottomSheet(
                 text = stringResource(R.string.common_save),
                 icon = Icons.Rounded.Save,
                 onClick = { onSave(normalizedInterfaces) },
+                enabled = !editorPending && normalizedInterfaces.all(::isSingBoxSharedNetworkInterface),
             )
         },
         onDismissRequest = onDismissRequest,
@@ -73,6 +81,10 @@ internal fun EbpfSharedNetworkBottomSheet(
                         onInterfacesChange(values.sanitizeEbpfSharedNetworkInterfaces())
                     },
                     emptyText = stringResource(R.string.settings_ebpf_shared_network_empty),
+                    validateInput = { value ->
+                        if (isSingBoxSharedNetworkInterface(value)) null else invalidMessage
+                    },
+                    onPendingChange = { editorPending = it },
                 )
             }
         }

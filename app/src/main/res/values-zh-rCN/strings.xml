@@ -271,6 +271,7 @@
     <string name="settings_ebpf_bypass_rule_sets_summary_none">未选择规则集</string>
     <string name="settings_ebpf_bypass_rule_sets_summary_selected">已选择：{ruleSets}</string>
     <string name="settings_ebpf_bypass_rule_sets_picker_title">本地规则集</string>
+    <string name="settings_ebpf_bypass_rule_sets_description">仅所选规则集中的 IP CIDR 在系统路由层绕过接管，域名规则在此处不生效。</string>
     <string name="settings_root_ebpf_matcher_failed">eBPF 匹配器支持探测失败</string>
     <string name="settings_root_ebpf_matcher_unsupported">当前设备不支持 eBPF 匹配器</string>
     <string name="settings_root_ebpf_selinux_policy_warning_title">启用 eBPF 匹配器？</string>
@@ -321,6 +322,7 @@
     <string name="settings_ebpf_shared_network_input">下游接口名称</string>
     <string name="settings_ebpf_shared_network">热点共享设置</string>
     <string name="settings_ebpf_shared_network_description">每项填写一个实际的下游接口名（如 ap0、rndis0、rmnet0 或 ppp0）。不支持通配符和 loopback。</string>
+    <string name="settings_ebpf_shared_network_invalid">请输入实际接口名（1–15 位字母、数字、点、下划线或连字符）。本机流量自动包含，无需填写 lo。</string>
     <string name="settings_ebpf_shared_network_empty">尚未配置下游接口</string>
     <string name="settings_ebpf_shared_network_none">未启用</string>
     <string name="settings_ebpf_shared_network_selected">已配置 {count} 个接口</string>

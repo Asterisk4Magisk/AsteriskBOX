@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import app.AppState
+import app.modes.RunModeTun
 import features.settings.sheets.sanitizeIgnoredInterfaceSelectors
 import features.settings.sheets.sanitizeExternalInterfaces
 import features.settings.sheets.sanitizePrivateAddressCidrs
@@ -94,13 +95,16 @@ internal class SettingsSheetState(
 
     fun openEbpfSharedNetwork(appState: AppState) {
         ebpfSharedNetworkInterfacesDraft =
-            appState.ebpfSharedNetworkInterfaces.sanitizeEbpfSharedNetworkInterfaces()
+            (if (appState.runMode == RunModeTun) appState.tunSharedNetworkInterfaces else appState.ebpfSharedNetworkInterfaces)
+                .sanitizeEbpfSharedNetworkInterfaces()
         showEbpfSharedNetwork = true
     }
 
     fun openEbpfBypassRuleSets(appState: AppState) {
         ebpfBypassRuleSetTagsDraft =
-            sanitizeEbpfBypassRuleSetTags(appState.ebpfBypassRuleSetTags)
+            sanitizeEbpfBypassRuleSetTags(
+                if (appState.runMode == RunModeTun) appState.tunBypassRuleSetTags else appState.ebpfBypassRuleSetTags,
+            )
         showEbpfBypassRuleSets = true
     }
 }

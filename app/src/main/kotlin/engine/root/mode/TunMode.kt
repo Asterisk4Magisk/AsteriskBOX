@@ -3,57 +3,32 @@
 
 package engine.root.mode
 
-import app.AppState
-import app.rootIpv6DataPathEnabled
 import engine.proxy.toLocalProxyOptions
 import engine.root.config.RootConfigBuildContext
+import engine.root.config.RootIptablesConfig
 import engine.root.config.RootModeStartConfig
 import engine.root.config.buildAsteriskdConfig
 import engine.root.daemon.config.AsteriskdMode
 import engine.root.daemon.config.AsteriskdModeOptions
-import engine.singbox.SingBoxConfigFactory
 import engine.singbox.config.SingBoxTunDevice
-import engine.vpn.TunOptions
-import engine.vpn.toTunOptions
-
-internal data class SingBoxTunConfig(
-    val device: String,
-    val stack: String,
-    val mtu: Int,
-    val ipv4Address: String?,
-    val ipv6Address: String?,
-)
 
 internal fun RootConfigBuildContext.buildTunStartConfig(): RootModeStartConfig {
     val appState = this.appState
     val rootStartConfig = buildRootStartConfig()
-    val iptablesConfig = buildRootIptablesConfig()
-    val tunConfig = appState.buildSingBoxTunConfig(appState.toTunOptions())
     return RootModeStartConfig(
         root = rootStartConfig,
         localProxyOptions = appState.toLocalProxyOptions(),
         asteriskdConfig = rootStartConfig.buildAsteriskdConfig(
             mode = AsteriskdMode.Tun,
-            iptablesConfig = iptablesConfig,
-            virtualInterfaces = listOf(tunConfig.device),
+            iptablesConfig = RootIptablesConfig(
+                externalInterfacePrefixes = appState.tunSharedNetworkInterfaces
+                    .map(String::trim).filter { it.isNotEmpty() && it != "lo" }.distinct(),
+            ),
+            virtualInterfaces = emptyList(),
             modeOptions = AsteriskdModeOptions(
                 transparentPort = null,
-                tunnelName = tunConfig.device,
+                tunnelName = SingBoxTunDevice,
             ),
         ),
-    )
-}
-
-private fun AppState.buildSingBoxTunConfig(tunOptions: TunOptions): SingBoxTunConfig {
-    return SingBoxTunConfig(
-        device = SingBoxTunDevice,
-        stack = SingBoxConfigFactory.tunStack(this),
-        mtu = tunOptions.mtu,
-        ipv4Address = "${tunOptions.ipv4Address.address}/${tunOptions.ipv4Address.prefixLength}",
-        ipv6Address = if (rootIpv6DataPathEnabled) {
-            "${tunOptions.ipv6Address.address}/${tunOptions.ipv6Address.prefixLength}"
-        } else {
-            null
-        },
     )
 }

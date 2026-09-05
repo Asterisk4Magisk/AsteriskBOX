@@ -265,11 +265,13 @@ private fun SettingsContent(
         ).map { choice -> choice.tag to choice.remarks }
     }
     val ebpfBypassRuleSetsSummary = ebpfBypassRuleSetSummary(
-        selectedTags = appState.ebpfBypassRuleSetTags,
+        selectedTags = if (appState.runMode == RunModeTun) appState.tunBypassRuleSetTags else appState.ebpfBypassRuleSetTags,
         choices = ebpfBypassRuleSetChoices,
     )
-    val externalInterfacesSummary = if (appState.runMode == RunModeEbpf) {
-        ebpfSharedNetworkInterfacesSummary(appState.ebpfSharedNetworkInterfaces)
+    val externalInterfacesSummary = if (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun) {
+        ebpfSharedNetworkInterfacesSummary(
+            if (appState.runMode == RunModeTun) appState.tunSharedNetworkInterfaces else appState.ebpfSharedNetworkInterfaces,
+        )
     } else {
         externalInterfacesSummary(appState.externalInterfaces)
     }
@@ -291,7 +293,7 @@ private fun SettingsContent(
     )
     val sheetState = rememberSettingsSheetState(updateAppState)
     val nestedSearchEntries = settingsNestedSearchEntries(
-        useEbpfSharedNetwork = appState.runMode == RunModeEbpf,
+        useEbpfSharedNetwork = (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun),
         onOpenDns = {
             navigator.push(Route.DnsManagement(openSettings = true))
         },
@@ -299,7 +301,7 @@ private fun SettingsContent(
         onOpenLocalProxy = { sheetState.openLocalProxySettings(appState) },
         onOpenTun = { sheetState.openTunSettings(appState) },
         onOpenExternalInterfaces = {
-            if (appState.runMode == RunModeEbpf) {
+            if (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun) {
                 sheetState.openEbpfSharedNetwork(appState)
             } else {
                 sheetState.openExternalInterfaces(appState)
@@ -310,7 +312,7 @@ private fun SettingsContent(
         onOpenPrivateAddresses = { sheetState.openPrivateAddresses(appState) },
     )
     val topLevelSearchItems = settingsTopLevelSearchItems(
-        useEbpfSharedNetwork = appState.runMode == RunModeEbpf,
+        useEbpfSharedNetwork = (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun),
         colorModeOptions = colorModeOptions,
         colorMode = appState.colorMode,
         keyColorOptions = keyColorOptions,
@@ -581,7 +583,7 @@ private fun SettingsContent(
                         updateAppState { state -> state.copy(enableRootIpv6Disabler = enabled) }
                     },
                     onOpenExternalInterfaces = {
-                        if (appState.runMode == RunModeEbpf) {
+                        if (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun) {
                             sheetState.openEbpfSharedNetwork(appState)
                         } else {
                             sheetState.openExternalInterfaces(appState)

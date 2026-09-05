@@ -341,7 +341,7 @@ internal fun SettingsProxyModeSections(
                     onClick = onOpenServiceControl,
                 )
                 AnimatedVisibility(
-                    visible = runMode != RunModeBpf2Socks && runMode != RunModeEbpf,
+                    visible = runMode != RunModeBpf2Socks && runMode != RunModeEbpf && runMode != RunModeTun,
             enter = AsteriskMotion.contentEnter(),
             exit = AsteriskMotion.contentExit(),
                 ) {
@@ -356,12 +356,12 @@ internal fun SettingsProxyModeSections(
                 AnimatedVisibility(
                     visible = enableRootEbpfRules ||
                         runMode == RunModeBpf2Socks ||
-                        runMode == RunModeEbpf,
+                        (runMode == RunModeEbpf || runMode == RunModeTun),
             enter = AsteriskMotion.contentEnter(),
             exit = AsteriskMotion.contentExit(),
                 ) {
                     AnimatedContent(
-                        targetState = runMode == RunModeEbpf,
+                        targetState = (runMode == RunModeEbpf || runMode == RunModeTun),
                         modifier = Modifier.fillMaxWidth(),
                         transitionSpec = AsteriskMotion.fadeThrough(
                             effectsSpec = bypassControlEffectsMotion,
@@ -432,7 +432,7 @@ internal fun SettingsProxyModeSections(
                     )
                 }
                 AnimatedVisibility(
-                    visible = runMode == RunModeEbpf,
+                    visible = (runMode == RunModeEbpf || runMode == RunModeTun),
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
@@ -444,7 +444,7 @@ internal fun SettingsProxyModeSections(
                     )
                 }
                 AnimatedVisibility(
-                    visible = runMode != RunModeEbpf,
+                    visible = runMode != RunModeEbpf && runMode != RunModeTun,
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
@@ -456,7 +456,7 @@ internal fun SettingsProxyModeSections(
                     )
                 }
                 AnimatedVisibility(
-                    visible = runMode != RunModeEbpf,
+                    visible = runMode != RunModeEbpf && runMode != RunModeTun,
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
@@ -468,7 +468,7 @@ internal fun SettingsProxyModeSections(
                     )
                 }
                 AnimatedVisibility(
-                    visible = runMode != RunModeEbpf,
+                    visible = runMode != RunModeEbpf && runMode != RunModeTun,
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {

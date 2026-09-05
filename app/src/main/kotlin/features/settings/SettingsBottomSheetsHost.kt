@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import app.AppState
+import app.modes.RunModeTun
 import app.LocalAppServices
 import app.modes.RunModeBpf2Socks
 import app.modes.RunModeTproxy
@@ -344,9 +345,13 @@ internal fun SettingsBottomSheetsHost(
         onDismissRequest = { sheetState.showEbpfBypassRuleSets = false },
         onSave = { tags ->
             validateAndCommit(
-                operation = "save_ebpf_bypass_rule_sets",
+                operation = "save_root_bypass_rule_sets",
                 transform = { state ->
-                    state.copy(ebpfBypassRuleSetTags = sanitizeEbpfBypassRuleSetTags(tags))
+                    if (appState.runMode == RunModeTun) {
+                        state.copy(tunBypassRuleSetTags = sanitizeEbpfBypassRuleSetTags(tags))
+                    } else {
+                        state.copy(ebpfBypassRuleSetTags = sanitizeEbpfBypassRuleSetTags(tags))
+                    }
                 },
                 close = { sheetState.showEbpfBypassRuleSets = false },
             )
@@ -362,9 +367,11 @@ internal fun SettingsBottomSheetsHost(
         onDismissRequest = { sheetState.showEbpfSharedNetwork = false },
         onSave = { interfaces ->
             updateAppState { state ->
-                state.copy(
-                    ebpfSharedNetworkInterfaces = interfaces.sanitizeEbpfSharedNetworkInterfaces(),
-                )
+                if (appState.runMode == RunModeTun) {
+                    state.copy(tunSharedNetworkInterfaces = interfaces.sanitizeEbpfSharedNetworkInterfaces())
+                } else {
+                    state.copy(ebpfSharedNetworkInterfaces = interfaces.sanitizeEbpfSharedNetworkInterfaces())
+                }
             }
             sheetState.showEbpfSharedNetwork = false
         },

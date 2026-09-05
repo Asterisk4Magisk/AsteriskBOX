@@ -274,6 +274,7 @@
     <string name="settings_ebpf_bypass_rule_sets_summary_none">No rule sets selected</string>
     <string name="settings_ebpf_bypass_rule_sets_summary_selected">Selected: {ruleSets}</string>
     <string name="settings_ebpf_bypass_rule_sets_picker_title">Local rule sets</string>
+    <string name="settings_ebpf_bypass_rule_sets_description">Only IP CIDRs in the selected rule sets bypass capture at the system routing layer. Domain rules have no effect here.</string>
     <string name="settings_root_ebpf_matcher_failed">Failed to probe eBPF matcher support</string>
     <string name="settings_root_ebpf_matcher_unsupported">This device does not support eBPF matcher</string>
     <string name="settings_root_ebpf_selinux_policy_warning_title">Enable eBPF matcher?</string>
@@ -324,6 +325,7 @@
     <string name="settings_ebpf_shared_network_input">Downstream interface names</string>
     <string name="settings_ebpf_shared_network">Tethering sharing</string>
     <string name="settings_ebpf_shared_network_description">Enter one exact downstream interface name per item (for example ap0, rndis0, rmnet0, or ppp0). Wildcards and loopback are not supported.</string>
+    <string name="settings_ebpf_shared_network_invalid">Use an exact interface name (1–15 letters, digits, dots, underscores, or hyphens). Local traffic is included automatically; do not enter lo.</string>
     <string name="settings_ebpf_shared_network_empty">No downstream interfaces configured</string>
     <string name="settings_ebpf_shared_network_none">Not enabled</string>
     <string name="settings_ebpf_shared_network_selected">Configured interfaces: {count}</string>

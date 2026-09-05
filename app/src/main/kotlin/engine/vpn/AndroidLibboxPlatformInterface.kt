@@ -24,6 +24,8 @@ import app.modes.ProxyAppListModeGlobal
 import app.modes.ProxyAppListModeWhitelist
 import engine.proxy.LocalProxyLoopbackAddress
 import features.logs.AndroidAppLogger
+import io.nekohasekai.libbox.AutoRedirectHandler
+import io.nekohasekai.libbox.AutoRedirectSession
 import io.nekohasekai.libbox.BridgeOptions
 import io.nekohasekai.libbox.BridgeSession
 import io.nekohasekai.libbox.ConnectionOwner
@@ -306,6 +308,10 @@ internal class AndroidLibboxPlatformInterface(
     override fun readSystemSSHHostKey(): String = unsupported("system SSH host key")
     override fun lookupSFTPServer(): String = unsupported("SFTP server")
     override fun lookupUser(username: String?): PlatformUser = unsupported("platform user")
+    override fun usePlatformAutoRedirect(): Boolean = false
+    override fun createAutoRedirect(options: ByteArray?, handler: AutoRedirectHandler?): AutoRedirectSession =
+        unsupported("platform auto redirect")
+
     override fun usePlatformBridge(): Boolean = false
     override fun createBridge(options: BridgeOptions?): BridgeSession = unsupported("platform bridge")
     override fun registerMyInterface(name: String?) = Unit

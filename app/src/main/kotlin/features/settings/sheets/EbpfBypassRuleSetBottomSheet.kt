@@ -6,6 +6,8 @@ package features.settings.sheets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -78,6 +80,13 @@ internal fun EbpfBypassRuleSetBottomSheet(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
+            item {
+                Text(
+                    text = stringResource(R.string.settings_ebpf_bypass_rule_sets_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+            }
             item {
                 ReferenceSelectionCard(
                     title = stringResource(R.string.settings_ebpf_bypass_rule_sets_picker_title),

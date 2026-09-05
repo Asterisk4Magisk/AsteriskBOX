@@ -109,10 +109,10 @@ internal object SingBoxConfigCompiler {
             runMode = runMode,
             exposePorts = exposePorts,
             localRuleSets = localRuleSets,
-            ebpfUidPolicy = if (runMode == RunModeEbpf) {
-                context.resolveEbpfUidPolicy(runtimeState)
+            rootUidPolicy = if (runMode == RunModeEbpf || runMode == RunModeTun) {
+                context.resolveRootInboundUidPolicy(runtimeState)
             } else {
-                EbpfUidPolicy()
+                RootInboundUidPolicy()
             },
         )
     }
@@ -122,7 +122,7 @@ internal object SingBoxConfigCompiler {
         runMode: Int = appState.runMode,
         exposePorts: Boolean = true,
         localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
-        ebpfUidPolicy: EbpfUidPolicy = EbpfUidPolicy(),
+        rootUidPolicy: RootInboundUidPolicy = RootInboundUidPolicy(),
     ): String {
         val encoded = encodeSingBoxJson(
             compileGeneratedRoot(
@@ -130,7 +130,7 @@ internal object SingBoxConfigCompiler {
                 runMode = runMode,
                 exposePorts = exposePorts,
                 localRuleSets = localRuleSets,
-                ebpfUidPolicy = ebpfUidPolicy,
+                rootUidPolicy = rootUidPolicy,
             ),
         )
         SingBoxConfigChecker.check(encoded)
@@ -142,14 +142,14 @@ internal object SingBoxConfigCompiler {
         runMode: Int = appState.runMode,
         exposePorts: Boolean = true,
         localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
-        ebpfUidPolicy: EbpfUidPolicy = EbpfUidPolicy(),
+        rootUidPolicy: RootInboundUidPolicy = RootInboundUidPolicy(),
     ): JsonObject = generateRoot(
         sourceRoot = JsonObject(emptyMap()),
         appState = appState.withCanonicalManagedTagReferences(),
         runMode = runMode,
         exposePorts = exposePorts,
         localRuleSets = localRuleSets,
-        ebpfUidPolicy = ebpfUidPolicy,
+        rootUidPolicy = rootUidPolicy,
     )
 
     private fun generateRoot(
@@ -158,7 +158,7 @@ internal object SingBoxConfigCompiler {
         runMode: Int = appState.runMode,
         exposePorts: Boolean = true,
         localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
-        ebpfUidPolicy: EbpfUidPolicy = EbpfUidPolicy(),
+        rootUidPolicy: RootInboundUidPolicy = RootInboundUidPolicy(),
     ): JsonObject {
         val managedSourceRoot = sourceRoot.withLocalRuleSets(localRuleSets)
         val availableRuleSetTags = localRuleSets.mapTo(linkedSetOf(), SingBoxLocalRuleSet::tag)
@@ -172,7 +172,7 @@ internal object SingBoxConfigCompiler {
                     appState = appState,
                     runMode = runMode,
                     exposePorts = exposePorts,
-                    ebpfUidPolicy = ebpfUidPolicy,
+                    rootUidPolicy = rootUidPolicy,
                     availableRuleSetTags = availableRuleSetTags,
                 ),
             )
@@ -257,7 +257,7 @@ private fun compileInbounds(
     appState: AppState,
     runMode: Int,
     exposePorts: Boolean,
-    ebpfUidPolicy: EbpfUidPolicy,
+    rootUidPolicy: RootInboundUidPolicy,
     availableRuleSetTags: Set<String>,
 ): JsonArray {
     val retained = (root["inbounds"] as? JsonArray)
@@ -283,10 +283,15 @@ private fun compileInbounds(
             put("listen", LocalProxyLoopbackAddress)
             put("listen_port", appState.socks5ProxyPort.toPortOrNull() ?: RootModeEngine.DefaultTun2SocksProxyPort)
         }
-        RunModeTun -> retained += compileTunInbound(appState, rootMode = true)
+        RunModeTun -> retained += compileTunInbound(
+            appState,
+            rootMode = true,
+            uidPolicy = rootUidPolicy,
+            availableRuleSetTags = availableRuleSetTags,
+        )
         RunModeEbpf -> retained += compileEbpfInbound(
             appState = appState,
-            uidPolicy = ebpfUidPolicy,
+            uidPolicy = rootUidPolicy,
             availableRuleSetTags = availableRuleSetTags,
         )
     }
@@ -295,7 +300,7 @@ private fun compileInbounds(
 
 internal fun compileEbpfInbound(
     appState: AppState,
-    uidPolicy: EbpfUidPolicy,
+    uidPolicy: RootInboundUidPolicy,
     availableRuleSetTags: Set<String>,
 ): JsonObject {
     val sharedInterfaces = normalizeEbpfSharedNetworkInterfaces(appState.ebpfSharedNetworkInterfaces)
@@ -366,25 +371,50 @@ private fun compileLocalInbound(appState: AppState): JsonObject {
     }
 }
 
-private fun compileTunInbound(appState: AppState, rootMode: Boolean): JsonObject {
+internal fun compileTunInbound(
+    appState: AppState,
+    rootMode: Boolean,
+    uidPolicy: RootInboundUidPolicy = RootInboundUidPolicy(),
+    availableRuleSetTags: Set<String> = emptySet(),
+): JsonObject {
     val options = appState.toTunOptions()
     return buildJsonObject {
         put("type", "tun")
         put("tag", APP_TUN_INBOUND)
         if (rootMode) {
             put("interface_name", SingBoxTunDevice)
-        } else {
-            put("auto_route", true)
+            put("auto_redirect", true)
+            val sharedInterfaces = appState.tunSharedNetworkInterfaces
+                .map(String::trim).filter(String::isNotEmpty).filterNot { it == "lo" }.distinct()
+            require(sharedInterfaces.all(::isSingBoxSharedNetworkInterface)) {
+                "TUN shared interfaces must be exact interface names"
+            }
+            // lo keeps local OUTPUT enabled; an empty shared list must not capture other ingress.
+            putJsonArray("include_interface") {
+                (listOf("lo") + sharedInterfaces).forEach(::add)
+            }
+            if (uidPolicy.includeUids.isNotEmpty()) {
+                putJsonArray("include_uid") { uidPolicy.includeUids.forEach(::add) }
+            }
+            if (uidPolicy.excludeUids.isNotEmpty()) {
+                putJsonArray("exclude_uid") { uidPolicy.excludeUids.forEach(::add) }
+            }
+            val bypassTags = appState.tunBypassRuleSetTags
+                .map(String::trim).distinct().filter(availableRuleSetTags::contains)
+            if (bypassTags.isNotEmpty()) {
+                putJsonArray("route_exclude_address_set") { bypassTags.forEach(::add) }
+            }
         }
+        put("auto_route", true)
         put("mtu", options.mtu)
         putJsonArray("address") {
             add("${options.ipv4Address.address}/${options.ipv4Address.prefixLength}")
-            if (appState.enableIpv6 || (rootMode && appState.rootIpv6DataPathEnabled)) {
+            if (appState.enableIpv6) {
                 add("${options.ipv6Address.address}/${options.ipv6Address.prefixLength}")
             }
         }
         put("dns_mode", if (appState.enableLocalDns) "hijack" else "disabled")
-        if (appState.enableLocalDns) {
+        if (appState.enableLocalDns && !rootMode) {
             putJsonArray("dns_address") {
                 options.dnsServers.forEach(::add)
             }
