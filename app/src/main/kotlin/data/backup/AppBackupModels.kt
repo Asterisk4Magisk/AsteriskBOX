@@ -105,6 +105,10 @@ internal data class AppBackupSettings(
     val dnsDisableExpire: Boolean = BackupDefaults.dnsDisableExpire,
     val dnsTimeout: String = BackupDefaults.dnsTimeout,
     val transparentProxyPort: String = BackupDefaults.transparentProxyPort,
+    val ebpfLocalDataPlane: String = BackupDefaults.ebpfLocalDataPlane,
+    val ebpfSharedDataPlane: String = BackupDefaults.ebpfSharedDataPlane,
+    val ebpfLocalDnsMode: String = BackupDefaults.ebpfLocalDnsMode,
+    val ebpfSharedDnsMode: String = BackupDefaults.ebpfSharedDnsMode,
     val enableRootEbpfDirectCidrBypass: Boolean = BackupDefaults.enableRootEbpfDirectCidrBypass,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     @SerialName("ebpfBypassRuleSetTags")

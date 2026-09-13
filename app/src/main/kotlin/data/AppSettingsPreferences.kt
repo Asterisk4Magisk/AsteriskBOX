@@ -229,6 +229,10 @@ internal class AppSettingsPreferences(
                 KeyEnableRootEbpfDirectCidrBypass,
                 defaults.enableRootEbpfDirectCidrBypass,
             ),
+            ebpfLocalDataPlane = preferences.getString(KeyEbpfLocalDataPlane, defaults.ebpfLocalDataPlane) ?: defaults.ebpfLocalDataPlane,
+            ebpfSharedDataPlane = preferences.getString(KeyEbpfSharedDataPlane, defaults.ebpfSharedDataPlane) ?: defaults.ebpfSharedDataPlane,
+            ebpfLocalDnsMode = preferences.getString(KeyEbpfLocalDnsMode, defaults.ebpfLocalDnsMode) ?: defaults.ebpfLocalDnsMode,
+            ebpfSharedDnsMode = preferences.getString(KeyEbpfSharedDnsMode, defaults.ebpfSharedDnsMode) ?: defaults.ebpfSharedDnsMode,
             tunBypassRuleSetTags = preferences.getStringList(
                 if (preferences.contains(KeyTunBypassRuleSetTags)) {
                     KeyTunBypassRuleSetTags
@@ -437,6 +441,10 @@ internal const val KeyTransparentProxyPort = "transparent_proxy_port"
 internal const val KeyEnableRootBootScript = "enable_root_boot_script"
 internal const val KeyEnableRootEbpfRules = "enable_root_ebpf_rules"
 internal const val KeyEnableRootEbpfDirectCidrBypass = "enable_root_ebpf_direct_cidr_bypass"
+internal const val KeyEbpfLocalDataPlane = "ebpf_local_data_plane"
+internal const val KeyEbpfSharedDataPlane = "ebpf_shared_data_plane"
+internal const val KeyEbpfLocalDnsMode = "ebpf_local_dns_mode"
+internal const val KeyEbpfSharedDnsMode = "ebpf_shared_dns_mode"
 internal const val KeyTunBypassRuleSetTags = "tun_bypass_rule_set_tags"
 private const val LegacyKeyEbpfBypassRuleSetTags = "ebpf_bypass_rule_set_tags"
 internal const val KeyEnableRootIpv6Disabler = "enable_root_ipv6_disabler"

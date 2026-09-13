@@ -284,8 +284,11 @@ private fun SettingsContent(
         ipv6Cidr = appState.tunIpv6Cidr,
         showVpnDns = appState.runMode == RunModeVpnService,
     )
+    val ebpfLocalDataPlane = appState.ebpfLocalDataPlane
+    val ebpfLocalDnsMode = appState.ebpfLocalDnsMode
     val sheetState = rememberSettingsSheetState(updateAppState)
     val nestedSearchEntries = settingsNestedSearchEntries(
+        showEbpfOptions = appState.runMode == RunModeEbpf,
         useTunSharedNetwork = (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun),
         onOpenDns = {
             navigator.push(Route.DnsManagement(openSettings = true))
@@ -305,6 +308,10 @@ private fun SettingsContent(
         onOpenPrivateAddresses = { sheetState.openPrivateAddresses(appState) },
     )
     val topLevelSearchItems = settingsTopLevelSearchItems(
+        showEbpfOptions = appState.runMode == RunModeEbpf,
+        ebpfLocalDataPlane = ebpfLocalDataPlane,
+        ebpfLocalDnsMode = ebpfLocalDnsMode,
+        enableLocalDns = appState.enableLocalDns,
         useTunSharedNetwork = (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun),
         colorModeOptions = colorModeOptions,
         colorMode = appState.colorMode,
@@ -459,6 +466,9 @@ private fun SettingsContent(
                 SettingsProxyModeSections(
                     runMode = appState.runMode,
                     localProxySettingsSummary = localProxySettingsSummary,
+                    ebpfLocalDataPlane = ebpfLocalDataPlane,
+                    ebpfLocalDnsMode = ebpfLocalDnsMode,
+                    enableLocalDns = appState.enableLocalDns,
                     enableTrafficStatsNotification = appState.enableTrafficStatsNotification,
                     enableVpnAppendHttpProxy = appState.enableVpnAppendHttpProxy,
                     enableVpnHevTun = appState.enableVpnHevTun,
@@ -473,6 +483,12 @@ private fun SettingsContent(
                     ignoredInterfacesSummary = ignoredInterfacesSummary,
                     privateAddressCidrsSummary = privateAddressCidrsSummary,
                     onOpenLocalProxySettings = { sheetState.openLocalProxySettings(appState) },
+                    onEbpfLocalDataPlaneChange = { value ->
+                        updateAppState { state -> state.copy(ebpfLocalDataPlane = value) }
+                    },
+                    onEbpfLocalDnsModeChange = { value ->
+                        updateAppState { state -> state.copy(ebpfLocalDnsMode = value) }
+                    },
                     onEnableTrafficStatsNotificationChange = { enabled ->
                         updateAppState { state -> state.copy(enableTrafficStatsNotification = enabled) }
                     },

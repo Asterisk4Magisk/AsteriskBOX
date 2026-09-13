@@ -422,6 +422,13 @@
     <string name="settings_resource_files_restored">{name} restored from bundled assets</string>
     <string name="settings_resource_files_deleted">{name} deleted</string>
     <string name="settings_log_level">Log level</string>
+    <string name="settings_ebpf_data_plane">Data plane</string>
+    <string name="settings_ebpf_dns_mode">DNS mode</string>
+    <string name="settings_ebpf_local_data_plane_summary">tc intercepts interface traffic; cgroup intercepts sockets.</string>
+    <string name="settings_ebpf_shared_data_plane_summary">socket_assign uses transparent listeners; packet_rewrite rewrites Ethernet packets.</string>
+    <string name="settings_ebpf_local_dns_mode_summary">hijack captures port 53; respect_policy follows app selection.</string>
+    <string name="settings_ebpf_shared_dns_mode_summary">hijack captures port 53; respect_policy follows client selection.</string>
+    <string name="settings_ebpf_dns_disabled">Local DNS is disabled; off is in effect.</string>
     <string name="settings_traffic_stats_notification">Show statistics</string>
     <string name="settings_traffic_stats_notification_summary">Show current speed and total traffic in notifications</string>
     <string name="settings_sniffer">Protocol sniffing</string>

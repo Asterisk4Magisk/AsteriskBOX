@@ -417,6 +417,13 @@
     <string name="settings_resource_files_restored">{name} 已恢复为内置文件</string>
     <string name="settings_resource_files_deleted">{name} 已删除</string>
     <string name="settings_log_level">日志等级</string>
+    <string name="settings_ebpf_data_plane">数据面</string>
+    <string name="settings_ebpf_dns_mode">DNS 模式</string>
+    <string name="settings_ebpf_local_data_plane_summary">tc 接管接口流量；cgroup 接管 socket。</string>
+    <string name="settings_ebpf_shared_data_plane_summary">socket_assign 使用透明监听器；packet_rewrite 改写以太网报文。</string>
+    <string name="settings_ebpf_local_dns_mode_summary">hijack 接管 53 端口；respect_policy 遵循应用筛选。</string>
+    <string name="settings_ebpf_shared_dns_mode_summary">hijack 接管 53 端口；respect_policy 遵循客户端筛选。</string>
+    <string name="settings_ebpf_dns_disabled">本地 DNS 已关闭，当前使用 off。</string>
     <string name="settings_traffic_stats_notification">显示统计数据</string>
     <string name="settings_traffic_stats_notification_summary">在通知中显示当前速度和累计流量</string>
     <string name="settings_sniffer">协议嗅探</string>

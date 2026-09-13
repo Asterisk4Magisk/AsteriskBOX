@@ -14,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import app.AppState
 import app.LocalAppServices
 import app.modes.RunModeBpf2Socks
+import app.modes.RunModeEbpf
 import app.modes.RunModeTproxy
 import app.modes.RunModeTun2Socks
 import app.modes.RunModeVpnService
@@ -344,15 +345,25 @@ internal fun SettingsBottomSheetsHost(
     )
     TunSharedNetworkBottomSheet(
         show = sheetState.showTunSharedNetwork,
+        showEbpfOptions = appState.runMode == RunModeEbpf,
+        enableLocalDns = appState.enableLocalDns,
+        ebpfSharedDataPlane = sheetState.ebpfSharedDataPlaneDraft,
+        ebpfSharedDnsMode = sheetState.ebpfSharedDnsModeDraft,
+        onEbpfSharedDataPlaneChange = { sheetState.ebpfSharedDataPlaneDraft = it },
+        onEbpfSharedDnsModeChange = { sheetState.ebpfSharedDnsModeDraft = it },
         interfaces = sheetState.tunSharedNetworkInterfacesDraft,
         onInterfacesChange = { interfaces ->
             sheetState.tunSharedNetworkInterfacesDraft =
                 interfaces.sanitizeTunSharedNetworkInterfaces()
         },
         onDismissRequest = { sheetState.showTunSharedNetwork = false },
-        onSave = { interfaces ->
+        onSave = { interfaces, dataPlane, dnsMode ->
             updateAppState { state ->
-                state.copy(tunSharedNetworkInterfaces = interfaces.sanitizeTunSharedNetworkInterfaces())
+                state.copy(
+                    tunSharedNetworkInterfaces = interfaces.sanitizeTunSharedNetworkInterfaces(),
+                    ebpfSharedDataPlane = if (state.runMode == RunModeEbpf) dataPlane else state.ebpfSharedDataPlane,
+                    ebpfSharedDnsMode = if (state.runMode == RunModeEbpf) dnsMode else state.ebpfSharedDnsMode,
+                )
             }
             sheetState.showTunSharedNetwork = false
         },

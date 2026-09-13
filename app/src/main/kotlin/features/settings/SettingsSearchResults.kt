@@ -30,6 +30,10 @@ internal fun filterSettingsSearchEntries(
 
 @Composable
 internal fun settingsTopLevelSearchItems(
+    showEbpfOptions: Boolean,
+    ebpfLocalDataPlane: String,
+    ebpfLocalDnsMode: String,
+    enableLocalDns: Boolean,
     useTunSharedNetwork: Boolean,
     colorModeOptions: List<String>,
     colorMode: Int,
@@ -208,6 +212,23 @@ internal fun settingsTopLevelSearchItems(
                 privateAddressesSummary,
             )
         },
+        if (showEbpfOptions) SettingsSearchItem(
+            SettingsSectionId.Tproxy,
+            stringResource(R.string.settings_ebpf_data_plane),
+            summary = stringResource(R.string.settings_ebpf_local_data_plane_summary),
+            value = ebpfLocalDataPlane,
+            optionText = engine.singbox.EbpfLocalDataPlanes,
+        ) else null,
+        if (showEbpfOptions) SettingsSearchItem(
+            SettingsSectionId.Tproxy,
+            stringResource(R.string.settings_ebpf_dns_mode),
+            summary = stringResource(
+                if (enableLocalDns) R.string.settings_ebpf_local_dns_mode_summary
+                else R.string.settings_ebpf_dns_disabled,
+            ),
+            value = ebpfLocalDnsMode,
+            optionText = engine.singbox.EbpfDnsModes,
+        ) else null,
         SettingsSearchItem(SettingsSectionId.Logs, stringResource(R.string.settings_core_logs)),
         SettingsSearchItem(SettingsSectionId.Logs, stringResource(R.string.settings_logcat)),
         SettingsSearchItem(
@@ -252,6 +273,7 @@ internal fun SettingsNestedSearchResults(
 
 @Composable
 internal fun settingsNestedSearchEntries(
+    showEbpfOptions: Boolean,
     useTunSharedNetwork: Boolean,
     onOpenDns: () -> Unit,
     onOpenSniffer: () -> Unit,
@@ -320,7 +342,19 @@ internal fun settingsNestedSearchEntries(
         )
     }
 
+    val ebpfDataPlane = stringResource(R.string.settings_ebpf_data_plane)
+    val ebpfDnsMode = stringResource(R.string.settings_ebpf_dns_mode)
     return buildList {
+        if (showEbpfOptions) {
+            add(SettingsSearchEntry(ebpfDataPlane, externalInterfaces, Icons.Rounded.AccountTree, onOpenExternalInterfaces))
+            add(SettingsSearchEntry(ebpfDnsMode, externalInterfaces, Icons.Rounded.Dns, onOpenExternalInterfaces))
+            engine.singbox.EbpfSharedDataPlanes.forEach {
+                add(SettingsSearchEntry(it, "$externalInterfaces · $ebpfDataPlane", Icons.Rounded.AccountTree, onOpenExternalInterfaces))
+            }
+            engine.singbox.EbpfDnsModes.forEach {
+                add(SettingsSearchEntry(it, "$externalInterfaces · $ebpfDnsMode", Icons.Rounded.Dns, onOpenExternalInterfaces))
+            }
+        }
         dnsItems.forEach { add(SettingsSearchEntry(it, dns, Icons.Rounded.Dns, onOpenDns)) }
         snifferItems.forEach { add(SettingsSearchEntry(it, sniffer, Icons.Rounded.TravelExplore, onOpenSniffer)) }
         localProxyItems.forEach { add(SettingsSearchEntry(it, localProxy, Icons.Rounded.Router, onOpenLocalProxy)) }

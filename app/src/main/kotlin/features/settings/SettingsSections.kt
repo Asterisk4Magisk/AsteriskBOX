@@ -25,6 +25,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
 import engine.singbox.DefaultSingBoxLogLevel
+import engine.singbox.EbpfLocalDataPlanes
+import engine.singbox.EbpfDnsModes
 import app.R
 import ui.icons.AsteriskIcons as Icons
 import ui.theme.AsteriskMotion
@@ -222,6 +224,9 @@ internal fun SettingsAdvancedSection(
 internal fun SettingsProxyModeSections(
     runMode: Int,
     localProxySettingsSummary: String,
+    ebpfLocalDataPlane: String,
+    ebpfLocalDnsMode: String,
+    enableLocalDns: Boolean,
     enableTrafficStatsNotification: Boolean,
     enableVpnAppendHttpProxy: Boolean,
     enableVpnHevTun: Boolean,
@@ -236,6 +241,8 @@ internal fun SettingsProxyModeSections(
     ignoredInterfacesSummary: String,
     privateAddressCidrsSummary: String,
     onOpenLocalProxySettings: () -> Unit,
+    onEbpfLocalDataPlaneChange: (String) -> Unit,
+    onEbpfLocalDnsModeChange: (String) -> Unit,
     onEnableTrafficStatsNotificationChange: (Boolean) -> Unit,
     onEnableVpnAppendHttpProxyChange: (Boolean) -> Unit,
     onEnableVpnHevTunChange: (Boolean) -> Unit,
@@ -398,6 +405,37 @@ internal fun SettingsProxyModeSections(
                         checked = enableRootIpv6Disabler,
                         onCheckedChange = onEnableRootIpv6DisablerChange,
                     )
+                }
+                AnimatedVisibility(
+                    visible = runMode == RunModeEbpf,
+                    enter = AsteriskMotion.contentEnter(),
+                    exit = AsteriskMotion.contentExit(),
+                ) {
+                    Column {
+                        OverlayDropdownPreference(
+                            title = stringResource(R.string.settings_ebpf_data_plane),
+                            icon = Icons.Rounded.AccountTree,
+                            summary = stringResource(R.string.settings_ebpf_local_data_plane_summary),
+                            items = EbpfLocalDataPlanes,
+                            selectedIndex = EbpfLocalDataPlanes.indexOf(ebpfLocalDataPlane).coerceAtLeast(0),
+                            onSelectedIndexChange = { index ->
+                                EbpfLocalDataPlanes.getOrNull(index)?.let(onEbpfLocalDataPlaneChange)
+                            },
+                        )
+                        OverlayDropdownPreference(
+                            title = stringResource(R.string.settings_ebpf_dns_mode),
+                            icon = Icons.Rounded.Dns,
+                            summary = stringResource(
+                                if (enableLocalDns) R.string.settings_ebpf_local_dns_mode_summary
+                                else R.string.settings_ebpf_dns_disabled,
+                            ),
+                            items = EbpfDnsModes,
+                            selectedIndex = EbpfDnsModes.indexOf(ebpfLocalDnsMode).coerceAtLeast(0),
+                            onSelectedIndexChange = { index ->
+                                EbpfDnsModes.getOrNull(index)?.let(onEbpfLocalDnsModeChange)
+                            },
+                        )
+                    }
                 }
                 SwitchPreference(
                     title = stringResource(R.string.settings_traffic_stats_notification),

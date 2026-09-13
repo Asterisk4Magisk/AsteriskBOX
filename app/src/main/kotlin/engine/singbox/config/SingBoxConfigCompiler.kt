@@ -42,6 +42,9 @@ import engine.proxy.LocalProxyLoopbackAddress
 import engine.proxy.toLocalProxyOptions
 import engine.root.RootModeEngine
 import engine.singbox.isNonNegativeSingBoxDuration
+import engine.singbox.effectiveEbpfDnsMode
+import engine.singbox.EbpfLocalDataPlanes
+import engine.singbox.EbpfSharedDataPlanes
 import engine.singbox.singBoxControlConfig
 import engine.vpn.toTunOptions
 import features.resources.SingBoxRuleSetFileFormat
@@ -304,13 +307,22 @@ internal fun compileEbpfInbound(
     availableRuleSetTags: Set<String>,
 ): JsonObject {
     val sharedInterfaces = normalizeTunSharedNetworkInterfaces(appState.tunSharedNetworkInterfaces)
+    require(sharedInterfaces.all(::isSingBoxSharedNetworkInterface)) {
+        "eBPF shared interfaces must be exact, non-loopback interface names"
+    }
+    require(appState.ebpfLocalDataPlane in EbpfLocalDataPlanes) {
+        "eBPF local data_plane must be tc or cgroup"
+    }
+    require(sharedInterfaces.isEmpty() || appState.ebpfSharedDataPlane in EbpfSharedDataPlanes) {
+        "eBPF shared data_plane must be socket_assign or packet_rewrite"
+    }
     return buildJsonObject {
         put("type", "ebpf")
         put("tag", APP_ROOT_INBOUND)
         putJsonObject("local") {
             put("enabled", true)
-            put("data_plane", "tc")
-            put("dns_mode", if (appState.enableLocalDns) "hijack" else "off")
+            put("data_plane", appState.ebpfLocalDataPlane)
+            put("dns_mode", appState.ebpfLocalDnsMode.effectiveEbpfDnsMode(appState.enableLocalDns))
             put("ipv6", appState.enableIpv6)
             put("bypass_private_address", false)
             if (uidPolicy.includeUids.isNotEmpty()) {
@@ -333,8 +345,8 @@ internal fun compileEbpfInbound(
         if (sharedInterfaces.isNotEmpty()) {
             putJsonObject("shared") {
                 put("enabled", true)
-                put("data_plane", "socket_assign")
-                put("dns_mode", if (appState.enableLocalDns) "hijack" else "off")
+                put("data_plane", appState.ebpfSharedDataPlane)
+                put("dns_mode", appState.ebpfSharedDnsMode.effectiveEbpfDnsMode(appState.enableLocalDns))
                 putJsonArray("interface") {
                     sharedInterfaces.forEach(::add)
                 }

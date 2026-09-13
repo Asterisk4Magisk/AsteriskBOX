@@ -13,6 +13,9 @@ import app.modes.SingBoxModeRule
 import app.modes.SingBoxProxyLayoutAuto
 import app.modes.SingBoxProxySortDefault
 import engine.singbox.DefaultSingBoxControlPort
+import engine.singbox.DefaultEbpfLocalDataPlane
+import engine.singbox.DefaultEbpfSharedDataPlane
+import engine.singbox.DefaultEbpfDnsMode
 import engine.singbox.DefaultSingBoxDnsCacheCapacity
 import engine.singbox.DefaultSingBoxDnsFinal
 import engine.singbox.DefaultSingBoxDnsRules
@@ -115,6 +118,10 @@ data class AppState(
     val enableRootBootScript: Boolean = false,
     val enableRootEbpfRules: Boolean = false,
     val enableRootEbpfDirectCidrBypass: Boolean = false,
+    val ebpfLocalDataPlane: String = DefaultEbpfLocalDataPlane,
+    val ebpfSharedDataPlane: String = DefaultEbpfSharedDataPlane,
+    val ebpfLocalDnsMode: String = DefaultEbpfDnsMode,
+    val ebpfSharedDnsMode: String = DefaultEbpfDnsMode,
     val tunBypassRuleSetTags: List<String> = emptyList(),
     val enableRootIpv6Disabler: Boolean = false,
     val socks5ProxyPort: String = RootModeEngine.DefaultTun2SocksProxyPort.toString(),
