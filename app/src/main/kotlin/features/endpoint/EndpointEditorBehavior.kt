@@ -12,11 +12,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal fun endpointEditorShowsProperties(
-    editorFocused: Boolean,
-    imeVisible: Boolean,
-): Boolean = !editorFocused || !imeVisible
-
 internal fun formatEndpointJson(json: String): String {
     val endpoint = SingBoxJson.parseToJsonElement(json.trim()) as? JsonObject
         ?: throw IllegalArgumentException("Endpoint must be a JSON object")

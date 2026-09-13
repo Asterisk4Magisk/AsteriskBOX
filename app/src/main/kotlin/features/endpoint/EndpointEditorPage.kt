@@ -5,6 +5,7 @@
 
 package features.endpoint
 
+import ui.layout.codeEditorShowsSupportingContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,11 +13,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.LocalAppServices
@@ -121,11 +119,7 @@ internal fun EndpointEditorPage(
     val invalidJsonMessage = stringResource(R.string.endpoint_editor_json_invalid)
     val formatJsonContentDescription = stringResource(R.string.endpoint_editor_format_json)
     val copiedMessage = stringResource(R.string.common_copied)
-    val density = LocalDensity.current
-    val showProperties = endpointEditorShowsProperties(
-        editorFocused = editorState.isFocused,
-        imeVisible = WindowInsets.ime.getBottom(density) > 0,
-    )
+    val showProperties = codeEditorShowsSupportingContent(editorState.isFocused)
 
     fun formatCurrentJson() {
         runCatching {
