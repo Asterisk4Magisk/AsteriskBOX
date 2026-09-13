@@ -44,7 +44,6 @@ import ui.components.AsteriskTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -94,8 +93,6 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.asterisk.zcc.abox.R
 import sh.calvin.reorderable.ReorderableItem
@@ -103,6 +100,7 @@ import ui.components.AsteriskActionButton
 import ui.components.AsteriskModalBottomSheet
 import ui.components.WarningConfirmDialog
 import ui.components.draggedCardShadow
+import ui.components.rememberReorderPreview
 import ui.components.longPressReorderDragHandle
 import ui.components.rememberAsteriskReorderableLazyListState
 import ui.components.verticalReorderScrollThresholdPadding
@@ -133,10 +131,6 @@ internal fun OutboundGroupListPage(
     var pendingDelete by remember { mutableStateOf<OutboundGroupState?>(null) }
     var deletingGroupId by remember { mutableStateOf<Int?>(null) }
     var enabledChangingGroupIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
-    var groupOrderPreviewIds by remember { mutableStateOf<List<Int>?>(null) }
-    var groupOrderPreviewGeneration by remember { mutableStateOf<Long?>(null) }
-    var nextGroupOrderGeneration by remember { mutableLongStateOf(0L) }
-    val groupReorderMutex = remember { Mutex() }
     var syncingGroupIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var batchSyncJob by remember { mutableStateOf<Job?>(null) }
     var batchSyncProgress by remember { mutableStateOf<OutboundGroupBatchProgress?>(null) }
@@ -429,77 +423,38 @@ internal fun OutboundGroupListPage(
         )
         val listContentPadding = pageListPadding(contentPadding)
         val listState = rememberLazyListState()
-        val displayedGroups = groupOrderPreviewIds?.let { previewIds ->
-            val groupsById = appState.outboundGroups.associateBy(OutboundGroupState::id)
-            previewIds.mapNotNull(groupsById::get).takeIf { groups ->
-                groups.size == appState.outboundGroups.size
+        val preview = rememberReorderPreview(
+            appState.outboundGroups,
+            OutboundGroupState::id,
+            commitScope = scope,
+        ) { ids ->
+            when (val result = services.outboundRepository.reorderGroups(ids)) {
+                OutboundCommandResult.GroupsReordered -> true
+                OutboundCommandResult.Conflict -> {
+                    services.tipNotifier.show(stateChangedMessage)
+                    false
+                }
+                is OutboundCommandResult.PersistenceFailed -> {
+                    services.tipNotifier.showError(
+                        result.error,
+                        importFailedMessage,
+                        FailureLogContext(operation = "outbound_group_reorder", stage = "persist"),
+                    )
+                    false
+                }
+                is OutboundCommandResult.Invalid -> {
+                    services.tipNotifier.show(importFailedMessage)
+                    false
+                }
+                else -> error("Unexpected outbound group reorder result: $result")
             }
-        } ?: appState.outboundGroups
+        }
+        val displayedGroups = preview.items
         val reorderableState = rememberAsteriskReorderableLazyListState(
             lazyListState = listState,
             itemCount = displayedGroups.size,
             scrollThresholdPadding = verticalReorderScrollThresholdPadding(listContentPadding),
-            onMove = { fromIndex, toIndex ->
-                val currentIds = groupOrderPreviewIds
-                    ?.takeIf { ids ->
-                        ids.size == displayedGroups.size &&
-                            ids.toSet() == displayedGroups.mapTo(mutableSetOf(), OutboundGroupState::id)
-                    }
-                    ?: displayedGroups.map(OutboundGroupState::id)
-                val reorderedIds = currentIds.toMutableList().apply {
-                    if (fromIndex in indices && toIndex in indices && fromIndex != toIndex) {
-                        add(toIndex, removeAt(fromIndex))
-                    }
-                }
-                if (reorderedIds == currentIds) return@rememberAsteriskReorderableLazyListState
-                nextGroupOrderGeneration += 1L
-                val generation = nextGroupOrderGeneration
-                groupOrderPreviewIds = reorderedIds
-                groupOrderPreviewGeneration = generation
-                scope.launch {
-                    groupReorderMutex.withLock {
-                        when (val result = services.outboundRepository.reorderGroups(reorderedIds)) {
-                            OutboundCommandResult.GroupsReordered -> {
-                                if (groupOrderPreviewGeneration == generation) {
-                                    groupOrderPreviewIds = null
-                                    groupOrderPreviewGeneration = null
-                                }
-                            }
-                            OutboundCommandResult.Conflict -> {
-                                services.tipNotifier.show(stateChangedMessage)
-                                if (groupOrderPreviewGeneration == generation) {
-                                    groupOrderPreviewIds = null
-                                    groupOrderPreviewGeneration = null
-                                }
-                            }
-                            is OutboundCommandResult.PersistenceFailed -> {
-                                services.tipNotifier.showError(
-                                    result.error,
-                                    importFailedMessage,
-                                    FailureLogContext(
-                                        operation = "outbound_group_reorder",
-                                        stage = "persist",
-                                    ),
-                                )
-                                if (groupOrderPreviewGeneration == generation) {
-                                    groupOrderPreviewIds = null
-                                    groupOrderPreviewGeneration = null
-                                }
-                            }
-                            is OutboundCommandResult.Invalid ->
-                                services.tipNotifier.show(importFailedMessage)
-                            OutboundCommandResult.Deleted,
-                            OutboundCommandResult.GroupDeleted,
-                            OutboundCommandResult.GroupEnabledChanged,
-                            OutboundCommandResult.ImportPersisted,
-                            OutboundCommandResult.Reordered,
-                            is OutboundCommandResult.Saved,
-                            is OutboundCommandResult.GroupSaved,
-                            -> error("Unexpected outbound group reorder result: $result")
-                        }
-                    }
-                }
-            },
+            onMove = preview.onMove,
         )
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -590,6 +545,8 @@ internal fun OutboundGroupListPage(
                                 scope = this,
                                 enabled = displayedGroups.size > 1,
                                 state = reorderableState,
+                                onDragStarted = preview.onDragStarted,
+                                onDragStopped = preview.onDragStopped,
                             ),
                     )
                 }

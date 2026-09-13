@@ -125,6 +125,7 @@ import ui.components.AsteriskInfoChip
 import ui.components.AsteriskPinnedSearchArea
 import ui.components.WarningConfirmDialog
 import ui.components.draggedCardShadow
+import ui.components.rememberReorderPreview
 import ui.components.longPressReorderDragHandle
 import ui.components.rememberAsteriskReorderableLazyGridState
 import ui.components.singBoxOptionLabel
@@ -209,8 +210,6 @@ internal fun OutboundListPage(
     var query by rememberSaveable { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<OutboundState?>(null) }
     var deletingOutboundId by remember { mutableStateOf<Int?>(null) }
-    var dragPreviewIds by remember { mutableStateOf<Map<Int, List<Int>>>(emptyMap()) }
-    val dragPreviewOwnership = remember { ReorderPreviewOwnership<Int>() }
     val reorderMutex = remember { Mutex() }
     var qrCodeDialogState by remember { mutableStateOf<OutboundQrDialogState?>(null) }
     var importResultPresentation by remember {
@@ -700,19 +699,42 @@ internal fun OutboundListPage(
                 sort = appState.outboundListSort,
                 pingState = pingState,
             )
-            val outbounds = dragPreviewIds[group?.id]
-                ?.let { previewIds ->
-                    val itemsById = groupOutbounds.associateBy(OutboundListItem::id)
-                    previewIds.mapNotNull(itemsById::get).takeIf { it.size == groupOutbounds.size }
-                }
-                ?: groupOutbounds
             val reorderEnabled =
                 appState.outboundListSort == OutboundListSortDefault && query.isBlank()
+            val preview = rememberReorderPreview(
+                items = groupOutbounds,
+                key = OutboundListItem::id,
+                enabled = reorderEnabled,
+                listKey = group?.id,
+                commitScope = scope,
+            ) { ids ->
+                val groupId = group?.id
+                if (groupId == null) {
+                    false
+                } else {
+                    activeOperations += 1
+                    interactionCallback(true)
+                    try {
+                        reorderMutex.withLock {
+                            val result = services.outboundRepository.reorder(groupId, ids)
+                            handleOutboundCommandResult(
+                                result = result,
+                                expectedSuccess = OutboundCommandResult.Reordered,
+                                operation = "outbound_reorder",
+                                onSuccess = {},
+                            )
+                            result is OutboundCommandResult.Reordered
+                        }
+                    } finally {
+                        activeOperations -= 1
+                    }
+                }
+            }
             val dragScrollThresholdBottomPadding =
                 pageListPadding(contentPadding).calculateBottomPadding()
             OutboundPage(
                 onInteractionCountChange = onChildInteractionChange,
-                outbounds = outbounds,
+                outbounds = preview.items,
                 contentPadding = pageListPadding(
                     contentPadding = contentPadding,
                     bottomExtra = outboundListBottomExtraDp().dp,
@@ -722,44 +744,9 @@ internal fun OutboundListPage(
                 columns = columns,
                 reorderEnabled = reorderEnabled,
                 pingState = pingState,
-                onMove = { fromIndex, toIndex ->
-                    val groupId = group?.id ?: return@OutboundPage
-                    val currentIds = dragPreviewIds[groupId]
-                        ?.takeIf { previewIds ->
-                            previewIds.size == outbounds.size &&
-                                previewIds.toSet() == outbounds.mapTo(mutableSetOf(), OutboundListItem::id)
-                        }
-                        ?: outbounds.map(OutboundListItem::id)
-                    val reorderedIds = currentIds.toMutableList().apply {
-                        if (fromIndex in indices && toIndex in indices && fromIndex != toIndex) {
-                            add(toIndex, removeAt(fromIndex))
-                        }
-                    }
-                    if (reorderedIds == currentIds) return@OutboundPage
-                    val generation = dragPreviewOwnership.claim(groupId)
-                    dragPreviewIds = dragPreviewIds + (groupId to reorderedIds)
-                    launchOperation {
-                        reorderMutex.withLock {
-                            val result = services.outboundRepository.reorder(groupId, reorderedIds)
-                            handleOutboundCommandResult(
-                                result = result,
-                                expectedSuccess = OutboundCommandResult.Reordered,
-                                operation = "outbound_reorder",
-                                onSuccess = {
-                                    if (dragPreviewOwnership.releaseIfOwned(groupId, generation)) {
-                                        dragPreviewIds = dragPreviewIds - groupId
-                                    }
-                                },
-                            )
-                            if (
-                                result !is OutboundCommandResult.Reordered &&
-                                    dragPreviewOwnership.releaseIfOwned(groupId, generation)
-                            ) {
-                                dragPreviewIds = dragPreviewIds - groupId
-                            }
-                        }
-                    }
-                },
+                onMove = preview.onMove,
+                onDragStarted = preview.onDragStarted,
+                onDragStopped = preview.onDragStopped,
                 onEdit = { outbound ->
                     navigator.push(
                         Route.OutboundEdit(
@@ -866,6 +853,8 @@ private fun OutboundPage(
     reorderEnabled: Boolean,
     pingState: OutboundPingRuntimeState,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
+    onDragStarted: () -> Unit,
+    onDragStopped: () -> Unit,
     onEdit: (OutboundState) -> Unit,
     onShare: (OutboundState, OutboundShareAction, OutboundShareUrlResult) -> Unit,
     onPing: (OutboundState) -> Unit,
@@ -958,6 +947,8 @@ private fun OutboundPage(
                                 scope = this,
                                 enabled = reorderEnabled && outbounds.size > 1,
                                 state = reorderableState,
+                                onDragStarted = onDragStarted,
+                                onDragStopped = onDragStopped,
                             ),
                     )
                 }

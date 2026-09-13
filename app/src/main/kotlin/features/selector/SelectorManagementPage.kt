@@ -110,6 +110,8 @@ import ui.components.AsteriskInfoChip
 import ui.components.EditorPageScaffold
 import ui.components.WarningConfirmDialog
 import ui.components.draggedCardShadow
+import ui.components.rememberReorderPreview
+import ui.components.reorderByIds
 import ui.components.longPressReorderDragHandle
 import ui.components.rememberAsteriskReorderableLazyGridState
 import ui.components.singBoxOptionLabel
@@ -293,18 +295,18 @@ internal fun SelectorManagementPage(padding: PaddingValues) {
         val listContentPadding = pageListPadding(contentPadding, bottomExtra = 24.dp)
         val gridState = rememberLazyGridState()
         val reorderEnabled = isSelectorReorderEnabled(query, appState.selectors.size)
+        val preview = rememberReorderPreview(customSelectors, SingBoxSelectorState::id, enabled = reorderEnabled) { ids ->
+            updateAppState { state ->
+                state.copy(selectors = state.selectors.reorderByIds(ids, SingBoxSelectorState::id))
+            }
+            true
+        }
         val reorderableState = rememberAsteriskReorderableLazyGridState(
             lazyGridState = gridState,
             itemCount = customSelectors.size,
             indexOffset = selectorCustomSectionIndexOffset(managedGroups.size),
             scrollThresholdPadding = verticalReorderScrollThresholdPadding(listContentPadding),
-            onMove = { fromIndex, toIndex ->
-                if (reorderEnabled) {
-                    updateAppState { state ->
-                        state.copy(selectors = state.selectors.moveSelector(fromIndex, toIndex))
-                    }
-                }
-            },
+            onMove = preview.onMove,
         )
         LazyVerticalGrid(
             columns = GridCells.Adaptive(300.dp),
@@ -343,7 +345,7 @@ internal fun SelectorManagementPage(padding: PaddingValues) {
                     SelectorSectionTitle(stringResource(R.string.selector_custom_section))
                 }
                 gridItems(
-                    items = customSelectors,
+                    items = preview.items,
                     key = { selector -> "custom:${selector.id}" },
                     contentType = { "custom-selector" },
                 ) { selector ->
@@ -367,6 +369,8 @@ internal fun SelectorManagementPage(padding: PaddingValues) {
                                     scope = this,
                                     enabled = reorderEnabled,
                                     state = reorderableState,
+                                    onDragStarted = preview.onDragStarted,
+                                    onDragStopped = preview.onDragStopped,
                                 ),
                         )
                     }

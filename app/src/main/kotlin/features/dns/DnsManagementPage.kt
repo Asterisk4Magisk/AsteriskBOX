@@ -90,6 +90,8 @@ import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskInfoChip
 import ui.components.WarningConfirmDialog
 import ui.components.draggedCardShadow
+import ui.components.rememberReorderPreview
+import ui.components.reorderByIds
 import ui.components.longPressReorderDragHandle
 import ui.components.managedInboundChoices
 import ui.components.rememberAsteriskReorderableLazyGridState
@@ -256,9 +258,9 @@ internal fun DnsManagementPage(
                 dnsSettingsDraft = appState.toDnsSettingsDraft()
                 showDnsSettings = true
             },
-            onMove = { fromIndex, toIndex ->
+            onReorder = { orderedIds ->
                 updateAppState { state ->
-                    state.copy(dnsRules = state.dnsRules.moveDnsRule(fromIndex, toIndex))
+                    state.copy(dnsRules = state.dnsRules.reorderByIds(orderedIds, SingBoxDnsRuleState::id))
                         .withPrunedDnsEvaluationReferences()
                 }
             },
@@ -378,11 +380,15 @@ private fun DnsRuleGrid(
     contentPadding: PaddingValues,
     pendingEnableRuleId: Int?,
     onOpenDnsSettings: () -> Unit,
-    onMove: (Int, Int) -> Unit,
+    onReorder: (List<Int>) -> Unit,
     onEnabledChange: (SingBoxDnsRuleState, Boolean) -> Unit,
     onEdit: (SingBoxDnsRuleState) -> Unit,
     onDelete: (SingBoxDnsRuleState) -> Unit,
 ) {
+    val preview = rememberReorderPreview(rules, SingBoxDnsRuleState::id) { ids ->
+        onReorder(ids)
+        true
+    }
     val gridState = rememberLazyGridState()
     val layout = dnsManagementGridLayout(rules.size)
     val reorderableState = rememberAsteriskReorderableLazyGridState(
@@ -390,7 +396,7 @@ private fun DnsRuleGrid(
         itemCount = rules.size,
         indexOffset = layout.ruleIndexOffset,
         scrollThresholdPadding = verticalReorderScrollThresholdPadding(contentPadding),
-        onMove = onMove,
+        onMove = preview.onMove,
     )
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
@@ -421,7 +427,7 @@ private fun DnsRuleGrid(
                 }
                 DnsManagementGridSection.Rules -> {
                     items(
-                        items = rules,
+                        items = preview.items,
                         key = SingBoxDnsRuleState::id,
                         contentType = { "dns-rule" },
                     ) { rule ->
@@ -447,6 +453,8 @@ private fun DnsRuleGrid(
                                         scope = this,
                                         enabled = rules.size > 1,
                                         state = reorderableState,
+                                        onDragStarted = preview.onDragStarted,
+                                        onDragStopped = preview.onDragStopped,
                                     ),
                             )
                         }

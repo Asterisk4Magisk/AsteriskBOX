@@ -104,6 +104,8 @@ import ui.components.StringListEditor
 import ui.components.WarningConfirmDialog
 import ui.components.draggedCardShadow
 import ui.components.localizedLabel
+import ui.components.rememberReorderPreview
+import ui.components.reorderByIds
 import ui.components.longPressReorderDragHandle
 import ui.components.managedInboundChoices
 import ui.components.rememberAsteriskReorderableLazyGridState
@@ -245,9 +247,9 @@ internal fun RoutingManagementPage(
             onFinalOutboundChange = { outbound ->
                 updateAppState { state -> state.copy(routeFinal = outbound) }
             },
-            onMove = { fromIndex, toIndex ->
+            onReorder = { orderedIds ->
                 updateAppState { state ->
-                    state.copy(routeRules = state.routeRules.moveRouteRule(fromIndex, toIndex))
+                    state.copy(routeRules = state.routeRules.reorderByIds(orderedIds, SingBoxRouteRuleState::id))
                 }
             },
             onEnabledChange = { rule, enabled ->
@@ -366,18 +368,22 @@ private fun RoutingRuleGrid(
     globalLabel: String,
     onOpenRouteSettings: () -> Unit,
     onFinalOutboundChange: (String) -> Unit,
-    onMove: (Int, Int) -> Unit,
+    onReorder: (List<Int>) -> Unit,
     onEnabledChange: (SingBoxRouteRuleState, Boolean) -> Unit,
     onEdit: (SingBoxRouteRuleState) -> Unit,
     onDelete: (SingBoxRouteRuleState) -> Unit,
 ) {
+    val preview = rememberReorderPreview(rules, SingBoxRouteRuleState::id) { ids ->
+        onReorder(ids)
+        true
+    }
     val gridState = rememberLazyGridState()
     val reorderableState = rememberAsteriskReorderableLazyGridState(
         lazyGridState = gridState,
         itemCount = rules.size,
         indexOffset = 2,
         scrollThresholdPadding = verticalReorderScrollThresholdPadding(contentPadding),
-        onMove = onMove,
+        onMove = preview.onMove,
     )
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
@@ -414,7 +420,7 @@ private fun RoutingRuleGrid(
             }
         } else {
             items(
-                items = rules,
+                items = preview.items,
                 key = SingBoxRouteRuleState::id,
                 contentType = { "route-rule" },
             ) { rule ->
@@ -441,6 +447,8 @@ private fun RoutingRuleGrid(
                                 scope = this,
                                 enabled = rules.size > 1,
                                 state = reorderableState,
+                                onDragStarted = preview.onDragStarted,
+                                onDragStopped = preview.onDragStopped,
                             ),
                     )
                 }
