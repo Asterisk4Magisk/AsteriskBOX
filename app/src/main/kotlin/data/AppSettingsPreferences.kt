@@ -99,7 +99,6 @@ internal class AppSettingsPreferences(
                 KeySingBoxProxySort,
                 defaults.singBoxProxySort,
             ),
-            singBoxTunStack = preferences.getInt(KeySingBoxTunStack, defaults.singBoxTunStack),
             singBoxControlPort = preferences.getString(
                 KeySingBoxControlPort,
                 defaults.singBoxControlPort,
@@ -392,7 +391,6 @@ internal const val KeyRunMode = "run_mode"
 internal const val KeySingBoxMode = "sing_box_mode"
 internal const val KeySingBoxProxyLayout = "sing_box_proxy_layout"
 internal const val KeySingBoxProxySort = "sing_box_proxy_sort"
-internal const val KeySingBoxTunStack = "sing_box_tun_stack"
 internal const val KeySingBoxControlPort = "sing_box_control_port"
 internal const val KeySingBoxControlSecret = "sing_box_control_secret"
 internal const val KeyEnableLocalDns = "enable_local_dns"

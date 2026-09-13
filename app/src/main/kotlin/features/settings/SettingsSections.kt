@@ -29,13 +29,6 @@ import app.R
 import ui.icons.AsteriskIcons as Icons
 import ui.theme.AsteriskMotion
 
-@Composable
-internal fun settingsTunStackOptions() = listOf(
-    stringResource(R.string.settings_tun_stack_system),
-    stringResource(R.string.settings_tun_stack_gvisor),
-    stringResource(R.string.settings_tun_stack_mixed),
-)
-
 internal fun settingsCoreLogLevelLabels(): List<String> =
     SettingsCoreLogLevelOptions
 

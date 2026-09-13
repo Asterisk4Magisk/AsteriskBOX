@@ -67,7 +67,6 @@ internal data class AppBackupSettings(
     val singBoxMode: Int = BackupDefaults.singBoxMode,
     val singBoxProxyLayout: Int = BackupDefaults.singBoxProxyLayout,
     val singBoxProxySort: Int = BackupDefaults.singBoxProxySort,
-    val singBoxTunStack: Int = BackupDefaults.singBoxTunStack,
     val singBoxControlPort: String = BackupDefaults.singBoxControlPort,
     val singBoxControlSecret: String = BackupDefaults.singBoxControlSecret,
     val enableLocalDns: Boolean = BackupDefaults.enableLocalDns,

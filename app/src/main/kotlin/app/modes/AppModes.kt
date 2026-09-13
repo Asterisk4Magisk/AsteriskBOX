@@ -33,10 +33,6 @@ const val SingBoxModeRule = 0
 const val SingBoxModeGlobal = 1
 const val SingBoxModeDirect = 2
 
-const val SingBoxTunStackSystem = 0
-const val SingBoxTunStackGvisor = 1
-const val SingBoxTunStackMixed = 2
-
 const val ProxyAppListModeBlacklist = 0
 const val ProxyAppListModeWhitelist = 1
 const val ProxyAppListModeGlobal = 2

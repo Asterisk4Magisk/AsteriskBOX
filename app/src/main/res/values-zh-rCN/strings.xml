@@ -231,10 +231,6 @@
     <string name="sing_box_proxies_option_sort_name">名称</string>
     <string name="sing_box_proxies_option_sort_delay">延迟</string>
     <string name="settings_general">常规</string>
-    <string name="settings_tun_stack">TUN 栈</string>
-    <string name="settings_tun_stack_system">System</string>
-    <string name="settings_tun_stack_gvisor">gVisor</string>
-    <string name="settings_tun_stack_mixed">Mixed</string>
 
     <!-- Settings -->
     <string name="settings_title">设置</string>
@@ -301,9 +297,8 @@
     <string name="settings_vpn_hev_tun">使用 Hev TUN</string>
     <string name="settings_vpn_hev_tun_summary">使用 hev-socks5-tunnel 创建 TUN 设备</string>
     <string name="settings_tun">TUN 设置</string>
-    <string name="settings_tun_summary">TUN 栈 {stack}，MTU {mtu}，VPN DNS {vpnDns}，IPv4 {ipv4}，IPv6 {ipv6}</string>
-    <string name="settings_tun_summary_without_dns">TUN 栈 {stack}，MTU {mtu}，IPv4 {ipv4}，IPv6 {ipv6}</string>
-    <string name="settings_tun_summary_without_stack">MTU {mtu}，IPv4 {ipv4}，IPv6 {ipv6}</string>
+    <string name="settings_tun_summary">MTU {mtu}，VPN DNS {vpnDns}，IPv4 {ipv4}，IPv6 {ipv6}</string>
+    <string name="settings_tun_summary_without_dns">MTU {mtu}，IPv4 {ipv4}，IPv6 {ipv6}</string>
     <string name="settings_tun_mtu">MTU</string>
     <string name="settings_tun_vpn_dns">VPN DNS</string>
     <string name="settings_tun_ipv4_cidr">IPv4 CIDR</string>

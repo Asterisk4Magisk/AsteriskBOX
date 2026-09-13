@@ -44,7 +44,6 @@ import app.R
 internal fun SettingsBottomSheetsHost(
     appState: AppState,
     sheetState: SettingsSheetState,
-    tunStackOptions: List<String>,
     tunBypassRuleSetChoices: List<Pair<String, String>>,
     updateAppState: ((AppState) -> AppState) -> Unit,
 ) {
@@ -197,15 +196,11 @@ internal fun SettingsBottomSheetsHost(
     TunSettingsBottomSheet(
         show = sheetState.showTunSettings,
         saving = validating,
-        tunStackOptions = tunStackOptions,
-        tunStack = sheetState.tunSettingsDraft.tunStack,
         mtu = sheetState.tunSettingsDraft.mtu,
         vpnDns = sheetState.tunSettingsDraft.vpnDns,
         ipv4Cidr = sheetState.tunSettingsDraft.ipv4Cidr,
         ipv6Cidr = sheetState.tunSettingsDraft.ipv6Cidr,
-        showTunStack = appState.runMode != RunModeTun2Socks,
         showVpnDns = appState.runMode == RunModeVpnService,
-        onTunStackChange = { sheetState.tunSettingsDraft = sheetState.tunSettingsDraft.copy(tunStack = it) },
         onMtuChange = {
             sheetState.tunSettingsDraft = sheetState.tunSettingsDraft.copy(mtu = it)
         },
@@ -213,16 +208,11 @@ internal fun SettingsBottomSheetsHost(
         onIpv4CidrChange = { sheetState.tunSettingsDraft = sheetState.tunSettingsDraft.copy(ipv4Cidr = it) },
         onIpv6CidrChange = { sheetState.tunSettingsDraft = sheetState.tunSettingsDraft.copy(ipv6Cidr = it) },
         onDismissRequest = { sheetState.showTunSettings = false },
-        onSave = { tunStack, mtu, vpnDns, ipv4Cidr, ipv6Cidr ->
+        onSave = { mtu, vpnDns, ipv4Cidr, ipv6Cidr ->
             validateAndCommit(
                 operation = "save_tun_settings",
                 transform = { state ->
                     state.copy(
-                        singBoxTunStack = if (state.runMode == RunModeTun2Socks) {
-                            state.singBoxTunStack
-                        } else {
-                            tunStack
-                        },
                         tunMtu = mtu,
                         tunVpnDns = if (state.runMode == RunModeVpnService) vpnDns else state.tunVpnDns,
                         tunIpv4Cidr = ipv4Cidr,

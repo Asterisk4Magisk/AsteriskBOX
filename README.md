@@ -33,7 +33,6 @@ An Android sing-box GUI client. VPN Service mode uses [AndroidLibBoxLite](https:
 
 - Runs the bundled sing-box binary with the fixed TUN device `asterisk0`.
 - Uses sing-box-managed `auto_route` and `auto_redirect` instead of app-managed transparent routing.
-- Supports the System, gVisor, and Mixed TUN stacks.
 - Selected rule-set IP CIDRs are passed to `route_exclude_address_set`; domain rules do not apply.
 - Exact downstream interface names can be included for hotspot and tethering traffic.
 

@@ -59,7 +59,6 @@ internal fun Intent.readVpnServiceStartConfig(): VpnServiceStartConfig? {
         },
         singBoxConfigPath = singBoxConfigPath,
         singBoxConfigSignature = singBoxConfigSignature,
-        singBoxTunStack = getStringExtra(EXTRA_SING_BOX_TUN_STACK).orEmpty().ifBlank { "system" },
         applicationPolicy = VpnApplicationPolicy(
             mode = getIntExtra(EXTRA_PROXY_APP_LIST_MODE, ProxyAppListModeGlobal),
             packageNames = getStringArrayExtra(EXTRA_PROXY_APP_LIST_PACKAGES)?.toList().orEmpty(),
@@ -89,7 +88,6 @@ private fun Intent.writeStartConfig(config: VpnServiceStartConfig) {
     putExtra(EXTRA_DNS_SERVERS, config.dnsServers.toTypedArray())
     putExtra(EXTRA_SING_BOX_CONFIG_PATH, config.singBoxConfigPath)
     putExtra(EXTRA_SING_BOX_CONFIG_SIGNATURE, config.singBoxConfigSignature)
-    putExtra(EXTRA_SING_BOX_TUN_STACK, config.singBoxTunStack)
     putExtra(EXTRA_PROXY_APP_LIST_MODE, config.applicationPolicy.mode)
     putExtra(EXTRA_PROXY_APP_LIST_PACKAGES, config.applicationPolicy.packageNames.toTypedArray())
     putExtra(EXTRA_LOCAL_PROXY_LISTEN_ADDRESS, config.localProxyOptions.listenAddress)
@@ -170,7 +168,6 @@ private const val EXTRA_ENABLE_LOCAL_DNS = "enable_local_dns"
 private const val EXTRA_DNS_SERVERS = "dns_servers"
 private const val EXTRA_SING_BOX_CONFIG_PATH = "sing_box_config_path"
 private const val EXTRA_SING_BOX_CONFIG_SIGNATURE = "sing_box_config_signature"
-private const val EXTRA_SING_BOX_TUN_STACK = "singBox_tun_stack"
 private const val EXTRA_PROXY_APP_LIST_MODE = "proxy_app_list_mode"
 private const val EXTRA_PROXY_APP_LIST_PACKAGES = "proxy_app_list_packages"
 private const val EXTRA_LOCAL_PROXY_LISTEN_ADDRESS = "local_proxy_listen_address"

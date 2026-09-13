@@ -12,7 +12,6 @@ import app.modes.RunModeVpnService
 import app.modes.SingBoxModeRule
 import app.modes.SingBoxProxyLayoutAuto
 import app.modes.SingBoxProxySortDefault
-import app.modes.SingBoxTunStackGvisor
 import engine.singbox.DefaultSingBoxControlPort
 import engine.singbox.DefaultSingBoxDnsCacheCapacity
 import engine.singbox.DefaultSingBoxDnsFinal
@@ -59,7 +58,6 @@ data class AppState(
     val singBoxMode: Int = SingBoxModeRule,
     val singBoxProxyLayout: Int = SingBoxProxyLayoutAuto,
     val singBoxProxySort: Int = SingBoxProxySortDefault,
-    val singBoxTunStack: Int = SingBoxTunStackGvisor,
     val singBoxControlPort: String = DefaultSingBoxControlPort.toString(),
     val singBoxControlSecret: String = "",
     val enableLocalDns: Boolean = true,

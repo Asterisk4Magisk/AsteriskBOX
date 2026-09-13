@@ -9,7 +9,6 @@ import engine.singbox.DefaultSingBoxSnifferProtocols
 import engine.singbox.DefaultSingBoxSnifferTimeout
 
 internal data class TunSettingsDraft(
-    val tunStack: Int = 0,
     val mtu: String = "",
     val vpnDns: String = "",
     val ipv4Cidr: String = "",
@@ -18,7 +17,6 @@ internal data class TunSettingsDraft(
 
 internal fun AppState.toTunSettingsDraft(): TunSettingsDraft {
     return TunSettingsDraft(
-        tunStack = singBoxTunStack,
         mtu = tunMtu,
         vpnDns = tunVpnDns,
         ipv4Cidr = tunIpv4Cidr,

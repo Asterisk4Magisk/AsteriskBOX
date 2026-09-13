@@ -421,14 +421,6 @@ internal fun compileTunInbound(
                 options.dnsServers.forEach(::add)
             }
         }
-        put(
-            "stack",
-            when (appState.singBoxTunStack) {
-                app.modes.SingBoxTunStackGvisor -> "gvisor"
-                app.modes.SingBoxTunStackMixed -> "mixed"
-                else -> "system"
-            },
-        )
     }
 }
 

@@ -301,7 +301,6 @@ internal fun settingsNestedSearchEntries(
         stringResource(R.string.settings_local_proxy_password),
     )
     val tunItems = listOf(
-        stringResource(R.string.settings_tun_stack),
         stringResource(R.string.settings_tun_mtu),
         stringResource(R.string.settings_tun_vpn_dns),
         stringResource(R.string.settings_tun_ipv4_cidr),

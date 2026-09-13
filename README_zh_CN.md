@@ -33,7 +33,6 @@
 
 - 运行内置 sing-box 二进制文件并创建固定 TUN 设备 `asterisk0`。
 - 使用 sing-box 托管的 `auto_route` 和 `auto_redirect`，不再由应用管理透明路由。
-- 支持 System、gVisor 和 Mixed TUN 栈。
 - 所选规则集中的 IP CIDR 会写入 `route_exclude_address_set`，域名规则不生效。
 - 可加入准确的下游接口名以接管热点和网络共享流量。
 

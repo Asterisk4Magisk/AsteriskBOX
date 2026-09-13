@@ -17,23 +17,20 @@ import utils.toIntInRangeOrNull
 
 @Composable
 internal fun tunSettingsSummary(
-    tunStack: String,
     mtu: String,
     vpnDns: String,
     ipv4Cidr: String,
     ipv6Cidr: String,
-    showTunStack: Boolean,
     showVpnDns: Boolean,
 ): String {
     val template = stringResource(
-        when {
-            showVpnDns -> R.string.settings_tun_summary
-            showTunStack -> R.string.settings_tun_summary_without_dns
-            else -> R.string.settings_tun_summary_without_stack
+        if (showVpnDns) {
+            R.string.settings_tun_summary
+        } else {
+            R.string.settings_tun_summary_without_dns
         },
     )
     return template.formatTemplate(
-        "stack" to tunStack,
         "mtu" to mtu,
         "vpnDns" to vpnDns,
         "ipv4" to ipv4Cidr,
@@ -45,21 +42,17 @@ internal fun tunSettingsSummary(
 internal fun TunSettingsBottomSheet(
     show: Boolean,
     saving: Boolean,
-    tunStackOptions: List<String>,
-    tunStack: Int,
     mtu: String,
     vpnDns: String,
     ipv4Cidr: String,
     ipv6Cidr: String,
-    showTunStack: Boolean,
     showVpnDns: Boolean,
-    onTunStackChange: (Int) -> Unit,
     onMtuChange: (String) -> Unit,
     onVpnDnsChange: (String) -> Unit,
     onIpv4CidrChange: (String) -> Unit,
     onIpv6CidrChange: (String) -> Unit,
     onDismissRequest: () -> Unit,
-    onSave: (Int, String, String, String, String) -> Unit,
+    onSave: (String, String, String, String) -> Unit,
 ) {
     val mtuError = if (isTunMtu(mtu)) null else stringResource(R.string.settings_tun_mtu_invalid)
     val vpnDnsError = if (!showVpnDns || isTunVpnDns(vpnDns)) {
@@ -98,7 +91,6 @@ internal fun TunSettingsBottomSheet(
                 onClick = {
                     if (canSave) {
                         onSave(
-                            tunStack.coerceIn(tunStackOptions.indices),
                             mtu.trim(),
                             vpnDns.trim(),
                             ipv4Cidr.trim(),
@@ -110,17 +102,8 @@ internal fun TunSettingsBottomSheet(
         },
         onDismissRequest = onDismissRequest,
     ) {
-        key(show, showTunStack) {
+        key(show) {
             SettingsSheetContent {
-                if (showTunStack) {
-                    WindowDropdownPreference(
-                        title = stringResource(R.string.settings_tun_stack),
-                        icon = Icons.Rounded.AccountTree,
-                        items = tunStackOptions,
-                        selectedIndex = tunStack.coerceIn(tunStackOptions.indices),
-                        onSelectedIndexChange = onTunStackChange,
-                    )
-                }
                 SettingsTextField(
                     value = mtu,
                     onValueChange = onMtuChange,

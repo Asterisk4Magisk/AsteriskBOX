@@ -174,7 +174,6 @@ private fun SettingsContent(
         .indexOfFirst { item -> item.first == appState.runMode }
         .takeIf { index -> index >= 0 }
         ?: 0
-    val tunStackOptions = settingsTunStackOptions()
     val keyColorOptions = listOf(
         stringResource(R.string.theme_color_default),
         stringResource(R.string.theme_color_blue),
@@ -279,12 +278,10 @@ private fun SettingsContent(
         snifferTimeout = appState.snifferTimeout,
     )
     val tunSettingsSummary = tunSettingsSummary(
-        tunStack = tunStackOptions[appState.singBoxTunStack.coerceIn(tunStackOptions.indices)],
         mtu = appState.tunMtu,
         vpnDns = appState.tunVpnDns,
         ipv4Cidr = appState.tunIpv4Cidr,
         ipv6Cidr = appState.tunIpv6Cidr,
-        showTunStack = appState.runMode != RunModeTun2Socks,
         showVpnDns = appState.runMode == RunModeVpnService,
     )
     val sheetState = rememberSettingsSheetState(updateAppState)
@@ -648,7 +645,6 @@ private fun SettingsContent(
         SettingsBottomSheetsHost(
             appState = appState,
             sheetState = sheetState,
-            tunStackOptions = tunStackOptions,
             tunBypassRuleSetChoices = tunBypassRuleSetChoices,
             updateAppState = updateAppState,
         )
