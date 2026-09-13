@@ -52,7 +52,7 @@ import engine.network.toPortOrNull
 import features.resources.runtime.ResourceFileBatchDownloadFailedException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.text.formatTemplate

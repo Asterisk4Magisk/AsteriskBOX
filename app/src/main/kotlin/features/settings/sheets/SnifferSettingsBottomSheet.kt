@@ -20,17 +20,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import engine.singbox.DefaultSingBoxSnifferProtocols
+import app.R
 import engine.singbox.SingBoxSnifferProtocols
 import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.sanitizedSnifferProtocols
 import engine.singbox.sanitizedSnifferTimeout
 import features.settings.SnifferSettingsDraft
-import org.asterisk.zcc.abox.R
 import ui.components.AsteriskFilterChip
 import ui.components.singBoxOptionLabel
-import ui.icons.AsteriskIcons as Icons
 import ui.theme.AsteriskMotion
+import ui.icons.AsteriskIcons as Icons
 
 @Composable
 internal fun snifferSettingsSummary(

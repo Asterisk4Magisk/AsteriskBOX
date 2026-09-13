@@ -32,7 +32,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.theme.AsteriskShapeTokens
 import utils.generateQrCodeImageBitmap
 

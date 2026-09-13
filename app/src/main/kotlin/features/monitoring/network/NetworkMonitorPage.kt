@@ -44,7 +44,7 @@ import features.monitoring.MonitoringSectionCard
 import features.monitoring.MonitoringValueRow
 import features.monitoring.ObserveMonitoring
 import kotlinx.coroutines.launch
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.layout.rememberPageGutter
 import java.util.UUID
 import ui.icons.AsteriskIcons as Icons

@@ -37,7 +37,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.managedInboundChoices
 import java.util.UUID
 

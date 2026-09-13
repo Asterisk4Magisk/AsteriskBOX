@@ -34,7 +34,7 @@ import features.settings.SettingsSectionCard
 import features.settings.SettingsSwitchRow
 import features.settings.sheets.SettingsSheetContent
 import features.settings.sheets.SettingsTextField
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskFilterChip
 import ui.components.AsteriskModalBottomSheet

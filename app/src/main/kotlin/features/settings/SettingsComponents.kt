@@ -44,7 +44,7 @@ import androidx.compose.ui.unit.dp
 import app.modes.RunModeBpf2Socks
 import app.modes.RunModeTproxy
 import app.modes.RunModeTun2Socks
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.AsteriskDropdownAnchor
 import ui.components.AsteriskDropdownMenuItem
 import ui.text.formatTemplate

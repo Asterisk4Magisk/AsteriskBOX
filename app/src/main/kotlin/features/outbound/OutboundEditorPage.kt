@@ -54,7 +54,7 @@ import features.settings.SettingsSwitchRow
 import features.settings.sheets.dnsServerTypeLabel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.clipboard.setPlainText
 import ui.components.AsteriskFilterChip
 import ui.components.EditorPageScaffold

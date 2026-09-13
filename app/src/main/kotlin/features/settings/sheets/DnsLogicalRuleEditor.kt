@@ -37,7 +37,7 @@ import app.SingBoxDnsRuleState
 import app.SingBoxDnsRuleTypeLogical
 import engine.singbox.config.hasValidDnsRuleStructure
 import features.dns.dnsMatcherCount
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.AsteriskExpressiveCard
 import ui.components.ruleEditorAnimatedListContentKey
 import ui.theme.AsteriskMotion

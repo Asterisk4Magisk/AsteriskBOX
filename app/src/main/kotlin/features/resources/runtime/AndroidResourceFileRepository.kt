@@ -5,7 +5,7 @@ package features.resources.runtime
 
 import android.content.Context
 import android.net.Uri
-import org.asterisk.zcc.abox.R
+import app.R
 import app.AppState
 import app.CustomResourceFileState
 import app.ResourceFileKind

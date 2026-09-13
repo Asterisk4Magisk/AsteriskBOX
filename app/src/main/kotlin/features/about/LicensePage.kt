@@ -31,7 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.LocalIsWideScreen
 import app.LocalNavigator
-import org.asterisk.zcc.abox.R
+import app.R
 import features.about.license.Library
 import features.about.license.decodeAboutLibraries
 import ui.layout.pageContentPaddingWithCutout

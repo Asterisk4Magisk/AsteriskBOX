@@ -15,7 +15,7 @@ import android.service.quicksettings.TileService
 import android.widget.Toast
 import app.AppState
 import app.MainActivity
-import org.asterisk.zcc.abox.R
+import app.R
 import app.modes.RunModeVpnService
 import data.AndroidAppStateStore
 import data.AppSettingsPreferences

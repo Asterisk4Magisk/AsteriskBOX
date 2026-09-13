@@ -6,7 +6,7 @@ package features.settings
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.icons.AsteriskIcons as Icons
 
 internal data class SettingsSearchEntry(

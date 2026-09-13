@@ -28,7 +28,7 @@ import features.settings.servicecontrol.canSaveServiceControlDraft
 import features.settings.servicecontrol.isValidServiceSsid
 import features.settings.servicecontrol.normalizeBssidOrNull
 import features.settings.servicecontrol.parseServiceCron
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.StringListEditor
 import ui.icons.AsteriskIcons as Icons
 import ui.theme.AsteriskMotion

@@ -3,7 +3,6 @@
 
 package app
 
-import org.asterisk.zcc.abox.R
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -22,9 +21,9 @@ import com.journeyapps.barcodescanner.ScanContract
 import data.AppSettingsPreferences
 import engine.vpn.AndroidVpnPermissionRequester
 import features.logs.AndroidLogFileCreator
-import features.singbox.qr.AndroidQrCodeScanRequester
 import features.resources.runtime.AndroidResourceFilePicker
 import features.settings.locale.localizedAppContext
+import features.singbox.qr.AndroidQrCodeScanRequester
 
 class MainActivity : ComponentActivity() {
     private val vpnPermissionRequester = AndroidVpnPermissionRequester {

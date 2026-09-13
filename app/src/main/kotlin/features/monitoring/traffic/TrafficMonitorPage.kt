@@ -29,7 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.LocalAppServices
-import org.asterisk.zcc.abox.R
+import app.R
 import features.monitoring.MonitoringIntent
 import features.monitoring.MonitoringScaffold
 import features.monitoring.MonitoringSectionCard

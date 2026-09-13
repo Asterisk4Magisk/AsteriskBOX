@@ -10,7 +10,7 @@ import features.logs.GenericUserActionFailureContext
 import features.logs.reportFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.asterisk.zcc.abox.R
+import app.R
 
 internal class AndroidToastTipNotifier(context: Context) {
     private val appContext = context.applicationContext

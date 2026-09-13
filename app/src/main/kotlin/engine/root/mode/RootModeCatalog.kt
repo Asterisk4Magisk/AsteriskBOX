@@ -10,7 +10,7 @@ import app.modes.RunModeTun
 import app.modes.RunModeTun2Socks
 import engine.root.daemon.config.AsteriskdMode
 import engine.root.config.RootConfigBuildContext
-import org.asterisk.zcc.abox.R
+import app.R
 
 internal object RootModeCatalog {
     val definitions: List<RootModeDefinition> = validatedDefinitions(

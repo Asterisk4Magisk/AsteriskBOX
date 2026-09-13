@@ -9,7 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.icons.AsteriskIcons as Icons
 import ui.components.StringListEditor
 import engine.network.isCidrAddress

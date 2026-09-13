@@ -53,7 +53,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.CustomResourceFileState
 import app.CustomResourceFileStatus
-import org.asterisk.zcc.abox.R
+import app.R
 import app.ResourceFileStatus
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskChipTone

@@ -28,7 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.LocalNavigator
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.AsteriskStatusCard
 import ui.components.AsteriskValueRow
 import ui.icons.AsteriskIcons as Icons

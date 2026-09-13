@@ -16,7 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import app.LocalIsWideScreen
 import app.LocalNavigator
-import org.asterisk.zcc.abox.R
+import app.R
 import androidx.compose.ui.res.stringResource
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding

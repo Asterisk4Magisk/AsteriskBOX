@@ -32,7 +32,7 @@ import app.LocalIsWideScreen
 import app.LocalNavigator
 import app.LocalUpdateAppState
 import app.ProjectInfo
-import org.asterisk.zcc.abox.R
+import app.R
 import app.collectAppState
 import app.managedRuleSetChoices
 import app.withPrunedManagedInboundReferences

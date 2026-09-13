@@ -77,7 +77,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.clipboard.getPlainText
 import ui.clipboard.setPlainText
 import ui.components.AsteriskPinnedSearchArea

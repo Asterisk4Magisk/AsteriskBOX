@@ -13,7 +13,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.os.Build
-import org.asterisk.zcc.abox.R
+import app.R
 
 internal class AndroidResourceFileDownloadNotifier(
     context: Context,

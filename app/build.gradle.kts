@@ -20,7 +20,7 @@ val isBuildingAppBundle = gradle.startParameter.taskNames.any { requestedTask ->
 }
 
 android {
-    namespace = ProjectConfig.PACKAGE_NAME
+    namespace = "app"
     compileSdk = ProjectConfig.TARGET_SDK
 
     defaultConfig {

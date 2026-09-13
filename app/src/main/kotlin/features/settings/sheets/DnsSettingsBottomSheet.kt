@@ -74,7 +74,7 @@ import features.dns.nextLogicalDnsRuleId
 import features.dns.withDnsRuleMatchValues
 import features.settings.DnsSettingsDraft
 import features.settings.withDnsServerTagReplacement
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.AsteriskInfoChip
 import ui.components.EditorPageScaffold
 import ui.components.ReferenceSelectionCard

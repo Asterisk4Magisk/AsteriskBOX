@@ -16,7 +16,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import app.AsteriskApplication
-import org.asterisk.zcc.abox.R
+import app.R
 import engine.singbox.SingBoxControlConfig
 import engine.singbox.runtime.SingBoxCommandClient
 import engine.singbox.runtime.SingBoxCommandListener

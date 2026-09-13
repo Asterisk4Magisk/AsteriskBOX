@@ -8,7 +8,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.asterisk.zcc.abox.R
+import app.R
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 

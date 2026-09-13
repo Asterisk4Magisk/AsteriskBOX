@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import engine.singbox.SingBoxSnifferProtocols
 import engine.singbox.config.APP_ROOT_INBOUND
 import engine.singbox.config.APP_TUN_INBOUND
-import org.asterisk.zcc.abox.R
+import app.R
 
 @Composable
 internal fun <T> ReferenceSelectionCard(

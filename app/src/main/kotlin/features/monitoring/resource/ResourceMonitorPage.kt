@@ -43,7 +43,7 @@ import features.monitoring.MonitoringStatusHeader
 import features.monitoring.MonitoringValueRow
 import features.monitoring.ObserveMonitoring
 import features.monitoring.buildMonitoringResourceFocusState
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.AsteriskFilterChip
 import ui.layout.rememberPageGutter
 import utils.toReadableBytes

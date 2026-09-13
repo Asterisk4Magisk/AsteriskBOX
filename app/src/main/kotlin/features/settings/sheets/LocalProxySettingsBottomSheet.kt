@@ -10,7 +10,7 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.icons.AsteriskIcons as Icons
 
 

@@ -6,7 +6,7 @@ package ui.components
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import app.isManagedSingBoxTag
-import org.asterisk.zcc.abox.R
+import app.R
 
 @Composable
 internal fun singBoxOptionLabel(

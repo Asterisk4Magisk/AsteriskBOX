@@ -46,7 +46,7 @@ import features.singbox.JsonCodeEditor
 import features.singbox.SingBoxCodeEditorState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.EditorPageScaffold
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens

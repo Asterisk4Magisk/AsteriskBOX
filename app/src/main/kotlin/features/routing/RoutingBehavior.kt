@@ -9,7 +9,7 @@ import app.SingBoxRouteRuleTypeLogical
 import app.visibleManagedReference
 import engine.singbox.isSingBoxPortRange
 import engine.singbox.isSingBoxUnsigned16
-import org.asterisk.zcc.abox.R
+import app.R
 
 internal val RouteRuleMatcherLabelResources = linkedMapOf(
     "clash_mode" to R.string.routing_clash_mode,
@@ -35,16 +35,6 @@ internal val RouteRuleMatcherLabelResources = linkedMapOf(
     "wifi_ssid" to R.string.routing_wifi_ssid,
     "wifi_bssid" to R.string.routing_wifi_bssid,
 )
-
-internal fun List<SingBoxRouteRuleState>.moveRouteRule(
-    fromIndex: Int,
-    toIndex: Int,
-): List<SingBoxRouteRuleState> {
-    if (fromIndex !in indices || toIndex !in indices || fromIndex == toIndex) return this
-    return toMutableList().apply {
-        add(toIndex, removeAt(fromIndex))
-    }
-}
 
 internal fun AppState.withRouteRuleEnabled(
     ruleId: Int,

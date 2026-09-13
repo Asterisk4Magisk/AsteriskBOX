@@ -38,7 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskCheckbox
 import ui.components.AsteriskChipTone

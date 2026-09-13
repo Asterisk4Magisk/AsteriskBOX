@@ -9,7 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.StringListEditor
 import ui.icons.AsteriskIcons as Icons
 

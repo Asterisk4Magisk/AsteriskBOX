@@ -14,7 +14,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import data.backup.AppBackupRestorePreview
 import data.backup.AppBackupWarning
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.WarningConfirmDialog
 import ui.text.formatTemplate
 import java.text.DateFormat

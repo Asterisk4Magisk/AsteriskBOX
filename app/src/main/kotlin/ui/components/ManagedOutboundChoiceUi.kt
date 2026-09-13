@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import app.ManagedOutboundChoice
 import app.ManagedOutboundChoiceKind
-import org.asterisk.zcc.abox.R
+import app.R
 
 @Composable
 internal fun ManagedOutboundChoice.localizedLabel(includeGroupName: Boolean = true): String {

@@ -50,7 +50,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.theme.AsteriskShapeTokens
 import ui.theme.AsteriskMotion
 

@@ -3,7 +3,6 @@
 
 package app
 
-import org.asterisk.zcc.abox.R
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -20,33 +19,29 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
-import ui.icons.AsteriskIcons as Icons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import ui.components.AsteriskFloatingNavigationBar
-import ui.components.AsteriskFloatingNavigationItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
-import ui.components.AsteriskScaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
-import ui.navigation.AsteriskNavDisplay
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
@@ -57,34 +52,38 @@ import app.navigation.Route
 import app.navigation.rememberMainDestinationState
 import features.about.AboutPage
 import features.about.LicensePage
+import features.dns.DnsManagementPage
+import features.dns.DnsRuleEditorPage
+import features.endpoint.EndpointEditorPage
+import features.endpoint.EndpointListPage
 import features.logs.CoreLogsPage
 import features.logs.LogcatLogsPage
 import features.monitoring.connections.ConnectionsMonitorPage
 import features.monitoring.network.NetworkMonitorPage
 import features.monitoring.resource.ResourceMonitorPage
 import features.monitoring.traffic.TrafficMonitorPage
-import features.outbound.OutboundGroupListPage
 import features.outbound.OutboundEditorPage
+import features.outbound.OutboundGroupListPage
 import features.outbound.OutboundListPage
-import features.endpoint.EndpointEditorPage
-import features.endpoint.EndpointListPage
-import features.dns.DnsManagementPage
-import features.dns.DnsRuleEditorPage
-import features.selector.SelectorManagementPage
-import features.selector.SelectorEditorPage
-import features.singbox.SingBoxDashboardPage
-import features.singbox.SingBoxProxyDestination
 import features.proxy.app.ProxyAppListPage
-import features.resources.ResourceManagementPage
 import features.resources.ResourceJsonEditorPage
+import features.resources.ResourceManagementPage
 import features.routing.RouteRuleEditorPage
 import features.routing.RoutingManagementPage
+import features.selector.SelectorEditorPage
+import features.selector.SelectorManagementPage
 import features.settings.SettingsPage
+import features.singbox.SingBoxDashboardPage
+import features.singbox.SingBoxProxyDestination
+import ui.components.AsteriskFloatingNavigationBar
+import ui.components.AsteriskFloatingNavigationItem
+import ui.components.AsteriskScaffold
 import ui.layout.pageWindowPadding
 import ui.layout.shouldShowNavigationRail
 import ui.layout.shouldShowSplitPane
+import ui.navigation.AsteriskNavDisplay
 import ui.theme.AsteriskMotion
-import androidx.compose.runtime.getValue
+import ui.icons.AsteriskIcons as Icons
 
 private data class MainNavigationItem(
     val destination: MainDestination,

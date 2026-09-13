@@ -7,7 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import app.modes.RunModeVpnService
-import org.asterisk.zcc.abox.R
+import app.R
 import engine.proxy.mode.AndroidModeProxyEngine
 import engine.proxy.ProxyEngineStartRequest
 import engine.proxy.ProxyEngineStatus

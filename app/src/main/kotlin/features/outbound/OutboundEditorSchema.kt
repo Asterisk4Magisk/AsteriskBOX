@@ -14,7 +14,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
-import org.asterisk.zcc.abox.R
+import app.R
 
 internal enum class OutboundFieldKind {
     TEXT,

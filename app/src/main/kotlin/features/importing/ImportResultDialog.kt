@@ -14,7 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import org.asterisk.zcc.abox.R
+import app.R
 
 internal enum class ImportResultStatus {
     CLEAN_SUCCESS,

@@ -25,7 +25,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
 import engine.singbox.DefaultSingBoxLogLevel
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.icons.AsteriskIcons as Icons
 import ui.theme.AsteriskMotion
 

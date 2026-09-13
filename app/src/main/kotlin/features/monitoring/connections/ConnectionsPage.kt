@@ -71,7 +71,7 @@ import features.monitoring.discardDisplayedConnection
 import features.monitoring.reduceConnections
 import features.monitoring.resolveDisplayedConnections
 import kotlinx.coroutines.launch
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskDropdownAnchor
 import ui.components.AsteriskDropdownMenuItem

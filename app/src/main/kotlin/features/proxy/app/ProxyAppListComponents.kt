@@ -42,7 +42,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import org.asterisk.zcc.abox.R
+import app.R
 import coil3.compose.AsyncImage
 import features.proxy.app.model.AppPackageEntry
 import features.proxy.app.model.ProxyAppIconRequest

@@ -29,7 +29,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.ProjectInfo
-import org.asterisk.zcc.abox.R
+import app.R
 import ui.components.AsteriskListRow
 import ui.components.AsteriskSection
 import ui.theme.AsteriskShapeTokens

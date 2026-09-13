@@ -58,7 +58,7 @@ import features.proxy.app.usecase.decodeProxyAppListFromClipboard
 import features.proxy.app.usecase.encodeProxyAppListForClipboard
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.asterisk.zcc.abox.R
+import app.R
 import system.ANDROID_APP_ICON_SIZE_DP
 import ui.clipboard.ClipboardImportException
 import ui.clipboard.ClipboardImportFailure

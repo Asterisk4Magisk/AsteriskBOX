@@ -115,7 +115,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import org.asterisk.zcc.abox.R
+import app.R
 import sh.calvin.reorderable.ReorderableItem
 import ui.clipboard.getPlainText
 import ui.clipboard.setPlainText

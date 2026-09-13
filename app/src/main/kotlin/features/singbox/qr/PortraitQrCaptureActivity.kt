@@ -13,7 +13,7 @@ import android.provider.MediaStore
 import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.TextView
-import org.asterisk.zcc.abox.R
+import app.R
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.client.android.Intents
 import com.journeyapps.barcodescanner.CaptureActivity
