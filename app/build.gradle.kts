@@ -121,6 +121,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.coil)
     implementation(libs.coil.compose)
+    implementation(libs.dexlib2)
     implementation(dependencies.project(":asteriskd"))
     implementation(dependencies.project(":bpfmatcher"))
     implementation(dependencies.project(":bpf2socks"))
