@@ -7,6 +7,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import com.android.tools.smali.dexlib2.dexbacked.DexBackedDexFile
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.CancellationException
 import java.io.BufferedInputStream
 import java.io.File
 import java.util.zip.ZipFile
@@ -97,7 +100,8 @@ internal object AppScanner {
     /**
      * Returns true when the given package is judged to be a Chinese application.
      */
-    fun isChinaApp(packageName: String, packageManager: PackageManager): Boolean {
+    suspend fun isChinaApp(packageName: String, packageManager: PackageManager): Boolean {
+        currentCoroutineContext().ensureActive()
         SKIP_PREFIX_LIST.forEach { skip ->
             if (packageName == skip || packageName.startsWith("$skip.")) {
                 return false
@@ -110,20 +114,12 @@ internal object AppScanner {
         }
 
         try {
-            val packageManagerFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            val packageManagerFlags =
                 PackageManager.MATCH_UNINSTALLED_PACKAGES or
                     PackageManager.GET_ACTIVITIES or
                     PackageManager.GET_SERVICES or
                     PackageManager.GET_RECEIVERS or
                     PackageManager.GET_PROVIDERS
-            } else {
-                @Suppress("DEPRECATION")
-                PackageManager.GET_UNINSTALLED_PACKAGES or
-                    PackageManager.GET_ACTIVITIES or
-                    PackageManager.GET_SERVICES or
-                    PackageManager.GET_RECEIVERS or
-                    PackageManager.GET_PROVIDERS
-            }
 
             val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 packageManager.getPackageInfo(
@@ -163,11 +159,13 @@ internal object AppScanner {
             ZipFile(File(publicSourceDir)).use { zip ->
                 // Cheap negative signal: a firebase resource hints Google ecosystem.
                 for (entry in zip.entries()) {
+                    currentCoroutineContext().ensureActive()
                     if (entry.name.startsWith("firebase-")) {
                         return false
                     }
                 }
                 for (entry in zip.entries()) {
+                    currentCoroutineContext().ensureActive()
                     if (!(entry.name.startsWith("classes") && entry.name.endsWith(".dex"))) {
                         continue
                     }
@@ -177,12 +175,13 @@ internal object AppScanner {
                     }
                     val input = BufferedInputStream(zip.getInputStream(entry), 65536)
                     val dexFile = try {
-                        DexBackedDexFile.fromInputStream(null, input)
+                        input.use { DexBackedDexFile.fromInputStream(null, it) }
                     } catch (error: Exception) {
                         Log.e(TAG, "Error reading dex file for $packageName", error)
                         return false
                     }
                     for (clazz in dexFile.classes) {
+                        currentCoroutineContext().ensureActive()
                         val rawType = clazz.type
                         val clazzName = rawType
                             .substring(1, rawType.length - 1)
@@ -195,6 +194,8 @@ internal object AppScanner {
                     }
                 }
             }
+        } catch (error: CancellationException) {
+            throw error
         } catch (error: Exception) {
             Log.e(TAG, "Error scanning package $packageName", error)
         }

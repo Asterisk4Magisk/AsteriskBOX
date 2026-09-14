@@ -67,17 +67,6 @@ internal class ProxyAppListPageState {
     }
 }
 
-internal data class ScanProgressState(
-    val total: Int,
-    val scanned: Int,
-    val matched: List<MatchedApp>,
-)
-
-internal data class MatchedApp(
-    val packageName: String,
-    val label: String,
-)
-
 @Composable
 internal fun ProxyAppListPageEffects(
     pageState: ProxyAppListPageState,

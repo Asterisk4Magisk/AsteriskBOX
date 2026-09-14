@@ -3,15 +3,14 @@
 
 package ui.icons
 
-import androidx.compose.material.icons.Icons as MaterialIcons
 import androidx.compose.material.icons.automirrored.rounded.AltRoute
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Article
+import androidx.compose.material.icons.automirrored.rounded.CompareArrows
 import androidx.compose.material.icons.automirrored.rounded.Help
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.Send
-import androidx.compose.material.icons.automirrored.rounded.CompareArrows
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.Add
@@ -29,7 +28,6 @@ import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -51,7 +49,6 @@ import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.FilterAlt
 import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Home
@@ -75,6 +72,7 @@ import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Public
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.Router
 import androidx.compose.material.icons.rounded.Save
@@ -97,12 +95,12 @@ import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material.icons.rounded.ViewAgenda
 import androidx.compose.material.icons.rounded.ViewColumn
 import androidx.compose.material.icons.rounded.ViewModule
-import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VpnLock
 import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.material.icons.rounded.Widgets
+import androidx.compose.material.icons.rounded.Wifi
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.Icons as MaterialIcons
 
 /** Central ownership point for the app's Material/Google icon language. */
 internal object AsteriskIcons {
@@ -123,7 +121,7 @@ internal object AsteriskIcons {
         val ChevronRight: ImageVector = MaterialIcons.Rounded.ChevronRight
         val Clear: ImageVector = MaterialIcons.Rounded.Clear
         val Close: ImageVector = MaterialIcons.Rounded.Close
-        val CleaningServices: ImageVector = MaterialIcons.Rounded.CleaningServices
+        val Remove: ImageVector = MaterialIcons.Rounded.Remove
         val CloudSync: ImageVector = MaterialIcons.Rounded.CloudSync
         val Code: ImageVector = MaterialIcons.Rounded.Code
         val ContentCopy: ImageVector = MaterialIcons.Rounded.ContentCopy
@@ -145,7 +143,6 @@ internal object AsteriskIcons {
         val FileUpload: ImageVector = MaterialIcons.Rounded.FileUpload
         val FilterAlt: ImageVector = MaterialIcons.Rounded.FilterAlt
         val Folder: ImageVector = MaterialIcons.Rounded.Folder
-        val FolderOpen: ImageVector = MaterialIcons.Rounded.FolderOpen
         val GridView: ImageVector = MaterialIcons.Rounded.GridView
         val History: ImageVector = MaterialIcons.Rounded.History
         val Home: ImageVector = MaterialIcons.Rounded.Home
@@ -191,7 +188,6 @@ internal object AsteriskIcons {
         val ViewAgenda: ImageVector = MaterialIcons.Rounded.ViewAgenda
         val ViewColumn: ImageVector = MaterialIcons.Rounded.ViewColumn
         val ViewModule: ImageVector = MaterialIcons.Rounded.ViewModule
-        val Visibility: ImageVector = MaterialIcons.Rounded.Visibility
         val VpnLock: ImageVector = MaterialIcons.Rounded.VpnLock
         val Warning: ImageVector = MaterialIcons.Rounded.Warning
         val Wifi: ImageVector = MaterialIcons.Rounded.Wifi
