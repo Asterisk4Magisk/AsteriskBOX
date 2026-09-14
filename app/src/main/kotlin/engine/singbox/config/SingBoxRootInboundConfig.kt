@@ -27,10 +27,8 @@ internal fun normalizeTunSharedNetworkInterfaces(values: Iterable<String>): List
 
 internal fun buildRootInboundUidPolicy(
     mode: Int,
-    hasSelectedApps: Boolean,
     resolvedUids: List<Int>,
 ): RootInboundUidPolicy {
-    if (!hasSelectedApps) return RootInboundUidPolicy()
     return when (mode.toSupportedProxyAppListMode()) {
         ProxyAppListModeWhitelist -> RootInboundUidPolicy(
             includeUids = (resolvedUids + RootProxyAppWhitelistSystemUids).distinct().sorted(),
@@ -43,17 +41,13 @@ internal fun buildRootInboundUidPolicy(
 
 internal fun Context.resolveRootInboundUidPolicy(appState: AppState): RootInboundUidPolicy {
     val selectedAppKeys = appState.proxyAppListSelectedApps.toTrimmedNonEmptyDistinctList()
-    val mode = if (selectedAppKeys.isEmpty()) {
-        ProxyAppListModeGlobal
-    } else {
-        appState.proxyAppListMode.toSupportedProxyAppListMode()
-    }
+    val mode = appState.proxyAppListMode.toSupportedProxyAppListMode()
     val resolvedUids = if (mode == ProxyAppListModeGlobal) {
         emptyList()
     } else {
         resolveApplicationUids(selectedAppKeys)
     }
-    return buildRootInboundUidPolicy(mode, selectedAppKeys.isNotEmpty(), resolvedUids)
+    return buildRootInboundUidPolicy(mode, resolvedUids)
 }
 
 private val RootProxyAppWhitelistSystemUids = listOf(0, 1052)
