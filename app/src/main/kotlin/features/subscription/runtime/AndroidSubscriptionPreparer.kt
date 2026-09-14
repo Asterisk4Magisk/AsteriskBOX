@@ -13,6 +13,7 @@ import features.subscription.usecase.SubscriptionSyncStage
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
+import utils.runCancellableHttpRequest
 import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.charset.StandardCharsets
@@ -72,8 +73,9 @@ internal class AndroidSubscriptionPreparer(
             val source = if (sourceContent == null) {
                 onStage(SubscriptionSyncStage.Downloading)
                 stage = SubscriptionSyncStage.Downloading
-                withContext(Dispatchers.IO) {
+                runCancellableHttpRequest { track ->
                     downloadSubscription(
+                        track = track,
                         sourceUrl = sourceUrl,
                         userAgent = userAgent,
                         hwid = fetchOptions.hwid.trim().ifBlank { installationHwid },
@@ -151,6 +153,7 @@ private sealed interface DownloadedSubscription {
 }
 
 private fun downloadSubscription(
+    track: (HttpURLConnection) -> Unit,
     sourceUrl: String,
     userAgent: String,
     hwid: String,
@@ -163,6 +166,7 @@ private fun downloadSubscription(
         if (proxy == null) url.openConnection() else url.openConnection(proxy.proxy)
     ) as HttpURLConnection
     try {
+        track(connection)
         connection.instanceFollowRedirects = true
         connection.connectTimeout = ConnectTimeoutMillis
         connection.readTimeout = ReadTimeoutMillis

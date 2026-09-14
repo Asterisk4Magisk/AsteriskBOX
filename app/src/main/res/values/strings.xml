@@ -340,7 +340,7 @@
     <string name="settings_private_addresses_invalid">Invalid CIDR</string>
     <string name="settings_private_addresses_empty">No CIDR ranges added</string>
     <string name="settings_broadcast_control">Broadcast control</string>
-    <string name="settings_broadcast_control_summary">Allow external broadcasts to start and stop the proxy service</string>
+    <string name="settings_broadcast_control_summary">Allow external broadcasts to control app services</string>
     <string name="settings_ipv6_summary">Enable IPv6 support</string>
     <string name="settings_ipv6_prefer">IPv6 preferred</string>
     <string name="settings_ipv6_prefer_summary">Prefer IPv6 addresses when connecting</string>
@@ -1310,4 +1310,5 @@
     <string name="monitor_connections_total">Total connections</string>
     <string name="monitor_connections_closed_time">Disconnection time</string>
     <string name="monitor_connections_closed_empty">No disconnected connections recorded</string>
+    <string name="broadcast_update_notification_title">Updating subscriptions and resources</string>
 </resources>

@@ -25,10 +25,7 @@ import features.logs.AndroidCoreLogRepository
 import features.logs.AndroidAsteriskdLogRepository
 import features.logs.AndroidLogcatRepository
 import features.monitoring.MonitoringRepository
-import features.resources.ResourceFileUpdateCoordinator
-import features.resources.ResourceFileUpdateRequest
 import features.resources.ResourceFileUseCase
-import features.resources.runtime.AndroidResourceFileDownloadCancellation
 import features.settings.locale.ProvideAppLanguage
 import features.settings.usecase.RootBootScriptUseCase
 import features.settings.usecase.RootEbpfProbeUseCase
@@ -91,37 +88,7 @@ fun App(
             ),
         )
     }
-    val resourceFileUpdateCoordinator = remember(appScope, resourceFileUseCase) {
-        ResourceFileUpdateCoordinator(
-            scope = appScope,
-            execute = { request ->
-                when (request) {
-                    is ResourceFileUpdateRequest.BuiltIn -> resourceFileUseCase.update(
-                        kind = request.kind,
-                        source = request.source,
-                        options = request.options,
-                        customResourceFiles = request.customResourceFiles,
-                    )
-                    is ResourceFileUpdateRequest.Custom -> resourceFileUseCase.updateCustom(
-                        customFile = request.file,
-                        options = request.options,
-                        customResourceFiles = request.customResourceFiles,
-                    )
-                    is ResourceFileUpdateRequest.CustomBatch -> resourceFileUseCase.updateCustomBatch(
-                        customFiles = request.files,
-                        options = request.options,
-                        allCustomResourceFiles = request.customResourceFiles,
-                    )
-                    is ResourceFileUpdateRequest.All -> resourceFileUseCase.update(
-                        source = request.source,
-                        options = request.options,
-                        customResourceFiles = request.customResourceFiles,
-                    )
-                }
-            },
-            cancelRunning = AndroidResourceFileDownloadCancellation::cancel,
-        )
-    }
+    val resourceFileUpdateCoordinator = application.resourceFileUpdateCoordinator
     val outboundSubscriptionUpdater =
         remember(application) { application.outboundSubscriptionUpdater }
     val singBoxRuntime = application.singBoxRuntime

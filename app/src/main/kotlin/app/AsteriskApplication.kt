@@ -3,6 +3,10 @@
 
 package app
 
+import features.resources.ResourceFileUseCase
+import features.resources.ResourceFileUpdateCoordinator
+import features.resources.ResourceFileUpdateRequest
+import features.resources.runtime.AndroidResourceFileDownloadCancellation
 import android.app.Application
 import data.AndroidAppStateStore
 import data.AppSettingsPreferences
@@ -131,6 +135,45 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
             validate = { state ->
                 validateSingBoxRuntimeConfiguration(applicationContext, state)
             },
+        )
+    }
+
+    private val resourceFileUseCase by lazy {
+        ResourceFileUseCase(
+            context = this,
+            resourceFilePicker = { null },
+            currentAppState = { stateStore.state.value },
+        )
+    }
+    internal val resourceFileUpdateCoordinator by lazy {
+        ResourceFileUpdateCoordinator(
+            scope = appScope,
+            execute = { request ->
+                when (request) {
+                    is ResourceFileUpdateRequest.BuiltIn -> resourceFileUseCase.update(
+                        kind = request.kind,
+                        source = request.source,
+                        options = request.options,
+                        customResourceFiles = request.customResourceFiles,
+                    )
+                    is ResourceFileUpdateRequest.Custom -> resourceFileUseCase.updateCustom(
+                        customFile = request.file,
+                        options = request.options,
+                        customResourceFiles = request.customResourceFiles,
+                    )
+                    is ResourceFileUpdateRequest.CustomBatch -> resourceFileUseCase.updateCustomBatch(
+                        customFiles = request.files,
+                        options = request.options,
+                        allCustomResourceFiles = request.customResourceFiles,
+                    )
+                    is ResourceFileUpdateRequest.All -> resourceFileUseCase.update(
+                        source = request.source,
+                        options = request.options,
+                        customResourceFiles = request.customResourceFiles,
+                    )
+                }
+            },
+            cancelRunning = AndroidResourceFileDownloadCancellation::cancel,
         )
     }
 

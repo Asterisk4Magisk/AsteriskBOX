@@ -65,6 +65,28 @@ An Android sing-box GUI client. VPN Service mode uses [AndroidLibBoxLite](https:
 - The bundled reF1nd sing-box ROOT core can be replaced from Resource Management.
 - Direct CIDR and custom resource files can be replaced locally or updated from configured URLs; rule sets remain part of the sing-box JSON configuration.
 
+## Broadcast Control
+
+Enable **Broadcast Control** in settings, then send an explicit broadcast to the receiver below. Actions use the `org.asterisk.zcc.abox.action.` prefix.
+
+| Operation | Action suffix |
+| --- | --- |
+| Start proxy | `PROXY_START` |
+| Stop proxy | `PROXY_STOP` |
+| Toggle proxy | `PROXY_TOGGLE` |
+| Update all URL subscriptions | `SUBSCRIPTION_UPDATE` |
+| Cancel broadcast subscription update | `SUBSCRIPTION_UPDATE_CANCEL` |
+| Update all resources | `RESOURCE_UPDATE` |
+| Cancel resource updates | `RESOURCE_UPDATE_CANCEL` |
+
+```sh
+adb shell am broadcast -n org.asterisk.zcc.abox/features.automation.BroadcastControlReceiver -a org.asterisk.zcc.abox.action.SUBSCRIPTION_UPDATE
+```
+
+Subscription updates skip local entries; cancellation preserves completed results and scheduled update settings. Resources use the current Resource Management configuration; resource cancellation also clears its shared queue. Repeated update commands of the same kind are merged while running.
+
+Updates run in the background without starting the proxy. Broadcast delivery does not mean the update has finished; check the `BroadcastControl` app logs for results.
+
 ## Development
 
 Initialize submodules before building:
