@@ -56,6 +56,7 @@ internal class ProxyAppListPageState {
     var searchValue by mutableStateOf("")
     var debouncedSearchValue by mutableStateOf("")
     var showSystemApps by mutableStateOf(false)
+    var scanProgress by mutableStateOf<ScanProgressState?>(null)
 
     fun requestRefresh() {
         if (!loadingApps) {
@@ -65,6 +66,17 @@ internal class ProxyAppListPageState {
         }
     }
 }
+
+internal data class ScanProgressState(
+    val total: Int,
+    val scanned: Int,
+    val matched: List<MatchedApp>,
+)
+
+internal data class MatchedApp(
+    val packageName: String,
+    val label: String,
+)
 
 @Composable
 internal fun ProxyAppListPageEffects(

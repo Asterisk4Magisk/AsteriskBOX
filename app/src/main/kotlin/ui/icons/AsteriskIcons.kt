@@ -11,6 +11,7 @@ import androidx.compose.material.icons.automirrored.rounded.Help
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.automirrored.rounded.CompareArrows
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.Add
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentCopy
@@ -121,6 +123,7 @@ internal object AsteriskIcons {
         val ChevronRight: ImageVector = MaterialIcons.Rounded.ChevronRight
         val Clear: ImageVector = MaterialIcons.Rounded.Clear
         val Close: ImageVector = MaterialIcons.Rounded.Close
+        val CleaningServices: ImageVector = MaterialIcons.Rounded.CleaningServices
         val CloudSync: ImageVector = MaterialIcons.Rounded.CloudSync
         val Code: ImageVector = MaterialIcons.Rounded.Code
         val ContentCopy: ImageVector = MaterialIcons.Rounded.ContentCopy
@@ -204,6 +207,7 @@ internal object AsteriskIcons {
             val KeyboardArrowRight: ImageVector = MaterialIcons.AutoMirrored.Rounded.KeyboardArrowRight
             val OpenInNew: ImageVector = MaterialIcons.AutoMirrored.Rounded.OpenInNew
             val Send: ImageVector = MaterialIcons.AutoMirrored.Rounded.Send
+            val CompareArrows: ImageVector = MaterialIcons.AutoMirrored.Rounded.CompareArrows
             val Sort: ImageVector = MaterialIcons.AutoMirrored.Rounded.Sort
         }
     }
