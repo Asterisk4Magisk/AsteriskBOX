@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.R
 import engine.root.runtime.ProxyErrorBus
@@ -37,6 +38,10 @@ import java.util.Locale
  *
  * Hosted at the app content level so the dialog is visible whichever destination the user is on
  * — proxy start failures are triggered from the home page toggle.
+ *
+ * The dialog carries everything needed for a bug report: the real error, a device/system
+ * summary, the logs written by the failed attempt, and (only when a confirmed rule matched)
+ * suggested actions. Copy exports the diagnostic data; the app's own suggestions are excluded.
  */
 @Composable
 internal fun ProxyErrorHost() {
@@ -45,7 +50,9 @@ internal fun ProxyErrorHost() {
     if (current != null) {
         ProxyErrorDialog(
             explanation = current,
-            onDismiss = { ProxyErrorBus.acknowledge() },
+            // Pass the explanation that is actually on screen: if a newer failure replaced it
+            // while this dialog was open, dismissing this one must not discard that failure.
+            onDismiss = { ProxyErrorBus.acknowledge(current) },
         )
     }
 }
@@ -60,8 +67,54 @@ private fun ProxyErrorDialog(
         SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
             .format(Date(explanation.occurredAtEpochMillis))
     }
+    val detailsLabel = stringResource(R.string.proxy_error_dialog_details)
+    val deviceLabel = stringResource(R.string.proxy_error_dialog_device_info)
+    val serviceLogLabel = stringResource(R.string.proxy_error_dialog_service_log)
+    val diagnosticsLabel = stringResource(R.string.proxy_error_dialog_diagnostics)
     val copiedLabel = stringResource(R.string.proxy_error_dialog_copied)
+    val modeLine = stringResource(R.string.proxy_error_dialog_mode_title, explanation.mode)
+    val timeLine = stringResource(R.string.proxy_error_dialog_occurred_at, timestamp)
     val suggestions = explanation.diagnostics.map { id -> stringResource(id) }
+
+    // Copy carries every section shown in the dialog so the result is self-contained as a bug
+    // report — the app's own suggestions included.
+    val copyPayload = remember(
+        explanation,
+        suggestions,
+        modeLine,
+        timeLine,
+        detailsLabel,
+        deviceLabel,
+        serviceLogLabel,
+        diagnosticsLabel,
+    ) {
+        buildString {
+            appendLine(modeLine)
+            appendLine(timeLine)
+
+            appendLine()
+            appendLine(detailsLabel)
+            appendLine(explanation.rawMessage)
+
+            if (explanation.hasDeviceInfo) {
+                appendLine()
+                appendLine(deviceLabel)
+                appendLine(explanation.deviceInfo)
+            }
+
+            if (explanation.hasServiceLog) {
+                appendLine()
+                appendLine(serviceLogLabel)
+                appendLine(explanation.serviceLog)
+            }
+
+            if (suggestions.isNotEmpty()) {
+                appendLine()
+                appendLine(diagnosticsLabel)
+                suggestions.forEach { appendLine("• $it") }
+            }
+        }.trimEnd()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -69,33 +122,30 @@ private fun ProxyErrorDialog(
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    text = stringResource(R.string.proxy_error_dialog_mode_title, explanation.mode),
+                    text = modeLine,
                     style = MaterialTheme.typography.titleSmall,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = stringResource(R.string.proxy_error_dialog_occurred_at, timestamp),
+                    text = timeLine,
                     style = MaterialTheme.typography.bodySmall,
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = stringResource(R.string.proxy_error_dialog_details),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                SelectionContainer {
-                    Text(
-                        text = explanation.rawMessage,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+
+                SectionLabel(detailsLabel)
+                MonospaceBlock(explanation.rawMessage)
+
+                if (explanation.hasDeviceInfo) {
+                    SectionLabel(deviceLabel)
+                    MonospaceBlock(explanation.deviceInfo)
                 }
+
+                if (explanation.hasServiceLog) {
+                    SectionLabel(serviceLogLabel)
+                    MonospaceBlock(explanation.serviceLog)
+                }
+
                 if (suggestions.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = stringResource(R.string.proxy_error_dialog_diagnostics),
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SectionLabel(diagnosticsLabel)
                     suggestions.forEach { suggestion ->
                         Text(
                             text = "• $suggestion",
@@ -107,7 +157,7 @@ private fun ProxyErrorDialog(
         },
         confirmButton = {
             TextButton(onClick = {
-                copyToClipboard(context, explanation.rawMessage)
+                copyToClipboard(context, copyPayload)
                 runCatching {
                     android.widget.Toast.makeText(context, copiedLabel, android.widget.Toast.LENGTH_SHORT).show()
                 }
@@ -117,6 +167,27 @@ private fun ProxyErrorDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
         },
     )
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Spacer(modifier = Modifier.height(16.dp))
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+}
+
+/** Selectable monospace text — log and system output are far easier to read aligned. */
+@Composable
+private fun MonospaceBlock(text: String) {
+    SelectionContainer {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+        )
+    }
 }
 
 private fun copyToClipboard(context: Context, text: String) {

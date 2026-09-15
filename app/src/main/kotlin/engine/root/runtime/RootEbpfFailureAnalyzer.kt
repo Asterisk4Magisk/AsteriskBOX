@@ -90,6 +90,7 @@ internal object RootEbpfFailureAnalyzer {
             ?: error("Unknown asteriskd mode: $mode")
 
     private fun buildExplanation(runMode: Int, rawMessage: String, occurredAtEpochMillis: Long): ProxyErrorExplanation {
+        // Rules match the error's own wording, so they run against the original text.
         val diagnostics = rules
             .filter { it.runMode == runMode }
             .firstOrNull { it.matcher.containsMatchIn(rawMessage) }
@@ -99,7 +100,9 @@ internal object RootEbpfFailureAnalyzer {
         return ProxyErrorExplanation(
             mode = modeWireValue(runMode),
             occurredAtEpochMillis = occurredAtEpochMillis,
-            rawMessage = rawMessage,
+            // Redacted on the way in, so the dialog and the clipboard both receive sanitized text
+            // whichever producer built this explanation. The actionable FATAL signature survives.
+            rawMessage = DiagnosticRedaction.redact(rawMessage),
             diagnostics = diagnostics,
         )
     }
