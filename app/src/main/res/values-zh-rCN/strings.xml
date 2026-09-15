@@ -1301,4 +1301,19 @@
     <string name="monitor_connections_closed_time">断开时间</string>
     <string name="monitor_connections_closed_empty">暂无已断开连接记录</string>
     <string name="broadcast_update_notification_title">正在更新订阅和资源</string>
+
+    <!-- Proxy error dialog -->
+    <string name="proxy_error_dialog_title">代理启动失败</string>
+    <string name="proxy_error_dialog_mode_title">模式：%1$s</string>
+    <string name="proxy_error_dialog_occurred_at">时间：%1$s</string>
+    <string name="proxy_error_dialog_details">错误详情</string>
+    <string name="proxy_error_dialog_diagnostics">建议操作</string>
+    <string name="proxy_error_dialog_copy">复制日志</string>
+    <string name="proxy_error_dialog_copied">已复制到剪贴板</string>
+
+    <!-- Proxy error: eBPF tc data plane unavailable (confirmed on kernel 4.19 + KernelSU Next) -->
+    <string name="proxy_error_ebpf_tc_unsupported_explanation">eBPF tc 数据面需要内核同时支持 veth 设备与 clsact qdisc。当前内核拒绝在当前网络命名空间内创建 veth pair（内核返回 EOPNOTSUPP）。</string>
+    <string name="proxy_error_ebpf_tc_unsupported_switch">临时方案：在 设置 → ROOT 模式 → eBPF 数据面 中，把 local.data_plane 从 tc 切换为 cgroup 后重试。</string>
+    <string name="proxy_error_ebpf_tc_unsupported_fallback">若 cgroup 也无法启动：回到设置把 ROOT 模式切换为 TUN 作为备用方案。</string>
+    <string name="proxy_error_ebpf_tc_unsupported_report">上报时请附上上方错误原文，以及 logcat 中 asteriskd / sing-box 相关段落。</string>
 </resources>

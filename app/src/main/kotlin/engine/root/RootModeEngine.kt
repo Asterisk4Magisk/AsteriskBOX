@@ -16,6 +16,8 @@ import engine.root.mode.RootModeCatalog
 import engine.root.mode.RootModeDefinition
 import engine.root.mode.DefaultTproxyPort as ModeDefaultTproxyPort
 import engine.root.mode.DefaultTun2SocksProxyPort as ModeDefaultTun2SocksProxyPort
+import engine.root.runtime.ProxyErrorBus
+import engine.root.runtime.RootEbpfFailureAnalyzer
 import engine.root.runtime.RootRuntimeBusyException
 import engine.root.runtime.RootRuntimeConflictException
 import engine.root.runtime.RootSupervisorController
@@ -92,6 +94,16 @@ internal class RootModeEngine(
         }.getOrElse { error ->
             if (error is CancellationException) throw error
             if (error is RootRuntimeConflictException || error is RootRuntimeBusyException) throw error
+            // Surface a diagnostic dialog for start failures that happen synchronously (for
+            // example the launcher script refusing to run). Failures that happen after the
+            // supervisor already reached `running` are picked up by RootFailureWatcher.
+            ProxyErrorBus.publish(
+                RootEbpfFailureAnalyzer.analyze(
+                    runMode = runMode,
+                    error = error,
+                    occurredAtEpochMillis = System.currentTimeMillis(),
+                ),
+            )
             throw IllegalStateException(
                 context.getString(definition.startFailedErrorResId, error.message.orEmpty()),
                 error,
