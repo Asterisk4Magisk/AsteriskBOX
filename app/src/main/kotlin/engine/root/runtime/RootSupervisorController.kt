@@ -16,6 +16,7 @@ import engine.root.daemon.control.AsteriskdControlCodec
 import engine.root.daemon.control.AsteriskdControlResponse
 import engine.root.daemon.control.AsteriskdResultCode
 import engine.root.daemon.control.AsteriskdSnapshot
+import engine.root.daemon.control.AsteriskdEventType
 import engine.root.publication.RootBootConfigWriter
 import engine.root.publication.RootBootPublicationCommand
 import engine.root.publication.RootPublicationBundle
@@ -41,6 +42,13 @@ internal class RootSupervisorController(
     private val appContext = context.applicationContext
     private val runtimeLayout = appContext.rootRuntimeLayout()
     private val client = AsteriskdClient(shell)
+
+    init {
+        // ROOT failures are observed centrally so exactly one watcher runs per process, and a
+        // failure recorded by a previous session cannot reopen the dialog on launch.
+        RootFailureWatcher.ensureStarted(shell, runtimeLayout)
+    }
+
     suspend fun status(): AsteriskdControlResponse = client.status(runtimeLayout.asteriskdPath)
 
     fun observeStatus(): Flow<AsteriskdSnapshot> = client.observeStatus(runtimeLayout.asteriskdPath)
@@ -61,6 +69,24 @@ internal class RootSupervisorController(
 
     fun requireRunning(snapshot: AsteriskdSnapshot, expectedMode: AsteriskdMode) {
         snapshot.requireRunning(AsteriskdOwner.AsteriskBox, expectedMode)
+    }
+
+    /**
+     * Fingerprint keys off (mode, failure.code, exitCode, signal). Two snapshots with identical
+     * fingerprints describe the same root failure; we publish the explanation only on a change so
+     * repeated streaming updates do not redisplay the dialog after the user dismisses it.
+     */
+    private fun fingerprintOf(snapshot: AsteriskdSnapshot): String {
+        val err = snapshot.error ?: return ""
+        return buildString {
+            append(snapshot.mode.wireValue)
+            append('|')
+            append(err.code.wireValue)
+            append('|')
+            append(err.exitCode?.toString().orEmpty())
+            append('|')
+            append(err.signal?.toString().orEmpty())
+        }
     }
 
     suspend fun start(
