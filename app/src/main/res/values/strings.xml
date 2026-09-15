@@ -1326,13 +1326,15 @@
     <string name="proxy_error_dialog_mode_title">Mode: %1$s</string>
     <string name="proxy_error_dialog_occurred_at">Time: %1$s</string>
     <string name="proxy_error_dialog_details">Error details</string>
+    <string name="proxy_error_dialog_device_info">Device &amp; system</string>
+    <string name="proxy_error_dialog_service_log">Start log</string>
     <string name="proxy_error_dialog_diagnostics">Suggested actions</string>
     <string name="proxy_error_dialog_copy">Copy log</string>
     <string name="proxy_error_dialog_copied">Copied to clipboard</string>
 
     <!-- Proxy error: eBPF tc data plane unavailable (confirmed on kernel 4.19 + KernelSU Next) -->
     <string name="proxy_error_ebpf_tc_unsupported_explanation">The eBPF tc data plane needs both veth devices and the clsact qdisc. This kernel refuses to create a veth pair in the current network namespace (EOPNOTSUPP).</string>
-    <string name="proxy_error_ebpf_tc_unsupported_switch">Workaround: in Settings → ROOT mode → eBPF data plane, switch local.data_plane from tc to cgroup, then retry.</string>
-    <string name="proxy_error_ebpf_tc_unsupported_fallback">If cgroup also fails to start, switch the ROOT mode to TUN instead.</string>
+    <string name="proxy_error_ebpf_tc_unsupported_switch">Workaround: open Settings → Advanced settings, confirm eBPF (ROOT) is selected in Run mode, then under Proxy settings (eBPF) change Data plane from tc to cgroup and retry.</string>
+    <string name="proxy_error_ebpf_tc_unsupported_fallback">If cgroup also fails to start, open Settings → Advanced settings and select TUN (ROOT) in Run mode instead.</string>
     <string name="proxy_error_ebpf_tc_unsupported_report">When reporting this, include the error text above and the asteriskd / sing-box section of logcat.</string>
 </resources>

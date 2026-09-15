@@ -46,7 +46,7 @@ internal class RootSupervisorController(
     init {
         // ROOT failures are observed centrally so exactly one watcher runs per process, and a
         // failure recorded by a previous session cannot reopen the dialog on launch.
-        RootFailureWatcher.ensureStarted(shell, runtimeLayout)
+        RootFailureWatcher.ensureStarted(appContext, shell, runtimeLayout)
     }
 
     suspend fun status(): AsteriskdControlResponse = client.status(runtimeLayout.asteriskdPath)
