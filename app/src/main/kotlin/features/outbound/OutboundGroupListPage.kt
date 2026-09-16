@@ -1441,16 +1441,16 @@ private fun OutboundGroupState.clearingSubscriptionMetadataChangedFrom(
 private val GroupEditorSectionSpacing = 12.dp
 
 /**
- * Compact "Used X / Total Y · Expires Z" subscription traffic summary that mirrors the
- * META configuration card. Rendered below the update status row inside [OutboundGroupCard];
- * returns nothing when the server has not reported any traffic information.
+ * Subscription traffic summary for [OutboundGroupCard], rendered below the update
+ * status row.
  *
- * Behaviour notes:
- * - `hasTraffic` is true whenever either `totalBytes > 0` or `expireAtSeconds > 0`, so the
- *   unlimited-but-expiring case still gets an expiration row.
- * - The progress bar is only drawn when a metered quota exists (`totalBytes > 0`).
- *   Unlimited servers render only the expire row, which matches the Quantumult X / META
- *   conventions and avoids showing an empty 0% track.
+ * Two optional rows, each on its own line:
+ * - the quota: progress bar plus "Used X / Total Y", drawn only when the server
+ *   reported a positive total (`hasMeteredQuota`);
+ * - the expiry date, drawn only when the server reported one.
+ *
+ * Renders nothing when the server reported neither, so a group without
+ * subscription information keeps its previous card height.
  */
 @Composable
 private fun OutboundGroupSubscriptionInfo(
@@ -1458,13 +1458,6 @@ private fun OutboundGroupSubscriptionInfo(
     modifier: Modifier = Modifier,
 ) {
     if (!info.hasTraffic) return
-    val usedText = info.usedBytes.toReadableBytes(maxUnit = utils.ReadableByteUnit.GiB)
-    val totalText = info.totalBytes.toReadableBytes(maxUnit = utils.ReadableByteUnit.GiB)
-    val expireText = if (info.expireAtSeconds > 0L) {
-        (info.expireAtSeconds * 1000L).toReadableDateOrDash()
-    } else {
-        stringResource(R.string.outbound_group_subscription_expire_unlimited)
-    }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -1479,30 +1472,22 @@ private fun OutboundGroupSubscriptionInfo(
                 trackColor = MaterialTheme.colorScheme.primaryContainer,
             )
             Text(
-                text = if (info.expireAtSeconds > 0L) {
-                    stringResource(
-                        R.string.outbound_group_subscription_traffic_expire,
-                        usedText,
-                        totalText,
-                        expireText,
-                    )
-                } else {
-                    stringResource(
-                        R.string.outbound_group_subscription_traffic,
-                        usedText,
-                        totalText,
-                    )
-                },
+                text = stringResource(
+                    R.string.outbound_group_subscription_traffic,
+                    info.usedBytes.toReadableBytes(maxUnit = utils.ReadableByteUnit.GiB),
+                    info.totalBytes.toReadableBytes(maxUnit = utils.ReadableByteUnit.GiB),
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        } else {
+        }
+        if (info.expireAtSeconds > 0L) {
             Text(
                 text = stringResource(
                     R.string.outbound_group_subscription_expire,
-                    expireText,
+                    (info.expireAtSeconds * 1000L).toReadableDateOrDash(),
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

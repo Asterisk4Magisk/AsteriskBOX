@@ -74,6 +74,7 @@ internal class OutboundSubscriptionUpdater(
     ) -> SubscriptionPreparation,
     private val parse: (String) -> ImportOutcome<ImportedSingBoxOutbound>,
     private val validate: suspend (AppState) -> Unit,
+    private val formatDuplicateName: (name: String, ordinal: Int) -> String,
     private val nowMillis: () -> Long = System::currentTimeMillis,
     private val preparePermits: Semaphore = Semaphore(2),
     private val validationCommitMutex: Mutex = Mutex(),
@@ -514,6 +515,7 @@ internal class OutboundSubscriptionUpdater(
             preferredName = remoteName,
             subscriptionUrl = sourceUrl,
             takenNames = otherGroupNames,
+            formatDuplicate = formatDuplicateName,
         )
     }
 
