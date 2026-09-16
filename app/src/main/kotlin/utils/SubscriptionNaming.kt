@@ -23,33 +23,45 @@ import java.nio.charset.StandardCharsets
  * is worse than no name at all, and callers treat `null` as "leave the title
  * alone".
  *
+ * [formatDuplicate] builds the collision suffix; callers pass the string
+ * resource so the punctuation can be localized. See [disambiguateName].
+ *
  * Callers must only invoke this when the user has not already supplied a name;
  * see `OutboundSubscriptionUpdater.resolveAutoAssignedName`.
  */
 internal fun resolveSubscriptionName(
     preferredName: String?,
     subscriptionUrl: String,
-    takenNames: Collection<String> = emptyList(),
+    takenNames: Collection<String>,
+    formatDuplicate: (name: String, ordinal: Int) -> String,
 ): String? {
     val base = preferredName?.trim()?.takeIf(String::isNotBlank)
         ?: nameFromSubscriptionUrl(subscriptionUrl)
         ?: return null
-    return disambiguateName(base, takenNames)
+    return disambiguateName(base, takenNames, formatDuplicate)
 }
 
 /**
- * Append `(1)`, `(2)`, … to [base] until it no longer collides with
- * [takenNames]. Mirrors FlClash's `getOverwriteLabel`, so a duplicated
- * subscription title reads the same here as it does there.
+ * Append the [formatDuplicate] suffix (`%1$s(%2$d)` in the shipped locale files)
+ * to [base] until it no longer collides with [takenNames]. Mirrors FlClash's
+ * `getOverwriteLabel`, so a duplicated subscription title reads the same here
+ * as it does there.
+ *
+ * The suffix is built by the caller rather than with a local literal because
+ * the result is user-visible and gets persisted as the group's title.
  */
-internal fun disambiguateName(base: String, takenNames: Collection<String>): String {
+internal fun disambiguateName(
+    base: String,
+    takenNames: Collection<String>,
+    formatDuplicate: (name: String, ordinal: Int) -> String,
+): String {
     val taken = takenNames.mapTo(mutableSetOf(), String::trim)
     if (base !in taken) return base
-    var index = 1
+    var ordinal = 1
     while (true) {
-        val candidate = "$base($index)"
+        val candidate = formatDuplicate(base, ordinal)
         if (candidate !in taken) return candidate
-        index += 1
+        ordinal += 1
     }
 }
 

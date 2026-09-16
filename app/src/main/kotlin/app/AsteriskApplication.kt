@@ -135,6 +135,9 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
             validate = { state ->
                 validateSingBoxRuntimeConfiguration(applicationContext, state)
             },
+            formatDuplicateName = { name, ordinal ->
+                applicationContext.getString(R.string.outbound_group_name_duplicate, name, ordinal)
+            },
         )
     }
 
