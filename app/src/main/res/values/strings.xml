@@ -639,7 +639,7 @@
     <string name="proxy_app_list_show_system_apps">Show system apps</string>
     <string name="proxy_app_list_scan_china_apps">Scan Chinese apps</string>
     <string name="proxy_app_list_scan_china_progress">Scanned %1$d of %2$d, matched %3$d</string>
-    <string name="proxy_app_list_scan_china_done">Scanned %1$d apps, found %2$d Chinese apps</string>
+    <string name="proxy_app_list_scan_china_done">Apps scanned: %1$d; Chinese apps found: %2$d</string>
     <string name="proxy_app_list_scan_china_no_match">Scanned {scanned} apps, no Chinese apps found</string>
     <string name="proxy_app_list_scan_china_skipped_global">Skipped in all-app mode</string>
     <string name="proxy_app_list_invert_selection">Invert selection</string>
