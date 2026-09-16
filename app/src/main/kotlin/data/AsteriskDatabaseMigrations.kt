@@ -49,6 +49,23 @@ internal val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+internal val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "ALTER TABLE outbound_groups ADD COLUMN subscriptionUploadBytes INTEGER NOT NULL DEFAULT 0",
+        )
+        db.execSQL(
+            "ALTER TABLE outbound_groups ADD COLUMN subscriptionDownloadBytes INTEGER NOT NULL DEFAULT 0",
+        )
+        db.execSQL(
+            "ALTER TABLE outbound_groups ADD COLUMN subscriptionTotalBytes INTEGER NOT NULL DEFAULT 0",
+        )
+        db.execSQL(
+            "ALTER TABLE outbound_groups ADD COLUMN subscriptionExpireAtSeconds INTEGER NOT NULL DEFAULT 0",
+        )
+    }
+}
+
 internal val MIGRATION_2_3 = object : Migration(2, 3) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(

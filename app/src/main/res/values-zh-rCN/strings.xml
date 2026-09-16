@@ -700,6 +700,11 @@
     <string name="outbound_group_status_import_counts">导入 %1$d，跳过 %2$d，重复 %3$d</string>
     <string name="outbound_group_status_checked">%1$s · 检查于 %2$s</string>
     <string name="outbound_group_http_warning">该订阅使用未加密的 HTTP，建议改用 HTTPS。</string>
+    <string name="outbound_group_subscription_traffic">已用 %1$s / 总量 %2$s</string>
+    <string name="outbound_group_subscription_traffic_expire">已用 %1$s / 总量 %2$s · 过期 %3$s</string>
+    <string name="outbound_group_subscription_expire">过期 %1$s</string>
+    <string name="outbound_group_subscription_expire_unlimited">不限期</string>
+    <string name="outbound_group_name_placeholder">留空则首次同步后自动命名</string>
     <string name="outbound_group_delete_title">删除分组？</string>
     <string name="outbound_group_delete_message">分组“%1$s”及其中的所有出站将被永久删除。</string>
     <string name="outbound_group_sync_failed">分组更新失败</string>
