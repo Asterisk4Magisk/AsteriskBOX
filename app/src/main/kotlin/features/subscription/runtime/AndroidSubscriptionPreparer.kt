@@ -95,6 +95,7 @@ internal class AndroidSubscriptionPreparer(
                             subscriptionInfo = result.subscriptionInfo,
                             etag = result.etag,
                             lastModified = result.lastModified,
+                            remoteName = result.remoteName,
                         )
                     }
                 }.let { result ->

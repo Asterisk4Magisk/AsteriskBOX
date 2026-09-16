@@ -1110,11 +1110,10 @@ private fun OutboundGroupEditorSheet(
     val validUrl = url.isBlank() || url.isHttpUrl()
     val validInterval =
         parseSubscriptionSchedule(updateInterval) !is SubscriptionSchedule.Invalid
-    // Name may be left blank: it is auto-assigned after the first successful
-    // sync (Content-Disposition filename → URL host → random). The user can
-    // still type one if they want a custom label, in which case the auto path
-    // is skipped on every subsequent sync.
-    val canSave = validUrl && validInterval
+    // A blank name is only safe when the subscription URL can supply one on the
+    // first successful sync. A local group has no such source, so it still needs
+    // a title; a typed name always wins and is never auto-overwritten.
+    val canSave = validUrl && validInterval && (url.isNotBlank() || name.isNotBlank())
     val hasSubscription = url.isNotBlank()
     val userAgent = userAgentOption.resolveUserAgent(customUserAgent)
     val userAgentLabels = SubscriptionUserAgentOptions.map { option ->
@@ -1422,6 +1421,7 @@ private fun OutboundGroupState.clearingSubscriptionMetadataChangedFrom(
             lastUpdateErrorSummary = "",
             subscriptionEtag = "",
             subscriptionLastModified = "",
+            subscriptionInfo = SubscriptionInfo(),
         )
     }
     if (
