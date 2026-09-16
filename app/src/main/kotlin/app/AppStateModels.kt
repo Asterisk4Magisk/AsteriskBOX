@@ -28,7 +28,50 @@ data class SubscriptionInfo(
     val downloadBytes: Long = 0L,
     val totalBytes: Long = 0L,
     val expireAtSeconds: Long = 0L,
-)
+) {
+    /** Aggregate used bytes: upload + download. Saturates at 0 for negative inputs. */
+    val usedBytes: Long
+        get() {
+            val upload = uploadBytes.coerceAtLeast(0L)
+            val download = downloadBytes.coerceAtLeast(0L)
+            val sum = upload + download
+            return if (sum < 0L) Long.MAX_VALUE else sum
+        }
+
+    /** Remaining bytes derived from total - used. Falls back to 0 when unknown. */
+    val remainingBytes: Long
+        get() {
+            val total = totalBytes.coerceAtLeast(0L)
+            if (total <= 0L) return 0L
+            val used = usedBytes
+            return (total - used).coerceAtLeast(0L)
+        }
+
+    /**
+     * True when the server reported enough information for the UI to draw a meaningful
+     * traffic summary: either a positive total quota (metered) or a positive expire time.
+     */
+    val hasTraffic: Boolean
+        get() = totalBytes > 0L || expireAtSeconds > 0L
+
+    /**
+     * True when the server reported a positive total quota so a progress bar makes sense.
+     */
+    val hasMeteredQuota: Boolean
+        get() = totalBytes > 0L
+
+    /**
+     * Progress in `[0, 1]` for a metered quota. Returns `0f` when total is unknown or 0,
+     * so callers can render a stable track without special-casing the unlimited branch.
+     */
+    val usageProgress: Float
+        get() {
+            if (!hasMeteredQuota) return 0f
+            val used = usedBytes.toDouble()
+            val total = totalBytes.toDouble()
+            return (used / total).coerceIn(0.0, 1.0).toFloat()
+        }
+}
 
 @Stable
 enum class OutboundGroupUpdateStatus {
@@ -61,6 +104,7 @@ data class OutboundGroupState(
     val lastUpdateErrorSummary: String = "",
     val subscriptionEtag: String = "",
     val subscriptionLastModified: String = "",
+    val subscriptionInfo: SubscriptionInfo = SubscriptionInfo(),
 )
 
 @Stable

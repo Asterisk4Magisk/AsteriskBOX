@@ -20,12 +20,14 @@ internal sealed interface SubscriptionPreparation {
         val subscriptionInfo: SubscriptionInfo,
         val etag: String = "",
         val lastModified: String = "",
+        val remoteName: String? = null,
     ) : SubscriptionPreparation
 
     data class NotModified(
         val subscriptionInfo: SubscriptionInfo,
         val etag: String,
         val lastModified: String,
+        val remoteName: String? = null,
     ) : SubscriptionPreparation
 
     data class Failure(
@@ -35,6 +37,7 @@ internal sealed interface SubscriptionPreparation {
         val subscriptionInfo: SubscriptionInfo? = null,
         val etag: String = "",
         val lastModified: String = "",
+        val remoteName: String? = null,
     ) : SubscriptionPreparation
 }
 
@@ -68,12 +71,14 @@ internal suspend fun prepareSubscription(
             subscriptionInfo = result.subscriptionInfo,
             etag = result.etag,
             lastModified = result.lastModified,
+            remoteName = result.remoteName,
         )
 
         is AndroidSubscriptionPreparation.NotModified -> SubscriptionPreparation.NotModified(
             subscriptionInfo = result.subscriptionInfo,
             etag = result.etag,
             lastModified = result.lastModified,
+            remoteName = result.remoteName,
         )
 
         is AndroidSubscriptionPreparation.Failure -> SubscriptionPreparation.Failure(
@@ -83,6 +88,7 @@ internal suspend fun prepareSubscription(
             subscriptionInfo = result.subscriptionInfo,
             etag = result.etag,
             lastModified = result.lastModified,
+            remoteName = result.remoteName,
         )
     }
 }

@@ -66,6 +66,7 @@ import app.LocalIsWideScreen
 import app.LocalNavigator
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
+import app.SubscriptionInfo
 import app.collectAppState
 import features.importing.ImportOperation
 import features.importing.ImportResultDetail
@@ -108,6 +109,8 @@ import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
+import utils.toReadableBytes
+import utils.toReadableDateOrDash
 import utils.toReadableDateTimeOrDash
 import java.net.URI
 import ui.icons.AsteriskIcons as Icons
@@ -1033,6 +1036,7 @@ private fun OutboundGroupCard(
                             )
                         }
                     }
+                    OutboundGroupSubscriptionInfo(info = group.subscriptionInfo)
                 }
                 Switch(
                     checked = group.enabled,
@@ -1106,7 +1110,11 @@ private fun OutboundGroupEditorSheet(
     val validUrl = url.isBlank() || url.isHttpUrl()
     val validInterval =
         parseSubscriptionSchedule(updateInterval) !is SubscriptionSchedule.Invalid
-    val canSave = name.isNotBlank() && validUrl && validInterval
+    // Name may be left blank: it is auto-assigned after the first successful
+    // sync (Content-Disposition filename → URL host → random). The user can
+    // still type one if they want a custom label, in which case the auto path
+    // is skipped on every subsequent sync.
+    val canSave = validUrl && validInterval
     val hasSubscription = url.isNotBlank()
     val userAgent = userAgentOption.resolveUserAgent(customUserAgent)
     val userAgentLabels = SubscriptionUserAgentOptions.map { option ->
@@ -1179,6 +1187,9 @@ private fun OutboundGroupEditorSheet(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text(stringResource(R.string.outbound_group_name)) },
+                    placeholder = {
+                        Text(stringResource(R.string.outbound_group_name_placeholder))
+                    },
                     singleLine = true,
                     shape = AsteriskShapeTokens.InnerContainer,
                     modifier = Modifier.fillMaxWidth(),
@@ -1428,3 +1439,76 @@ private fun OutboundGroupState.clearingSubscriptionMetadataChangedFrom(
 }
 
 private val GroupEditorSectionSpacing = 12.dp
+
+/**
+ * Compact "Used X / Total Y · Expires Z" subscription traffic summary that mirrors the
+ * META configuration card. Rendered below the update status row inside [OutboundGroupCard];
+ * returns nothing when the server has not reported any traffic information.
+ *
+ * Behaviour notes:
+ * - `hasTraffic` is true whenever either `totalBytes > 0` or `expireAtSeconds > 0`, so the
+ *   unlimited-but-expiring case still gets an expiration row.
+ * - The progress bar is only drawn when a metered quota exists (`totalBytes > 0`).
+ *   Unlimited servers render only the expire row, which matches the Quantumult X / META
+ *   conventions and avoids showing an empty 0% track.
+ */
+@Composable
+private fun OutboundGroupSubscriptionInfo(
+    info: SubscriptionInfo,
+    modifier: Modifier = Modifier,
+) {
+    if (!info.hasTraffic) return
+    val usedText = info.usedBytes.toReadableBytes(maxUnit = utils.ReadableByteUnit.GiB)
+    val totalText = info.totalBytes.toReadableBytes(maxUnit = utils.ReadableByteUnit.GiB)
+    val expireText = if (info.expireAtSeconds > 0L) {
+        (info.expireAtSeconds * 1000L).toReadableDateOrDash()
+    } else {
+        stringResource(R.string.outbound_group_subscription_expire_unlimited)
+    }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp, end = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (info.hasMeteredQuota) {
+            LinearProgressIndicator(
+                progress = { info.usageProgress },
+                modifier = Modifier.fillMaxWidth().height(6.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.primaryContainer,
+            )
+            Text(
+                text = if (info.expireAtSeconds > 0L) {
+                    stringResource(
+                        R.string.outbound_group_subscription_traffic_expire,
+                        usedText,
+                        totalText,
+                        expireText,
+                    )
+                } else {
+                    stringResource(
+                        R.string.outbound_group_subscription_traffic,
+                        usedText,
+                        totalText,
+                    )
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else {
+            Text(
+                text = stringResource(
+                    R.string.outbound_group_subscription_expire,
+                    expireText,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}

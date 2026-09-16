@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
 import app.OutboundState
+import app.SubscriptionInfo
 import app.SingBoxEndpointState
 import app.SingBoxSelectorState
 import app.SingBoxSelectorTypeSelector
@@ -43,6 +44,10 @@ internal data class OutboundGroupEntity(
     val lastUpdateErrorSummary: String,
     val subscriptionEtag: String,
     val subscriptionLastModified: String,
+    val subscriptionUploadBytes: Long,
+    val subscriptionDownloadBytes: Long,
+    val subscriptionTotalBytes: Long,
+    val subscriptionExpireAtSeconds: Long,
 ) {
     fun toState(): OutboundGroupState =
         OutboundGroupState(
@@ -68,6 +73,12 @@ internal data class OutboundGroupEntity(
             lastUpdateErrorSummary = lastUpdateErrorSummary,
             subscriptionEtag = subscriptionEtag,
             subscriptionLastModified = subscriptionLastModified,
+            subscriptionInfo = SubscriptionInfo(
+                uploadBytes = subscriptionUploadBytes.coerceAtLeast(0L),
+                downloadBytes = subscriptionDownloadBytes.coerceAtLeast(0L),
+                totalBytes = subscriptionTotalBytes.coerceAtLeast(0L),
+                expireAtSeconds = subscriptionExpireAtSeconds.coerceAtLeast(0L),
+            ),
         )
 
     companion object {
@@ -94,6 +105,10 @@ internal data class OutboundGroupEntity(
                 lastUpdateErrorSummary = group.lastUpdateErrorSummary,
                 subscriptionEtag = group.subscriptionEtag,
                 subscriptionLastModified = group.subscriptionLastModified,
+                subscriptionUploadBytes = group.subscriptionInfo.uploadBytes,
+                subscriptionDownloadBytes = group.subscriptionInfo.downloadBytes,
+                subscriptionTotalBytes = group.subscriptionInfo.totalBytes,
+                subscriptionExpireAtSeconds = group.subscriptionInfo.expireAtSeconds,
             )
     }
 }

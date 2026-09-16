@@ -180,6 +180,10 @@ internal data class AppBackupOutboundGroup(
     val lastUpdateErrorSummary: String = "",
     val subscriptionEtag: String = "",
     val subscriptionLastModified: String = "",
+    val subscriptionUploadBytes: Long = 0L,
+    val subscriptionDownloadBytes: Long = 0L,
+    val subscriptionTotalBytes: Long = 0L,
+    val subscriptionExpireAtSeconds: Long = 0L,
 )
 
 @Serializable

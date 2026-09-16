@@ -12,6 +12,7 @@ import app.CustomResourceFileState
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
 import app.OutboundState
+import app.SubscriptionInfo
 import app.SingBoxDnsRuleState
 import app.SingBoxDnsRuleTypeLogical
 import app.SingBoxEndpointState
@@ -194,6 +195,10 @@ private fun OutboundGroupState.toBackup(): AppBackupOutboundGroup =
         lastUpdateErrorSummary = lastUpdateErrorSummary,
         subscriptionEtag = subscriptionEtag,
         subscriptionLastModified = subscriptionLastModified,
+        subscriptionUploadBytes = subscriptionInfo.uploadBytes,
+        subscriptionDownloadBytes = subscriptionInfo.downloadBytes,
+        subscriptionTotalBytes = subscriptionInfo.totalBytes,
+        subscriptionExpireAtSeconds = subscriptionInfo.expireAtSeconds,
     )
 
 private fun OutboundState.toBackup(): AppBackupOutbound =
@@ -366,6 +371,12 @@ private fun AppBackupOutboundGroup.toState(): OutboundGroupState =
         lastUpdateErrorSummary = lastUpdateErrorSummary,
         subscriptionEtag = subscriptionEtag,
         subscriptionLastModified = subscriptionLastModified,
+        subscriptionInfo = SubscriptionInfo(
+            uploadBytes = subscriptionUploadBytes.coerceAtLeast(0L),
+            downloadBytes = subscriptionDownloadBytes.coerceAtLeast(0L),
+            totalBytes = subscriptionTotalBytes.coerceAtLeast(0L),
+            expireAtSeconds = subscriptionExpireAtSeconds.coerceAtLeast(0L),
+        ),
     )
 
 private fun AppBackupOutbound.toState(): OutboundState =

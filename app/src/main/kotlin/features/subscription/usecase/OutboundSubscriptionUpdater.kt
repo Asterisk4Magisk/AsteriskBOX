@@ -6,8 +6,10 @@ package features.subscription.usecase
 import app.AppState
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
+import app.SubscriptionInfo
 import features.importing.ImportOutcome
 import features.importing.ImportStage
+import utils.resolveSubscriptionName
 import features.importing.sanitizePersistedImportSummary
 import features.outbound.ImportedSingBoxOutbound
 import features.outbound.planOutboundImport
@@ -135,6 +137,7 @@ internal class OutboundSubscriptionUpdater(
                             groupId = groupId,
                             trigger = trigger,
                             fetchedGroup = group,
+                            remoteName = prepared.remoteName,
                         )
                     }
                     if (commit === CommitResult.Refetch && fetchAttempt + 1 < MaxFetchAttempts) {
@@ -185,6 +188,7 @@ internal class OutboundSubscriptionUpdater(
         groupId: Int,
         trigger: SubscriptionUpdateTrigger,
         fetchedGroup: OutboundGroupState,
+        remoteName: String? = null,
     ): CommitResult {
         repeat(MaxCommitAttempts) {
             val snapshot = stateGateway.snapshot()
@@ -194,6 +198,12 @@ internal class OutboundSubscriptionUpdater(
                 return CommitResult.Refetch
             }
             val now = nowMillis()
+            val resolvedName = resolveAutoAssignedName(
+                currentName = currentGroup.name,
+                remoteName = remoteName,
+                sourceUrl = currentGroup.url,
+                otherGroupNames = snapshot.otherGroupNames(groupId),
+            )
             val candidate = snapshot.withUpdatedGroup(groupId) { group ->
                 group.copy(
                     lastUpdateAttemptAtMillis = now,
@@ -204,6 +214,10 @@ internal class OutboundSubscriptionUpdater(
                     lastUpdateDuplicateCount = 0,
                     consecutiveUpdateFailures = 0,
                     lastUpdateErrorSummary = "",
+                    subscriptionInfo = fetchedGroup.subscriptionInfo.takeIf { subscriptionInfo ->
+                        subscriptionInfo != SubscriptionInfo()
+                    } ?: group.subscriptionInfo,
+                    name = resolvedName ?: group.name,
                 )
             }
             when (val commit = commitState(snapshot, candidate)) {
@@ -280,6 +294,12 @@ internal class OutboundSubscriptionUpdater(
             } else {
                 ""
             }
+            val resolvedName = resolveAutoAssignedName(
+                currentName = currentGroup.name,
+                remoteName = prepared.remoteName,
+                sourceUrl = currentGroup.url,
+                otherGroupNames = snapshot.otherGroupNames(groupId),
+            )
             val candidate = plan.state.withUpdatedGroup(groupId) { group ->
                 group.copy(
                     lastUpdateAttemptAtMillis = now,
@@ -296,6 +316,10 @@ internal class OutboundSubscriptionUpdater(
                     lastUpdateErrorSummary = sanitizePersistedImportSummary(summary),
                     subscriptionEtag = prepared.etag,
                     subscriptionLastModified = prepared.lastModified,
+                    subscriptionInfo = prepared.subscriptionInfo.takeIf { subscriptionInfo ->
+                        subscriptionInfo != SubscriptionInfo()
+                    } ?: group.subscriptionInfo,
+                    name = resolvedName ?: group.name,
                 )
             }
             try {
@@ -432,6 +456,10 @@ internal class OutboundSubscriptionUpdater(
         },
     )
 
+    /** Titles of every group but [groupId]; keeps auto-assigned names unique. */
+    private fun AppState.otherGroupNames(groupId: Int): List<String> =
+        outboundGroups.filter { group -> group.id != groupId }.map { group -> group.name }
+
     private fun AppState.failureCandidate(
         groupId: Int,
         now: Long,
@@ -459,6 +487,30 @@ internal class OutboundSubscriptionUpdater(
         etag = subscriptionEtag,
         lastModified = subscriptionLastModified,
     )
+
+    /**
+     * Resolve a new group title when the user has not supplied one themselves.
+     *
+     * Returns `null` when the current name is non-blank (the user already named
+     * the group, and a later sync must not silently rename it) or when neither
+     * the server nor the URL yields anything usable.
+     */
+    private fun resolveAutoAssignedName(
+        currentName: String,
+        remoteName: String?,
+        sourceUrl: String,
+        otherGroupNames: Collection<String>,
+    ): String? {
+        if (currentName.isNotBlank()) return null
+        // `remoteName` is the already-decoded `Content-Disposition` filename
+        // when the server supplied one; see utils.SubscriptionNaming for the
+        // full resolution order and the (N) disambiguation.
+        return resolveSubscriptionName(
+            preferredName = remoteName,
+            subscriptionUrl = sourceUrl,
+            takenNames = otherGroupNames,
+        )
+    }
 
     private fun SubscriptionSyncStage.toImportStage(): ImportStage = when (this) {
         SubscriptionSyncStage.Downloading -> ImportStage.DOWNLOAD

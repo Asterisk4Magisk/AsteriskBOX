@@ -708,6 +708,11 @@
     <string name="outbound_group_status_import_counts">Imported %1$d, skipped %2$d, duplicate %3$d</string>
     <string name="outbound_group_status_checked">%1$s · Checked %2$s</string>
     <string name="outbound_group_http_warning">This subscription uses unencrypted HTTP. HTTPS is recommended.</string>
+    <string name="outbound_group_subscription_traffic">Used %1$s / Total %2$s</string>
+    <string name="outbound_group_subscription_traffic_expire">Used %1$s / Total %2$s · Expires %3$s</string>
+    <string name="outbound_group_subscription_expire">Expires %1$s</string>
+    <string name="outbound_group_subscription_expire_unlimited">No expiration</string>
+    <string name="outbound_group_name_placeholder">Leave blank to auto-assign on first sync</string>
     <string name="outbound_group_delete_title">Delete group?</string>
     <string name="outbound_group_delete_message">The group “%1$s” and all of its outbounds will be permanently deleted.</string>
     <string name="outbound_group_sync_failed">Unable to update group</string>
