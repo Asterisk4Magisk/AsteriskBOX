@@ -138,6 +138,7 @@ internal class OutboundSubscriptionUpdater(
                             trigger = trigger,
                             fetchedGroup = group,
                             remoteName = prepared.remoteName,
+                            subscriptionInfo = prepared.subscriptionInfo,
                         )
                     }
                     if (commit === CommitResult.Refetch && fetchAttempt + 1 < MaxFetchAttempts) {
@@ -189,6 +190,7 @@ internal class OutboundSubscriptionUpdater(
         trigger: SubscriptionUpdateTrigger,
         fetchedGroup: OutboundGroupState,
         remoteName: String? = null,
+        subscriptionInfo: SubscriptionInfo? = null,
     ): CommitResult {
         repeat(MaxCommitAttempts) {
             val snapshot = stateGateway.snapshot()
@@ -214,9 +216,12 @@ internal class OutboundSubscriptionUpdater(
                     lastUpdateDuplicateCount = 0,
                     consecutiveUpdateFailures = 0,
                     lastUpdateErrorSummary = "",
-                    subscriptionInfo = fetchedGroup.subscriptionInfo.takeIf { subscriptionInfo ->
-                        subscriptionInfo != SubscriptionInfo()
-                    } ?: group.subscriptionInfo,
+                    // A 304 still carries Subscription-Userinfo, so prefer the
+                    // freshly parsed value; keep the persisted one when this
+                    // response reported nothing.
+                    subscriptionInfo = subscriptionInfo
+                        ?.takeIf { fresh -> fresh != SubscriptionInfo() }
+                        ?: group.subscriptionInfo,
                     name = resolvedName ?: group.name,
                 )
             }
