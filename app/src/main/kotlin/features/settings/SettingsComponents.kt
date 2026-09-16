@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -47,6 +46,8 @@ import app.modes.RunModeTun2Socks
 import app.R
 import ui.components.AsteriskDropdownAnchor
 import ui.components.AsteriskDropdownMenuItem
+import ui.components.IconAccent
+import ui.components.MaskedPreferenceIcon
 import ui.text.formatTemplate
 import ui.theme.AsteriskMotion
 import ui.icons.AsteriskIcons as Icons
@@ -64,12 +65,14 @@ internal fun ArrowPreference(
     summary: String = "",
     icon: ImageVector = Icons.Rounded.Tune,
     enabled: Boolean = true,
+    accent: IconAccent = IconAccent.Surface,
 ) = SettingsActionRow(
     title = title,
     summary = summary,
     icon = icon,
     onClick = onClick,
     enabled = enabled,
+    accent = accent,
 )
 
 @Composable
@@ -79,12 +82,14 @@ internal fun SwitchPreference(
     onCheckedChange: (Boolean) -> Unit,
     summary: String = "",
     icon: ImageVector = Icons.Rounded.Tune,
+    accent: IconAccent = IconAccent.Surface,
 ) = SettingsSwitchRow(
     title = title,
     summary = summary,
     icon = icon,
     checked = checked,
     onCheckedChange = onCheckedChange,
+    accent = accent,
 )
 
 @Composable
@@ -95,6 +100,7 @@ internal fun OverlayDropdownPreference(
     onSelectedIndexChange: (Int) -> Unit,
     summary: String = "",
     icon: ImageVector = Icons.Rounded.Tune,
+    accent: IconAccent = IconAccent.Surface,
 ) = SettingsDropdownRow(
     title = title,
     summary = summary,
@@ -102,6 +108,7 @@ internal fun OverlayDropdownPreference(
     items = items,
     selectedIndex = selectedIndex,
     onSelectedIndexChange = onSelectedIndexChange,
+    accent = accent,
 )
 
 @Composable
@@ -146,6 +153,7 @@ internal fun SettingsActionRow(
     summary: String = "",
     value: String = "",
     enabled: Boolean = true,
+    accent: IconAccent = IconAccent.Surface,
 ) {
     if (!settingsRowMatchesQuery(title, summary, value)) return
     val rowAlpha by animateFloatAsState(
@@ -168,6 +176,7 @@ internal fun SettingsActionRow(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
+        accent = accent,
     )
 }
 
@@ -180,6 +189,7 @@ internal fun SettingsSwitchRow(
     modifier: Modifier = Modifier,
     summary: String = "",
     enabled: Boolean = true,
+    accent: IconAccent = IconAccent.Surface,
 ) {
     if (!settingsRowMatchesQuery(title, summary, checked.toString())) return
     SettingsRow(
@@ -196,6 +206,7 @@ internal fun SettingsSwitchRow(
                 enabled = enabled,
             )
         },
+        accent = accent,
     )
 }
 
@@ -209,6 +220,7 @@ internal fun SettingsDropdownRow(
     modifier: Modifier = Modifier,
     summary: String = "",
     enabled: Boolean = true,
+    accent: IconAccent = IconAccent.Surface,
 ) {
     if (items.isEmpty()) return
     val safeIndex = selectedIndex.coerceIn(items.indices)
@@ -242,6 +254,7 @@ internal fun SettingsDropdownRow(
                     }
                 }
             },
+            accent = accent,
         )
     }
 }
@@ -254,6 +267,7 @@ private fun SettingsRow(
     summary: String = "",
     value: String = "",
     trailing: (@Composable () -> Unit)? = null,
+    accent: IconAccent = IconAccent.Surface,
 ) {
     Row(
         modifier = modifier
@@ -262,26 +276,7 @@ private fun SettingsRow(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Card(
-                modifier = Modifier.size(32.dp),
-                shape = CircleShape,
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-            ) {
-                Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(19.dp),
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    )
-                }
-            }
-        }
+        MaskedPreferenceIcon(icon = icon, accent = accent)
         Spacer(Modifier.width(12.dp))
         Column(
             modifier = Modifier.weight(1f),
