@@ -156,7 +156,7 @@ class MainActivity : ComponentActivity() {
                 return@launch
             }
             try {
-                when (val result = application.subscriptionInstallConfigUseCase.install(config)) {
+                when (val result = application.subscriptionInstallConfig.install(config)) {
                     is OutboundSubscriptionUpdateResult.Success -> notifier.show(
                         getString(
                             R.string.import_result_summary,

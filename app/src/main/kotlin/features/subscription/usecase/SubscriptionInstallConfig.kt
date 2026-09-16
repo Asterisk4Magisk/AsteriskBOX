@@ -1,20 +1,18 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-package features.subscription
+package features.subscription.usecase
 
 import app.AppState
 import app.OutboundGroupState
 import app.nextAvailableOutboundGroupId
 import features.outbound.OutboundCommandResult
 import features.outbound.OutboundRepository
-import features.subscription.usecase.OutboundSubscriptionUpdateResult
-import features.subscription.usecase.OutboundSubscriptionUpdater
-import features.subscription.usecase.SubscriptionUpdateTrigger
+import features.subscription.SubscriptionInstallConfig
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal class SubscriptionInstallConfigUseCase(
+internal class SubscriptionInstallConfig(
     private val currentState: () -> AppState,
     private val repository: OutboundRepository,
     private val updater: OutboundSubscriptionUpdater,

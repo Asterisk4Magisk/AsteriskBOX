@@ -29,7 +29,7 @@ import features.subscription.runtime.toSubscriptionFetchOptions
 import features.subscription.usecase.OutboundSubscriptionUpdater
 import features.subscription.usecase.SubscriptionStateGateway
 import features.subscription.usecase.prepareSubscription
-import features.subscription.SubscriptionInstallConfigUseCase
+import features.subscription.usecase.SubscriptionInstallConfig
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -59,8 +59,8 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
     internal val stateStore: AndroidAppStateStore by lazy {
         AndroidAppStateStore.get(applicationContext)
     }
-    internal val subscriptionInstallConfigUseCase by lazy {
-        SubscriptionInstallConfigUseCase(
+    internal val subscriptionInstallConfig by lazy {
+        SubscriptionInstallConfig(
             currentState = { stateStore.state.value },
             repository = outboundRepository,
             updater = outboundSubscriptionUpdater,
