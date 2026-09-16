@@ -1241,21 +1241,15 @@ private fun OutboundPingStatus(
 
 @Composable
 private fun outboundPingColor(latencyMillis: Long): Color {
-    val base = when {
-        latencyMillis < 0L -> Color.Red
-        latencyMillis < 300L -> Color(0xFF84DE02)
-        latencyMillis < 500L -> Color(0xFFFFA500)
-        else -> Color.Red
+    val darkTheme = isInDarkTheme()
+    return when {
+        latencyMillis < 0L -> if (darkTheme) Color(0xFFF12522) else Color(0xFFE94634)
+        latencyMillis < 100L -> if (darkTheme) Color(0xFF6BD58A) else Color(0xFF128A3C)
+        latencyMillis < 200L -> if (darkTheme) Color(0xFFFFC857) else Color(0xFFD18A00)
+        latencyMillis < 300L -> if (darkTheme) Color(0xFFFF9B63) else Color(0xFFE06400)
+        else -> if (darkTheme) Color(0xFFF12522) else Color(0xFFE94634)
     }
-    return if (isInDarkTheme()) base.dim(0.7f) else base
 }
-
-private fun Color.dim(factor: Float): Color = Color(
-    red = (red * factor).coerceIn(0f, 1f),
-    green = (green * factor).coerceIn(0f, 1f),
-    blue = (blue * factor).coerceIn(0f, 1f),
-    alpha = alpha,
-)
 
 @Composable
 private fun OutboundOptionsMenu(

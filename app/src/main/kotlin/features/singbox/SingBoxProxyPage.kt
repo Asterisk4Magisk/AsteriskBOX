@@ -1073,26 +1073,20 @@ private fun delayColor(
     delayStatus: SingBoxProxyDelayStatus,
     delay: Int?,
 ): Color {
-    val base = when (delayStatus) {
-        SingBoxProxyDelayStatus.NotTested -> Color.Gray
-        SingBoxProxyDelayStatus.Testing -> Color.Gray
-        SingBoxProxyDelayStatus.Failed -> Color.Red
+    val darkTheme = isInDarkTheme()
+    return when (delayStatus) {
+        SingBoxProxyDelayStatus.NotTested, SingBoxProxyDelayStatus.Testing -> MaterialTheme.colorScheme.onSurfaceVariant
+        SingBoxProxyDelayStatus.Failed -> if (darkTheme) Color(0xFFF12522) else Color(0xFFE94634)
         SingBoxProxyDelayStatus.Measured -> when {
-            delay == null -> Color.Gray
-            delay < 300 -> Color(0xFF84DE02)
-            delay < 500 -> Color(0xFFFFA500)
-            else -> Color.Red
+            delay == null -> MaterialTheme.colorScheme.onSurfaceVariant
+            delay < 0 -> if (darkTheme) Color(0xFFF12522) else Color(0xFFE94634)
+            delay < 300 -> if (darkTheme) Color(0xFF6BD58A) else Color(0xFF128A3C)
+            delay < 600 -> if (darkTheme) Color(0xFFFFC857) else Color(0xFFD18A00)
+            delay < 900 -> if (darkTheme) Color(0xFFFF9B63) else Color(0xFFE06400)
+            else -> if (darkTheme) Color(0xFFF12522) else Color(0xFFE94634)
         }
     }
-    return if (isInDarkTheme()) base.dim(0.7f) else base
 }
-
-private fun Color.dim(factor: Float): Color = Color(
-    red = (red * factor).coerceIn(0f, 1f),
-    green = (green * factor).coerceIn(0f, 1f),
-    blue = (blue * factor).coerceIn(0f, 1f),
-    alpha = alpha,
-)
 
 private val SingBoxProxyNodeCardHeight = 112.dp
 private val SingBoxProxyNodeCardPadding = PaddingValues(start = 10.dp, top = 14.dp, end = 10.dp, bottom = 10.dp)
