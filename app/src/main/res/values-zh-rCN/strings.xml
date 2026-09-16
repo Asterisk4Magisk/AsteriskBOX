@@ -707,6 +707,8 @@
     <string name="outbound_group_delete_title">删除分组？</string>
     <string name="outbound_group_delete_message">分组“%1$s”及其中的所有出站将被永久删除。</string>
     <string name="outbound_group_sync_failed">分组更新失败</string>
+    <string name="subscription_install_link_invalid">无效的订阅链接</string>
+    <string name="subscription_install_failed">无法导入订阅</string>
     <string name="outbound_group_sync_all">更新全部分组订阅</string>
     <string name="outbound_group_sync_all_progress_title">正在更新分组订阅</string>
     <string name="outbound_group_sync_all_result_title">订阅更新结果</string>

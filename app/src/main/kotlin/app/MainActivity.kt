@@ -5,6 +5,7 @@ package app
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -24,6 +25,15 @@ import features.logs.AndroidLogFileCreator
 import features.resources.runtime.AndroidResourceFilePicker
 import features.settings.locale.localizedAppContext
 import features.singbox.qr.AndroidQrCodeScanRequester
+import features.importing.ImportOperation
+import features.importing.ImportSource
+import features.importing.ImportStage
+import features.importing.reportImportFailure
+import features.subscription.parseSubscriptionDeepLink
+import features.subscription.usecase.OutboundSubscriptionUpdateResult
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+import ui.feedback.AndroidToastTipNotifier
 
 class MainActivity : ComponentActivity() {
     private val vpnPermissionRequester = AndroidVpnPermissionRequester {
@@ -125,6 +135,73 @@ class MainActivity : ComponentActivity() {
         }
         showAppContent()
         requestStartupPermissions()
+        if (savedInstanceState == null) handleExternalIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleExternalIntent(intent)
+    }
+
+    private fun handleExternalIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_VIEW) return
+        val raw = intent.dataString ?: return
+        val application = application as AsteriskApplication
+        val notifier = AndroidToastTipNotifier(application)
+        val config = parseSubscriptionDeepLink(raw)
+        application.appScope.launch {
+            if (config == null) {
+                notifier.show(getString(R.string.subscription_install_link_invalid))
+                return@launch
+            }
+            try {
+                when (val result = application.subscriptionInstallConfigUseCase.install(config)) {
+                    is OutboundSubscriptionUpdateResult.Success -> notifier.show(
+                        getString(
+                            R.string.import_result_summary,
+                            result.outcome.accepted.size,
+                            result.outcome.skippedCount,
+                            result.outcome.duplicateCount,
+                        ),
+                    )
+                    is OutboundSubscriptionUpdateResult.Partial -> notifier.show(
+                        getString(R.string.import_result_partial_title) + "\n" +
+                            getString(
+                                R.string.import_result_summary,
+                                result.outcome.accepted.size,
+                                result.outcome.skippedCount,
+                                result.outcome.duplicateCount,
+                            ),
+                    )
+                    OutboundSubscriptionUpdateResult.NotModified -> notifier.show(
+                        getString(R.string.outbound_group_sync_not_modified),
+                    )
+                    is OutboundSubscriptionUpdateResult.Failed -> {
+                        reportImportFailure(
+                            ImportOperation.OUTBOUND_SUBSCRIPTION,
+                            ImportSource.SUBSCRIPTION,
+                            result.stage,
+                            result.error,
+                        )
+                        notifier.show(getString(R.string.subscription_install_failed))
+                    }
+                    is OutboundSubscriptionUpdateResult.Cancelled -> notifier.show(
+                        getString(R.string.subscription_install_failed),
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                reportImportFailure(
+                    ImportOperation.OUTBOUND_SUBSCRIPTION,
+                    ImportSource.SUBSCRIPTION,
+                    ImportStage.COMMIT,
+                    error,
+                )
+                notifier.show(getString(R.string.subscription_install_failed))
+            }
+        }
     }
 
     override fun onDestroy() {

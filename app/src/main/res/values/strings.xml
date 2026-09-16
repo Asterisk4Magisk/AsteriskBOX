@@ -715,6 +715,8 @@
     <string name="outbound_group_delete_title">Delete group?</string>
     <string name="outbound_group_delete_message">The group “%1$s” and all of its outbounds will be permanently deleted.</string>
     <string name="outbound_group_sync_failed">Unable to update group</string>
+    <string name="subscription_install_link_invalid">Invalid subscription link</string>
+    <string name="subscription_install_failed">Unable to import subscription</string>
     <string name="outbound_group_sync_all">Update all group subscriptions</string>
     <string name="outbound_group_sync_all_progress_title">Updating group subscriptions</string>
     <string name="outbound_group_sync_all_result_title">Subscription update results</string>
