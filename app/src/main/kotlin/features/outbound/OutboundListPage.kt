@@ -119,6 +119,7 @@ import app.R
 import sh.calvin.reorderable.ReorderableItem
 import ui.clipboard.getPlainText
 import ui.clipboard.setPlainText
+import ui.isInDarkTheme
 import ui.components.AsteriskExpressiveCard
 import ui.components.AsteriskFilterChip
 import ui.components.AsteriskInfoChip
@@ -1240,14 +1241,21 @@ private fun OutboundPingStatus(
 
 @Composable
 private fun outboundPingColor(latencyMillis: Long): Color {
-    return when {
-        latencyMillis < 0L -> MaterialTheme.colorScheme.error
-        latencyMillis < 100L -> MaterialTheme.colorScheme.tertiary
-        latencyMillis < 300L -> MaterialTheme.colorScheme.primary
-        latencyMillis < 600L -> MaterialTheme.colorScheme.secondary
-        else -> MaterialTheme.colorScheme.error
+    val base = when {
+        latencyMillis < 0L -> Color.Red
+        latencyMillis < 300L -> Color(0xFF84DE02)
+        latencyMillis < 500L -> Color(0xFFFFA500)
+        else -> Color.Red
     }
+    return if (isInDarkTheme()) base.dim(0.7f) else base
 }
+
+private fun Color.dim(factor: Float): Color = Color(
+    red = (red * factor).coerceIn(0f, 1f),
+    green = (green * factor).coerceIn(0f, 1f),
+    blue = (blue * factor).coerceIn(0f, 1f),
+    alpha = alpha,
+)
 
 @Composable
 private fun OutboundOptionsMenu(

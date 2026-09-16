@@ -110,6 +110,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import ui.layout.pageContentPaddingWithCutout
+import ui.isInDarkTheme
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
 
@@ -1072,18 +1073,26 @@ private fun delayColor(
     delayStatus: SingBoxProxyDelayStatus,
     delay: Int?,
 ): Color {
-    return when (delayStatus) {
-        SingBoxProxyDelayStatus.NotTested -> MaterialTheme.colorScheme.onSurfaceVariant
-        SingBoxProxyDelayStatus.Testing -> MaterialTheme.colorScheme.primary
-        SingBoxProxyDelayStatus.Failed -> MaterialTheme.colorScheme.error
+    val base = when (delayStatus) {
+        SingBoxProxyDelayStatus.NotTested -> Color.Gray
+        SingBoxProxyDelayStatus.Testing -> Color.Gray
+        SingBoxProxyDelayStatus.Failed -> Color.Red
         SingBoxProxyDelayStatus.Measured -> when {
-            delay == null -> MaterialTheme.colorScheme.onSurfaceVariant
-            delay < 300 -> MaterialTheme.colorScheme.primary
-            delay < 500 -> MaterialTheme.colorScheme.tertiary
-            else -> MaterialTheme.colorScheme.error
+            delay == null -> Color.Gray
+            delay < 300 -> Color(0xFF84DE02)
+            delay < 500 -> Color(0xFFFFA500)
+            else -> Color.Red
         }
     }
+    return if (isInDarkTheme()) base.dim(0.7f) else base
 }
+
+private fun Color.dim(factor: Float): Color = Color(
+    red = (red * factor).coerceIn(0f, 1f),
+    green = (green * factor).coerceIn(0f, 1f),
+    blue = (blue * factor).coerceIn(0f, 1f),
+    alpha = alpha,
+)
 
 private val SingBoxProxyNodeCardHeight = 112.dp
 private val SingBoxProxyNodeCardPadding = PaddingValues(start = 10.dp, top = 14.dp, end = 10.dp, bottom = 10.dp)
