@@ -36,35 +36,19 @@ internal fun settingsCoreLogLevelLabels(): List<String> =
     SettingsCoreLogLevelOptions
 
 @Composable
-internal fun SettingsThemeSection(
+internal fun SettingsAppSection(
+    languageOptions: List<String>,
+    languageMode: Int,
     colorModeOptions: List<String>,
     colorMode: Int,
     keyColorOptions: List<String>,
     seedIndex: Int,
-    languageOptions: List<String>,
-    languageMode: Int,
     onColorModeChange: (Int) -> Unit,
     onSeedIndexChange: (Int) -> Unit,
     onLanguageModeChange: (Int) -> Unit,
 ) {
-    SmallTitle(text = stringResource(R.string.settings_theme))
+    SmallTitle(text = stringResource(R.string.settings_app))
     SettingsSectionCard {
-        OverlayDropdownPreference(
-            title = stringResource(R.string.settings_color_mode),
-            icon = Icons.Rounded.DarkMode,
-            items = colorModeOptions,
-            selectedIndex = colorMode,
-            onSelectedIndexChange = onColorModeChange,
-            accent = IconAccent.MaskPurple,
-        )
-        OverlayDropdownPreference(
-            title = stringResource(R.string.settings_theme_color),
-            icon = Icons.Rounded.Palette,
-            items = keyColorOptions,
-            selectedIndex = seedIndex,
-            onSelectedIndexChange = onSeedIndexChange,
-            accent = IconAccent.MaskPink,
-        )
         OverlayDropdownPreference(
             title = stringResource(R.string.settings_language),
             icon = Icons.Rounded.Language,
@@ -74,34 +58,14 @@ internal fun SettingsThemeSection(
             accent = IconAccent.MaskBlue,
         )
     }
-}
-
-@Composable
-internal fun SettingsGeneralSection(
-    onOpenOutboundGroups: () -> Unit,
-    onOpenResourceManagement: () -> Unit,
-) {
-    SmallTitle(text = stringResource(R.string.settings_general))
-    SettingsSectionCard {
-        SettingsGeneralItems.forEach { item ->
-            when (item) {
-                SettingsGeneralItem.OutboundGroups -> ArrowPreference(
-                    title = stringResource(R.string.settings_group_management),
-                    icon = Icons.Rounded.AccountTree,
-                    summary = stringResource(R.string.settings_group_management_summary),
-                    onClick = onOpenOutboundGroups,
-                    accent = IconAccent.MaskBlue,
-                )
-                SettingsGeneralItem.Resources -> ArrowPreference(
-                    title = stringResource(R.string.settings_resource_management),
-                    icon = Icons.Rounded.Folder,
-                    summary = stringResource(R.string.settings_resource_management_summary),
-                    onClick = onOpenResourceManagement,
-                    accent = IconAccent.MaskOrange,
-                )
-            }
-        }
-    }
+    ThemeSettingsContent(
+        colorModeOptions = colorModeOptions,
+        colorMode = colorMode,
+        keyColorOptions = keyColorOptions,
+        seedIndex = seedIndex,
+        onColorModeChange = onColorModeChange,
+        onSeedIndexChange = onSeedIndexChange,
+    )
 }
 
 @Composable
@@ -131,6 +95,8 @@ internal fun SettingsCoreSection(
     onOpenDnsManagement: () -> Unit,
     onOpenSnifferSettings: () -> Unit,
     onOpenOutbounds: () -> Unit,
+    onOpenApps: () -> Unit,
+    onOpenResourceManagement: () -> Unit,
     onOpenSelectors: () -> Unit,
     onOpenEndpoints: () -> Unit,
     onOpenRouting: () -> Unit,
@@ -165,6 +131,20 @@ internal fun SettingsCoreSection(
                     summary = stringResource(R.string.settings_outbound_management_summary),
                     onClick = onOpenOutbounds,
                     accent = IconAccent.MaskBlue,
+                )
+                SettingsCoreItem.AppManagement -> ArrowPreference(
+                    title = stringResource(R.string.proxy_app_list_title),
+                    icon = Icons.Rounded.Apps,
+                    summary = stringResource(R.string.settings_app_management_summary),
+                    onClick = onOpenApps,
+                    accent = IconAccent.MaskPurple,
+                )
+                SettingsCoreItem.Resources -> ArrowPreference(
+                    title = stringResource(R.string.settings_resource_management),
+                    icon = Icons.Rounded.Folder,
+                    summary = stringResource(R.string.settings_resource_management_summary),
+                    onClick = onOpenResourceManagement,
+                    accent = IconAccent.MaskOrange,
                 )
                 SettingsCoreItem.Selectors -> ArrowPreference(
                     title = stringResource(R.string.settings_selector_management),

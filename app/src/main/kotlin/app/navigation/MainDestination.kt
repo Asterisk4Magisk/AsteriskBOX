@@ -8,7 +8,7 @@ internal enum class MainDestination(
 ) {
     Home("home"),
     Proxies("proxies"),
-    Apps("apps"),
+    Groups("groups"),
     Settings("settings"),
     ;
 

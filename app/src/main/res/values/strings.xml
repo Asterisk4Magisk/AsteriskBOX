@@ -83,7 +83,7 @@
     <!-- Navigation -->
     <string name="nav_dashboard">Home</string>
     <string name="nav_proxies">Proxies</string>
-    <string name="nav_apps">Apps</string>
+    <string name="nav_groups">Groups</string>
     <string name="nav_settings">Settings</string>
     <string name="common_back">Back</string>
     <string name="common_more_actions">More actions</string>
@@ -281,18 +281,17 @@
     <string name="sing_box_proxies_option_sort_default">Default</string>
     <string name="sing_box_proxies_option_sort_name">Name</string>
     <string name="sing_box_proxies_option_sort_delay">Delay</string>
-    <string name="settings_general">General</string>
-    <string name="settings_tools">Tools</string>
 
     <!-- Settings -->
+    <string name="settings_tools">Tools</string>
     <string name="settings_title">Settings</string>
+    <string name="settings_app">Appearance</string>
     <string name="settings_search_results">Search results</string>
     <string name="settings_search_no_results">No matching settings</string>
     <plurals name="settings_search_match_count">
         <item quantity="one">%1$d matching setting</item>
         <item quantity="other">%1$d matching settings</item>
     </plurals>
-    <string name="settings_theme">Theme</string>
     <string name="settings_color_mode">Theme</string>
     <string name="settings_language">Language</string>
     <string name="settings_theme_color">Accent color</string>
@@ -394,7 +393,7 @@
     <string name="settings_ipv6_summary">Enable IPv6 support</string>
     <string name="settings_ipv6_prefer">IPv6 preferred</string>
     <string name="settings_ipv6_prefer_summary">Prefer IPv6 addresses when connecting</string>
-    <string name="settings_core">Core settings</string>
+    <string name="settings_core">General</string>
     <string name="settings_resource_management">Resource management</string>
     <string name="settings_resource_management_summary">Manage core files and GEO resource files</string>
     <string name="settings_resource_files_core_files">Core files</string>
@@ -684,10 +683,14 @@
     <string name="proxy_app_list_mode_blacklist">Blacklist mode</string>
     <string name="proxy_app_list_mode_whitelist">Whitelist mode</string>
     <string name="proxy_app_list_mode_global">All-app mode</string>
-    <string name="proxy_app_list_mode">App proxy mode</string>
     <string name="proxy_app_list_more_actions">More actions</string>
     <string name="proxy_app_list_show_system_apps">Show system apps</string>
     <string name="proxy_app_list_scan_china_apps">Scan Chinese apps</string>
+    <string name="proxy_app_list_help">Help</string>
+    <string name="proxy_app_list_help_title">App proxy modes</string>
+    <string name="proxy_app_list_help_blacklist">Blacklist mode: apps on the blacklist bypass the proxy; everything else uses it.</string>
+    <string name="proxy_app_list_help_global">All-app mode: every app uses the proxy.</string>
+    <string name="proxy_app_list_help_whitelist">Whitelist mode: only apps on the whitelist use the proxy; everything else bypasses it.</string>
     <string name="proxy_app_list_scan_china_progress">Scanned %1$d of %2$d, matched %3$d</string>
     <string name="proxy_app_list_scan_china_done">Apps scanned: %1$d; Chinese apps found: %2$d</string>
     <string name="proxy_app_list_scan_china_no_match">Scanned {scanned} apps, no Chinese apps found</string>
@@ -715,10 +718,9 @@
     <string name="proxy_service_stopped">Proxy service stopped</string>
 
     <!-- Outbound groups and outbounds -->
-    <string name="settings_group_management">Group management</string>
-    <string name="settings_group_management_summary">Edit subscription URLs, group names, and enabled status</string>
     <string name="settings_network_quality_test">Network quality test</string>
     <string name="settings_network_quality_test_summary">Measure download, upload, and responsiveness using the Apple networkQuality protocol</string>
+    <string name="settings_app_management_summary">Choose which installed apps use the proxy and how</string>
     <string name="settings_outbound_management">Outbound management</string>
     <string name="settings_outbound_management_summary">Import, add, and edit core outbound proxy servers</string>
     <string name="settings_selector_management">Selector management</string>
