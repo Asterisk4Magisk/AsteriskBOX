@@ -423,6 +423,19 @@ internal class SingBoxRuntimeRepository(
         return session ?: error("sing-box API is not connected")
     }
 
+    /**
+     * Resolve the current command client for a non-delay-test consumer.
+     *
+     * Waits for a connected session when the service is starting but not yet
+     * reporting `running`. Throws when the service is stopped, when the session
+     * still fails to connect within [SessionWaitMillis], or when a fresh
+     * `lastError` is observed. Used by the network quality executor; the delay
+     * test path continues to use its own [requireActiveSession] gate to keep
+     * the two code paths independent.
+     */
+    suspend fun activeCommandClient(appState: AppState): SingBoxCommandClient =
+        requireActiveSession(appState)
+
     private suspend fun runDelayTest(
         appState: AppState,
         target: String,

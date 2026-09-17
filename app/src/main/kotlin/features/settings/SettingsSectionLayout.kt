@@ -15,6 +15,14 @@ internal val SettingsGeneralItems = listOf(
     SettingsGeneralItem.Resources,
 )
 
+internal enum class SettingsToolsItem {
+    NetworkQualityTest,
+}
+
+internal val SettingsToolsItems = listOf(
+    SettingsToolsItem.NetworkQualityTest,
+)
+
 internal enum class SettingsCoreItem {
     DnsManagement,
     Sniffer,

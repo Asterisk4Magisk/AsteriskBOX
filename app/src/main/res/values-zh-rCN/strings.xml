@@ -44,6 +44,11 @@
     <string name="qr_scan_choose_image">从相册选择</string>
 <!-- Common -->
     <string name="common_cancel">取消</string>
+    <string name="common_ok">确定</string>
+    <string name="common_start">开始</string>
+    <string name="common_settings">设置</string>
+    <string name="common_error_required">必填</string>
+    <string name="common_error_positive_number">必须大于零</string>
     <string name="common_clear">清除</string>
     <string name="common_copy">复制</string>
     <string name="common_share">分享</string>
@@ -200,6 +205,49 @@
     <string name="monitor_network_error_request">请求失败</string>
     <string name="monitor_network_error_response">探测服务返回了无效地址</string>
 
+    <!-- Apple networkQuality test page -->
+    <string name="monitor_network_quality_title">网络质量测试</string>
+    <string name="monitor_network_quality_section_target">目标与操作</string>
+    <string name="monitor_network_quality_settings_title">测试参数</string>
+    <string name="monitor_network_quality_section_endpoint">端点</string>
+    <string name="monitor_network_quality_endpoint_summary">Apple NetworkQuality 配置 URL。除非你自建 mensura 镜像,否则保持默认即可。</string>
+    <string name="monitor_network_quality_section_timing">时长</string>
+    <string name="monitor_network_quality_timing_summary">整次测量的最长时间上限。</string>
+    <string name="monitor_network_quality_section_options">选项</string>
+    <string name="monitor_network_quality_serial_summary">串行执行上行与下行测量阶段。</string>
+    <string name="monitor_network_quality_http3_summary">当服务端支持时,使用 QUIC / HTTP/3 探测。</string>
+    <string name="monitor_network_quality_running">测量中…</string>
+    <string name="monitor_network_quality_fab_start">开始</string>
+    <string name="monitor_network_quality_fab_stop">停止</string>
+    <string name="monitor_network_quality_info_action">参数说明</string>
+    <string name="monitor_network_quality_settings_action">测试参数</string>
+    <string name="monitor_network_quality_rating_good">良好</string>
+    <string name="monitor_network_quality_rating_fair">一般</string>
+    <string name="monitor_network_quality_rating_poor">较差</string>
+    <string name="monitor_network_quality_explanation_title">关于这些数值</string>
+    <string name="monitor_network_quality_idle_latency_explanation">空闲时链路的响应延迟。300 毫秒以内对实时交互足够好,300–700 毫秒可以接受,超过 700 毫秒会明显迟滞。</string>
+    <string name="monitor_network_quality_download_capacity_explanation">持续下载吞吐。高于 150 Mbps 为优秀,50–150 Mbps 为可接受,低于 50 Mbps 即视为受限。</string>
+    <string name="monitor_network_quality_download_responsiveness_explanation">链路过载下每分钟可完成的小下载次数。500 RPM 以上保持流畅,低于 200 RPM 时交互会被排队。</string>
+    <string name="monitor_network_quality_upload_capacity_explanation">持续上传吞吐。高于 100 Mbps 为优秀,30–100 Mbps 为可接受,低于 30 Mbps 即视为受限。</string>
+    <string name="monitor_network_quality_upload_responsiveness_explanation">链路过载下每分钟可完成的小上传次数,与下行响应度相同的阈值。</string>
+    <string name="monitor_network_quality_elapsed_time_explanation">本次测试运行的总时长,向下取整到秒。仅反映测试本身,不代表链路质量。</string>
+    <string name="monitor_network_quality_config_title">测试参数</string>
+    <string name="monitor_network_quality_config_url">配置 URL</string>
+    <string name="monitor_network_quality_max_runtime">最长耗时(秒)</string>
+    <string name="monitor_network_quality_serial">串行测量</string>
+    <string name="monitor_network_quality_http3">HTTP/3</string>
+    <string name="monitor_network_quality_outbound_label">出站</string>
+    <string name="monitor_network_quality_outbound_default">默认</string>
+    <string name="monitor_network_quality_standalone_hint">服务未启动。测试将以独立模式运行,不走代理,也无法选择出站。</string>
+    <string name="monitor_network_quality_report_title">结果</string>
+    <string name="monitor_network_quality_idle_latency">空闲延迟</string>
+    <string name="monitor_network_quality_download_capacity">下行带宽</string>
+    <string name="monitor_network_quality_download_responsiveness">下行响应度</string>
+    <string name="monitor_network_quality_upload_capacity">上行带宽</string>
+    <string name="monitor_network_quality_upload_responsiveness">上行响应度</string>
+    <string name="monitor_network_quality_elapsed_time">总耗时</string>
+    <string name="monitor_network_quality_error_title">网络质量测试失败</string>
+
     <!-- sing-box -->
     <string name="sing_box_dashboard_network_detection_checking">检测中…</string>
     <string name="sing_box_dashboard_start_failed">启动代理失败</string>
@@ -231,6 +279,7 @@
     <string name="sing_box_proxies_option_sort_name">名称</string>
     <string name="sing_box_proxies_option_sort_delay">延迟</string>
     <string name="settings_general">常规</string>
+    <string name="settings_tools">工具</string>
 
     <!-- Settings -->
     <string name="settings_title">设置</string>
@@ -660,6 +709,8 @@
     <!-- Outbound groups and outbounds -->
     <string name="settings_group_management">分组管理</string>
     <string name="settings_group_management_summary">编辑订阅地址、分组名和启用状态</string>
+    <string name="settings_network_quality_test">网络质量测试</string>
+    <string name="settings_network_quality_test_summary">使用 Apple networkQuality 协议测量下行、上行与响应度</string>
     <string name="settings_outbound_management">出站管理</string>
     <string name="settings_outbound_management_summary">导入、添加、编辑核心出站代理服务器</string>
     <string name="settings_selector_management">选择器管理</string>

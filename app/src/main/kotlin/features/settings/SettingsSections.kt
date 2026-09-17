@@ -105,6 +105,26 @@ internal fun SettingsGeneralSection(
 }
 
 @Composable
+internal fun SettingsToolsSection(
+    onOpenNetworkQualityTest: () -> Unit,
+) {
+    SmallTitle(text = stringResource(R.string.settings_tools))
+    SettingsSectionCard {
+        SettingsToolsItems.forEach { item ->
+            when (item) {
+                SettingsToolsItem.NetworkQualityTest -> ArrowPreference(
+                    title = stringResource(R.string.settings_network_quality_test),
+                    icon = Icons.Rounded.Speed,
+                    summary = stringResource(R.string.settings_network_quality_test_summary),
+                    onClick = onOpenNetworkQualityTest,
+                    accent = IconAccent.MaskBlueVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 internal fun SettingsCoreSection(
     snifferSettingsSummary: String,
     coreLogLevel: String,
