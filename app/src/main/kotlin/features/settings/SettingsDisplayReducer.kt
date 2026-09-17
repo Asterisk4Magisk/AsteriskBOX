@@ -13,6 +13,7 @@ internal enum class SettingsSectionId {
     Tun,
     Tun2Socks,
     Bpf2Socks,
+    Apps,
     Logs,
     BackupRestore,
     About,

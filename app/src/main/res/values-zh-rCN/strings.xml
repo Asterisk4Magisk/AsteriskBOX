@@ -78,8 +78,11 @@
     <!-- Navigation -->
     <string name="nav_dashboard">首页</string>
     <string name="nav_proxies">代理</string>
-    <string name="nav_apps">应用</string>
+    <string name="nav_groups">分组</string>
     <string name="nav_settings">设置</string>
+
+    <!-- Settings sections -->
+    <string name="settings_app">外观</string>
     <string name="common_back">返回</string>
     <string name="common_more_actions">更多操作</string>
     <string name="common_ipv4">IPv4</string>
@@ -230,7 +233,6 @@
     <string name="sing_box_proxies_option_sort_default">默认</string>
     <string name="sing_box_proxies_option_sort_name">名称</string>
     <string name="sing_box_proxies_option_sort_delay">延迟</string>
-    <string name="settings_general">常规</string>
 
     <!-- Settings -->
     <string name="settings_title">设置</string>
@@ -239,7 +241,6 @@
     <plurals name="settings_search_match_count">
         <item quantity="other">匹配 %1$d 个设置项</item>
     </plurals>
-    <string name="settings_theme">主题</string>
     <string name="settings_color_mode">主题</string>
     <string name="settings_language">语言</string>
     <string name="settings_theme_color">强调色</string>
@@ -341,7 +342,7 @@
     <string name="settings_ipv6_summary">启用 IPv6 支持</string>
     <string name="settings_ipv6_prefer">IPv6 优先</string>
     <string name="settings_ipv6_prefer_summary">连接时优先使用 IPv6 地址</string>
-    <string name="settings_core">核心设置</string>
+    <string name="settings_core">常规</string>
     <string name="settings_resource_management">资源管理</string>
     <string name="settings_resource_management_summary">管理核心文件与GEO资源文件</string>
     <string name="settings_resource_files_core_files">核心文件</string>
@@ -662,8 +663,7 @@
     <string name="proxy_service_stopped">代理服务已停止</string>
 
     <!-- Outbound groups and outbounds -->
-    <string name="settings_group_management">分组管理</string>
-    <string name="settings_group_management_summary">编辑订阅地址、分组名和启用状态</string>
+    <string name="settings_app_management_summary">选择哪些应用使用代理以及代理方式</string>
     <string name="settings_outbound_management">出站管理</string>
     <string name="settings_outbound_management_summary">导入、添加、编辑核心出站代理服务器</string>
     <string name="settings_selector_management">选择器管理</string>

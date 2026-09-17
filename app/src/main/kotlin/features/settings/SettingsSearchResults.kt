@@ -58,32 +58,32 @@ internal fun settingsTopLevelSearchItems(
     val coreLogLevelLabels = settingsCoreLogLevelLabels()
     return listOfNotNull(
         SettingsSearchItem(
-            SettingsSectionId.Theme,
+            SettingsSectionId.Apps,
             stringResource(R.string.settings_color_mode),
             value = optionValue(colorModeOptions, colorMode),
             optionText = colorModeOptions,
         ),
         SettingsSearchItem(
-            SettingsSectionId.Theme,
+            SettingsSectionId.Apps,
             stringResource(R.string.settings_theme_color),
             value = optionValue(keyColorOptions, seedIndex),
             optionText = keyColorOptions,
         ),
         SettingsSearchItem(
-            SettingsSectionId.Theme,
+            SettingsSectionId.Apps,
             stringResource(R.string.settings_language),
             value = optionValue(languageOptions, languageMode),
             optionText = languageOptions,
         ),
         SettingsSearchItem(
-            SettingsSectionId.General,
-            stringResource(R.string.settings_group_management),
-            stringResource(R.string.settings_group_management_summary),
-        ),
-        SettingsSearchItem(
-            SettingsSectionId.General,
+            SettingsSectionId.Core,
             stringResource(R.string.settings_resource_management),
             stringResource(R.string.settings_resource_management_summary),
+        ),
+        SettingsSearchItem(
+            SettingsSectionId.Core,
+            stringResource(R.string.proxy_app_list_title),
+            stringResource(R.string.settings_app_management_summary),
         ),
         SettingsSearchItem(
             SettingsSectionId.Core,
@@ -229,20 +229,20 @@ internal fun settingsTopLevelSearchItems(
             value = ebpfLocalDnsMode,
             optionText = engine.singbox.EbpfDnsModes,
         ) else null,
-        SettingsSearchItem(SettingsSectionId.Logs, stringResource(R.string.settings_core_logs)),
-        SettingsSearchItem(SettingsSectionId.Logs, stringResource(R.string.settings_logcat)),
+        SettingsSearchItem(SettingsSectionId.Apps, stringResource(R.string.settings_core_logs)),
+        SettingsSearchItem(SettingsSectionId.Apps, stringResource(R.string.settings_logcat)),
         SettingsSearchItem(
-            SettingsSectionId.BackupRestore,
+            SettingsSectionId.Apps,
             stringResource(R.string.settings_backup_user_data),
             stringResource(R.string.settings_backup_user_data_summary),
         ),
         SettingsSearchItem(
-            SettingsSectionId.BackupRestore,
+            SettingsSectionId.Apps,
             stringResource(R.string.settings_restore_user_data),
             stringResource(R.string.settings_restore_user_data_summary),
         ),
-        SettingsSearchItem(SettingsSectionId.About, stringResource(R.string.settings_about_project)),
-        SettingsSearchItem(SettingsSectionId.About, stringResource(R.string.settings_open_source_licenses)),
+        SettingsSearchItem(SettingsSectionId.Apps, stringResource(R.string.settings_about_project)),
+        SettingsSearchItem(SettingsSectionId.Apps, stringResource(R.string.settings_open_source_licenses)),
         SettingsSearchItem(
             SettingsSectionId.Advanced,
             title = stringResource(R.string.common_boolean),

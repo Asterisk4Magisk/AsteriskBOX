@@ -366,25 +366,6 @@ private fun SettingsContent(
                     )
                 }
             }
-            item(key = "settings_theme") {
-                SettingsThemeSection(
-                    colorModeOptions = colorModeOptions,
-                    colorMode = appState.colorMode,
-                    keyColorOptions = keyColorOptions,
-                    seedIndex = appState.seedIndex,
-                    languageOptions = languageOptions,
-                    languageMode = appState.languageMode,
-                    onColorModeChange = { index -> updateAppState { state -> state.copy(colorMode = index) } },
-                    onSeedIndexChange = { index -> updateAppState { state -> state.copy(seedIndex = index) } },
-                    onLanguageModeChange = { index -> updateAppState { state -> state.copy(languageMode = index) } },
-                )
-            }
-            item(key = "settings_general") {
-                SettingsGeneralSection(
-                    onOpenOutboundGroups = { navigator.push(Route.OutboundGroupList) },
-                    onOpenResourceManagement = { navigator.push(Route.ResourceManagement) },
-                )
-            }
             item(key = "settings_core") {
                 SettingsCoreSection(
                     snifferSettingsSummary = snifferSummary,
@@ -392,6 +373,8 @@ private fun SettingsContent(
                     onOpenDnsManagement = { navigator.push(Route.DnsManagement()) },
                     onOpenSnifferSettings = { sheetState.openSnifferSettings(appState) },
                     onOpenOutbounds = { navigator.push(Route.OutboundList) },
+                    onOpenApps = { navigator.push(Route.ProxyAppList) },
+                    onOpenResourceManagement = { navigator.push(Route.ResourceManagement) },
                     onOpenSelectors = { navigator.push(Route.SelectorManagement) },
                     onOpenEndpoints = { navigator.push(Route.EndpointList) },
                     onOpenRouting = { navigator.push(Route.RoutingManagement) },
@@ -601,6 +584,23 @@ private fun SettingsContent(
                     onOpenServiceControl = { sheetState.openServiceControl(appState) },
                     onOpenIgnoredInterfaces = { sheetState.openIgnoredInterfaces(appState) },
                     onOpenPrivateAddresses = { sheetState.openPrivateAddresses(appState) },
+                )
+            }
+            item(key = "settings_app") {
+                SettingsAppSection(
+                    languageOptions = languageOptions,
+                    languageMode = appState.languageMode,
+                    colorModeOptions = listOf(
+                        stringResource(R.string.option_follow_system),
+                        stringResource(R.string.option_light),
+                        stringResource(R.string.option_dark),
+                    ),
+                    colorMode = appState.colorMode,
+                    keyColorOptions = keyColorOptions,
+                    seedIndex = appState.seedIndex,
+                    onColorModeChange = { index -> updateAppState { state -> state.copy(colorMode = index) } },
+                    onSeedIndexChange = { index -> updateAppState { state -> state.copy(seedIndex = index) } },
+                    onLanguageModeChange = { index -> updateAppState { state -> state.copy(languageMode = index) } },
                 )
             }
             item(key = "settings_backup_restore") {

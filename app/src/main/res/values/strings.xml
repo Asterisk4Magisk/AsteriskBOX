@@ -78,8 +78,11 @@
     <!-- Navigation -->
     <string name="nav_dashboard">Home</string>
     <string name="nav_proxies">Proxies</string>
-    <string name="nav_apps">Apps</string>
+    <string name="nav_groups">Groups</string>
     <string name="nav_settings">Settings</string>
+
+    <!-- Settings sections -->
+    <string name="settings_app">Appearance</string>
     <string name="common_back">Back</string>
     <string name="common_more_actions">More actions</string>
     <string name="common_ipv4">IPv4</string>
@@ -232,7 +235,6 @@
     <string name="sing_box_proxies_option_sort_default">Default</string>
     <string name="sing_box_proxies_option_sort_name">Name</string>
     <string name="sing_box_proxies_option_sort_delay">Delay</string>
-    <string name="settings_general">General</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -242,7 +244,6 @@
         <item quantity="one">%1$d matching setting</item>
         <item quantity="other">%1$d matching settings</item>
     </plurals>
-    <string name="settings_theme">Theme</string>
     <string name="settings_color_mode">Theme</string>
     <string name="settings_language">Language</string>
     <string name="settings_theme_color">Accent color</string>
@@ -344,7 +345,7 @@
     <string name="settings_ipv6_summary">Enable IPv6 support</string>
     <string name="settings_ipv6_prefer">IPv6 preferred</string>
     <string name="settings_ipv6_prefer_summary">Prefer IPv6 addresses when connecting</string>
-    <string name="settings_core">Core settings</string>
+    <string name="settings_core">General</string>
     <string name="settings_resource_management">Resource management</string>
     <string name="settings_resource_management_summary">Manage core files and GEO resource files</string>
     <string name="settings_resource_files_core_files">Core files</string>
@@ -669,8 +670,7 @@
     <string name="proxy_service_stopped">Proxy service stopped</string>
 
     <!-- Outbound groups and outbounds -->
-    <string name="settings_group_management">Group management</string>
-    <string name="settings_group_management_summary">Edit subscription URLs, group names, and enabled status</string>
+    <string name="settings_app_management_summary">Choose which installed apps use the proxy and how</string>
     <string name="settings_outbound_management">Outbound management</string>
     <string name="settings_outbound_management_summary">Import, add, and edit core outbound proxy servers</string>
     <string name="settings_selector_management">Selector management</string>
