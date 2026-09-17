@@ -219,6 +219,7 @@
     <string name="monitor_network_quality_serial_summary">Run upload and download stages sequentially.</string>
     <string name="monitor_network_quality_http3_summary">Probe over QUIC / HTTP/3 when the server supports it.</string>
     <string name="monitor_network_quality_running">Running…</string>
+    <string name="monitor_network_quality_snackbar_done">Network quality test finished</string>
     <string name="monitor_network_quality_fab_start">Start</string>
     <string name="monitor_network_quality_fab_stop">Stop</string>
     <string name="monitor_network_quality_info_action">About the metrics</string>

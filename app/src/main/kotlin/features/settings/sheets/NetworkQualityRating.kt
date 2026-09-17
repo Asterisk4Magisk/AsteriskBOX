@@ -45,7 +45,7 @@ internal fun MetricRating.colors(): RatingColors? = when (this) {
     )
     MetricRating.Poor -> RatingColors(
         container = if (isInDarkTheme()) PoorColor.dim(0.7f) else PoorColor,
-        onContainer = if (isInDarkTheme()) Color.Black else Color.White,
+        onContainer = if (isInDarkTheme()) Color.White else Color.Black,
     )
     MetricRating.Unrated -> null
 }

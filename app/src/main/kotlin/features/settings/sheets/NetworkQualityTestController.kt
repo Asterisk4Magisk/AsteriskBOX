@@ -74,6 +74,7 @@ internal class NetworkQualityTestController {
         proxyRunning: Boolean,
         appState: AppState,
         runtimeRepository: SingBoxRuntimeRepository,
+        snackbarMessage: String,
         tipNotifier: AndroidToastTipNotifier,
         scope: CoroutineScope,
     ) {
@@ -118,7 +119,7 @@ internal class NetworkQualityTestController {
                 )
                 if (progress.finished) {
                     running = false
-                    tipNotifier.show(SNACKBAR_DONE)
+                    tipNotifier.show(snackbarMessage)
                 }
             }
         }
@@ -128,10 +129,6 @@ internal class NetworkQualityTestController {
         if (outboundTag.isNotEmpty() && outboundTag !in knownTags) {
             outboundTag = ""
         }
-    }
-
-    companion object {
-        const val SNACKBAR_DONE = "Network quality test finished"
     }
 }
 

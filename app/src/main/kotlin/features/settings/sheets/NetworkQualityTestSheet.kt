@@ -73,6 +73,9 @@ internal fun NetworkQualityTestSheet(
     val runtimeState by services.singBoxRuntime.state.collectAsState()
 
     var showExplanation by remember { mutableStateOf(false) }
+    val snackbarDoneMessage = stringResource(
+        R.string.monitor_network_quality_snackbar_done,
+    )
 
     SettingsModalBottomSheet(
         show = show,
@@ -141,6 +144,7 @@ internal fun NetworkQualityTestSheet(
                         proxyRunning = appState.proxyRunning,
                         appState = appState,
                         runtimeRepository = services.singBoxRuntime,
+                        snackbarMessage = snackbarDoneMessage,
                         tipNotifier = services.tipNotifier,
                         scope = services.appScope,
                     )

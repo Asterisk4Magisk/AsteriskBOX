@@ -62,14 +62,17 @@ internal class ServiceNetworkQualityExecutor(
         http3: Boolean,
     ): Flow<NetworkQualityProgress> = callbackFlow {
         val client = repository.activeCommandClient(appState)
+        val latestProgress = AtomicReference(LibboxNetworkQualityProgress())
         val handler = object : NetworkQualityTestHandler {
             override fun onProgress(progress: LibboxNetworkQualityProgress) {
+                latestProgress.set(progress)
                 trySend(progress.toModel())
             }
 
             override fun onError(message: String) {
                 trySend(
                     NetworkQualityProgress(
+                        elapsedMs = latestProgress.get().elapsedMs,
                         error = message,
                         finished = true,
                     ),
@@ -86,6 +89,7 @@ internal class ServiceNetworkQualityExecutor(
                         downloadRpm = result.downloadRPM,
                         uploadRpm = result.uploadRPM,
                         idleLatencyMs = result.idleLatencyMs,
+                        elapsedMs = latestProgress.get().elapsedMs,
                         downloadCapacityAccuracy = result.downloadCapacityAccuracy,
                         uploadCapacityAccuracy = result.uploadCapacityAccuracy,
                         downloadRpmAccuracy = result.downloadRPMAccuracy,
@@ -131,13 +135,21 @@ internal class StandaloneNetworkQualityExecutor : NetworkQualityExecutor {
         @Suppress("UNUSED_PARAMETER")
         val ignored = outboundTag
         val test = Libbox.newNetworkQualityTest()
+        val latestProgress = AtomicReference(LibboxNetworkQualityProgress())
         val handler = object : NetworkQualityTestHandler {
             override fun onProgress(progress: LibboxNetworkQualityProgress) {
+                latestProgress.set(progress)
                 trySend(progress.toModel())
             }
 
             override fun onError(message: String) {
-                trySend(NetworkQualityProgress(error = message, finished = true))
+                trySend(
+                    NetworkQualityProgress(
+                        elapsedMs = latestProgress.get().elapsedMs,
+                        error = message,
+                        finished = true,
+                    ),
+                )
                 close()
             }
 
@@ -150,6 +162,7 @@ internal class StandaloneNetworkQualityExecutor : NetworkQualityExecutor {
                         downloadRpm = result.downloadRPM,
                         uploadRpm = result.uploadRPM,
                         idleLatencyMs = result.idleLatencyMs,
+                        elapsedMs = latestProgress.get().elapsedMs,
                         downloadCapacityAccuracy = result.downloadCapacityAccuracy,
                         uploadCapacityAccuracy = result.uploadCapacityAccuracy,
                         downloadRpmAccuracy = result.downloadRPMAccuracy,
