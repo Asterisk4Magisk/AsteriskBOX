@@ -212,7 +212,7 @@ internal fun SnifferSettingsBottomSheet(
 }
 
 @Composable
-private fun SnifferSheetSection(
+internal fun SnifferSheetSection(
     title: String,
     content: @Composable () -> Unit,
 ) {

@@ -5,6 +5,14 @@ package features.settings
 
 import engine.singbox.SingBoxLogLevels
 
+internal enum class SettingsToolsItem {
+    NetworkQualityTest,
+}
+
+internal val SettingsToolsItems = listOf(
+    SettingsToolsItem.NetworkQualityTest,
+)
+
 internal enum class SettingsCoreItem {
     DnsManagement,
     Sniffer,

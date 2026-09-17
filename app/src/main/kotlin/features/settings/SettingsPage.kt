@@ -603,6 +603,11 @@ private fun SettingsContent(
                     onLanguageModeChange = { index -> updateAppState { state -> state.copy(languageMode = index) } },
                 )
             }
+            item(key = "settings_tools") {
+                SettingsToolsSection(
+                    onOpenNetworkQualityTest = { sheetState.openNetworkQualityTest() },
+                )
+            }
             item(key = "settings_backup_restore") {
                 SettingsBackupRestoreSection(
                     progressText = backupRestoreProgressText,

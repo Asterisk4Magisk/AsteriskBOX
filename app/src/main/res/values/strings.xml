@@ -44,6 +44,9 @@
     <string name="qr_scan_choose_image">Choose from album</string>
 <!-- Common -->
     <string name="common_cancel">Cancel</string>
+    <string name="common_ok">OK</string>
+    <string name="common_error_required">Required</string>
+    <string name="common_error_positive_number">Must be greater than zero</string>
     <string name="common_clear">Clear</string>
     <string name="common_copy">Copy</string>
     <string name="common_share">Share</string>
@@ -202,6 +205,46 @@
     <string name="monitor_network_error_request">The request failed</string>
     <string name="monitor_network_error_response">The service returned an invalid address</string>
 
+    <!-- Apple networkQuality test page -->
+    <string name="monitor_network_quality_title">Network quality test</string>
+    <string name="monitor_network_quality_settings_title">Test parameters</string>
+    <string name="monitor_network_quality_section_endpoint">Endpoint</string>
+    <string name="monitor_network_quality_endpoint_summary">Apple NetworkQuality config URL. Use the default unless you operate a custom mensura mirror.</string>
+    <string name="monitor_network_quality_section_timing">Timing</string>
+    <string name="monitor_network_quality_timing_summary">Upper bound for the entire measurement cycle.</string>
+    <string name="monitor_network_quality_section_options">Options</string>
+    <string name="monitor_network_quality_serial_summary">Run upload and download stages sequentially.</string>
+    <string name="monitor_network_quality_http3_summary">Probe over QUIC / HTTP/3 when the server supports it.</string>
+    <string name="monitor_network_quality_snackbar_done">Network quality test finished</string>
+    <string name="monitor_network_quality_fab_start">Start</string>
+    <string name="monitor_network_quality_fab_stop">Stop</string>
+    <string name="monitor_network_quality_info_action">About the metrics</string>
+    <string name="monitor_network_quality_settings_action">Test parameters</string>
+    <string name="monitor_network_quality_rating_good">Good</string>
+    <string name="monitor_network_quality_rating_fair">Fair</string>
+    <string name="monitor_network_quality_rating_poor">Poor</string>
+    <string name="monitor_network_quality_explanation_title">About these numbers</string>
+    <string name="monitor_network_quality_idle_latency_explanation">How quickly the link responds when no traffic is flowing. Under 300 ms is good for real-time work; 300–700 ms is acceptable; over 700 ms feels sluggish.</string>
+    <string name="monitor_network_quality_download_capacity_explanation">Sustained download throughput. Above 150 Mbps is great; 50–150 Mbps is acceptable; under 50 Mbps is constrained.</string>
+    <string name="monitor_network_quality_download_responsiveness_explanation">How many small downloads the link can finish per minute while busy. 500 RPM or more stays responsive under load; under 200 RPM means interactions queue up.</string>
+    <string name="monitor_network_quality_upload_capacity_explanation">Sustained upload throughput. Above 100 Mbps is great; 30–100 Mbps is acceptable; under 30 Mbps is constrained.</string>
+    <string name="monitor_network_quality_upload_responsiveness_explanation">How many small uploads the link can finish per minute while busy. Same scale as download responsiveness.</string>
+    <string name="monitor_network_quality_elapsed_time_explanation">Total time the test ran, rounded down to seconds. Pure artefact of the test — not a property of the link.</string>
+    <string name="monitor_network_quality_config_url">Config URL</string>
+    <string name="monitor_network_quality_max_runtime">Max runtime (seconds)</string>
+    <string name="monitor_network_quality_serial">Serial measurement</string>
+    <string name="monitor_network_quality_http3">HTTP/3</string>
+    <string name="monitor_network_quality_outbound_label">Outbound</string>
+    <string name="monitor_network_quality_outbound_default">Default</string>
+    <string name="monitor_network_quality_standalone_hint">Service is stopped. The test will run standalone without routing through the proxy and cannot select an outbound.</string>
+    <string name="monitor_network_quality_idle_latency">Idle latency</string>
+    <string name="monitor_network_quality_download_capacity">Download capacity</string>
+    <string name="monitor_network_quality_download_responsiveness">Download responsiveness</string>
+    <string name="monitor_network_quality_upload_capacity">Upload capacity</string>
+    <string name="monitor_network_quality_upload_responsiveness">Upload responsiveness</string>
+    <string name="monitor_network_quality_elapsed_time">Elapsed time</string>
+    <string name="monitor_network_quality_error_title">Network quality test failed</string>
+
     <!-- sing-box -->
     <string name="sing_box_dashboard_network_detection_checking">Checking…</string>
     <string name="sing_box_dashboard_start_failed">Failed to start proxy</string>
@@ -234,6 +277,7 @@
     <string name="sing_box_proxies_option_sort_delay">Delay</string>
 
     <!-- Settings -->
+    <string name="settings_tools">Tools</string>
     <string name="settings_title">Settings</string>
     <string name="settings_app">Appearance</string>
     <string name="settings_search_results">Search results</string>
@@ -668,6 +712,8 @@
     <string name="proxy_service_stopped">Proxy service stopped</string>
 
     <!-- Outbound groups and outbounds -->
+    <string name="settings_network_quality_test">Network quality test</string>
+    <string name="settings_network_quality_test_summary">Measure download, upload, and responsiveness using the Apple networkQuality protocol</string>
     <string name="settings_app_management_summary">Choose which installed apps use the proxy and how</string>
     <string name="settings_outbound_management">Outbound management</string>
     <string name="settings_outbound_management_summary">Import, add, and edit core outbound proxy servers</string>

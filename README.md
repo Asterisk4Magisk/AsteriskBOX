@@ -130,4 +130,4 @@ appops set org.asterisk.zcc.abox ACTIVATE_VPN allow
 - [@topjohnwu/libsu](https://github.com/topjohnwu/libsu)
 - [@android/material3](https://developer.android.com/develop/ui/compose/designsystems/material3)
 - [@mayaxcn/china-ip-list](https://github.com/mayaxcn/china-ip-list)
-- [@xchacha20-poly1305/husi](https://github.com/xchacha20-poly1305/husi) — heuristic idea for the per-app proxy "Scan Chinese apps" feature
+- [@xchacha20-poly1305/husi](https://github.com/xchacha20-poly1305/husi)

@@ -13,6 +13,8 @@ import io.nekohasekai.libbox.ConnectionEvents
 import io.nekohasekai.libbox.Connections
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.LogIterator
+import io.nekohasekai.libbox.NetworkQualityTestHandler
+import io.nekohasekai.libbox.NetworkQualityTestSession
 import io.nekohasekai.libbox.OutboundGroupItemIterator
 import io.nekohasekai.libbox.OutboundGroupIterator
 import io.nekohasekai.libbox.RemoteConnectionOptions
@@ -93,6 +95,31 @@ internal class SingBoxCommandClient(
     fun urlTest(groupTag: String) {
         requireClient().urlTest(groupTag)
     }
+
+    /**
+     * Start an Apple networkQuality test through the running sing-box.
+     *
+     * Forwards to [CommandClient.startNetworkQualityTest], which the aar binds to
+     * the `daemon.StartedService/StartNetworkQualityTest` gRPC method on both VPN
+     * (process-internal channel) and ROOT (127.0.0.1:9090 gRPC) targets. Caller
+     * must `close()` the returned [NetworkQualityTestSession] to cancel; the
+     * handler keeps receiving callbacks until either `onResult` or `onError`.
+     */
+    fun startNetworkQualityTest(
+        configURL: String,
+        outboundTag: String,
+        serial: Boolean,
+        maxRuntimeSeconds: Int,
+        http3: Boolean,
+        handler: NetworkQualityTestHandler,
+    ): NetworkQualityTestSession = requireClient().startNetworkQualityTest(
+        configURL,
+        outboundTag,
+        serial,
+        maxRuntimeSeconds,
+        http3,
+        handler,
+    )
 
     fun closeConnection(connectionId: String) {
         requireClient().closeConnection(connectionId)
