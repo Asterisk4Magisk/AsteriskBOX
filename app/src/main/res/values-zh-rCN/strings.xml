@@ -80,9 +80,6 @@
     <string name="nav_proxies">代理</string>
     <string name="nav_groups">分组</string>
     <string name="nav_settings">设置</string>
-
-    <!-- Settings sections -->
-    <string name="settings_app">外观</string>
     <string name="common_back">返回</string>
     <string name="common_more_actions">更多操作</string>
     <string name="common_ipv4">IPv4</string>
@@ -236,6 +233,7 @@
 
     <!-- Settings -->
     <string name="settings_title">设置</string>
+    <string name="settings_app">外观</string>
     <string name="settings_search_results">搜索结果</string>
     <string name="settings_search_no_results">没有匹配的设置项</string>
     <plurals name="settings_search_match_count">

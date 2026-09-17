@@ -80,9 +80,6 @@
     <string name="nav_proxies">Proxies</string>
     <string name="nav_groups">Groups</string>
     <string name="nav_settings">Settings</string>
-
-    <!-- Settings sections -->
-    <string name="settings_app">Appearance</string>
     <string name="common_back">Back</string>
     <string name="common_more_actions">More actions</string>
     <string name="common_ipv4">IPv4</string>
@@ -238,6 +235,7 @@
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
+    <string name="settings_app">Appearance</string>
     <string name="settings_search_results">Search results</string>
     <string name="settings_search_no_results">No matching settings</string>
     <plurals name="settings_search_match_count">
