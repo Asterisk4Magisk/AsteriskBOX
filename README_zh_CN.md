@@ -130,4 +130,4 @@ appops set org.asterisk.zcc.abox ACTIVATE_VPN allow
 - [@topjohnwu/libsu](https://github.com/topjohnwu/libsu)
 - [@android/material3](https://developer.android.com/develop/ui/compose/designsystems/material3)
 - [@mayaxcn/china-ip-list](https://github.com/mayaxcn/china-ip-list)
-- [@xchacha20-poly1305/husi](https://github.com/xchacha20-poly1305/husi) — 分应用代理“扫描中国应用”功能参考实现
+- [@xchacha20-poly1305/husi](https://github.com/xchacha20-poly1305/husi) — Apple networkQuality 测试(mensura.cdn-apple.com)、设置 UI 与分应用代理“扫描中国应用”思路参考
