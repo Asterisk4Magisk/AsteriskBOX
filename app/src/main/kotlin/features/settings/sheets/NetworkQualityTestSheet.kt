@@ -37,7 +37,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -45,9 +44,12 @@ import androidx.compose.ui.unit.dp
 import app.LocalAppServices
 import app.LocalAppStateStore
 import app.R
-import java.util.Locale
+import app.selectableManagedOutbounds
+import app.visibleManagedReference
 import ui.components.AsteriskDropdownAnchor
 import ui.components.AsteriskDropdownMenuItem
+import ui.components.localizedLabel
+import java.util.Locale
 import ui.icons.AsteriskIcons as Icons
 
 /**
@@ -74,6 +76,9 @@ internal fun NetworkQualityTestSheet(
     val stateStore = LocalAppStateStore.current
     val appState by stateStore.state.collectAsState()
     val runtimeState by services.singBoxRuntime.state.collectAsState()
+    val outboundLabels = selectableManagedOutbounds(appState).associate { choice ->
+        choice.tag to choice.localizedLabel()
+    }
 
     var showExplanation by remember { mutableStateOf(false) }
     val snackbarDoneMessage = stringResource(
@@ -130,6 +135,7 @@ internal fun NetworkQualityTestSheet(
                         proxyRunning = appState.proxyRunning,
                         selectedTag = controller.outboundTag,
                         outboundTags = runtimeState.proxies.nodeByName.keys.toList(),
+                        outboundLabels = outboundLabels,
                         enabled = !controller.running,
                         onSelect = { controller.outboundTag = it },
                     )
@@ -185,14 +191,18 @@ private fun OutboundCard(
     proxyRunning: Boolean,
     selectedTag: String,
     outboundTags: List<String>,
+    outboundLabels: Map<String, String>,
     enabled: Boolean,
     onSelect: (String) -> Unit,
 ) {
     val defaultLabel = stringResource(R.string.monitor_network_quality_outbound_default)
     val label = stringResource(R.string.monitor_network_quality_outbound_label)
+    val unavailableLabel = stringResource(R.string.common_unavailable)
     val tags = remember(outboundTags) { listOf("") + outboundTags }
     var expanded by remember { mutableStateOf(false) }
-    val selectedDisplay = selectedTag.ifEmpty { defaultLabel }
+    fun outboundLabel(tag: String): String =
+        visibleManagedReference(tag, outboundLabels, unavailableLabel).ifEmpty { defaultLabel }
+    val selectedDisplay = outboundLabel(selectedTag)
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.outlinedCardColors(),
@@ -230,7 +240,7 @@ private fun OutboundCard(
                     ) {
                         tags.forEach { tag ->
                             AsteriskDropdownMenuItem(
-                                text = tag.ifEmpty { defaultLabel },
+                                text = outboundLabel(tag),
                                 selected = tag == selectedTag,
                                 onClick = {
                                     expanded = false
