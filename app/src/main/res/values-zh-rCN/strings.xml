@@ -72,6 +72,7 @@
     <string name="common_clipboard_unsupported_format">剪贴板格式不支持</string>
     <string name="common_replace">替换</string>
     <string name="common_update">更新</string>
+    <string name="common_error_update_interval">请输入不少于 0.25 小时的数值</string>
     <string name="common_restore">恢复</string>
     <string name="common_more">更多</string>
     <string name="string_list_item_empty">条目不能为空</string>
@@ -400,6 +401,9 @@
     </plurals>
     <string name="settings_resource_files_source_value">来源：%1$s</string>
     <string name="settings_resource_files_last_check">最近检查 {time}</string>
+    <string name="settings_resource_files_auto_update_title">资源自动更新</string>
+    <string name="settings_resource_files_auto_update_summary">联网时定期更新资源文件</string>
+    <string name="settings_resource_files_auto_update_interval">更新周期（小时）</string>
     <string name="settings_resource_files_update">更新资源文件</string>
     <string name="settings_resource_files_add">新增资源</string>
     <string name="settings_resource_files_add_source_hint">选择规则集文件的来源</string>
@@ -736,7 +740,6 @@
     <string name="outbound_group_custom_user_agent">自定义 User-Agent</string>
     <string name="outbound_group_update_interval">更新间隔（小时，可选）</string>
     <string name="outbound_group_update_interval_value">每 %1$s 小时</string>
-    <string name="outbound_group_update_interval_invalid">请输入不少于 0.25 小时的数值，或留空</string>
     <string name="outbound_group_update_via_proxy">通过当前运行的代理更新</string>
     <string name="outbound_group_strict_import">严格导入</string>
     <string name="outbound_group_strict_import_summary">订阅中任一条目无效时保留现有节点</string>

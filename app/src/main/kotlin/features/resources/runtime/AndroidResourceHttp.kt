@@ -3,6 +3,7 @@
 
 package features.resources.runtime
 
+import app.ProjectInfo
 import engine.network.isPort
 import engine.proxy.LocalProxyLoopbackAddress
 import engine.proxy.LocalProxyRuntime
@@ -49,6 +50,7 @@ internal fun URI.toHttpConnection(
         readTimeout = 60_000
         instanceFollowRedirects = true
         requestMethod = "GET"
+        setRequestProperty("User-Agent", ResourceFileDefaultUserAgent)
         headers.forEach { (name, value) -> setRequestProperty(name, value) }
     }
 }
@@ -79,3 +81,4 @@ private fun AndroidResourceHttpProxy.toAuthenticator(): Authenticator {
 }
 
 private val ProxyAuthenticatorLock = Any()
+private const val ResourceFileDefaultUserAgent = "${ProjectInfo.PROJECT_NAME}/v${ProjectInfo.VERSION_NAME}"

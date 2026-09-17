@@ -70,5 +70,4 @@ private fun HttpURLConnection.requireSuccessfulResponse() {
 private val GitHubTreeRequestHeaders = mapOf(
     "Accept" to "application/vnd.github+json",
     "X-GitHub-Api-Version" to "2026-03-10",
-    "User-Agent" to "AsteriskBOX",
 )

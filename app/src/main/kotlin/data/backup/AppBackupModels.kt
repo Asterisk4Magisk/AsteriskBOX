@@ -84,6 +84,8 @@ internal data class AppBackupSettings(
     val coreLogLevel: String = BackupDefaults.coreLogLevel,
     val enableTrafficStatsNotification: Boolean = BackupDefaults.enableTrafficStatsNotification,
     val enableBroadcastControl: Boolean = BackupDefaults.enableBroadcastControl,
+    val enableResourceAutoUpdate: Boolean = BackupDefaults.enableResourceAutoUpdate,
+    val resourceAutoUpdateInterval: String = BackupDefaults.resourceAutoUpdateInterval,
     val resourceFileSource: Int = BackupDefaults.resourceFileSource,
     val customResourceFileGeositeCategoryAdsAllUrl: String =
         BackupDefaults.customResourceFileGeositeCategoryAdsAllUrl,

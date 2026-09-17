@@ -148,6 +148,9 @@ internal class AppSettingsPreferences(
                 KeyEnableBroadcastControl,
                 defaults.enableBroadcastControl,
             ),
+            enableResourceAutoUpdate = preferences.getBoolean(KeyEnableResourceAutoUpdate, defaults.enableResourceAutoUpdate),
+            resourceAutoUpdateInterval = preferences.getString(KeyResourceAutoUpdateInterval, defaults.resourceAutoUpdateInterval)
+                ?: defaults.resourceAutoUpdateInterval,
             resourceFileSource = preferences.getInt(
                 KeyResourceFileSource,
                 defaults.resourceFileSource,
@@ -412,6 +415,8 @@ internal const val KeyTunIpv6Cidr = "tun_ipv6_cidr"
 internal const val KeyCoreLogLevel = "core_log_level"
 internal const val KeyEnableTrafficStatsNotification = "enable_traffic_stats_notification"
 internal const val KeyEnableBroadcastControl = "enable_broadcast_control"
+internal const val KeyEnableResourceAutoUpdate = "enable_resource_auto_update"
+internal const val KeyResourceAutoUpdateInterval = "resource_auto_update_interval"
 internal const val KeyResourceFileSource = "resource_file_source"
 internal const val KeyCustomResourceFileGeositeCategoryAdsAllUrl =
     "custom_resource_file_geosite_category_ads_all_url"

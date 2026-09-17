@@ -70,6 +70,8 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
     string(KeyCoreLogLevel, coreLogLevel)
     boolean(KeyEnableTrafficStatsNotification, enableTrafficStatsNotification)
     boolean(KeyEnableBroadcastControl, enableBroadcastControl)
+    boolean(KeyEnableResourceAutoUpdate, enableResourceAutoUpdate)
+    string(KeyResourceAutoUpdateInterval, resourceAutoUpdateInterval)
     int(KeyResourceFileSource, resourceFileSource)
     string(KeyCustomResourceFileGeositeCategoryAdsAllUrl, customResourceFileGeositeCategoryAdsAllUrl)
     string(KeyCustomResourceFileGeositeGoogleUrl, customResourceFileGeositeGoogleUrl)

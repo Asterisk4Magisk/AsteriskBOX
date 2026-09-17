@@ -72,6 +72,7 @@
     <string name="common_clipboard_unsupported_format">Unsupported clipboard format</string>
     <string name="common_replace">Replace</string>
     <string name="common_update">Update</string>
+    <string name="common_error_update_interval">Enter at least 0.25 hours</string>
     <string name="common_restore">Restore</string>
     <string name="common_more">More</string>
     <string name="string_list_item_empty">Entry cannot be empty</string>
@@ -404,6 +405,9 @@
     </plurals>
     <string name="settings_resource_files_source_value">Source: %1$s</string>
     <string name="settings_resource_files_last_check">Last check {time}</string>
+    <string name="settings_resource_files_auto_update_title">Automatic resource updates</string>
+    <string name="settings_resource_files_auto_update_summary">Periodically update resource files when connected</string>
+    <string name="settings_resource_files_auto_update_interval">Update interval (hours)</string>
     <string name="settings_resource_files_update">Update resource files</string>
     <string name="settings_resource_files_add">Add resource</string>
     <string name="settings_resource_files_add_source_hint">Choose where the rule-set file comes from</string>
@@ -744,7 +748,6 @@
     <string name="outbound_group_custom_user_agent">Custom User-Agent</string>
     <string name="outbound_group_update_interval">Update interval (hours, optional)</string>
     <string name="outbound_group_update_interval_value">Every %1$s h</string>
-    <string name="outbound_group_update_interval_invalid">Enter at least 0.25 hours, or leave empty</string>
     <string name="outbound_group_update_via_proxy">Update through the running proxy</string>
     <string name="outbound_group_strict_import">Strict import</string>
     <string name="outbound_group_strict_import_summary">Keep existing nodes if any subscription entry is invalid</string>

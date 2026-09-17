@@ -82,6 +82,8 @@ data class AppState(
     val coreLogLevel: String = DefaultSingBoxLogLevel,
     val enableTrafficStatsNotification: Boolean = false,
     val enableBroadcastControl: Boolean = false,
+    val enableResourceAutoUpdate: Boolean = false,
+    val resourceAutoUpdateInterval: String = "24",
     val resourceFileSource: Int = ResourceFileSourceDefault,
     val customResourceFileGeositeCategoryAdsAllUrl: String = "",
     val customResourceFileGeositeGoogleUrl: String = "",

@@ -1327,7 +1327,7 @@ private fun OutboundGroupEditorSheet(
                                 label = { Text(stringResource(R.string.outbound_group_update_interval)) },
                                 isError = !validInterval,
                                 supportingText = if (!validInterval) {
-                                    { Text(stringResource(R.string.outbound_group_update_interval_invalid)) }
+                                    { Text(stringResource(R.string.common_error_update_interval)) }
                                 } else {
                                     null
                                 },
