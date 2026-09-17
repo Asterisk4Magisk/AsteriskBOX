@@ -6,6 +6,8 @@ package features.settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.R
 import ui.KeyColors
@@ -93,7 +96,12 @@ private fun ThemeModeSegmentedRow(
                         count = options.size,
                     ),
                 ) {
-                    Text(label)
+                    Text(
+                        text = label,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }
@@ -115,14 +123,11 @@ private fun ThemeColorDotPicker(
             modifier = Modifier.padding(bottom = 8.dp),
         )
         val safeIndex = if (selectedIndex in options.indices) selectedIndex else 0
-        // Single-row layout (no wrap): the picker fits all 8 options in one
-        // line on common phone widths. The dot size is tightened and the
-        // inter-dot gap is reduced so the row never spills into a second
-        // line; the per-dot touch target stays at 32dp (above the 32dp
-        // minimum and well within the 48dp Material guideline when the
-        // 6dp arrangement spacing is factored in).
+        // Keep every accent reachable when the single-row picker exceeds the screen width.
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
