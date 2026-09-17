@@ -95,14 +95,14 @@ private data class MainNavigationItem(
 private fun mainNavigationItems(): List<MainNavigationItem> {
     val home = stringResource(R.string.nav_dashboard)
     val proxies = stringResource(R.string.nav_proxies)
-    val apps = stringResource(R.string.nav_apps)
+    val groups = stringResource(R.string.nav_groups)
     val settings = stringResource(R.string.nav_settings)
 
-    return remember(home, proxies, apps, settings) {
+    return remember(home, proxies, groups, settings) {
         listOf(
             MainNavigationItem(MainDestination.Home, home, Icons.Rounded.Home),
             MainNavigationItem(MainDestination.Proxies, proxies, Icons.AutoMirrored.Rounded.AltRoute),
-            MainNavigationItem(MainDestination.Apps, apps, Icons.Rounded.Apps),
+            MainNavigationItem(MainDestination.Groups, groups, Icons.Rounded.AccountTree),
             MainNavigationItem(MainDestination.Settings, settings, Icons.Rounded.Settings),
         )
     }
@@ -171,11 +171,18 @@ fun AppContent(
                         )
                     }
                 }
-                entry<Route.OutboundGroupList> {
-                    OutboundGroupListPage(padding = padding)
-                }
                 entry<Route.OutboundGroupCreate> {
-                    OutboundGroupListPage(padding = padding, createOnOpen = true)
+                    OutboundGroupListPage(
+                        padding = padding,
+                        createOnOpen = true,
+                        onBack = navigator::pop,
+                    )
+                }
+                entry<Route.ProxyAppList> {
+                    ProxyAppListPage(
+                        padding = padding,
+                        onBack = navigator::pop,
+                    )
                 }
                 entry<Route.OutboundList> {
                     OutboundListPage(padding = padding)
@@ -409,7 +416,7 @@ private fun MainDestinationContent(
                 when (destination) {
                     MainDestination.Home -> SingBoxDashboardPage(padding = padding)
                     MainDestination.Proxies -> SingBoxProxyDestination(padding = padding)
-                    MainDestination.Apps -> ProxyAppListPage(padding = padding)
+                    MainDestination.Groups -> OutboundGroupListPage(padding = padding)
                     MainDestination.Settings -> SettingsPage(padding = padding)
                 }
             }

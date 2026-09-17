@@ -119,6 +119,7 @@ import ui.icons.AsteriskIcons as Icons
 internal fun OutboundGroupListPage(
     padding: PaddingValues,
     createOnOpen: Boolean = false,
+    onBack: (() -> Unit)? = null,
 ) {
     val stateStore = LocalAppStateStore.current
     val appState by stateStore.collectAppState()
@@ -387,11 +388,13 @@ internal fun OutboundGroupListPage(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = navigator::pop) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            stringResource(R.string.common_back),
-                        )
+                    onBack?.let { navigateBack ->
+                        IconButton(onClick = navigateBack) {
+                            Icon(
+                                Icons.AutoMirrored.Rounded.ArrowBack,
+                                stringResource(R.string.common_back),
+                            )
+                        }
                     }
                 },
                 actions = {
