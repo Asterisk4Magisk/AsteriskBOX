@@ -9,7 +9,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import app.AppState
@@ -136,7 +135,6 @@ internal class NetworkQualityTestController {
 internal fun rememberNetworkQualityTestController(): NetworkQualityTestController {
     val services = LocalAppServices.current
     val stateStore = LocalAppStateStore.current
-    val scope = rememberCoroutineScope()
     val appState by stateStore.state.collectAsState()
     val runtimeState by services.singBoxRuntime.state.collectAsState()
 

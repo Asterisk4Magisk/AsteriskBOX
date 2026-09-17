@@ -5,7 +5,6 @@ package features.settings.sheets
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
@@ -36,15 +35,24 @@ internal fun NetworkQualitySettingsSheet(
     controller: NetworkQualityTestController,
     onDismissRequest: () -> Unit,
 ) {
-    var maxRuntimeText by remember(controller.maxRuntimeSeconds) {
+    var configUrl by remember(controller, controller.showSettings) {
+        mutableStateOf(controller.configUrl)
+    }
+    var maxRuntimeText by remember(controller, controller.showSettings) {
         mutableStateOf(controller.maxRuntimeSeconds.toString())
+    }
+    var serial by remember(controller, controller.showSettings) {
+        mutableStateOf(controller.serial)
+    }
+    var http3 by remember(controller, controller.showSettings) {
+        mutableStateOf(controller.http3)
     }
     val maxRuntimeError = if (maxRuntimeText.toIntOrNull()?.let { it > 0 } != true) {
         stringResource(R.string.common_error_positive_number)
     } else {
         null
     }
-    val urlError = if (controller.configUrl.isBlank()) {
+    val urlError = if (configUrl.isBlank()) {
         stringResource(R.string.common_error_required)
     } else {
         null
@@ -68,8 +76,11 @@ internal fun NetworkQualitySettingsSheet(
                 enabled = urlError == null && maxRuntimeError == null,
                 onClick = {
                     val parsed = maxRuntimeText.toIntOrNull()
-                    if (parsed != null && parsed > 0 && controller.configUrl.isNotBlank()) {
+                    if (parsed != null && parsed > 0 && configUrl.isNotBlank()) {
+                        controller.configUrl = configUrl
                         controller.maxRuntimeSeconds = parsed
+                        controller.serial = serial
+                        controller.http3 = http3
                         onDismissRequest()
                     }
                 },
@@ -87,8 +98,8 @@ internal fun NetworkQualitySettingsSheet(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                 )
                 SettingsTextField(
-                    value = controller.configUrl,
-                    onValueChange = { controller.configUrl = it },
+                    value = configUrl,
+                    onValueChange = { configUrl = it },
                     label = stringResource(R.string.monitor_network_quality_config_url),
                     errorText = urlError,
                     enabled = true,
@@ -111,9 +122,7 @@ internal fun NetworkQualitySettingsSheet(
                 SettingsTextField(
                     value = maxRuntimeText,
                     onValueChange = { raw ->
-                        val sanitized = raw.filter(Char::isDigit).take(5)
-                        maxRuntimeText = sanitized
-                        sanitized.toIntOrNull()?.let { controller.maxRuntimeSeconds = it }
+                        maxRuntimeText = raw.filter(Char::isDigit).take(5)
                     },
                     label = stringResource(R.string.monitor_network_quality_max_runtime),
                     errorText = maxRuntimeError,
@@ -133,15 +142,15 @@ internal fun NetworkQualitySettingsSheet(
                         title = stringResource(R.string.monitor_network_quality_serial),
                         icon = Icons.Rounded.Speed,
                         summary = stringResource(R.string.monitor_network_quality_serial_summary),
-                        checked = controller.serial,
-                        onCheckedChange = { controller.serial = it },
+                        checked = serial,
+                        onCheckedChange = { serial = it },
                     )
                     SwitchPreference(
                         title = stringResource(R.string.monitor_network_quality_http3),
                         icon = Icons.Rounded.Lock,
                         summary = stringResource(R.string.monitor_network_quality_http3_summary),
-                        checked = controller.http3,
-                        onCheckedChange = { controller.http3 = it },
+                        checked = http3,
+                        onCheckedChange = { http3 = it },
                     )
                 }
             }

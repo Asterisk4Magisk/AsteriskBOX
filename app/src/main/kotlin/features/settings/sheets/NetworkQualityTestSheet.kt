@@ -33,6 +33,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +69,7 @@ internal fun NetworkQualityTestSheet(
     onDismiss: () -> Unit,
 ) {
     val services = LocalAppServices.current
+    val scope = rememberCoroutineScope()
     val stateStore = LocalAppStateStore.current
     val appState by stateStore.state.collectAsState()
     val runtimeState by services.singBoxRuntime.state.collectAsState()
@@ -146,7 +148,7 @@ internal fun NetworkQualityTestSheet(
                         runtimeRepository = services.singBoxRuntime,
                         snackbarMessage = snackbarDoneMessage,
                         tipNotifier = services.tipNotifier,
-                        scope = services.appScope,
+                        scope = scope,
                     )
                 },
                 onCancel = { controller.cancel() },
