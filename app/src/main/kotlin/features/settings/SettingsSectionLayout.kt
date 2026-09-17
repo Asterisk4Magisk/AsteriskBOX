@@ -26,14 +26,14 @@ internal enum class SettingsCoreItem {
 }
 
 internal val SettingsCoreItems = listOf(
+    SettingsCoreItem.Resources,
     SettingsCoreItem.DnsManagement,
     SettingsCoreItem.Sniffer,
     SettingsCoreItem.Outbounds,
-    SettingsCoreItem.AppManagement,
-    SettingsCoreItem.Resources,
     SettingsCoreItem.Endpoints,
     SettingsCoreItem.Selectors,
     SettingsCoreItem.Routing,
+    SettingsCoreItem.AppManagement,
     SettingsCoreItem.LogLevel,
 )
 
