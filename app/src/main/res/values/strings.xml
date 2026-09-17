@@ -45,8 +45,6 @@
 <!-- Common -->
     <string name="common_cancel">Cancel</string>
     <string name="common_ok">OK</string>
-    <string name="common_start">Start</string>
-    <string name="common_settings">Settings</string>
     <string name="common_error_required">Required</string>
     <string name="common_error_positive_number">Must be greater than zero</string>
     <string name="common_clear">Clear</string>
@@ -209,7 +207,6 @@
 
     <!-- Apple networkQuality test page -->
     <string name="monitor_network_quality_title">Network quality test</string>
-    <string name="monitor_network_quality_section_target">Target &amp; action</string>
     <string name="monitor_network_quality_settings_title">Test parameters</string>
     <string name="monitor_network_quality_section_endpoint">Endpoint</string>
     <string name="monitor_network_quality_endpoint_summary">Apple NetworkQuality config URL. Use the default unless you operate a custom mensura mirror.</string>
@@ -218,7 +215,6 @@
     <string name="monitor_network_quality_section_options">Options</string>
     <string name="monitor_network_quality_serial_summary">Run upload and download stages sequentially.</string>
     <string name="monitor_network_quality_http3_summary">Probe over QUIC / HTTP/3 when the server supports it.</string>
-    <string name="monitor_network_quality_running">Running…</string>
     <string name="monitor_network_quality_snackbar_done">Network quality test finished</string>
     <string name="monitor_network_quality_fab_start">Start</string>
     <string name="monitor_network_quality_fab_stop">Stop</string>
@@ -234,7 +230,6 @@
     <string name="monitor_network_quality_upload_capacity_explanation">Sustained upload throughput. Above 100 Mbps is great; 30–100 Mbps is acceptable; under 30 Mbps is constrained.</string>
     <string name="monitor_network_quality_upload_responsiveness_explanation">How many small uploads the link can finish per minute while busy. Same scale as download responsiveness.</string>
     <string name="monitor_network_quality_elapsed_time_explanation">Total time the test ran, rounded down to seconds. Pure artefact of the test — not a property of the link.</string>
-    <string name="monitor_network_quality_config_title">Test parameters</string>
     <string name="monitor_network_quality_config_url">Config URL</string>
     <string name="monitor_network_quality_max_runtime">Max runtime (seconds)</string>
     <string name="monitor_network_quality_serial">Serial measurement</string>
@@ -242,7 +237,6 @@
     <string name="monitor_network_quality_outbound_label">Outbound</string>
     <string name="monitor_network_quality_outbound_default">Default</string>
     <string name="monitor_network_quality_standalone_hint">Service is stopped. The test will run standalone without routing through the proxy and cannot select an outbound.</string>
-    <string name="monitor_network_quality_report_title">Report</string>
     <string name="monitor_network_quality_idle_latency">Idle latency</string>
     <string name="monitor_network_quality_download_capacity">Download capacity</string>
     <string name="monitor_network_quality_download_responsiveness">Download responsiveness</string>

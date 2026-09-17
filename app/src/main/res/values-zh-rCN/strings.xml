@@ -45,8 +45,6 @@
 <!-- Common -->
     <string name="common_cancel">取消</string>
     <string name="common_ok">确定</string>
-    <string name="common_start">开始</string>
-    <string name="common_settings">设置</string>
     <string name="common_error_required">必填</string>
     <string name="common_error_positive_number">必须大于零</string>
     <string name="common_clear">清除</string>
@@ -207,7 +205,6 @@
 
     <!-- Apple networkQuality test page -->
     <string name="monitor_network_quality_title">网络质量测试</string>
-    <string name="monitor_network_quality_section_target">目标与操作</string>
     <string name="monitor_network_quality_settings_title">测试参数</string>
     <string name="monitor_network_quality_section_endpoint">端点</string>
     <string name="monitor_network_quality_endpoint_summary">Apple NetworkQuality 配置 URL。除非你自建 mensura 镜像,否则保持默认即可。</string>
@@ -216,7 +213,6 @@
     <string name="monitor_network_quality_section_options">选项</string>
     <string name="monitor_network_quality_serial_summary">串行执行上行与下行测量阶段。</string>
     <string name="monitor_network_quality_http3_summary">当服务端支持时,使用 QUIC / HTTP/3 探测。</string>
-    <string name="monitor_network_quality_running">测量中…</string>
     <string name="monitor_network_quality_snackbar_done">网络质量测试完成</string>
     <string name="monitor_network_quality_fab_start">开始</string>
     <string name="monitor_network_quality_fab_stop">停止</string>
@@ -232,7 +228,6 @@
     <string name="monitor_network_quality_upload_capacity_explanation">持续上传吞吐。高于 100 Mbps 为优秀,30–100 Mbps 为可接受,低于 30 Mbps 即视为受限。</string>
     <string name="monitor_network_quality_upload_responsiveness_explanation">链路过载下每分钟可完成的小上传次数,与下行响应度相同的阈值。</string>
     <string name="monitor_network_quality_elapsed_time_explanation">本次测试运行的总时长,向下取整到秒。仅反映测试本身,不代表链路质量。</string>
-    <string name="monitor_network_quality_config_title">测试参数</string>
     <string name="monitor_network_quality_config_url">配置 URL</string>
     <string name="monitor_network_quality_max_runtime">最长耗时(秒)</string>
     <string name="monitor_network_quality_serial">串行测量</string>
@@ -240,7 +235,6 @@
     <string name="monitor_network_quality_outbound_label">出站</string>
     <string name="monitor_network_quality_outbound_default">默认</string>
     <string name="monitor_network_quality_standalone_hint">服务未启动。测试将以独立模式运行,不走代理,也无法选择出站。</string>
-    <string name="monitor_network_quality_report_title">结果</string>
     <string name="monitor_network_quality_idle_latency">空闲延迟</string>
     <string name="monitor_network_quality_download_capacity">下行带宽</string>
     <string name="monitor_network_quality_download_responsiveness">下行响应度</string>

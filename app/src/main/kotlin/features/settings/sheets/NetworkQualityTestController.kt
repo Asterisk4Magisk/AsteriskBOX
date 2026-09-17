@@ -8,6 +8,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
@@ -40,7 +41,7 @@ internal class NetworkQualityTestController {
 
     // ----- Test parameters (in-memory) ---------------------------------------
     var configUrl by mutableStateOf(NETWORK_QUALITY_DEFAULT_CONFIG_URL)
-    var maxRuntimeSeconds by mutableStateOf(NETWORK_QUALITY_DEFAULT_MAX_RUNTIME_SECONDS)
+    var maxRuntimeSeconds by mutableIntStateOf(NETWORK_QUALITY_DEFAULT_MAX_RUNTIME_SECONDS)
     var serial by mutableStateOf(false)
     var http3 by mutableStateOf(false)
 

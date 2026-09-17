@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import app.LocalAppServices
 import app.LocalAppStateStore
 import app.R
+import java.util.Locale
 import ui.components.AsteriskDropdownAnchor
 import ui.components.AsteriskDropdownMenuItem
 import ui.icons.AsteriskIcons as Icons
@@ -492,9 +493,9 @@ private fun formatSpeedNumber(bitsPerSecond: Long): String {
     if (bitsPerSecond <= 0L) return "—"
     val mbps = bitsPerSecond / 1_000_000.0
     return when {
-        mbps >= 1000.0 -> String.format("%.2f", mbps / 1000.0)
-        mbps >= 1.0 -> String.format("%.2f", mbps)
-        else -> String.format("%.0f", bitsPerSecond / 1000.0)
+        mbps >= 1000.0 -> String.format(Locale.getDefault(), "%.2f", mbps / 1000.0)
+        mbps >= 1.0 -> String.format(Locale.getDefault(), "%.2f", mbps)
+        else -> String.format(Locale.getDefault(), "%.0f", bitsPerSecond / 1000.0)
     }
 }
 
