@@ -82,6 +82,7 @@ import androidx.compose.ui.zIndex
 import app.LocalAppServices
 import app.LocalAppStateStore
 import app.LocalIsWideScreen
+import app.LocalMainDestinationState
 import app.LocalNavigator
 import app.LocalUpdateAppState
 import app.OutboundGroupState
@@ -96,6 +97,7 @@ import app.modes.OutboundListSortLatency
 import app.modes.OutboundListSortName
 import app.modes.OutboundListSortType
 import app.navigation.Route
+import app.navigation.MainDestination
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.importing.ImportOperation
 import features.importing.ImportResultDialog
@@ -169,6 +171,7 @@ internal fun OutboundListPage(
     val appState by stateStore.collectAppState()
     val updateAppState = LocalUpdateAppState.current
     val navigator = LocalNavigator.current
+    val mainDestinationState = LocalMainDestinationState.current
     val services = LocalAppServices.current
     val isWideScreen = LocalIsWideScreen.current
     val context = LocalContext.current
@@ -683,7 +686,13 @@ internal fun OutboundListPage(
                     .padding(contentPadding),
             ) {
                 OutboundGroupEmptyState(
-                    onAdd = { navigator.push(Route.OutboundGroupCreate) },
+                    onAdd = {
+                        if (embeddedInProxyTab && mainDestinationState != null) {
+                            mainDestinationState.select(MainDestination.Groups)
+                        } else {
+                            navigator.push(Route.OutboundGroupCreate)
+                        }
+                    },
                 )
             }
             return@AsteriskScaffold
