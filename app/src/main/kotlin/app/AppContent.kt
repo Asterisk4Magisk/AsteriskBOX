@@ -102,7 +102,7 @@ private fun mainNavigationItems(): List<MainNavigationItem> {
         listOf(
             MainNavigationItem(MainDestination.Home, home, Icons.Rounded.Home),
             MainNavigationItem(MainDestination.Proxies, proxies, Icons.AutoMirrored.Rounded.AltRoute),
-            MainNavigationItem(MainDestination.Groups, groups, Icons.Rounded.AccountTree),
+            MainNavigationItem(MainDestination.Groups, groups, Icons.AutoMirrored.Rounded.Wysiwyg),
             MainNavigationItem(MainDestination.Settings, settings, Icons.Rounded.Settings),
         )
     }

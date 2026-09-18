@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.material.icons.automirrored.rounded.Wysiwyg
 import androidx.compose.material.icons.rounded.AccountTree
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
@@ -32,7 +33,6 @@ import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DataObject
 import androidx.compose.material.icons.rounded.DataUsage
 import androidx.compose.material.icons.rounded.Delete
@@ -64,7 +64,6 @@ import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Notifications
-import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Policy
@@ -126,7 +125,6 @@ internal object AsteriskIcons {
         val Code: ImageVector = MaterialIcons.Rounded.Code
         val ContentCopy: ImageVector = MaterialIcons.Rounded.ContentCopy
         val ContentPaste: ImageVector = MaterialIcons.Rounded.ContentPaste
-        val DarkMode: ImageVector = MaterialIcons.Rounded.DarkMode
         val DataObject: ImageVector = MaterialIcons.Rounded.DataObject
         val DataUsage: ImageVector = MaterialIcons.Rounded.DataUsage
         val Delete: ImageVector = MaterialIcons.Rounded.Delete
@@ -158,7 +156,6 @@ internal object AsteriskIcons {
         val Memory: ImageVector = MaterialIcons.Rounded.Memory
         val MoreVert: ImageVector = MaterialIcons.Rounded.MoreVert
         val Notifications: ImageVector = MaterialIcons.Rounded.Notifications
-        val Palette: ImageVector = MaterialIcons.Rounded.Palette
         val Pause: ImageVector = MaterialIcons.Rounded.Pause
         val PlayArrow: ImageVector = MaterialIcons.Rounded.PlayArrow
         val Policy: ImageVector = MaterialIcons.Rounded.Policy
@@ -205,6 +202,7 @@ internal object AsteriskIcons {
             val Send: ImageVector = MaterialIcons.AutoMirrored.Rounded.Send
             val CompareArrows: ImageVector = MaterialIcons.AutoMirrored.Rounded.CompareArrows
             val Sort: ImageVector = MaterialIcons.AutoMirrored.Rounded.Sort
+            val Wysiwyg: ImageVector = MaterialIcons.AutoMirrored.Rounded.Wysiwyg
         }
     }
 }
