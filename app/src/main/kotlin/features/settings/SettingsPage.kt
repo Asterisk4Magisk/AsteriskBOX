@@ -288,6 +288,7 @@ private fun SettingsContent(
     val ebpfLocalDataPlane = appState.ebpfLocalDataPlane
     val ebpfLocalDnsMode = appState.ebpfLocalDnsMode
     val sheetState = rememberSettingsSheetState(updateAppState)
+    val homeShellSheets = features.home.LocalHomeShellSheetState.current
     val nestedSearchEntries = settingsNestedSearchEntries(
         showEbpfOptions = appState.runMode == RunModeEbpf,
         useTunSharedNetwork = (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun),
@@ -606,7 +607,7 @@ private fun SettingsContent(
             }
             item(key = "settings_tools") {
                 SettingsToolsSection(
-                    onOpenNetworkQualityTest = { sheetState.openNetworkQualityTest() },
+                    onOpenNetworkQualityTest = { homeShellSheets.openNetworkQualityTest() },
                 )
             }
             item(key = "settings_backup_restore") {

@@ -26,6 +26,8 @@ import features.logs.AndroidAsteriskdLogRepository
 import features.logs.AndroidLogcatRepository
 import features.monitoring.MonitoringRepository
 import features.resources.ResourceFileUseCase
+import features.home.HomeShellSheetsHost
+import features.home.rememberHomeShellSheetState
 import features.settings.locale.ProvideAppLanguage
 import features.settings.usecase.RootBootScriptUseCase
 import features.settings.usecase.RootEbpfProbeUseCase
@@ -193,6 +195,7 @@ fun App(
         { transform -> stateStore.update(transform) }
     }
     val keyColor = keyColorFor(chromeState.seedIndex)
+    val homeShellSheetState = rememberHomeShellSheetState()
     ProxyStatusSynchronizer(
         stateStore = stateStore,
         proxyEngine = proxyEngine,
@@ -229,7 +232,9 @@ fun App(
                 LocalUpdateAppState provides updateAppState,
                 LocalAppServices provides services,
             ) {
-                AppContent(padding = padding)
+                HomeShellSheetsHost(state = homeShellSheetState) {
+                    AppContent(padding = padding)
+                }
             }
         }
     }

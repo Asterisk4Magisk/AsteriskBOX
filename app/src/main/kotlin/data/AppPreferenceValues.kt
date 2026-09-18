@@ -4,6 +4,7 @@
 package data
 
 import app.AppState
+import features.home.HomeDashboardLayoutJson
 
 internal sealed interface AppPreferenceValue {
     data class IntValue(val value: Int) : AppPreferenceValue
@@ -139,4 +140,8 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
     stringList(KeyIgnoredInterfaces, ignoredInterfaces)
     stringList(KeyPrivateAddressCidrs, privateAddressCidrs)
     int(KeyProxyAppListMode, proxyAppListMode)
+    string(
+        KeyHomeDashboardLayout,
+        HomeDashboardLayoutJson.encode(homeDashboard),
+    )
 }

@@ -73,7 +73,7 @@ import features.routing.RoutingManagementPage
 import features.selector.SelectorEditorPage
 import features.selector.SelectorManagementPage
 import features.settings.SettingsPage
-import features.singbox.SingBoxDashboardPage
+import features.singbox.HomeDashboardPage
 import features.singbox.SingBoxProxyDestination
 import ui.components.AsteriskFloatingNavigationBar
 import ui.components.AsteriskFloatingNavigationItem
@@ -414,7 +414,7 @@ private fun MainDestinationContent(
         stateHolder.SaveableStateProvider(destination.id) {
             key(destination) {
                 when (destination) {
-                    MainDestination.Home -> SingBoxDashboardPage(padding = padding)
+                    MainDestination.Home -> HomeDashboardPage(padding = padding)
                     MainDestination.Proxies -> SingBoxProxyDestination(padding = padding)
                     MainDestination.Groups -> OutboundGroupListPage(padding = padding)
                     MainDestination.Settings -> SettingsPage(padding = padding)

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.automirrored.rounded.CompareArrows
 import androidx.compose.material.icons.automirrored.rounded.Help
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.automirrored.rounded.RotateRight
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.automirrored.rounded.Wysiwyg
@@ -38,7 +39,9 @@ import androidx.compose.material.icons.rounded.DataUsage
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.DonutLarge
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ErrorOutline
@@ -58,6 +61,7 @@ import androidx.compose.material.icons.rounded.Hub
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Lan
 import androidx.compose.material.icons.rounded.Language
+import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.LinkOff
 import androidx.compose.material.icons.rounded.Lock
@@ -65,6 +69,7 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PieChart
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Policy
 import androidx.compose.material.icons.rounded.PowerSettingsNew
@@ -98,6 +103,8 @@ import androidx.compose.material.icons.rounded.VpnLock
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material.icons.rounded.Wifi
+import androidx.compose.material.icons.rounded.ZoomInMap
+import androidx.compose.material.icons.rounded.ZoomOutMap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons as MaterialIcons
 
@@ -130,7 +137,9 @@ internal object AsteriskIcons {
         val Delete: ImageVector = MaterialIcons.Rounded.Delete
         val Description: ImageVector = MaterialIcons.Rounded.Description
         val Dns: ImageVector = MaterialIcons.Rounded.Dns
+        val DonutLarge: ImageVector = MaterialIcons.Rounded.DonutLarge
         val Download: ImageVector = MaterialIcons.Rounded.Download
+        val DragIndicator: ImageVector = MaterialIcons.Rounded.DragIndicator
         val Edit: ImageVector = MaterialIcons.Rounded.Edit
         val EditNote: ImageVector = MaterialIcons.Rounded.EditNote
         val ErrorOutline: ImageVector = MaterialIcons.Rounded.ErrorOutline
@@ -150,6 +159,7 @@ internal object AsteriskIcons {
         val Info: ImageVector = MaterialIcons.Rounded.Info
         val Lan: ImageVector = MaterialIcons.Rounded.Lan
         val Language: ImageVector = MaterialIcons.Rounded.Language
+        val Layers: ImageVector = MaterialIcons.Rounded.Layers
         val Link: ImageVector = MaterialIcons.Rounded.Link
         val LinkOff: ImageVector = MaterialIcons.Rounded.LinkOff
         val Lock: ImageVector = MaterialIcons.Rounded.Lock
@@ -157,6 +167,7 @@ internal object AsteriskIcons {
         val MoreVert: ImageVector = MaterialIcons.Rounded.MoreVert
         val Notifications: ImageVector = MaterialIcons.Rounded.Notifications
         val Pause: ImageVector = MaterialIcons.Rounded.Pause
+        val PieChart: ImageVector = MaterialIcons.Rounded.PieChart
         val PlayArrow: ImageVector = MaterialIcons.Rounded.PlayArrow
         val Policy: ImageVector = MaterialIcons.Rounded.Policy
         val PowerSettingsNew: ImageVector = MaterialIcons.Rounded.PowerSettingsNew
@@ -189,6 +200,8 @@ internal object AsteriskIcons {
         val Warning: ImageVector = MaterialIcons.Rounded.Warning
         val Wifi: ImageVector = MaterialIcons.Rounded.Wifi
         val Widgets: ImageVector = MaterialIcons.Rounded.Widgets
+        val ZoomInMap: ImageVector = MaterialIcons.Rounded.ZoomInMap
+        val ZoomOutMap: ImageVector = MaterialIcons.Rounded.ZoomOutMap
     }
 
     object AutoMirrored {
@@ -201,6 +214,7 @@ internal object AsteriskIcons {
             val OpenInNew: ImageVector = MaterialIcons.AutoMirrored.Rounded.OpenInNew
             val Send: ImageVector = MaterialIcons.AutoMirrored.Rounded.Send
             val CompareArrows: ImageVector = MaterialIcons.AutoMirrored.Rounded.CompareArrows
+            val RotateRight: ImageVector = MaterialIcons.AutoMirrored.Rounded.RotateRight
             val Sort: ImageVector = MaterialIcons.AutoMirrored.Rounded.Sort
             val Wysiwyg: ImageVector = MaterialIcons.AutoMirrored.Rounded.Wysiwyg
         }

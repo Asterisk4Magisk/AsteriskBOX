@@ -1395,4 +1395,46 @@
     <string name="proxy_error_ebpf_tc_unsupported_switch">Workaround: open Settings → Advanced settings, confirm eBPF (ROOT) is selected in Run mode, then under Proxy settings (eBPF) change Data plane from tc to cgroup and retry.</string>
     <string name="proxy_error_ebpf_tc_unsupported_fallback">If cgroup also fails to start, open Settings → Advanced settings and select TUN (ROOT) in Run mode instead.</string>
     <string name="proxy_error_ebpf_tc_unsupported_report">When reporting this, include the error text above and the asteriskd / sing-box section of logcat.</string>
+
+    <!-- Home dashboard editor -->
+    <string name="home_dashboard_edit">Edit home</string>
+    <string name="home_dashboard_done">Done</string>
+    <string name="home_dashboard_discard">Discard changes</string>
+    <string name="home_dashboard_discard_confirm_title">Discard home changes?</string>
+    <string name="home_dashboard_discard_confirm_message">Your edits to the home dashboard will be lost.</string>
+    <string name="home_dashboard_discard_confirm_confirm">Discard</string>
+    <string name="home_dashboard_discard_confirm_cancel">Keep editing</string>
+    <string name="home_dashboard_hidden_section">Hidden cards</string>
+    <string name="home_dashboard_hidden_empty">No hidden cards. Drag a card here, or use the trash icon on a card to hide it.</string>
+    <string name="home_dashboard_resize_large">Expand card</string>
+    <string name="home_dashboard_resize_small">Shrink card</string>
+    <string name="home_dashboard_remove">Remove card</string>
+    <string name="home_dashboard_drag_handle">Drag to reorder</string>
+    <string name="home_dashboard_add_card">Add card</string>
+    <string name="home_dashboard_add_usage">Usage card</string>
+    <string name="home_dashboard_add_stacked">Stacked card</string>
+    <string name="home_dashboard_add_group_picker_title">Choose group</string>
+    <string name="home_dashboard_add_group_unavailable">No groups yet. Add one in the Groups tab first.</string>
+    <string name="home_dashboard_card_settings">Card settings</string>
+    <string name="home_dashboard_card_open">Open card</string>
+    <string name="home_dashboard_restore">Restore card</string>
+    <string name="home_dashboard_pick_group">Show this group</string>
+    <string name="home_dashboard_group_label">Group: %1$s</string>
+    <string name="home_dashboard_usage_title">Usage</string>
+    <string name="home_dashboard_usage_used">Used</string>
+    <string name="home_dashboard_usage_remaining">Remaining</string>
+    <string name="home_dashboard_usage_expires">Expires %1$s</string>
+    <string name="home_dashboard_usage_no_expiry">No expiry</string>
+    <string name="home_dashboard_usage_unmetered">Unmetered</string>
+    <string name="home_dashboard_usage_no_data">No usage data</string>
+    <string name="home_dashboard_stacked_title">Stacked</string>
+    <string name="home_dashboard_stacked_empty">Drag other cards into this stack in edit mode.</string>
+    <string name="home_dashboard_stacked_auto_rotate">Auto-rotate</string>
+    <string name="home_dashboard_stacked_manage_pages">Manage pages</string>
+    <string name="home_dashboard_stacked_add_page">Add card to this stack</string>
+    <string name="home_dashboard_stacked_remove_page">Remove from stack</string>
+    <string name="home_dashboard_stacked_page_label">Page %1$d of %2$d</string>
+    <string name="home_dashboard_network_quality_title">Network quality</string>
+    <string name="home_dashboard_network_quality_empty">Tap to start a network quality test.</string>
+    <string name="home_dashboard_network_quality_subtitle">Tap to open network quality test</string>
 </resources>

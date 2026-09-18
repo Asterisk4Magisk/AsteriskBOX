@@ -138,6 +138,9 @@ data class AppState(
 
     val proxyAppListMode: Int = ProxyAppListModeGlobal,
     val proxyAppListSelectedApps: List<String> = emptyList(),
+
+    val homeDashboard: features.home.HomeDashboardLayout =
+        features.home.DefaultHomeDashboardLayout,
 )
 
 val AppState.effectiveLocalDnsEnabled: Boolean

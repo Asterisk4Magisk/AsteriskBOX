@@ -26,13 +26,10 @@ import features.settings.sheets.TunSharedNetworkBottomSheet
 import features.settings.sheets.ExternalInterfacesBottomSheet
 import features.settings.sheets.IgnoredInterfacesBottomSheet
 import features.settings.sheets.LocalProxySettingsBottomSheet
-import features.settings.sheets.NetworkQualitySettingsSheet
-import features.settings.sheets.NetworkQualityTestSheet
 import features.settings.sheets.PrivateAddressBottomSheet
 import features.settings.sheets.SnifferSettingsBottomSheet
 import features.settings.sheets.ServiceControlBottomSheet
 import features.settings.sheets.TunSettingsBottomSheet
-import features.settings.sheets.rememberNetworkQualityTestController
 import features.settings.sheets.sanitizeTunBypassRuleSetTags
 import features.settings.sheets.sanitizeTunSharedNetworkInterfaces
 import features.settings.sheets.sanitizeExternalInterfaces
@@ -372,21 +369,8 @@ internal fun SettingsBottomSheetsHost(
         },
     )
 
-    // Apple networkQuality test — overlays the Settings page rather than
-    // pushing a new route. The primary sheet owns outbound selection and the
-    // Start/Cancel action; its settings icon opens a second sheet for the
-    // four test parameters (config URL, max runtime, serial, HTTP/3).
-    val networkQualityController = rememberNetworkQualityTestController()
-    NetworkQualityTestSheet(
-        controller = networkQualityController,
-        show = sheetState.showNetworkQualityTest,
-        onDismiss = {
-            networkQualityController.close()
-            sheetState.showNetworkQualityTest = false
-        },
-    )
-    NetworkQualitySettingsSheet(
-        controller = networkQualityController,
-        onDismissRequest = { networkQualityController.showSettings = false },
-    )
+    // Network quality test is hosted at the app shell so it can be
+    // opened from the home dashboard and the Settings page. The state is
+    // provided through [features.settings.LocalHomeShellSheetState] by
+    // [features.home.HomeShellSheetsHost].
 }

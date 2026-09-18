@@ -1376,4 +1376,46 @@
     <string name="proxy_error_ebpf_tc_unsupported_switch">临时方案：进入 设置 → 高级设置，在 运行模式 中确认已选择 eBPF（ROOT）；再在 代理设置（eBPF） 中把 数据面 从 tc 改为 cgroup，然后重试。</string>
     <string name="proxy_error_ebpf_tc_unsupported_fallback">若 cgroup 也无法启动：进入 设置 → 高级设置，在 运行模式 中改选 TUN（ROOT）作为备用方案。</string>
     <string name="proxy_error_ebpf_tc_unsupported_report">上报时请附上上方错误原文，以及 logcat 中 asteriskd / sing-box 相关段落。</string>
+
+    <!-- 首页编辑 -->
+    <string name="home_dashboard_edit">编辑首页</string>
+    <string name="home_dashboard_done">完成</string>
+    <string name="home_dashboard_discard">放弃修改</string>
+    <string name="home_dashboard_discard_confirm_title">放弃首页修改？</string>
+    <string name="home_dashboard_discard_confirm_message">当前首页编辑内容将丢失。</string>
+    <string name="home_dashboard_discard_confirm_confirm">放弃</string>
+    <string name="home_dashboard_discard_confirm_cancel">继续编辑</string>
+    <string name="home_dashboard_hidden_section">已隐藏卡片</string>
+    <string name="home_dashboard_hidden_empty">暂无已隐藏卡片。在编辑模式下拖入，或使用卡片上的删除按钮。</string>
+    <string name="home_dashboard_resize_large">放大卡片</string>
+    <string name="home_dashboard_resize_small">缩小卡片</string>
+    <string name="home_dashboard_remove">删除卡片</string>
+    <string name="home_dashboard_drag_handle">拖动以调整顺序</string>
+    <string name="home_dashboard_add_card">添加卡片</string>
+    <string name="home_dashboard_add_usage">用量卡片</string>
+    <string name="home_dashboard_add_stacked">堆叠卡片</string>
+    <string name="home_dashboard_add_group_picker_title">选择分组</string>
+    <string name="home_dashboard_add_group_unavailable">暂无分组，请先到 “分组” 标签添加。</string>
+    <string name="home_dashboard_card_settings">卡片设置</string>
+    <string name="home_dashboard_card_open">打开卡片</string>
+    <string name="home_dashboard_restore">恢复卡片</string>
+    <string name="home_dashboard_pick_group">显示此分组</string>
+    <string name="home_dashboard_group_label">分组：%1$s</string>
+    <string name="home_dashboard_usage_title">用量</string>
+    <string name="home_dashboard_usage_used">已用</string>
+    <string name="home_dashboard_usage_remaining">剩余</string>
+    <string name="home_dashboard_usage_expires">到期 %1$s</string>
+    <string name="home_dashboard_usage_no_expiry">无到期时间</string>
+    <string name="home_dashboard_usage_unmetered">不限量</string>
+    <string name="home_dashboard_usage_no_data">暂无用量数据</string>
+    <string name="home_dashboard_stacked_title">堆叠</string>
+    <string name="home_dashboard_stacked_empty">编辑模式下拖动其他卡片到此处。</string>
+    <string name="home_dashboard_stacked_auto_rotate">自动轮换</string>
+    <string name="home_dashboard_stacked_manage_pages">管理子卡片</string>
+    <string name="home_dashboard_stacked_add_page">添加子卡片</string>
+    <string name="home_dashboard_stacked_remove_page">从堆叠中移除</string>
+    <string name="home_dashboard_stacked_page_label">第 %1$d / %2$d 页</string>
+    <string name="home_dashboard_network_quality_title">网络质量</string>
+    <string name="home_dashboard_network_quality_empty">点击开始网络质量测速。</string>
+    <string name="home_dashboard_network_quality_subtitle">点击打开网络质量测速</string>
 </resources>

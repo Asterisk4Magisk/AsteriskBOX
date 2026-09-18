@@ -17,6 +17,7 @@ import features.settings.sheets.sanitizeTunSharedNetworkInterfaces
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 
+
 internal class SettingsSheetState(
     private val updateAppState: ((AppState) -> AppState) -> Unit,
 ) {
@@ -48,8 +49,6 @@ internal class SettingsSheetState(
 
     var showTunBypassRuleSets by mutableStateOf(false)
     var tunBypassRuleSetTagsDraft by mutableStateOf(emptyList<String>())
-
-    var showNetworkQualityTest by mutableStateOf(false)
 
     fun openLocalProxySettings(appState: AppState) {
         localProxySettingsDraft = appState.toLocalProxySettingsDraft()
@@ -109,10 +108,6 @@ internal class SettingsSheetState(
     fun openTunBypassRuleSets(appState: AppState) {
         tunBypassRuleSetTagsDraft = sanitizeTunBypassRuleSetTags(appState.tunBypassRuleSetTags)
         showTunBypassRuleSets = true
-    }
-
-    fun openNetworkQualityTest() {
-        showNetworkQualityTest = true
     }
 }
 
