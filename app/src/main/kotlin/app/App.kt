@@ -230,6 +230,7 @@ fun App(
                 LocalAppServices provides services,
             ) {
                 AppContent(padding = padding)
+                features.resources.SharedCoreMigrationPrompt()
             }
         }
     }

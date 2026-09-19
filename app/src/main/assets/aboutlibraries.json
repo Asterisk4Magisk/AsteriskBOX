@@ -54,7 +54,7 @@
         },
         {
             "uniqueId": "github:Asterisk4Magisk/asteriskd",
-            "artifactVersion": "v2.0.32",
+            "artifactVersion": "v2.0.33",
             "name": "asteriskd",
             "description": "A root Android daemon that synchronizes local-address bypass rules and pinned eBPF maps.",
             "website": "https://github.com/Asterisk4Magisk/asteriskd",
@@ -352,13 +352,13 @@
             ]
         },
         {
-            "uniqueId": "github:reF1nd/sing-box-releases",
-            "artifactVersion": "v1.15.0-alpha.6-reF1nd",
-            "name": "sing-box reF1nd build",
-            "description": "A reF1nd build of the sing-box proxy platform used by AsteriskBOX ROOT modes.",
-            "website": "https://github.com/reF1nd/sing-box-releases",
+            "uniqueId": "github:reF1nd/sing-box",
+            "artifactVersion": null,
+            "name": "sing-box (reF1nd)",
+            "description": "The sing-box proxy core shared by VPN and ROOT through AndroidLibBoxLite.",
+            "website": "https://github.com/reF1nd/sing-box",
             "scm": {
-                "url": "https://github.com/reF1nd/sing-box-releases"
+                "url": "https://github.com/reF1nd/sing-box"
             },
             "licenses": [
                 "GPL-3.0"

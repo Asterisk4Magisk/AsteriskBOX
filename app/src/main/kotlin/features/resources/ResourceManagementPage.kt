@@ -63,7 +63,8 @@ fun ResourceManagementPage(
 ) {
     val isWideScreen = LocalIsWideScreen.current
     val navigator = LocalNavigator.current
-    val appState by LocalAppStateStore.current.collectAppState()
+    val stateStore = LocalAppStateStore.current
+    val appState by stateStore.collectAppState()
     val updateAppState = LocalUpdateAppState.current
     val services = LocalAppServices.current
     val resourceFileUseCase = services.resourceFileUseCase
@@ -512,13 +513,23 @@ fun ResourceManagementPage(
                     description = stringResource(R.string.settings_resource_files_root_only),
                     onReplace = {
                         runResourceFileAction(
-                            action = { resourceFileUseCase.replace(kind, appState.customResourceFiles) },
+                            action = {
+                                services.replaceSingBoxCore(
+                                    currentState = { stateStore.state.value },
+                                    onRootStopped = { updateAppState { it.copy(proxyRunning = false) } },
+                                )
+                            },
                             successMessage = replacedMessage.formatTemplate("name" to kind.displayName),
                         )
                     },
                     onRestore = {
                         runResourceFileAction(
-                            action = { resourceFileUseCase.restoreBundled(kind, appState.customResourceFiles) },
+                            action = {
+                                services.restoreSharedSingBoxCore(
+                                    state = appState,
+                                    onRootStopped = { updateAppState { it.copy(proxyRunning = false) } },
+                                )
+                            },
                             successMessage = restoredMessage.formatTemplate("name" to kind.displayName),
                         )
                     },

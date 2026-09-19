@@ -46,11 +46,12 @@ internal class AndroidResourceFileRepository(
             store.status(customResourceFiles)
         }
 
+    suspend fun hasCustomSingBoxCore(): Boolean = withContext(Dispatchers.IO) {
+        store.hasCustomSingBoxCore()
+    }
+
     suspend fun restoreBundledDefaults(resourceFileSource: Int): ResourceFilesStatus = withContext(Dispatchers.IO) {
         store.restoreBundledDefaults(resourceFileSource)
-        if (store.shouldPublishBundledSingBoxCore(resourceFileSource)) {
-            publishBundledCoreIfPossible()
-        }
         store.currentStatus()
     }
 
@@ -347,21 +348,30 @@ internal class AndroidResourceFileRepository(
         customResourceFiles: List<CustomResourceFileState> = emptyList(),
     ): ResourceFilesStatus = withContext(Dispatchers.IO) {
         if (kind == ResourceFileKind.SingBoxCore) {
-            installOrPublishCoreCandidate {
-                store.stageBundledSingBoxCoreCandidate()
-            }
+            removeCustomSingBoxCore()
         } else {
             store.restoreBundled(kind)
         }
         store.currentStatus(customResourceFiles)
     }
 
-    private suspend fun publishBundledCoreIfPossible() {
-        executeCoreCandidateInstall(store::stageBundledSingBoxCoreCandidate) {
-            AndroidResourceFileLogger.info(
-                "Bundled sing-box core replacement deferred because the existing core is ROOT-owned",
-            )
-        }
+    private suspend fun removeCustomSingBoxCore() {
+        val target = store.file(ResourceFileKind.SingBoxCore)
+        sharedCoreReplacementCoordinator.execute(
+            targetOwnerUid = target::coreBinaryOwnerUidOrNull,
+            rootModeActive = { currentAppState().runMode.isRootRunMode() },
+            candidateFactory = { },
+            installInitial = {},
+            replaceAppOwned = { check(target.delete()) { "Failed to remove the custom sing-box core" } },
+            replaceWithRoot = {
+                val result = rootShell.exec(
+                    RootCoreRemovalCommand.build(target.absolutePath),
+                    ShellExecOptions(logFailure = false),
+                )
+                check(result.errno == 0) { result.stderr.ifBlank { "Failed to remove the custom sing-box core" } }
+            },
+            deferRootOwned = { error(appContext.getString(R.string.settings_root_required)) },
+        )
     }
 
     private suspend fun installOrPublishCoreCandidate(

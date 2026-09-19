@@ -3,8 +3,6 @@
 
 package features.resources
 
-import app.ProjectInfo
-
 const val ResourceFileSourceDefault = 0
 const val ResourceFileSourceCustom = 1
 
@@ -15,8 +13,6 @@ const val ResourceFileGeositeCnName = "geosite-cn.srs"
 const val ResourceFileGeoipCnName = "geoip-cn.srs"
 const val ResourceFileDirectCidrIpv4Name = "direct-cidr-v4.txt"
 const val ResourceFileDirectCidrIpv6Name = "direct-cidr-v6.txt"
-
-const val SingBoxCoreVersion = ProjectInfo.SING_BOX_VERSION
 
 const val ResourceFileGeositeCategoryAdsAllUrl =
     "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs"

@@ -46,7 +46,6 @@ internal fun AboutIdentityHeader(
         projectName = ProjectInfo.PROJECT_NAME,
         versionName = ProjectInfo.VERSION_NAME,
         versionCode = ProjectInfo.VERSION_CODE,
-        singBoxVersion = ProjectInfo.SING_BOX_VERSION,
         androidLibBoxLiteVersion = ProjectInfo.ANDROID_LIB_BOX_LITE_VERSION,
     )
     Column(
@@ -123,7 +122,6 @@ internal fun AboutRuntimeSection(
             ProjectInfo.ANDROID_LIB_BOX_LITE_VERSION,
             Icons.Rounded.Extension,
         )
-        AboutRuntimeRow("sing-box", ProjectInfo.SING_BOX_VERSION, Icons.Rounded.Router)
         AboutRuntimeRow("hev-socks5-tunnel", ProjectInfo.HEV_SOCKS5_TUNNEL_VERSION, Icons.Rounded.VpnLock)
     }
 }

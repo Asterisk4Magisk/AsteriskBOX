@@ -35,7 +35,10 @@ internal class AndroidResourceFileStore(
 
     fun currentStatus(customResourceFiles: List<CustomResourceFileState> = emptyList()): ResourceFilesStatus {
         return ResourceFilesStatus(
-            resourceFiles = ResourceFileKind.entries.associateWith { kind -> file(kind).toStatus(kind) },
+            resourceFiles = ResourceFileKind.entries.associateWith { kind ->
+                val target = if (kind == ResourceFileKind.SingBoxCore) effectiveSingBoxCoreFile() else file(kind)
+                target.toStatus(kind)
+            },
             customResourceFiles = customResourceFiles.map { customFile ->
                 CustomResourceFileStatus(
                     file = customFile,
@@ -114,18 +117,12 @@ internal class AndroidResourceFileStore(
         kind.applyPermissions(file(kind))
     }
 
-    fun stageBundledSingBoxCoreCandidate(): File {
-        val source = bundledSingBoxCoreFileOrNull()
-            ?: error("Bundled ${ResourceFileKind.SingBoxCore.fileName} is not available for ${currentRuntimeAbi()}")
-        return source.inputStream().use(::writeSingBoxCoreCandidate)
-    }
+    fun hasCustomSingBoxCore(): Boolean = file(ResourceFileKind.SingBoxCore).coreBinaryOwnerUidOrNull() != null
 
-    fun shouldPublishBundledSingBoxCore(resourceFileSource: Int): Boolean {
-        return bundledSingBoxCoreFileOrNull() != null && file(ResourceFileKind.SingBoxCore).needsBundledRestore(
-            ResourceFileKind.SingBoxCore,
-            resourceFileSource,
-            appContext.packageUpdatedAtMillis(),
-        )
+    fun effectiveSingBoxCoreFile(): File = if (hasCustomSingBoxCore()) {
+        file(ResourceFileKind.SingBoxCore)
+    } else {
+        File(appContext.applicationInfo.nativeLibraryDir, SingBoxCoreLibraryName)
     }
 
     private fun bundledSingBoxCoreFileOrNull(): File? {
@@ -275,7 +272,7 @@ internal class AndroidResourceFileStore(
             asteriskdPath = File(appContext.applicationInfo.nativeLibraryDir, AsteriskdLibraryName).absolutePath,
             bpfMatcherPath = File(appContext.applicationInfo.nativeLibraryDir, BpfMatcherLibraryName).absolutePath,
             bpf2socksPath = File(appContext.applicationInfo.nativeLibraryDir, Bpf2SocksLibraryName).absolutePath,
-            singBoxCorePath = file(ResourceFileKind.SingBoxCore).absolutePath,
+            singBoxCorePath = effectiveSingBoxCoreFile().absolutePath,
             directCidrIpv4Path = file(ResourceFileKind.DirectCidrIpv4).absolutePath,
             directCidrIpv6Path = file(ResourceFileKind.DirectCidrIpv6).absolutePath,
             hevSocks5TunnelPath = File(appContext.applicationInfo.nativeLibraryDir, HevSocks5TunnelLibraryName).absolutePath,
@@ -354,11 +351,6 @@ internal fun Context.singBoxRuleSetFiles(
     customResourceFiles: List<CustomResourceFileState>,
 ): List<File> = AndroidResourceFileStore(this).singBoxRuleSetFiles(customResourceFiles)
 
-private fun currentRuntimeAbi(): String {
-    return Build.SUPPORTED_ABIS.firstOrNull { abi -> abi in SupportedAndroidAbis }
-        ?: error("Unsupported CPU ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
-}
-
 private fun Context.packageUpdatedAtMillis(): Long {
     return runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -379,7 +371,6 @@ private const val SingBoxCoreLibraryName = "libsing-box.so"
 private const val HevSocks5TunnelLibraryName = "libhev-socks5-tunnel-cli.so"
 private const val SingBoxHomeDirName = "sing-box"
 
-private val SupportedAndroidAbis = setOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 
 internal fun resourceFileExists(
     kind: ResourceFileKind?,

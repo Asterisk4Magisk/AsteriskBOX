@@ -14,7 +14,6 @@ plugins {
 }
 
 val generatedSrcDir: Provider<Directory> = layout.buildDirectory.dir("generated/projectInfo")
-val generatedSingBoxCoreJniLibsDir: Provider<Directory> = layout.buildDirectory.dir("generated/singBoxCoreJniLibs")
 val isBuildingAppBundle = gradle.startParameter.taskNames.any { requestedTask ->
     requestedTask.substringAfterLast(':').startsWith("bundle", ignoreCase = true)
 }
@@ -152,7 +151,6 @@ val generateProjectInfo = tasks.register<GenerateProjectInfoTask>("generateProje
     projectName.set(ProjectConfig.PROJECT_NAME)
     versionName.set(ProjectConfig.VERSION_NAME)
     versionCode.set(getGitVersionCode())
-    singBoxVersion.set(ProjectConfig.SING_BOX_VERSION)
     androidLibBoxLiteVersion.set(ProjectConfig.ANDROID_LIB_BOX_LITE_VERSION)
     hevSocks5TunnelVersion.set(ProjectConfig.HEV_SOCKS5_TUNNEL_VERSION)
     outputDirectory.set(generatedSrcDir.map { it.dir("kotlin") })
@@ -172,7 +170,6 @@ androidComponents {
             task.outputDirectory
         }
         variant.sources.assets?.addStaticSourceDirectory("build/generated/resourceFileAssets")
-        variant.sources.jniLibs?.addStaticSourceDirectory("build/generated/singBoxCoreJniLibs")
     }
 }
 

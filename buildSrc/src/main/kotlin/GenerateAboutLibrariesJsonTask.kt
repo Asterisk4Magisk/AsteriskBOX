@@ -24,7 +24,7 @@ abstract class GenerateAboutLibrariesJsonTask : DefaultTask() {
     @TaskAction
     fun generate() {
         val library =
-            { id: String, version: String, name: String, description: String, website: String, scmUrl: String, licenses: List<String> ->
+            { id: String, version: String?, name: String, description: String, website: String, scmUrl: String, licenses: List<String> ->
                 mapOf(
                     "uniqueId" to id,
                     "artifactVersion" to version,
@@ -103,12 +103,12 @@ abstract class GenerateAboutLibrariesJsonTask : DefaultTask() {
                 listOf("GPL-3.0"),
             ),
             library(
-                "github:reF1nd/sing-box-releases",
-                ProjectConfig.SING_BOX_VERSION,
-                "sing-box reF1nd build",
-                "A reF1nd build of the sing-box proxy platform used by AsteriskBOX ROOT modes.",
-                "https://github.com/reF1nd/sing-box-releases",
-                "https://github.com/reF1nd/sing-box-releases",
+                "github:reF1nd/sing-box",
+                null,
+                "sing-box (reF1nd)",
+                "The sing-box proxy core shared by VPN and ROOT through AndroidLibBoxLite.",
+                "https://github.com/reF1nd/sing-box",
+                "https://github.com/reF1nd/sing-box",
                 listOf("GPL-3.0"),
             ),
             library(

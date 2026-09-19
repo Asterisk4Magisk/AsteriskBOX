@@ -1376,4 +1376,9 @@
     <string name="proxy_error_ebpf_tc_unsupported_switch">临时方案：进入 设置 → 高级设置，在 运行模式 中确认已选择 eBPF（ROOT）；再在 代理设置（eBPF） 中把 数据面 从 tc 改为 cgroup，然后重试。</string>
     <string name="proxy_error_ebpf_tc_unsupported_fallback">若 cgroup 也无法启动：进入 设置 → 高级设置，在 运行模式 中改选 TUN（ROOT）作为备用方案。</string>
     <string name="proxy_error_ebpf_tc_unsupported_report">上报时请附上上方错误原文，以及 logcat 中 asteriskd / sing-box 相关段落。</string>
+    <string name="shared_core_migration_title">软件已更新</string>
+    <string name="shared_core_migration_message">VPN 和 ROOT 现已共用内置 Core。是否移除自定义 Core 以节省空间？之后仍可上传自定义 Core。</string>
+    <string name="shared_core_migration_stop_root">移除前将停止 ROOT 服务。</string>
+    <string name="shared_core_migration_keep">保留</string>
+    <string name="shared_core_migration_remove">移除</string>
 </resources>

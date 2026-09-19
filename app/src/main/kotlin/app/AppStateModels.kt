@@ -19,7 +19,6 @@ import features.resources.ResourceFileGeositeGoogleUrl
 import features.resources.ResourceFileSingBoxCoreName
 import features.resources.ResourceFileSourceCustom
 import features.resources.ResourceFileSourceDefault
-import features.resources.SingBoxCoreVersion
 import kotlinx.serialization.Serializable
 
 @Stable
@@ -230,7 +229,7 @@ enum class ResourceFileKind(
 
     val displayName: String
         get() = when (this) {
-            SingBoxCore -> "sing-box $SingBoxCoreVersion"
+            SingBoxCore -> "sing-box Core"
             else -> fileName
         }
 }
