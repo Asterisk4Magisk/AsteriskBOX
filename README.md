@@ -2,7 +2,7 @@ English | [简体中文](README_zh_CN.md)
 
 # AsteriskBOX
 
-An Android sing-box GUI client. VPN Service mode uses [AndroidLibBoxLite](https://github.com/Asterisk4Magisk/AndroidLibBoxLite); ROOT modes execute the [reF1nd sing-box](https://github.com/reF1nd/sing-box-releases) build for Android.
+An Android sing-box GUI client.
 
 ## Telegram Channel
 

@@ -2,7 +2,7 @@
 
 # AsteriskBOX
 
-一个 Android sing-box GUI 客户端。VPN Service 模式使用 [AndroidLibBoxLite](https://github.com/Asterisk4Magisk/AndroidLibBoxLite)，ROOT 模式运行 [reF1nd sing-box](https://github.com/reF1nd/sing-box-releases)构建的 Android 二进制文件。
+一个 Android sing-box GUI 客户端。
 
 ## Telegram 频道
 
