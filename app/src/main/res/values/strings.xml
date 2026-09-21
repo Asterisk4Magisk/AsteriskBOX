@@ -670,10 +670,13 @@
     <string name="logs_paused">Paused</string>
     <string name="logs_pause">Pause log stream</string>
     <string name="logs_resume">Resume log stream</string>
+    <string name="logs_level_trace">Trace</string>
     <string name="logs_level_debug">Debug</string>
     <string name="logs_level_info">Info</string>
     <string name="logs_level_warning">Warning</string>
     <string name="logs_level_error">Error</string>
+    <string name="logs_level_fatal">Fatal</string>
+    <string name="logs_level_panic">Panic</string>
     <string name="logs_clear_title">Clear logs?</string>
     <string name="logs_clear_message">This permanently removes all entries in this log.</string>
 

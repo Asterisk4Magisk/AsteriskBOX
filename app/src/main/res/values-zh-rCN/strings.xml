@@ -663,10 +663,13 @@
     <string name="logs_paused">已暂停</string>
     <string name="logs_pause">暂停日志流</string>
     <string name="logs_resume">继续日志流</string>
+    <string name="logs_level_trace">追踪</string>
     <string name="logs_level_debug">调试</string>
     <string name="logs_level_info">信息</string>
     <string name="logs_level_warning">警告</string>
     <string name="logs_level_error">错误</string>
+    <string name="logs_level_fatal">致命</string>
+    <string name="logs_level_panic">恐慌</string>
     <string name="logs_clear_title">清除日志？</string>
     <string name="logs_clear_message">此操作会永久移除当前日志中的全部条目。</string>
 

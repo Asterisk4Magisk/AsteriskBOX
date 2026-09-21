@@ -72,7 +72,6 @@ fun CoreLogsPage(
         title = stringResource(R.string.core_logs_title),
         repository = services.coreLogRepository,
         levelFilters = CoreLogLevelFilters,
-        rawLevelLabels = true,
         onClear = { context.clearCoreLogFile(SingBoxLogFile.Error) },
     )
 }
@@ -87,7 +86,6 @@ fun LogcatLogsPage(
         title = stringResource(R.string.logcat_logs_title),
         repository = services.logcatRepository,
         levelFilters = LogcatLogLevelFilters,
-        rawLevelLabels = false,
     )
 }
 
@@ -97,7 +95,6 @@ private fun LogViewerPage(
     title: String,
     repository: CoreLogRepository,
     levelFilters: List<LogLevelFilter>,
-    rawLevelLabels: Boolean,
     onClear: suspend () -> Unit = {},
 ) {
     val isWideScreen = LocalIsWideScreen.current
@@ -242,7 +239,6 @@ private fun LogViewerPage(
                         filters = levelFilters,
                         selected = levelFilter,
                         onSelected = { levelFilter = it },
-                        rawLevelLabels = rawLevelLabels,
                     )
                 }
             }
@@ -327,7 +323,6 @@ private fun LogLevelFilterRow(
     filters: List<LogLevelFilter>,
     selected: LogLevelFilter,
     onSelected: (LogLevelFilter) -> Unit,
-    rawLevelLabels: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -338,23 +333,21 @@ private fun LogLevelFilterRow(
             AsteriskFilterChip(
                 selected = selected == filter,
                 onClick = { onSelected(filter) },
-                label = when {
-                    filter == LogLevelFilter.All -> stringResource(R.string.common_all)
-                    rawLevelLabels -> filter.rawLevel.orEmpty()
-                    else -> stringResource(filter.logcatLabelResource())
-                },
+                label = stringResource(filter.labelResource()),
             )
         }
     }
 }
 
-private fun LogLevelFilter.logcatLabelResource(): Int = when (this) {
+private fun LogLevelFilter.labelResource(): Int = when (this) {
     LogLevelFilter.All -> R.string.common_all
+    LogLevelFilter.Trace -> R.string.logs_level_trace
     LogLevelFilter.Debug -> R.string.logs_level_debug
     LogLevelFilter.Info -> R.string.logs_level_info
-    LogLevelFilter.Warning -> R.string.logs_level_warning
+    LogLevelFilter.Warn, LogLevelFilter.Warning -> R.string.logs_level_warning
     LogLevelFilter.Error -> R.string.logs_level_error
-    else -> error("Unsupported Logcat level filter: $this")
+    LogLevelFilter.Fatal -> R.string.logs_level_fatal
+    LogLevelFilter.Panic -> R.string.logs_level_panic
 }
 
 private fun CoreLogEntry.copyText(): String = "$time  ${level.uppercase()}  $message"
