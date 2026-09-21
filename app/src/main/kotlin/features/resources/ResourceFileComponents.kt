@@ -123,9 +123,10 @@ internal fun ResourceOverviewCard(
             }
         },
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+        // Move the hit-test bounds with the button, while keeping the title anchored.
+        Box(modifier = Modifier.fillMaxWidth().offset(x = 12.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(end = 48.dp),
+                modifier = Modifier.fillMaxWidth().offset(x = (-12).dp).padding(end = 48.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -152,7 +153,7 @@ internal fun ResourceOverviewCard(
                 Icon(
                     imageVector = Icons.Rounded.Settings,
                     contentDescription = stringResource(R.string.settings_title),
-                    modifier = Modifier.size(20.dp).offset(x = 12.dp),
+                    modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
