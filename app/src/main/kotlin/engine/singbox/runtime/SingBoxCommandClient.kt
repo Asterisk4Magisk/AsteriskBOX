@@ -20,6 +20,18 @@ import io.nekohasekai.libbox.OutboundGroupIterator
 import io.nekohasekai.libbox.RemoteConnectionOptions
 import io.nekohasekai.libbox.StatusMessage
 import io.nekohasekai.libbox.StringIterator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asExecutor
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.time.Duration.Companion.milliseconds
 
 internal data class SingBoxCommandTarget(
     val local: Boolean,
@@ -42,14 +54,19 @@ internal class SingBoxCommandClient(
     private val logWriter = SingBoxCommandLogWriter()
     private var client: CommandClient? = null
     private var connections: Connections = Libbox.newConnections()
+    private val modeMutex = Mutex()
+    private val modeStatus = MutableStateFlow(ClashModeStatus(disconnected = true))
 
-    fun connect() {
+    @JvmOverloads
+    fun connect(modeOnly: Boolean = false) {
         disconnect()
         val options = CommandClientOptions().apply {
-            addCommand(Libbox.CommandStatus)
-            addCommand(Libbox.CommandGroup)
-            addCommand(Libbox.CommandConnections)
-            addCommand(Libbox.CommandLog)
+            if (!modeOnly) {
+                addCommand(Libbox.CommandStatus)
+                addCommand(Libbox.CommandGroup)
+                addCommand(Libbox.CommandConnections)
+                addCommand(Libbox.CommandLog)
+            }
             addCommand(Libbox.CommandClashMode)
             statusInterval = StatusIntervalNanos
         }
@@ -60,7 +77,7 @@ internal class SingBoxCommandClient(
                 this,
                 options,
                 RemoteConnectionOptions().apply {
-                    setURL(target.control.baseUrl)
+                    url = target.control.baseUrl
                     secret = target.control.secret
                 },
             )
@@ -68,10 +85,14 @@ internal class SingBoxCommandClient(
         synchronized(access) {
             client = nextClient
             connections = Libbox.newConnections()
+            modeStatus.value = ClashModeStatus()
         }
         runCatching { nextClient.connect() }.onFailure { error ->
             synchronized(access) {
-                if (client === nextClient) client = null
+                if (client === nextClient) {
+                    client = null
+                    modeStatus.value = ClashModeStatus(disconnected = true)
+                }
             }
             runCatching { nextClient.disconnect() }
             throw error
@@ -83,6 +104,7 @@ internal class SingBoxCommandClient(
             client.also {
                 client = null
                 connections = Libbox.newConnections()
+                modeStatus.value = ClashModeStatus(disconnected = true)
             }
         }
         previous?.let { runCatching { it.disconnect() } }
@@ -129,8 +151,31 @@ internal class SingBoxCommandClient(
         requireClient().closeConnections()
     }
 
-    fun setMode(mode: String) {
-        requireClient().setClashMode(mode.toOfficialClashMode())
+    suspend fun setMode(mode: String) = modeMutex.withLock {
+        val active = requireClient()
+        val requested = mode.toOfficialClashMode()
+        val confirmed = withTimeoutOrNull(ModeConfirmationTimeoutMillis.milliseconds) {
+            val initial = modeStatus.first { it.supported != null || it.disconnected }
+            check(!initial.disconnected && requireClient() === active) { "sing-box API disconnected during mode change" }
+            require(initial.supported.orEmpty().any { it.equals(requested, ignoreCase = true) }) {
+                "sing-box does not support Clash mode $requested"
+            }
+            suspendCancellableCoroutine { continuation ->
+                // gomobile calls are blocking; cancellation must cancel the native gRPC context.
+                continuation.invokeOnCancellation { runCatching { active.disconnect() } }
+                Dispatchers.IO.asExecutor().execute {
+                    runCatching { active.setClashMode(requested) }.fold(
+                        onSuccess = { continuation.resume(Unit) },
+                        onFailure = continuation::resumeWithException,
+                    )
+                }
+            }
+            // The RPC silently accepts unknown modes. Only the subscription confirms application.
+            val applied = modeStatus.first { it.current.equals(requested, ignoreCase = true) || it.disconnected }
+            check(!applied.disconnected && requireClient() === active) { "sing-box API disconnected during mode change" }
+            true
+        }
+        check(confirmed == true) { "Timed out confirming sing-box Clash mode $requested" }
     }
 
     fun reloadService() {
@@ -147,6 +192,7 @@ internal class SingBoxCommandClient(
     }
 
     override fun disconnected(message: String?) {
+        modeStatus.value = ClashModeStatus(disconnected = true)
         listener.onDisconnected(message.orEmpty())
     }
 
@@ -155,10 +201,19 @@ internal class SingBoxCommandClient(
     }
 
     override fun initializeClashMode(modeList: StringIterator, currentMode: String) {
-        modeList.consume()
+        val supported = modeList.consume()
+        modeStatus.update { status ->
+            if (status.disconnected) status else status.copy(
+                supported = supported,
+                // Android's stack workaround dispatches initialization on a separate goroutine.
+                current = status.current.ifEmpty { currentMode },
+            )
+        }
     }
 
-    override fun updateClashMode(newMode: String) = Unit
+    override fun updateClashMode(newMode: String) {
+        modeStatus.update { if (it.disconnected) it else it.copy(current = newMode) }
+    }
 
     override fun writeGroups(message: OutboundGroupIterator?) {
         if (message == null) return
@@ -267,8 +322,15 @@ internal class SingBoxCommandClient(
 
     private companion object {
         const val StatusIntervalNanos = 1_000_000_000L
+        const val ModeConfirmationTimeoutMillis = 5_000L
     }
 }
+
+private data class ClashModeStatus(
+    val supported: List<String>? = null,
+    val current: String = "",
+    val disconnected: Boolean = false,
+)
 
 internal fun singBoxProxyNode(
     name: String,
@@ -324,7 +386,8 @@ private const val SingBoxLogLevelTrace = 6
 private fun String.toOfficialClashMode(): String = when (lowercase()) {
     "global" -> "Global"
     "direct" -> "Direct"
-    else -> "Rule"
+    "rule" -> "Rule"
+    else -> error("Unknown Clash mode: $this")
 }
 
 private fun StringIterator.consume(): List<String> = buildList {

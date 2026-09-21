@@ -25,9 +25,12 @@ import engine.root.runtime.RootRuntimeBusyException
 import engine.root.runtime.RootRuntimeConflictException
 import engine.root.runtime.RootSupervisorController
 import engine.root.runtime.toStableProxyEngineStatus
+import engine.singbox.runtime.restoreRootSingBoxMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
 import system.RootShellGateway
 
@@ -61,6 +64,7 @@ internal class RootModeEngine(
         controller.preflightStart(definition.daemonMode, explicitRestart = false) ?: return null
         val restored = buildLocalProxyOptions(request)
         val confirmed = controller.preflightStart(definition.daemonMode, explicitRestart = false) ?: return null
+        restoreRootSingBoxMode(request.appState)
         restored?.let(LocalProxyRuntime::update) ?: LocalProxyRuntime.clear()
         return controller.proxyStatus(confirmed, runMode, definition.daemonMode)
     }
@@ -93,6 +97,7 @@ internal class RootModeEngine(
                 controller.start(config.root, config.asteriskdConfig)
             }
             controller.requireRunning(snapshot, definition.daemonMode)
+            restoreStartedMode(request)
             config.localProxyOptions?.let(LocalProxyRuntime::update) ?: LocalProxyRuntime.clear()
             controller.proxyStatus(snapshot, runMode, definition.daemonMode)
         }.onFailure {
@@ -153,6 +158,7 @@ internal class RootModeEngine(
         RootFailureWatcher.beginAttempt()
         val wasRunning = controller.reconfigureServiceControl(config.root, config.asteriskdConfig)
         if (wasRunning) {
+            restoreStartedMode(request)
             config.localProxyOptions?.let(LocalProxyRuntime::update) ?: LocalProxyRuntime.clear()
         } else {
             LocalProxyRuntime.clear()
@@ -162,6 +168,19 @@ internal class RootModeEngine(
 
     suspend fun ownsRuntime(): Boolean {
         return controller.ownsRuntime()
+    }
+
+    private suspend fun restoreStartedMode(request: ProxyEngineStartRequest) {
+        try {
+            restoreRootSingBoxMode(request.appState)
+        } catch (error: Exception) {
+            // Do not leave a newly started cycle running in an unconfirmed mode.
+            withContext(NonCancellable) {
+                runCatching { controller.stopOwn() }.exceptionOrNull()?.let(error::addSuppressed)
+            }
+            LocalProxyRuntime.clear()
+            throw error
+        }
     }
 
     override suspend fun status(): ProxyEngineStatus {

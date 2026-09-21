@@ -4,7 +4,6 @@
 package features.home
 
 import app.AppState
-import app.modes.isRootRunMode
 import engine.singbox.runtime.SingBoxTrafficSample
 import engine.singbox.runtime.SingBoxTrafficState
 import features.monitoring.MonitoringState
@@ -48,7 +47,6 @@ internal data class HomeModeChange(
 internal enum class HomeModeRuntimeAction {
     None,
     PatchRuntime,
-    RestartService,
 }
 
 internal data class HomeModeOperationState(
@@ -95,7 +93,6 @@ internal fun buildHomeModeChange(
         persistSelection = true,
         runtimeAction = when {
             !appState.proxyRunning -> HomeModeRuntimeAction.None
-            appState.runMode.isRootRunMode() -> HomeModeRuntimeAction.RestartService
             else -> HomeModeRuntimeAction.PatchRuntime
         },
     )
@@ -110,10 +107,6 @@ internal fun buildHomeModeOperationState(
     )
     HomeModeRuntimeAction.PatchRuntime -> HomeModeOperationState(
         serviceOperationInProgress = false,
-        modeOperationInProgress = true,
-    )
-    HomeModeRuntimeAction.RestartService -> HomeModeOperationState(
-        serviceOperationInProgress = true,
         modeOperationInProgress = true,
     )
 }

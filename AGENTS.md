@@ -32,10 +32,10 @@ VPN Service is an independent non-ROOT execution path. Even on a rooted device, 
 
 - As a rule, do not introduce or depend on an experimental core feature. An exception exists only when this repository already uses that feature or a developer explicitly authorizes its use; adoption by a sibling app is not authorization for this app.
 - AsteriskBOX does not adopt sing-box `experimental.clash_api`. Do not enable it or rely on its HTTP control endpoints for mode switching or other runtime control unless a developer explicitly changes this product boundary.
-- In VPN Service mode, Rule/Global/Direct changes use the stable sing-box Command API (`setClashMode`) exposed by the embedded mobile runtime.
-- A running ROOT service has no approved stable mode-patch path in AsteriskBOX. Persist the new mode, rebuild the sing-box configuration, and call `ProxyServiceUseCase.restart` so asteriskd performs a supervised restart. Do not route this through `SingBoxRuntimeRepository.patchMode`, an experimental Clash API, or direct signal/process management.
+- In both VPN Service and ROOT modes, Rule/Global/Direct changes use `SingBoxRuntimeRepository.patchMode` and the sing-box Command API (`setClashMode`). Preserve dynamic `clash_mode` conditions in route and DNS rules, and confirm the applied mode through the mode subscription; an RPC success alone is insufficient.
+- ROOT startup restores the selected mode through the same command client before reporting success. Keep the ROOT cache file enabled so autonomous supervisor restarts retain the last applied mode. Mode changes must not restart the core; unrelated configuration changes still require a supervised restart when no hot API exists.
 - When the service is stopped, changing Rule/Global/Direct only persists the selection; it must not start or restart the service.
-- This supervised-restart behavior is BOX-specific. Do not copy it into AsteriskMETA, whose first-class Mihomo Clash API must handle every supported hot runtime change, including ROOT mode changes, directly.
+- BOX uses the sing-box gRPC Command API. AsteriskMETA uses its first-class Mihomo Clash API for supported hot runtime changes; keep their core-specific adapters separate.
 
 ## Repository Structure and Product Boundaries
 

@@ -27,6 +27,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
 internal class SingBoxRuntimeRepository(
@@ -46,6 +49,9 @@ internal class SingBoxRuntimeRepository(
     private var generation = 0L
     @Volatile
     private var latestConnections = SingBoxConnectionsState()
+    @Volatile
+    private var desiredMode = "rule"
+    private val modeMutex = Mutex()
 
     val state: StateFlow<SingBoxRuntimeState> = mutableState.asStateFlow()
 
@@ -57,6 +63,7 @@ internal class SingBoxRuntimeRepository(
         synchronized(trafficHistoryLock) { trafficHistory.snapshot(limit) }
 
     fun start(appState: AppState) {
+        desiredMode = appState.singBoxModeName()
         if (!appState.proxyRunning) {
             stop(resetSnapshots = false)
             return
@@ -71,7 +78,7 @@ internal class SingBoxRuntimeRepository(
                 return
             }
         }
-        replaceSession(appState, target)
+        replaceSession(target)
     }
 
     fun stop(resetSnapshots: Boolean = false) {
@@ -134,12 +141,9 @@ internal class SingBoxRuntimeRepository(
     }
 
     suspend fun patchMode(appState: AppState): Result<Unit> = runCatching {
-        if (appState.runMode == RunModeVpnService) {
-            requireActiveSession(appState).setMode(appState.singBoxModeName())
-        } else {
-            // The standard core's stable API service does not register ClashServer; enabling it
-            // through experimental.clash_api is intentionally forbidden by this application.
-            reloadConfiguration(appState)
+        val active = requireActiveSession(appState)
+        modeMutex.withLock {
+            active.setMode(appState.singBoxModeName())
         }
     }
 
@@ -166,7 +170,7 @@ internal class SingBoxRuntimeRepository(
                     refreshServiceStartedAt(activeGeneration, active)
                     throw error
                 }
-                replaceSession(appState, appState.commandTarget())
+                replaceSession(appState.commandTarget())
             } else {
                 error("ROOT runtime configuration changes require a supervised restart")
             }
@@ -215,7 +219,7 @@ internal class SingBoxRuntimeRepository(
         }.getOrNull()
     }
 
-    private fun replaceSession(appState: AppState, target: SingBoxCommandTarget) {
+    private fun replaceSession(target: SingBoxCommandTarget) {
         val old: SingBoxCommandClient?
         val nextGeneration: Long
         lateinit var next: SingBoxCommandClient
@@ -228,7 +232,7 @@ internal class SingBoxRuntimeRepository(
             sessionTarget = target
             next = SingBoxCommandClient(
                 target,
-                commandListener(nextGeneration, appState, target),
+                commandListener(nextGeneration, target),
             )
             mutableState.update { current ->
                 current.copy(
@@ -262,16 +266,13 @@ internal class SingBoxRuntimeRepository(
                             return@launch
                         }
                         refreshServiceStartedAt(nextGeneration, next)
-                        if (appState.runMode == RunModeVpnService) {
-                            runCatching {
-                                next.setMode(appState.singBoxModeName())
-                            }.onFailure { error ->
-                                AndroidAppLogger.warn(
-                                    LogTag,
-                                    "Failed to restore sing-box Clash mode",
-                                    error,
-                                )
-                            }
+                        runCatching {
+                            // Read inside the lock: a reconnect must not restore its original snapshot.
+                            modeMutex.withLock { next.setMode(desiredMode) }
+                        }.onFailure { error ->
+                            if (error is CancellationException) throw error
+                            AndroidAppLogger.warn(LogTag, "Failed to restore sing-box Clash mode", error)
+                            updateIfCurrent(nextGeneration) { it.copy(lastError = error.message.orEmpty()) }
                         }
                         return@launch
                     }
@@ -295,7 +296,6 @@ internal class SingBoxRuntimeRepository(
 
     private fun commandListener(
         listenerGeneration: Long,
-        appState: AppState,
         target: SingBoxCommandTarget,
     ): SingBoxCommandListener =
         object : SingBoxCommandListener {
@@ -335,7 +335,7 @@ internal class SingBoxRuntimeRepository(
                         delay(ReconnectDelayMillis.milliseconds)
                         synchronized(sessionLock) {
                             if (isCurrentLocked(listenerGeneration, target)) {
-                                replaceSession(appState, target)
+                                replaceSession(target)
                             }
                         }
                     }
@@ -417,7 +417,7 @@ internal class SingBoxRuntimeRepository(
         start(appState)
         session?.let { return it }
         withTimeout(SessionWaitMillis.milliseconds) {
-            state.first { runtime -> runtime.running || runtime.lastError.isNotBlank() }
+            state.first { runtime -> session != null || runtime.lastError.isNotBlank() }
         }
         state.value.lastError.takeIf(String::isNotBlank)?.let(::error)
         return session ?: error("sing-box API is not connected")

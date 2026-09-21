@@ -30,8 +30,6 @@ import app.modes.RunModeTproxy
 import app.modes.RunModeTun
 import app.modes.RunModeTun2Socks
 import app.modes.RunModeVpnService
-import app.modes.SingBoxModeDirect
-import app.modes.SingBoxModeGlobal
 import app.modes.isRootRunMode
 import app.rootIpv6DataPathEnabled
 import app.withCanonicalManagedTagReferences
@@ -769,17 +767,7 @@ internal fun compileRoute(
         .orEmptyObjects()
     val managedRules = appState.routeRules
         .filter(SingBoxRouteRuleState::enabled)
-        .mapNotNull { rule ->
-            if (appState.runMode == RunModeVpnService) {
-                compileManagedRouteRule(rule)
-            } else {
-                when (val resolved = rule.resolveClashMode(appState.singBoxMode)) {
-                    StaticRouteMatch.Never -> null
-                    StaticRouteMatch.Always -> compileManagedRouteAction(rule)
-                    is StaticRouteMatch.Rule -> compileManagedRouteRule(resolved.state)
-                }
-            }
-        }
+        .map(::compileManagedRouteRule)
     val injectedRules = buildList {
         addAll(SingBoxSniffCompiler.compile(appState))
         if (dnsEnabled) {
@@ -790,49 +778,28 @@ internal fun compileRoute(
                 },
             )
         }
-        if (appState.runMode == RunModeVpnService) {
-            add(
-                buildJsonObject {
-                    put("clash_mode", "Global")
-                    put("action", "route")
-                    put("outbound", APP_GLOBAL_SELECTOR)
-                },
-            )
-            add(
-                buildJsonObject {
-                    put("clash_mode", "Direct")
-                    put("action", "route")
-                    put("outbound", APP_DIRECT_OUTBOUND)
-                },
-            )
-        } else {
-            when (appState.singBoxMode) {
-                SingBoxModeDirect -> add(
-                    buildJsonObject {
-                        put("action", "route")
-                        put("outbound", APP_DIRECT_OUTBOUND)
-                    },
-                )
-                SingBoxModeGlobal -> add(
-                    buildJsonObject {
-                        put("action", "route")
-                        put("outbound", APP_GLOBAL_SELECTOR)
-                    },
-                )
-            }
-        }
-    }
-    val ruleModeFallback = if (appState.runMode == RunModeVpnService) {
-        listOf(
+        add(
             buildJsonObject {
-                put("clash_mode", "Rule")
+                put("clash_mode", "Global")
                 put("action", "route")
-                put("outbound", finalOutbound)
+                put("outbound", APP_GLOBAL_SELECTOR)
             },
         )
-    } else {
-        emptyList()
+        add(
+            buildJsonObject {
+                put("clash_mode", "Direct")
+                put("action", "route")
+                put("outbound", APP_DIRECT_OUTBOUND)
+            },
+        )
     }
+    val ruleModeFallback = listOf(
+        buildJsonObject {
+            put("clash_mode", "Rule")
+            put("action", "route")
+            put("outbound", finalOutbound)
+        },
+    )
     return JsonObject(
         buildMap {
             sourceRoute
@@ -966,92 +933,6 @@ private fun compileManagedRouteMatch(rule: SingBoxRouteRuleState): JsonObject =
         if (rule.invert) put("invert", true)
     }
 
-private sealed interface StaticRouteMatch {
-    data object Always : StaticRouteMatch
-    data object Never : StaticRouteMatch
-    data class Rule(val state: SingBoxRouteRuleState) : StaticRouteMatch
-}
-
-private fun SingBoxRouteRuleState.resolveClashMode(mode: Int): StaticRouteMatch {
-    if (type != SingBoxRouteRuleTypeLogical) {
-        if (clashMode.isBlank()) return StaticRouteMatch.Rule(this)
-        val activeMode = when (mode) {
-            SingBoxModeGlobal -> "Global"
-            SingBoxModeDirect -> "Direct"
-            else -> "Rule"
-        }
-        if (!clashMode.equals(activeMode, ignoreCase = true)) {
-            return if (invert) StaticRouteMatch.Always else StaticRouteMatch.Never
-        }
-        val withoutMode = copy(clashMode = "")
-        if (withoutMode.hasDefaultRouteMatchers()) {
-            return StaticRouteMatch.Rule(withoutMode)
-        }
-        return if (invert) StaticRouteMatch.Never else StaticRouteMatch.Always
-    }
-
-    val children = logicalRules
-        .filter(SingBoxRouteRuleState::enabled)
-        .map { child -> child.resolveClashMode(mode) }
-    val resolved = if (logicalMode == SingBoxRouteRuleLogicalModeOr) {
-        when {
-            children.any { child -> child == StaticRouteMatch.Always } ->
-                StaticRouteMatch.Always
-            else -> {
-                val remaining = children.filterIsInstance<StaticRouteMatch.Rule>()
-                if (remaining.isEmpty()) {
-                    StaticRouteMatch.Never
-                } else {
-                    StaticRouteMatch.Rule(copy(logicalRules = remaining.map { child -> child.state }))
-                }
-            }
-        }
-    } else {
-        when {
-            children.any { child -> child == StaticRouteMatch.Never } ->
-                StaticRouteMatch.Never
-            else -> {
-                val remaining = children.filterIsInstance<StaticRouteMatch.Rule>()
-                if (remaining.isEmpty()) {
-                    StaticRouteMatch.Always
-                } else {
-                    StaticRouteMatch.Rule(copy(logicalRules = remaining.map { child -> child.state }))
-                }
-            }
-        }
-    }
-    if (!invert || resolved is StaticRouteMatch.Rule) return resolved
-    return when (resolved) {
-        StaticRouteMatch.Always -> StaticRouteMatch.Never
-        StaticRouteMatch.Never -> StaticRouteMatch.Always
-        is StaticRouteMatch.Rule -> resolved
-    }
-}
-
-private fun SingBoxRouteRuleState.hasDefaultRouteMatchers(): Boolean =
-    inbound.isNotEmpty() ||
-        ipVersion == 4 ||
-        ipVersion == 6 ||
-        network.isNotEmpty() ||
-        protocol.isNotEmpty() ||
-        domain.isNotEmpty() ||
-        domainSuffix.isNotEmpty() ||
-        domainKeyword.isNotEmpty() ||
-        domainRegex.isNotEmpty() ||
-        sourceIpCidr.isNotEmpty() ||
-        ipCidr.isNotEmpty() ||
-        sourcePort.isNotEmpty() ||
-        sourcePortRange.isNotEmpty() ||
-        port.isNotEmpty() ||
-        portRange.isNotEmpty() ||
-        packageName.isNotEmpty() ||
-        networkType.isNotEmpty() ||
-        wifiSsid.isNotEmpty() ||
-        wifiBssid.isNotEmpty() ||
-        ruleSet.isNotEmpty() ||
-        sourceIpIsPrivate ||
-        ipIsPrivate
-
 private fun kotlinx.serialization.json.JsonObjectBuilder.putStringArray(
     name: String,
     values: List<String>,
@@ -1083,7 +964,8 @@ private fun JsonObject.hasAppTag(): Boolean =
     isManagedSingBoxTag((this["tag"] as? JsonPrimitive)?.contentOrNull.orEmpty())
 
 private fun compileExperimental(appState: AppState): JsonObject? {
-    if (!appState.storeFakeIp && !appState.storeDns) return null
+    // ROOT can restart independently of the UI; retain the last API-selected mode.
+    if (!appState.runMode.isRootRunMode() && !appState.storeFakeIp && !appState.storeDns) return null
     return buildJsonObject {
         putJsonObject("cache_file") {
             put("enabled", true)

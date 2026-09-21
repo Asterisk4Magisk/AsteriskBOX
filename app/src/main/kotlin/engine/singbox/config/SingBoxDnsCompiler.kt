@@ -14,9 +14,6 @@ import app.SingBoxDnsRuleTypeLogical
 import app.SingBoxDnsServerState
 import app.SingBoxDnsServerTypes
 import app.effectiveLocalDnsEnabled
-import app.modes.RunModeVpnService
-import app.modes.SingBoxModeDirect
-import app.modes.SingBoxModeGlobal
 import engine.singbox.DefaultSingBoxDnsFakeIpRange
 import engine.singbox.DefaultSingBoxDnsServers
 import engine.singbox.SingBoxUnsigned32Max
@@ -73,13 +70,6 @@ internal object SingBoxDnsCompiler {
                             "DNS rule ${rule.id} contains an empty logical or headless rule"
                         }
                     }
-                    .mapNotNull { rule ->
-                        if (appState.runMode == RunModeVpnService) {
-                            rule
-                        } else {
-                            rule.forSingBoxMode(appState.singBoxMode)
-                        }
-                    }
                     .map(SingBoxDnsRuleState::toJson)
                 if (rules.isNotEmpty()) put("rules", JsonArray(rules))
                 put("final", defaultServer)
@@ -107,92 +97,6 @@ internal object SingBoxDnsCompiler {
             defaultDomainResolver = defaultDomainResolver,
         )
     }
-}
-
-private sealed interface StaticDnsMatch {
-    data object Always : StaticDnsMatch
-    data object Never : StaticDnsMatch
-    data class Rule(val state: SingBoxDnsRuleState) : StaticDnsMatch
-}
-
-private fun SingBoxDnsRuleState.forSingBoxMode(mode: Int): SingBoxDnsRuleState? =
-    when (val resolved = resolveClashMode(mode)) {
-        StaticDnsMatch.Never -> null
-        StaticDnsMatch.Always -> copy(
-            type = SingBoxDnsRuleTypeDefault,
-            logicalMode = SingBoxDnsRuleLogicalModeAnd,
-            logicalRules = emptyList(),
-            matches = emptyList(),
-            ipVersion = "",
-            network = "",
-            invert = false,
-        )
-        is StaticDnsMatch.Rule -> resolved.state
-    }
-
-private fun SingBoxDnsRuleState.resolveClashMode(mode: Int): StaticDnsMatch {
-    if (type == SingBoxDnsRuleTypeLogical) {
-        val children = logicalRules
-            .filter(SingBoxDnsRuleState::enabled)
-            .map { child -> child.resolveClashMode(mode) }
-        val resolved = if (logicalMode == SingBoxDnsRuleLogicalModeOr) {
-            when {
-                children.any { child -> child == StaticDnsMatch.Always } ->
-                    StaticDnsMatch.Always
-                else -> {
-                    val remaining = children.filterIsInstance<StaticDnsMatch.Rule>()
-                    if (remaining.isEmpty()) {
-                        StaticDnsMatch.Never
-                    } else {
-                        StaticDnsMatch.Rule(
-                            copy(logicalRules = remaining.map { child -> child.state }),
-                        )
-                    }
-                }
-            }
-        } else {
-            when {
-                children.any { child -> child == StaticDnsMatch.Never } ->
-                    StaticDnsMatch.Never
-                else -> {
-                    val remaining = children.filterIsInstance<StaticDnsMatch.Rule>()
-                    if (remaining.isEmpty()) {
-                        StaticDnsMatch.Always
-                    } else {
-                        StaticDnsMatch.Rule(
-                            copy(logicalRules = remaining.map { child -> child.state }),
-                        )
-                    }
-                }
-            }
-        }
-        if (!invert || resolved is StaticDnsMatch.Rule) return resolved
-        return when (resolved) {
-            StaticDnsMatch.Always -> StaticDnsMatch.Never
-            StaticDnsMatch.Never -> StaticDnsMatch.Always
-            is StaticDnsMatch.Rule -> resolved
-        }
-    }
-
-    val modeMatch = matches.firstOrNull { match -> match.field == "clash_mode" }
-        ?: return StaticDnsMatch.Rule(this)
-    val activeMode = when (mode) {
-        SingBoxModeGlobal -> "Global"
-        SingBoxModeDirect -> "Direct"
-        else -> "Rule"
-    }
-    val matchesActiveMode = modeMatch.values.any { value ->
-        value.equals(activeMode, ignoreCase = true)
-    }
-    if (!matchesActiveMode) {
-        return if (invert) StaticDnsMatch.Always else StaticDnsMatch.Never
-    }
-    val remainingMatches = matches.filterNot { match -> match.field == "clash_mode" }
-    val withoutMode = copy(matches = remainingMatches)
-    if (withoutMode.hasDefaultDnsMatchers()) {
-        return StaticDnsMatch.Rule(withoutMode)
-    }
-    return if (invert) StaticDnsMatch.Never else StaticDnsMatch.Always
 }
 
 internal fun SingBoxDnsRuleState.hasValidDnsRuleStructure(

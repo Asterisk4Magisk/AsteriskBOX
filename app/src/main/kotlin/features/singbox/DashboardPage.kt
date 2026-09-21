@@ -236,22 +236,6 @@ fun SingBoxDashboardPage(
                     HomeModeRuntimeAction.None -> null
                     HomeModeRuntimeAction.PatchRuntime ->
                         services.singBoxRuntime.patchMode(modeChange.runtimeAppState).exceptionOrNull()
-                    HomeModeRuntimeAction.RestartService ->
-                        when (val result = services.proxyServiceUseCase.restart(modeChange.runtimeAppState)) {
-                            is ProxyServiceResult.Success -> {
-                                updateAppState { state ->
-                                    state.copy(
-                                        proxyRunning = result.proxyRunning,
-                                        localProxyPort = result.appState?.localProxyPort ?: state.localProxyPort,
-                                        singBoxControlPort =
-                                            result.appState?.singBoxControlPort ?: state.singBoxControlPort,
-                                    )
-                                }
-                                null
-                            }
-                            is ProxyServiceResult.Failed -> result.error
-                        }
-
                 }
                 failure?.let { error ->
                     if (modeChange.persistSelection) {
