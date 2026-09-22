@@ -229,7 +229,7 @@ enum class ResourceFileKind(
 
     val displayName: String
         get() = when (this) {
-            SingBoxCore -> "sing-box Core"
+            SingBoxCore -> "sing-box"
             else -> fileName
         }
 }
