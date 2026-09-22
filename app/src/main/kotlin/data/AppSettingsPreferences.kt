@@ -297,6 +297,15 @@ internal class AppSettingsPreferences(
         }
     }
 
+    @SuppressLint("UseKtx")
+    fun saveMigration(previous: AppState, next: AppState) {
+        val changed = changedPreferenceValues(previous, next)
+        if (changed.isEmpty()) return
+        val editor = preferences.edit()
+        changed.forEach { (key, value) -> editor.putPreferenceValue(key, value) }
+        check(editor.commit()) { "Failed to persist migrated app settings" }
+    }
+
     private fun SharedPreferences.Editor.putPreferenceValue(
         key: String,
         value: AppPreferenceValue,

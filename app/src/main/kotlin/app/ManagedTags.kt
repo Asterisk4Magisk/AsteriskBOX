@@ -4,6 +4,7 @@
 package app
 
 import java.text.Normalizer
+import features.resources.BundledRuleSet
 
 internal const val LegacyManagedSingBoxTagPrefix = "__asteriskbox_"
 
@@ -78,7 +79,7 @@ internal fun managedDnsEvaluationTag(id: Int, remarks: String): String =
 internal fun managedCustomRuleSetTag(id: Int, fileName: String): String =
     "rule_set_${id}_${sanitizeManagedTagPart(fileName)}"
 
-internal fun managedBundledRuleSetTag(kind: ResourceFileKind): String =
+internal fun managedBundledRuleSetTag(kind: BundledRuleSet): String =
     "rule_set_${sanitizeManagedTagPart(kind.fileName)}"
 
 internal fun managedTagIdentityOrNull(tag: String): ManagedTagIdentity? {
@@ -90,8 +91,7 @@ internal fun managedTagIdentityOrNull(tag: String): ManagedTagIdentity? {
             return ManagedTagIdentity(kind = pattern.kind, id = id)
         }
     }
-    ResourceFileKind.entries
-        .filter { kind -> kind.fileName.endsWith(".srs", ignoreCase = true) }
+    BundledRuleSet.entries
         .forEach { kind ->
             if (
                 normalized == managedBundledRuleSetTag(kind) ||

@@ -4,6 +4,7 @@
 package data.backup
 
 import app.AppState
+import features.resources.withInitializedBundledRuleSets
 import app.ServiceControlSchedule
 import app.ServiceControlSettings
 import app.ServiceControlWifi
@@ -45,6 +46,7 @@ internal fun AppState.toAppBackupFile(
                 dnsServers = dnsServers,
                 dnsRules = dnsRules,
                 customResourceFiles = customResourceFiles.map(CustomResourceFileState::toBackup),
+                bundledRuleSetsInitialized = bundledRuleSetsInitialized,
                 proxyAppListSelectedApps = proxyAppListSelectedApps,
             ),
     )
@@ -309,6 +311,7 @@ private fun AppBackupData.toAppState(): AppState {
         customResourceFileDirectCidrIpv4Url = settings.customResourceFileDirectCidrIpv4Url,
         customResourceFileDirectCidrIpv6Url = settings.customResourceFileDirectCidrIpv6Url,
         customResourceFiles = restoredCustomResourceFiles,
+        bundledRuleSetsInitialized = bundledRuleSetsInitialized,
         nextCustomResourceFileId = nextId(
             defaults.nextCustomResourceFileId,
             restoredCustomResourceFiles.map(CustomResourceFileState::id),
@@ -350,7 +353,7 @@ private fun AppBackupData.toAppState(): AppState {
         privateAddressCidrs = settings.privateAddressCidrs,
         proxyAppListMode = settings.proxyAppListMode,
         proxyAppListSelectedApps = proxyAppListSelectedApps,
-    ).withCanonicalManagedTagReferences()
+    ).withInitializedBundledRuleSets().withCanonicalManagedTagReferences()
 }
 
 private fun AppBackupOutboundGroup.toState(): OutboundGroupState =

@@ -52,7 +52,10 @@ internal class AndroidResourceFileRepository(
 
     suspend fun restoreBundledDefaults(resourceFileSource: Int): ResourceFilesStatus = withContext(Dispatchers.IO) {
         store.restoreBundledDefaults(resourceFileSource)
-        store.currentStatus()
+        synchronized(customResourceMutationLock) {
+            store.restoreBundledCustomRuleSets(currentAppState().customResourceFiles)
+        }
+        store.currentStatus(currentAppState().customResourceFiles)
     }
 
     suspend fun deleteCustom(

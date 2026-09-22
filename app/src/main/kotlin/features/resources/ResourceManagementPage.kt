@@ -92,10 +92,6 @@ fun ResourceManagementPage(
     val editCustomResourceFileUrlState = rememberTextFieldState()
     var showCustomSourceEditor by remember { mutableStateOf(false) }
     var showResourceAutoUpdateSheet by remember { mutableStateOf(false) }
-    val sourceGeositeCategoryAdsAllUrlState = rememberTextFieldState()
-    val sourceGeositeGoogleUrlState = rememberTextFieldState()
-    val sourceGeositeCnUrlState = rememberTextFieldState()
-    val sourceGeoipCnUrlState = rememberTextFieldState()
     val sourceDirectCidrIpv4UrlState = rememberTextFieldState()
     val sourceDirectCidrIpv6UrlState = rememberTextFieldState()
     val updatedMessage = stringResource(R.string.settings_resource_files_updated)
@@ -326,20 +322,6 @@ fun ResourceManagementPage(
 
     fun openCustomSourceEditor() {
         val source = appState.resourceFileUpdateSource()
-        sourceGeositeCategoryAdsAllUrlState.setTextAndPlaceCursorAtEnd(
-            appState.customResourceFileGeositeCategoryAdsAllUrl.ifBlank {
-                source.geositeCategoryAdsAllUrl
-            },
-        )
-        sourceGeositeGoogleUrlState.setTextAndPlaceCursorAtEnd(
-            appState.customResourceFileGeositeGoogleUrl.ifBlank { source.geositeGoogleUrl },
-        )
-        sourceGeositeCnUrlState.setTextAndPlaceCursorAtEnd(
-            appState.customResourceFileGeositeCnUrl.ifBlank { source.geositeCnUrl },
-        )
-        sourceGeoipCnUrlState.setTextAndPlaceCursorAtEnd(
-            appState.customResourceFileGeoipCnUrl.ifBlank { source.geoipCnUrl },
-        )
         sourceDirectCidrIpv4UrlState.setTextAndPlaceCursorAtEnd(
             appState.customResourceFileDirectCidrIpv4Url.ifBlank { source.directCidrIpv4Url },
         )
@@ -703,10 +685,6 @@ fun ResourceManagementPage(
         )
         CustomResourceSourceEditorSheet(
             show = showCustomSourceEditor,
-            geositeCategoryAdsAllUrlState = sourceGeositeCategoryAdsAllUrlState,
-            geositeGoogleUrlState = sourceGeositeGoogleUrlState,
-            geositeCnUrlState = sourceGeositeCnUrlState,
-            geoipCnUrlState = sourceGeoipCnUrlState,
             directCidrIpv4UrlState = sourceDirectCidrIpv4UrlState,
             directCidrIpv6UrlState = sourceDirectCidrIpv6UrlState,
             onDismissRequest = { showCustomSourceEditor = false },
@@ -714,11 +692,6 @@ fun ResourceManagementPage(
                 updateAppState { state ->
                     state.copy(
                         resourceFileSource = ResourceFileSourceCustom,
-                        customResourceFileGeositeCategoryAdsAllUrl =
-                            sourceGeositeCategoryAdsAllUrlState.text.toString().trim(),
-                        customResourceFileGeositeGoogleUrl = sourceGeositeGoogleUrlState.text.toString().trim(),
-                        customResourceFileGeositeCnUrl = sourceGeositeCnUrlState.text.toString().trim(),
-                        customResourceFileGeoipCnUrl = sourceGeoipCnUrlState.text.toString().trim(),
                         customResourceFileDirectCidrIpv4Url = sourceDirectCidrIpv4UrlState.text.toString().trim(),
                         customResourceFileDirectCidrIpv6Url = sourceDirectCidrIpv6UrlState.text.toString().trim(),
                     )

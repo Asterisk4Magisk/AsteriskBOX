@@ -206,20 +206,12 @@ internal fun ResourceOverviewCard(
 @Composable
 internal fun CustomResourceSourceEditorSheet(
     show: Boolean,
-    geositeCategoryAdsAllUrlState: TextFieldState,
-    geositeGoogleUrlState: TextFieldState,
-    geositeCnUrlState: TextFieldState,
-    geoipCnUrlState: TextFieldState,
     directCidrIpv4UrlState: TextFieldState,
     directCidrIpv6UrlState: TextFieldState,
     onDismissRequest: () -> Unit,
     onSave: () -> Unit,
 ) {
     val sourceUrlStates = listOf(
-        geositeCategoryAdsAllUrlState,
-        geositeGoogleUrlState,
-        geositeCnUrlState,
-        geoipCnUrlState,
         directCidrIpv4UrlState,
         directCidrIpv6UrlState,
     )
@@ -264,26 +256,6 @@ internal fun CustomResourceSourceEditorSheet(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                ResourceUrlField(
-                    geositeCategoryAdsAllUrlState,
-                    ResourceFileGeositeCategoryAdsAllName,
-                    invalidSourceUrlMessage,
-                )
-                ResourceUrlField(
-                    geositeGoogleUrlState,
-                    ResourceFileGeositeGoogleName,
-                    invalidSourceUrlMessage,
-                )
-                ResourceUrlField(
-                    geositeCnUrlState,
-                    ResourceFileGeositeCnName,
-                    invalidSourceUrlMessage,
-                )
-                ResourceUrlField(
-                    geoipCnUrlState,
-                    ResourceFileGeoipCnName,
-                    invalidSourceUrlMessage,
-                )
                 ResourceUrlField(
                     directCidrIpv4UrlState,
                     ResourceFileDirectCidrIpv4Name,

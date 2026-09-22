@@ -8,13 +8,9 @@ import features.resources.ResourceFileDirectCidrIpv4Name
 import features.resources.ResourceFileDirectCidrIpv4Url
 import features.resources.ResourceFileDirectCidrIpv6Name
 import features.resources.ResourceFileDirectCidrIpv6Url
-import features.resources.ResourceFileGeoipCnName
 import features.resources.ResourceFileGeoipCnUrl
-import features.resources.ResourceFileGeositeCategoryAdsAllName
 import features.resources.ResourceFileGeositeCategoryAdsAllUrl
-import features.resources.ResourceFileGeositeCnName
 import features.resources.ResourceFileGeositeCnUrl
-import features.resources.ResourceFileGeositeGoogleName
 import features.resources.ResourceFileGeositeGoogleUrl
 import features.resources.ResourceFileSingBoxCoreName
 import features.resources.ResourceFileSourceCustom
@@ -35,15 +31,6 @@ data class SubscriptionInfo(
             val download = downloadBytes.coerceAtLeast(0L)
             val sum = upload + download
             return if (sum < 0L) Long.MAX_VALUE else sum
-        }
-
-    /** Remaining bytes derived from total - used. Falls back to 0 when unknown. */
-    val remainingBytes: Long
-        get() {
-            val total = totalBytes.coerceAtLeast(0L)
-            if (total <= 0L) return 0L
-            val used = usedBytes
-            return (total - used).coerceAtLeast(0L)
         }
 
     /**
@@ -219,10 +206,6 @@ enum class ResourceFileKind(
     val fileName: String,
 ) {
     SingBoxCore(ResourceFileSingBoxCoreName),
-    GeositeCategoryAdsAll(ResourceFileGeositeCategoryAdsAllName),
-    GeositeGoogle(ResourceFileGeositeGoogleName),
-    GeositeCn(ResourceFileGeositeCnName),
-    GeoipCn(ResourceFileGeoipCnName),
     DirectCidrIpv4(ResourceFileDirectCidrIpv4Name),
     DirectCidrIpv6(ResourceFileDirectCidrIpv6Name),
     ;
@@ -604,10 +587,6 @@ fun AppState.resourceFileUpdateSource(): ResourceFileUpdateSource {
 fun ResourceFileUpdateSource.urlFor(kind: ResourceFileKind): String? =
     when (kind) {
         ResourceFileKind.SingBoxCore -> null
-        ResourceFileKind.GeositeCategoryAdsAll -> geositeCategoryAdsAllUrl
-        ResourceFileKind.GeositeGoogle -> geositeGoogleUrl
-        ResourceFileKind.GeositeCn -> geositeCnUrl
-        ResourceFileKind.GeoipCn -> geoipCnUrl
         ResourceFileKind.DirectCidrIpv4 -> directCidrIpv4Url
         ResourceFileKind.DirectCidrIpv6 -> directCidrIpv6Url
     }

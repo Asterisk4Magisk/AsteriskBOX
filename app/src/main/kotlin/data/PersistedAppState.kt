@@ -71,6 +71,7 @@ internal data class PersistedAppState(
                 (dnsRules.maxOfOrNull(DnsRuleEntity::id) ?: 0) + 1,
             ),
             customResourceFiles = customResourceFiles.map(CustomResourceFileEntity::toState),
+            bundledRuleSetsInitialized = identity.bundledRuleSetsInitialized,
             nextCustomResourceFileId = maxOf(
                 identity.nextCustomResourceFileId,
                 (customResourceFiles.maxOfOrNull(CustomResourceFileEntity::id) ?: 0) + 1,

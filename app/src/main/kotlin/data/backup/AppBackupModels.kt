@@ -44,6 +44,7 @@ internal data class AppBackupData(
     val dnsServers: List<SingBoxDnsServerState> = emptyList(),
     val dnsRules: List<SingBoxDnsRuleState> = emptyList(),
     val customResourceFiles: List<AppBackupCustomResourceFile> = emptyList(),
+    val bundledRuleSetsInitialized: Boolean = false,
     val proxyAppListSelectedApps: List<String> = emptyList(),
 )
 

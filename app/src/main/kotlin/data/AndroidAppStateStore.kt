@@ -10,6 +10,7 @@ import app.AppState
 import app.requiresManagedTagCanonicalization
 import app.withCanonicalManagedTagReferences
 import features.logs.AndroidAppLogger
+import features.resources.withInitializedBundledRuleSets
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -200,18 +201,22 @@ class AndroidAppStateStore private constructor(
                 resetDatabase()
             }.getOrNull()
             val settings = settingsPreferences.load()
-            if (persistedState?.hasRoomContent() == true) {
-                val state = persistedState.toAppState(settings)
-                LoadedAppState(
-                    state = state,
-                    loadedFromDatabase = true,
-                )
+            val hasRoomContent = persistedState?.hasRoomContent() == true
+            val previous = if (hasRoomContent) {
+                requireNotNull(persistedState).toAppState(settings)
             } else {
-                LoadedAppState(
-                    state = settings.withCanonicalManagedTagReferences(),
-                    loadedFromDatabase = false,
-                )
+                settings.withCanonicalManagedTagReferences()
             }
+            val initialized = previous.withInitializedBundledRuleSets()
+            // Persist the records, references and marker in one Room transaction before exposing them.
+            // Otherwise a process death after deletion could cause defaults to be seeded again.
+            if (initialized !== previous) {
+                // TUN bypass references live in preferences. Commit them before the Room marker;
+                // if the Room transaction fails, the same deterministic migration can be retried.
+                settingsPreferences.saveMigration(previous, initialized)
+                dao.saveState(previous, initialized, replaceAll = !hasRoomContent)
+            }
+            LoadedAppState(state = initialized, loadedFromDatabase = true)
         }
     }
 
@@ -289,7 +294,7 @@ class AndroidAppStateStore private constructor(
         )
             // Keep committed state in the main DB file for file-based backup tools.
             .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
     }
 

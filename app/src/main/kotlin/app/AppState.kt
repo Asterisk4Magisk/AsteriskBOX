@@ -92,6 +92,7 @@ data class AppState(
     val customResourceFileDirectCidrIpv4Url: String = "",
     val customResourceFileDirectCidrIpv6Url: String = "",
     val customResourceFiles: List<CustomResourceFileState> = emptyList(),
+    val bundledRuleSetsInitialized: Boolean = false,
     val nextCustomResourceFileId: Int = 1,
     val enableSniffer: Boolean = true,
     val snifferProtocols: List<String> = DefaultSingBoxSnifferProtocols,

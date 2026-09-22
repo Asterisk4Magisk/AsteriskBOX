@@ -3,7 +3,7 @@
 
 package engine.singbox
 
-import app.ResourceFileKind
+import features.resources.BundledRuleSet
 import app.SingBoxDnsRuleMatchState
 import app.SingBoxDnsRuleState
 import app.SingBoxDnsServerState
@@ -43,7 +43,7 @@ val DefaultSingBoxDnsRules = listOf(
             SingBoxDnsRuleMatchState(
                 field = "rule_set",
                 values = listOf(
-                    managedBundledRuleSetTag(ResourceFileKind.GeositeCategoryAdsAll),
+                    managedBundledRuleSetTag(BundledRuleSet.GeositeCategoryAdsAll),
                 ),
             ),
         ),
@@ -55,7 +55,7 @@ val DefaultSingBoxDnsRules = listOf(
         matches = listOf(
             SingBoxDnsRuleMatchState(
                 field = "rule_set",
-                values = listOf(managedBundledRuleSetTag(ResourceFileKind.GeositeGoogle)),
+                values = listOf(managedBundledRuleSetTag(BundledRuleSet.GeositeGoogle)),
             ),
         ),
         server = managedDnsServerTag(2, "proxy"),
@@ -66,7 +66,7 @@ val DefaultSingBoxDnsRules = listOf(
         matches = listOf(
             SingBoxDnsRuleMatchState(
                 field = "rule_set",
-                values = listOf(managedBundledRuleSetTag(ResourceFileKind.GeositeCn)),
+                values = listOf(managedBundledRuleSetTag(BundledRuleSet.GeositeCn)),
             ),
         ),
         server = managedDnsServerTag(1, "direct"),
@@ -89,15 +89,15 @@ val DefaultSingBoxRouteRules = listOf(
     SingBoxRouteRuleState(
         id = 3,
         remarks = "google",
-        ruleSet = listOf(managedBundledRuleSetTag(ResourceFileKind.GeositeGoogle)),
+        ruleSet = listOf(managedBundledRuleSetTag(BundledRuleSet.GeositeGoogle)),
         outbound = APP_GLOBAL_SELECTOR,
     ),
     SingBoxRouteRuleState(
         id = 4,
         remarks = "china_ip_site",
         ruleSet = listOf(
-            managedBundledRuleSetTag(ResourceFileKind.GeositeCn),
-            managedBundledRuleSetTag(ResourceFileKind.GeoipCn),
+            managedBundledRuleSetTag(BundledRuleSet.GeositeCn),
+            managedBundledRuleSetTag(BundledRuleSet.GeoipCn),
         ),
         outbound = APP_DIRECT_OUTBOUND,
     ),

@@ -4,6 +4,7 @@
 package data
 
 import androidx.room.Entity
+import androidx.room.ColumnInfo
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import app.AppState
@@ -23,6 +24,7 @@ internal data class AppStateMetadataEntity(
     val nextDnsServerId: Int,
     val nextDnsRuleId: Int,
     val nextCustomResourceFileId: Int,
+    @ColumnInfo(defaultValue = "0") val bundledRuleSetsInitialized: Boolean = false,
 ) {
     companion object {
         fun from(state: AppState): AppStateMetadataEntity = AppStateMetadataEntity(
@@ -34,6 +36,7 @@ internal data class AppStateMetadataEntity(
             nextDnsServerId = state.nextDnsServerId,
             nextDnsRuleId = state.nextDnsRuleId,
             nextCustomResourceFileId = state.nextCustomResourceFileId,
+            bundledRuleSetsInitialized = state.bundledRuleSetsInitialized,
         )
     }
 }

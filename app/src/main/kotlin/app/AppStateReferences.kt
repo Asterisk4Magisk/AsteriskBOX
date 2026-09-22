@@ -69,11 +69,6 @@ internal fun AppState.managedReferenceRemarks(): Map<String, String> = buildMap 
     customResourceFiles.forEach { file ->
         putVisibleRemarks(managedCustomRuleSetTag(file.id, file.name), file.name)
     }
-    ResourceFileKind.entries
-        .filter { kind -> kind.fileName.endsWith(SingBoxRuleSetExtension, ignoreCase = true) }
-        .forEach { kind ->
-            putVisibleRemarks(managedBundledRuleSetTag(kind), kind.fileName)
-        }
 }
 
 internal fun visibleManagedReference(
@@ -230,9 +225,6 @@ internal fun AppState.currentManagedTagsByIdentity(): Map<ManagedTagIdentity, St
     customResourceFiles.forEach { file ->
         add(managedCustomRuleSetTag(file.id, file.name))
     }
-    ResourceFileKind.entries
-        .filter { kind -> kind.fileName.endsWith(SingBoxRuleSetExtension, ignoreCase = true) }
-        .forEach { kind -> add(managedBundledRuleSetTag(kind)) }
 }
 
 internal fun SingBoxRouteRuleState.withCanonicalManagedReferences(
@@ -384,20 +376,6 @@ internal fun AppState.managedRuleSetChoices(
     availableFileNames: Iterable<String>,
 ): List<ManagedRuleSetChoice> {
     val available = availableFileNames.mapTo(mutableSetOf()) { name -> name.lowercase() }
-    val bundled = ResourceFileKind.entries.mapNotNull { kind ->
-        kind.fileName
-            .takeIf { fileName ->
-                fileName.endsWith(SingBoxRuleSetExtension, ignoreCase = true) &&
-                    fileName.lowercase() in available
-            }
-            ?.let { fileName ->
-                ManagedRuleSetChoice(
-                    tag = managedBundledRuleSetTag(kind),
-                    remarks = fileName,
-                    fileName = fileName,
-                )
-            }
-    }
     val custom = customResourceFiles.mapNotNull { file ->
         file.name
             .takeIf { fileName ->
@@ -412,7 +390,7 @@ internal fun AppState.managedRuleSetChoices(
                 )
             }
     }
-    return bundled + custom
+    return custom
 }
 
 internal fun AppState.withRemovedManagedRuleSets(
@@ -501,8 +479,7 @@ private fun OutboundState.withPrunedUnavailableGroupedMembers(
             ?.content
             ?: return null
     }
-    val rawDefault = root["default"]
-    val default = when (rawDefault) {
+    val default = when (val rawDefault = root["default"]) {
         null -> null
         is JsonPrimitive -> rawDefault.takeIf(JsonPrimitive::isString)?.content ?: return null
         else -> return null
@@ -892,11 +869,11 @@ private class ManagedOutboundReferenceIndex(state: AppState) {
         return reverse
     }
 
-    private fun dependenciesOf(tag: String): List<String> = when {
-        tag == APP_DIRECT_OUTBOUND -> emptyList()
-        tag == APP_GLOBAL_SELECTOR -> globalDependencies
-        tag in selectorsByTag -> selectorsByTag.getValue(tag).value.outbounds
-        tag in groupsByTag -> outboundsByGroup[groupsByTag.getValue(tag).value.id]
+    private fun dependenciesOf(tag: String): List<String> = when (tag) {
+        APP_DIRECT_OUTBOUND -> emptyList()
+        APP_GLOBAL_SELECTOR -> globalDependencies
+        in selectorsByTag -> selectorsByTag.getValue(tag).value.outbounds
+        in groupsByTag -> outboundsByGroup[groupsByTag.getValue(tag).value.id]
             .orEmpty()
             .map(IndexedOutbound::tag)
         else -> {
@@ -1154,7 +1131,6 @@ private fun JsonObject.withReference(
 private fun JsonObject.encoded(): String =
     SingBoxJson.encodeToString(JsonElement.serializer(), this)
 
-private const val SingBoxRuleSetExtension = ".srs"
 private const val SingBoxRuleSetField = "rule_set"
 private const val SingBoxInboundField = "inbound"
 private const val SingBoxMatchResponseField = "match_response"

@@ -14,6 +14,7 @@ import app.ResourceFileStatus
 import app.ResourceFilesStatus
 import app.sanitizeCustomResourceFileName
 import features.resources.ResourceFileSourceDefault
+import features.resources.bundledRuleSetOrNull
 import features.resources.hasSingBoxRuleSetExtension
 import features.resources.singBoxRuleSetFormatOrNull
 import utils.writeAtomically
@@ -63,13 +64,10 @@ internal class AndroidResourceFileStore(
     }
 
     fun singBoxRuleSetFiles(customResourceFiles: List<CustomResourceFileState>): List<File> {
-        val bundledFiles = ResourceFileKind.entries
-            .filter { kind -> kind.fileName.hasSingBoxRuleSetExtension() }
-            .map(::file)
         val customFiles = customResourceFiles
             .filter { customFile -> customFile.name.hasSingBoxRuleSetExtension() }
             .map(::file)
-        return (bundledFiles + customFiles)
+        return customFiles
             .filter { resourceFile -> resourceFile.isFile && resourceFile.length() > 0L }
             .distinctBy { resourceFile -> resourceFile.absolutePath }
     }
@@ -89,6 +87,26 @@ internal class AndroidResourceFileStore(
                     )
                 }
         }
+    }
+
+    fun restoreBundledCustomRuleSets(customResourceFiles: List<CustomResourceFileState>) {
+        val installedAtMillis = appContext.packageUpdatedAtMillis()
+        check(installedAtMillis > 0L) { "Cannot determine the installed resource bundle version" }
+        val preferences = appContext.getSharedPreferences("bundled_rule_sets", Context.MODE_PRIVATE)
+        if (preferences.getLong("installed_at", 0L) == installedAtMillis) return
+        // This is an install/upgrade action, not a missing-file repair. Absent custom records
+        // (including user deletions) and resources with a different URL are left alone.
+        customResourceFiles.forEach { customFile ->
+            val bundled = customFile.bundledRuleSetOrNull() ?: return@forEach
+            dataDir.mkdirs()
+            appContext.assets.open("sing-box/${bundled.fileName}").use { input ->
+                writeAtomically(file(customFile)) { output -> input.copyTo(output) }
+            }
+        }
+        // Do not consume the install marker on a failed write: the next launch can retry.
+        @Suppress("UseKtx")
+        val saved = preferences.edit().putLong("installed_at", installedAtMillis).commit()
+        check(saved) { "Failed to persist bundled rule set installation" }
     }
 
     private fun hasBundledFile(kind: ResourceFileKind): Boolean {
