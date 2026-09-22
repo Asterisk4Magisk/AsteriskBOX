@@ -474,7 +474,11 @@ private fun SingBoxRouteRuleState.outboundReferences(): List<String> =
 private fun SingBoxDnsRuleState.dnsServerReferences(
     includeAction: Boolean,
 ): List<String> = buildList {
-    if (includeAction) add(server)
+    if (includeAction) {
+        when (action.trim()) {
+            "route", "evaluate" -> add(server)
+        }
+    }
     if (type == SingBoxDnsRuleTypeLogical) {
         logicalRules.forEach { rule ->
             addAll(rule.dnsServerReferences(includeAction = false))

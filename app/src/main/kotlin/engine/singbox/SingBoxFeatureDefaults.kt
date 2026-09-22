@@ -48,7 +48,6 @@ val DefaultSingBoxDnsRules = listOf(
             ),
         ),
         action = SingBoxRouteRuleActionReject,
-        server = managedDnsServerTag(2, "proxy"),
     ),
     SingBoxDnsRuleState(
         id = 2,
