@@ -510,9 +510,6 @@ private fun ResourceFileCardSurface(
 private fun ResourceVisualKind.icon(): ImageVector {
     return when (this) {
         ResourceVisualKind.Core -> Icons.Rounded.Memory
-        ResourceVisualKind.AdRuleSet -> Icons.Rounded.Block
-        ResourceVisualKind.DomainRuleSet -> Icons.Rounded.Language
-        ResourceVisualKind.IpRuleSet -> Icons.Rounded.Public
         ResourceVisualKind.RuleSet -> Icons.Rounded.Policy
         ResourceVisualKind.Cidr -> Icons.Rounded.Route
         ResourceVisualKind.Custom -> Icons.Rounded.DataObject
