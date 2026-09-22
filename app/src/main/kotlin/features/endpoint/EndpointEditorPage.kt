@@ -353,7 +353,6 @@ internal fun EndpointEditorPage(
                     )
                     Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         JsonCodeEditor(
-                            label = stringResource(R.string.endpoint_editor_json),
                             state = editorState,
                             readOnly = saving,
                             modifier = Modifier.fillMaxSize(),

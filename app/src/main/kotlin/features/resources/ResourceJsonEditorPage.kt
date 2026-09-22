@@ -265,7 +265,6 @@ internal fun ResourceJsonEditorPage(
                     }
                     Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         JsonCodeEditor(
-                            label = stringResource(R.string.settings_resource_json_editor_content),
                             state = editorState,
                             readOnly = saving,
                             modifier = Modifier.fillMaxSize(),
