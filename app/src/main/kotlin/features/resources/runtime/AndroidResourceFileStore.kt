@@ -70,6 +70,7 @@ internal class AndroidResourceFileStore(
         assetDirectory.migrateRegistered(
             ResourceFileKind.entries.filterNot { it == ResourceFileKind.SingBoxCore }.map { it.fileName } +
                 customResourceFiles.map { it.name },
+            marker = File(appContext.noBackupFilesDir, "resource-assets-migration-v1"),
         )
     }
 
