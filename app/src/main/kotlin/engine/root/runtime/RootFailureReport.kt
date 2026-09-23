@@ -15,6 +15,9 @@ import utils.shellQuote
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Builds the diagnostic payload attached to a failure dialog: a device/system summary and the
@@ -124,13 +127,14 @@ internal data class RootFailureReport(
                 "/data/adb/magisk/magisk",
             )
             for (candidate in candidates) {
-                val value = runCatching {
+                currentCoroutineContext().ensureActive()
+                val value = diagnosticOrNull {
                     shell.exec("$candidate -V 2>/dev/null", ShellExecOptions(logFailure = false))
                         .stdout
                         .lineSequence()
                         .firstOrNull { it.isNotBlank() }
                         ?.trim()
-                }.getOrNull()
+                }
                 if (!value.isNullOrBlank()) return value
             }
             return null
@@ -211,6 +215,7 @@ internal data class RootFailureReport(
          * through the ROOT shell gateway. A direct read is attempted as a fallback.
          */
         internal suspend fun readText(shell: RootShellGateway, path: String, tailLines: Int? = null): String? {
+            currentCoroutineContext().ensureActive()
             // `logcat.log` grows without bound, so when only the tail is wanted ask the shell for
             // it rather than piping the whole file through the shell and discarding the head.
             val command = if (tailLines != null) {
@@ -218,15 +223,25 @@ internal data class RootFailureReport(
             } else {
                 "cat ${path.shellQuote()}"
             }
-            val viaShell = runCatching {
+            val viaShell = diagnosticOrNull {
                 val result = shell.exec(command, ShellExecOptions(logFailure = false))
                 result.stdout.takeIf { result.errno == 0 && it.isNotBlank() }
-            }.getOrNull()
+            }
             if (viaShell != null) return viaShell
 
-            return runCatching {
+            currentCoroutineContext().ensureActive()
+            return diagnosticOrNull {
                 File(path).takeIf { it.isFile && it.canRead() }?.readText()
-            }.getOrNull()?.takeIf { it.isNotBlank() }
+            }?.takeIf { it.isNotBlank() }
         }
     }
+}
+
+/** Diagnostics may fail, but cancellation must still stop ROOT work. */
+internal inline fun <T> diagnosticOrNull(block: () -> T): T? = try {
+    block()
+} catch (error: CancellationException) {
+    throw error
+} catch (_: Exception) {
+    null
 }

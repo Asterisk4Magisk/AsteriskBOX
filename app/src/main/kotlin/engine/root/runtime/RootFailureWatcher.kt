@@ -4,174 +4,207 @@
 package engine.root.runtime
 
 import android.content.Context
+import app.modes.RunModeVpnService
+import data.AndroidAppStateStore
 import engine.root.publication.RootRuntimeLayout
-import features.logs.AndroidAppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 import system.RootShellGateway
 import java.io.File
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Duration.Companion.milliseconds
 
-/**
- * Process-wide watcher for ROOT supervisor failures.
- *
- * The supervisor runs out of process (asteriskd under KSU's root context) and reports failures
- * through `asteriskd.state`. When the core process dies after reaching `running` — the common
- * eBPF case, where sing-box accepts its config and then aborts — the start call has already
- * returned successfully, so nothing synchronous observes the failure. This watcher bridges
- * that gap: it tails the state file and publishes a [ProxyErrorExplanation] to [ProxyErrorBus]
- * so the UI can surface a dialog.
- *
- * Exactly one watcher runs per application process, regardless of how many mode controllers
- * exist. A second [ensureStarted] call is a no-op.
- *
- * Freshness rule: a failure is surfaced only when the state file's modification time differs
- * from both the value captured when the watcher started and the value already published. A
- * failure record left behind by a previous session therefore never raises a dialog on app
- * launch; only a failure written while this process is running does.
- */
+/** Started by ROOT operations, never by constructing an engine or rendering the dialog. */
 internal object RootFailureWatcher {
-
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val started = AtomicBoolean(false)
-    private val attemptReset = AtomicBoolean(false)
+    private val lifecycle = Mutex()
+    private var job: Job? = null
+    private var deadline: Job? = null
+    private val delivery = RootFailureDelivery()
+    private var watchingAllowed = true
+    private var launchInProgress = false
 
-    fun ensureStarted(context: Context, shell: RootShellGateway, layout: RootRuntimeLayout) {
-        if (!started.compareAndSet(false, true)) return
-        // Capture the baseline here, synchronously, before the watcher coroutine is scheduled.
-        // `scope.launch` gives no ordering guarantee, and a supervisor failure landing in that
-        // gap would otherwise be recorded as the baseline and then dismissed as a leftover
-        // record — silently dropping the very failure this watcher exists to report.
-        val baselineMtime = runCatching { File(layout.asteriskdStatePath).lastModified() }
-            .getOrDefault(0L)
-        scope.launch { watch(context.applicationContext, shell, layout, baselineMtime) }
+    suspend fun ensureStarted(
+        context: Context,
+        shell: RootShellGateway,
+        layout: RootRuntimeLayout,
+        explicitRootAction: Boolean = false,
+        running: Boolean = true,
+    ) {
+        lifecycle.withLock {
+            val store = AndroidAppStateStore.get(context.applicationContext)
+            if (store.state.value.runMode == RunModeVpnService) return
+            // Status streams may still contain Running from the previous service cycle.
+            if (launchInProgress && running && !explicitRootAction) return
+            if (explicitRootAction) launchInProgress = !running
+            if (job?.isActive == true) {
+                if (running) startDeadline()
+                return
+            }
+            if (explicitRootAction) watchingAllowed = true
+            if (!watchingAllowed) return
+            // Consume this attempt before launching. Status queries cannot rearm an expired watcher.
+            watchingAllowed = false
+            deadline?.cancelAndJoin()
+            deadline = null
+            // Capture before scheduling: a failure arriving immediately after launch is fresh.
+            val baseline = File(layout.asteriskdStatePath).lastModified()
+            // Attaching to an externally restarted resident service is also a new episode.
+            delivery.beginAttempt()
+            job = scope.launch {
+                watch(context.applicationContext, shell, layout, baseline) {
+                    store.state.value.runMode != RunModeVpnService
+                }
+            }
+            if (running) startDeadline()
+        }
     }
 
-    /**
-     * Signal that a new start attempt has begun, so a failure from it publishes again even if the
-     * previous episode's failure is still the newest record in the state file.
-     *
-     * Without this the watcher would depend on observing an intermediate failure-free state write
-     * to re-arm. That write is normally seen, but if it lands between two polls the retry's
-     * failure would be swallowed with no dialog at all — a silent failure of the exact feature
-     * this exists to provide. An explicit signal removes that dependency.
-     */
-    fun beginAttempt() {
-        attemptReset.set(true)
+    suspend fun beginAttempt() {
+        lifecycle.withLock {
+            cancelMonitoring()
+            watchingAllowed = true
+            launchInProgress = true
+            delivery.beginAttempt()
+        }
+    }
+
+    fun currentAttempt(): Long = delivery.currentAttempt()
+
+    fun publish(explanation: ProxyErrorExplanation, expectedAttempt: Long) {
+        delivery.publish(explanation, expectedAttempt)
+    }
+
+    /** Await cancellation before returning from the ROOT stop boundary. */
+    suspend fun stop() {
+        lifecycle.withLock {
+            watchingAllowed = false
+            launchInProgress = false
+            cancelMonitoring()
+        }
+    }
+
+    // Called under lifecycle. The first Running confirmation owns the deadline;
+    // subsequent status events must not extend the observation window.
+    private fun startDeadline() {
+        if (deadline != null) return
+        deadline = scope.launch {
+            delay(30_000L.milliseconds)
+            lifecycle.withLock {
+                job?.cancelAndJoin()
+                job = null
+            }
+        }
+    }
+
+    private suspend fun cancelMonitoring() {
+        deadline?.cancelAndJoin()
+        deadline = null
+        job?.cancelAndJoin()
+        job = null
     }
 
     private suspend fun watch(
         context: Context,
         shell: RootShellGateway,
         layout: RootRuntimeLayout,
-        baselineMtime: Long,
+        baseline: Long,
+        rootModeSelected: () -> Boolean,
     ) {
-        val statePath = layout.asteriskdStatePath
-        val stateFile = File(statePath)
-        val errorLogPath = layout.logDirectoryPath + "/error.log"
-
-        var lastSeenMtime = NOT_CAPTURED
-        // The supervisor writes the state file several times for a single failure (failed, then
-        // stopping, then stopped), each write bumping the mtime, and the rendered failure shifts
-        // slightly between those writes. Keying publication on the failure code instead of on the
-        // write means one dialog per failure episode, while a change of code within the episode
-        // still gets through.
-        var publishedErrorCode: String? = null
-
-        while (true) {
-            val mtime = runCatching { stateFile.lastModified() }.getOrDefault(0L)
-
-            if (attemptReset.compareAndSet(true, false)) {
-                publishedErrorCode = null
+        val stateFile = File(layout.asteriskdStatePath)
+        val episode = RootFailureEpisode(baseline)
+        var observedAttempt = currentAttempt()
+        while (rootModeSelected()) {
+            currentCoroutineContext().ensureActive()
+            val currentAttempt = currentAttempt()
+            if (currentAttempt != observedAttempt) {
+                episode.beginAttempt()
+                observedAttempt = currentAttempt
             }
-
-            if (mtime > 0L && mtime != lastSeenMtime) {
-                lastSeenMtime = mtime
-                val state = readState(shell, statePath)
-                val errorCode = state?.errorCode
-                when {
-                    state == null -> Unit
-                    // A settled, failure-free state closes the episode: the next failure publishes.
-                    errorCode == null -> publishedErrorCode = null
-                    mtime == baselineMtime -> Unit
-                    errorCode == publishedErrorCode -> Unit
-                    else -> {
-                        publishedErrorCode = errorCode
-                        val occurredAt = System.currentTimeMillis()
-                        val report = RootFailureReport.build(context, shell, layout, occurredAt)
+            val mtime = stateFile.lastModified()
+            if (episode.needsRead(mtime)) {
+                val state = diagnosticOrNull {
+                    RootFailureReport.readText(shell, layout.asteriskdStatePath)?.let(::JSONObject)
+                }
+                if (state != null) {
+                    val failure = state.optJSONObject("failure")
+                    val code = failure?.optString("code")?.takeIf(String::isNotBlank)
+                    // A resident supervisor may be started externally without an app launch call.
+                    if (code == null && episode.hasFailure &&
+                        state.optString("phase") in setOf("starting", "applying-rules", "running")
+                    ) {
+                        delivery.beginAttempt()
+                    }
+                    if (episode.shouldPublish(mtime, code) && rootModeSelected()) {
+                        val time = System.currentTimeMillis()
+                        val report = diagnosticOrNull { RootFailureReport.build(context, shell, layout, time) }
+                        val errorTail = RootFailureReport.readText(shell, "${layout.logDirectoryPath}/error.log", 20)
                         val explanation = RootEbpfFailureAnalyzer.analyze(
-                            errorCode = errorCode,
-                            exitCode = state.exitCode,
-                            message = state.errorMessage,
-                            mode = state.mode,
-                            extraContext = readLastFatalLine(shell, errorLogPath),
-                            occurredAtEpochMillis = occurredAt,
-                        ).copy(
-                            deviceInfo = report.deviceInfo,
-                            serviceLog = report.serviceLog,
-                        )
-                        runCatching {
-                            AndroidAppLogger.warn(
-                                LogTag,
-                                "proxy_failure mode=${explanation.mode} code=$errorCode diagnostics=${explanation.diagnostics.size}",
-                            )
+                            errorCode = requireNotNull(code),
+                            exitCode = failure.optInt("exitCode", -1).takeIf { it >= 0 },
+                            message = failure.optString("message"),
+                            mode = state.optString("mode"),
+                            // Prefer the sing-box fatal line when available.
+                            extraContext = errorTail?.lineSequence()?.map(String::trim)?.lastOrNull { it.startsWith("FATAL[") },
+                            occurredAtEpochMillis = time,
+                        ).copy(deviceInfo = report?.deviceInfo.orEmpty(), serviceLog = report?.serviceLog.orEmpty())
+                        currentCoroutineContext().ensureActive()
+                        if (rootModeSelected()) {
+                            publish(explanation, currentAttempt)
                         }
-                        ProxyErrorBus.publish(explanation)
                     }
                 }
             }
-            delay(PollIntervalMillis)
+            delay(500L.milliseconds)
         }
     }
+}
 
-    private data class SupervisorState(
-        val mode: String,
-        val errorCode: String?,
-        val exitCode: Int?,
-        val errorMessage: String?,
-    )
+/** Pure freshness/episode policy, separate from ROOT IO for regression testing. */
+internal class RootFailureEpisode(private val baseline: Long) {
+    private var lastRead = Long.MIN_VALUE
+    private var publishedCode: String? = null
+    val hasFailure: Boolean get() = publishedCode != null
 
-    /**
-     * Parse the persisted supervisor state. The failure is optional: a healthy or in-progress
-     * state parses too, and reporting it as [SupervisorState.errorCode] `null` is what lets the
-     * watcher close a failure episode. Returning `null` for the whole state instead — as an
-     * earlier version did when `failure.code` was absent — made that reset unreachable, so a
-     * later attempt repeating the previous failure code produced no dialog at all.
-     */
-    private suspend fun readState(shell: RootShellGateway, path: String): SupervisorState? {
-        val text = RootFailureReport.readText(shell, path) ?: return null
-        return runCatching {
-            val state = JSONObject(text)
-            val failure = state.optJSONObject("failure")
-            SupervisorState(
-                mode = state.optString("mode"),
-                errorCode = failure?.optString("code")?.takeIf { it.isNotEmpty() },
-                exitCode = failure?.optInt("exitCode", -1)?.takeIf { it >= 0 },
-                errorMessage = failure?.optString("message")?.takeIf { it.isNotEmpty() },
-            )
-        }.getOrNull()
+    fun beginAttempt() {
+        publishedCode = null
     }
 
-    /**
-     * Read the newest sing-box FATAL line from the service error log. The state file only
-     * carries the supervisor-level message ("required core exited"); the actionable signature
-     * (for example "create TC eBPF delivery link: operation not supported") is written by the
-     * core to its own error log.
-     */
-    private suspend fun readLastFatalLine(shell: RootShellGateway, path: String): String? {
-        val text = RootFailureReport.readText(shell, path) ?: return null
-        return text.lineSequence()
-            .map(String::trim)
-            .filter { it.startsWith(FatalPrefix) }
-            .lastOrNull()
-    }
+    fun needsRead(mtime: Long): Boolean = mtime > 0L && mtime != lastRead
 
-    private const val NOT_CAPTURED = Long.MIN_VALUE
-    private const val PollIntervalMillis = 500L
-    private const val FatalPrefix = "FATAL["
-    private const val LogTag = "RootFailureWatcher"
+    fun shouldPublish(mtime: Long, code: String?): Boolean {
+        lastRead = mtime
+        if (code == null) {
+            publishedCode = null
+            return false
+        }
+        if (mtime == baseline || code == publishedCode) return false
+        publishedCode = code
+        return true
+    }
+}
+
+/** Both the synchronous start and the watcher may observe one failure; deliver it once. */
+internal class RootFailureDelivery {
+    private var attempt = 0L
+    private var publishedAttempt = -1L
+
+    @Synchronized fun beginAttempt(): Long = ++attempt
+    @Synchronized fun currentAttempt(): Long = attempt
+
+    @Synchronized fun publish(explanation: ProxyErrorExplanation, expectedAttempt: Long): Boolean {
+        if (expectedAttempt != attempt || publishedAttempt == attempt) return false
+        publishedAttempt = attempt
+        ProxyErrorBus.publish(explanation)
+        return true
+    }
 }

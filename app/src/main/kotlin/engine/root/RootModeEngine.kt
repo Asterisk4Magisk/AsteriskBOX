@@ -17,7 +17,6 @@ import engine.root.mode.RootModeDefinition
 import engine.root.mode.DefaultTproxyPort as ModeDefaultTproxyPort
 import engine.root.mode.DefaultTun2SocksProxyPort as ModeDefaultTun2SocksProxyPort
 import engine.root.publication.rootRuntimeLayout
-import engine.root.runtime.ProxyErrorBus
 import engine.root.runtime.RootEbpfFailureAnalyzer
 import engine.root.runtime.RootFailureReport
 import engine.root.runtime.RootFailureWatcher
@@ -87,9 +86,6 @@ internal class RootModeEngine(
         val rootContext = context.prepareRootConfigBuildContext(request)
         val config = definition.buildConfig(rootContext)
         require(config.asteriskdConfig.mode == definition.daemonMode)
-        // A new attempt begins: a failure from it must be publishable even while the previous
-        // failure is still the newest record in the supervisor state file.
-        RootFailureWatcher.beginAttempt()
         return runCatching {
             val snapshot = if (explicitRestart) {
                 controller.restart(config.root, config.asteriskdConfig)
@@ -108,6 +104,7 @@ internal class RootModeEngine(
             // Surface a diagnostic dialog for start failures that happen synchronously (for
             // example the launcher script refusing to run). Failures that happen after the
             // supervisor already reached `running` are picked up by RootFailureWatcher.
+            val attempt = RootFailureWatcher.currentAttempt()
             val occurredAt = System.currentTimeMillis()
             val report = RootFailureReport.build(
                 context = context,
@@ -115,7 +112,7 @@ internal class RootModeEngine(
                 layout = context.rootRuntimeLayout(),
                 occurredAtEpochMillis = occurredAt,
             )
-            ProxyErrorBus.publish(
+            RootFailureWatcher.publish(
                 RootEbpfFailureAnalyzer.analyze(
                     runMode = runMode,
                     error = error,
@@ -124,6 +121,7 @@ internal class RootModeEngine(
                     deviceInfo = report.deviceInfo,
                     serviceLog = report.serviceLog,
                 ),
+                expectedAttempt = attempt,
             )
             throw IllegalStateException(
                 context.getString(definition.startFailedErrorResId, error.message.orEmpty()),
@@ -153,9 +151,6 @@ internal class RootModeEngine(
         if (!rootAccess.hasRootAccess()) error(context.getString(definition.rootRequiredErrorResId))
         val config = definition.buildConfig(context.prepareRootConfigBuildContext(request))
         require(config.asteriskdConfig.mode == definition.daemonMode)
-        // Reconfiguring can start a Service attempt of its own, so it counts as a new attempt:
-        // without this a failure repeating the previous code would be suppressed.
-        RootFailureWatcher.beginAttempt()
         val wasRunning = controller.reconfigureServiceControl(config.root, config.asteriskdConfig)
         if (wasRunning) {
             restoreStartedMode(request)
