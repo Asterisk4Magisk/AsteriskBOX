@@ -228,7 +228,7 @@ internal fun SettingsAdvancedSection(
         }
         OverlayDropdownPreference(
             title = stringResource(R.string.settings_run_mode),
-            icon = Icons.Rounded.AccountTree,
+            icon = Icons.Rounded.SettingsEthernet,
             items = runModeOptions,
             selectedIndex = selectedRunModeIndex.coerceIn(runModeOptions.indices),
             onSelectedIndexChange = onRunModeChange,

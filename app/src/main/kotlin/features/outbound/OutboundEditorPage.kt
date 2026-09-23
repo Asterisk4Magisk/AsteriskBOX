@@ -248,7 +248,7 @@ internal fun OutboundEditorPage(
                     )
                     SettingsDropdownRow(
                         title = stringResource(R.string.outbound_group),
-                        icon = Icons.Rounded.AccountTree,
+                        icon = Icons.Rounded.Folder,
                         items = visibleGroups.map { it.displayName() },
                         selectedIndex = visibleGroups
                             .indexOfFirst { it.id == selectedGroupId }
