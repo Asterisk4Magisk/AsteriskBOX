@@ -182,7 +182,11 @@ internal fun publishValidatedResourceCandidate(
             val parent = target.parentFile
                 ?: error("Parent directory is unavailable for ${target.absolutePath}")
             require(parent.exists() || parent.mkdirs())
-            val staged = File.createTempFile(".${target.name}.", ".publish", parent)
+            val staged = if (parent.name == "assets") {
+                ResourceAssetDirectory(checkNotNull(parent.parentFile)).createCandidate("publish-")
+            } else {
+                File.createTempFile(".${target.name}.", ".publish", parent)
+            }
             stagedFile = staged
             candidate.inputStream().use { input ->
                 staged.outputStream().use { output ->

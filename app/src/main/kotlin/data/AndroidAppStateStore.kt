@@ -6,6 +6,7 @@ package data
 import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import features.resources.runtime.synchronizeResourceAssets
 import app.AppState
 import app.requiresManagedTagCanonicalization
 import app.withCanonicalManagedTagReferences
@@ -47,6 +48,7 @@ class AndroidAppStateStore private constructor(
 
     init {
         hasPersistedState.set(loadedState.loadedFromDatabase)
+        update { appContext.synchronizeResourceAssets(it) }
     }
 
     val state: StateFlow<AppState> = mutableState.asStateFlow()

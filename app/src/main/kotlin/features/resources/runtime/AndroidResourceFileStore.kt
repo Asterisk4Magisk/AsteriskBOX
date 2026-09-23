@@ -1,4 +1,4 @@
-﻿// Copyright 2026, AsteriskBOX contributors
+// Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
 package features.resources.runtime
@@ -7,17 +7,19 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import app.AppState
 import app.CustomResourceFileState
 import app.CustomResourceFileStatus
 import app.ResourceFileKind
 import app.ResourceFileStatus
 import app.ResourceFilesStatus
-import app.sanitizeCustomResourceFileName
+import features.resources.isSupportedCustomResourceName
+import features.resources.isSupportedResourceName
 import features.resources.ResourceFileSourceDefault
 import features.resources.bundledRuleSetOrNull
 import features.resources.hasSingBoxRuleSetExtension
 import features.resources.singBoxRuleSetFormatOrNull
-import utils.writeAtomically
+import features.resources.runtime.writeResourceAtomically as writeAtomically
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -29,6 +31,8 @@ internal class AndroidResourceFileStore(
 ) {
     private val appContext = context.applicationContext
     val dataDir: File = appContext.singBoxResourceFilesDir()
+    private val assetDirectory = ResourceAssetDirectory(dataDir)
+    val assetsDir: File = assetDirectory.assetsDir
 
     fun status(customResourceFiles: List<CustomResourceFileState> = emptyList()): ResourceFilesStatus {
         return currentStatus(customResourceFiles)
@@ -40,7 +44,7 @@ internal class AndroidResourceFileStore(
                 val target = if (kind == ResourceFileKind.SingBoxCore) effectiveSingBoxCoreFile() else file(kind)
                 target.toStatus(kind)
             },
-            customResourceFiles = customResourceFiles.map { customFile ->
+            customResourceFiles = scanCustomResources(customResourceFiles).map { customFile ->
                 CustomResourceFileStatus(
                     file = customFile,
                     status = file(customFile).toStatus(),
@@ -50,17 +54,36 @@ internal class AndroidResourceFileStore(
     }
 
     fun file(kind: ResourceFileKind): File {
-        return File(dataDir, kind.fileName)
+        return if (kind == ResourceFileKind.SingBoxCore) File(dataDir, kind.fileName)
+        else assetDirectory.file(kind.fileName)
     }
 
     fun file(customFile: CustomResourceFileState): File {
-        return File(
-            dataDir,
-            sanitizeCustomResourceFileName(
-                value = customFile.name,
-                fallback = "custom-resource-${customFile.id}.dat",
-            ),
+        require(isSupportedCustomResourceName(customFile.name)) { "Unsupported resource: ${customFile.name}" }
+        require(ResourceFileKind.entries.none { it.fileName == customFile.name }) {
+            "Reserved resource name: ${customFile.name}"
+        }
+        return assetDirectory.file(customFile.name)
+    }
+
+    fun migrateRegistered(customResourceFiles: List<CustomResourceFileState>) {
+        assetDirectory.migrateRegistered(
+            ResourceFileKind.entries.filterNot { it == ResourceFileKind.SingBoxCore }.map { it.fileName } +
+                customResourceFiles.map { it.name },
         )
+    }
+
+    fun scanCustomResources(customResourceFiles: List<CustomResourceFileState>): List<CustomResourceFileState> {
+        val diskFiles = assetDirectory.scan(::isSupportedResourceName)
+        val builtInNames = ResourceFileKind.entries.map { it.fileName }.toSet()
+        val registered = customResourceFiles.filter {
+            isSupportedCustomResourceName(it.name) && it.name !in builtInNames
+        }.distinctBy { it.name }
+        val knownNames = registered.map { it.name }.toSet() + ResourceFileKind.entries.map { it.fileName }
+        var nextId = (customResourceFiles.maxOfOrNull { it.id } ?: 0) + 1
+        return registered + diskFiles.filter { it.name !in knownNames }.map {
+            CustomResourceFileState(id = nextId++, name = it.name, url = "")
+        }
     }
 
     fun singBoxRuleSetFiles(customResourceFiles: List<CustomResourceFileState>): List<File> {
@@ -151,7 +174,7 @@ internal class AndroidResourceFileStore(
     fun replace(kind: ResourceFileKind, uri: Uri) {
         require(kind != ResourceFileKind.SingBoxCore) { "sing-box core must be replaced through the locked publisher" }
         dataDir.mkdirs()
-        val replaceTempFile = file(kind).resolveSibling("${kind.fileName}.replace.tmp")
+        val replaceTempFile = assetDirectory.createCandidate("replace-")
         appContext.contentResolver.openInputStream(uri)?.use { input ->
             replaceTempFile.outputStream().use { output -> input.copyTo(output) }
         } ?: throw FileNotFoundException(uri.toString())
@@ -218,7 +241,7 @@ internal class AndroidResourceFileStore(
         val target = file(customFile)
         if (ResourceFileKind.entries.any { kind -> kind.fileName == target.name }) return
         dataDir.mkdirs()
-        val replaceTempFile = target.resolveSibling("${target.name}.replace.tmp")
+        val replaceTempFile = assetDirectory.createCandidate("replace-")
         appContext.contentResolver.openInputStream(uri)?.use { input ->
             replaceTempFile.outputStream().use { output -> input.copyTo(output) }
         } ?: throw FileNotFoundException(uri.toString())
@@ -281,12 +304,14 @@ internal class AndroidResourceFileStore(
 
     fun preparePaths(): SingBoxResourceFilePaths {
         dataDir.mkdirs()
+        assetsDir.mkdirs()
         return currentPaths()
     }
 
     fun currentPaths(): SingBoxResourceFilePaths {
         return SingBoxResourceFilePaths(
             dataDir = dataDir.absolutePath,
+            assetsDir = assetsDir.absolutePath,
             asteriskdPath = File(appContext.applicationInfo.nativeLibraryDir, AsteriskdLibraryName).absolutePath,
             bpfMatcherPath = File(appContext.applicationInfo.nativeLibraryDir, BpfMatcherLibraryName).absolutePath,
             bpf2socksPath = File(appContext.applicationInfo.nativeLibraryDir, Bpf2SocksLibraryName).absolutePath,
@@ -344,6 +369,7 @@ internal fun shouldRestoreBundledResourceFile(
 
 internal data class SingBoxResourceFilePaths(
     val dataDir: String,
+    val assetsDir: String,
     val asteriskdPath: String,
     val bpfMatcherPath: String,
     val bpf2socksPath: String,
@@ -351,6 +377,17 @@ internal data class SingBoxResourceFilePaths(
     val directCidrIpv4Path: String,
     val directCidrIpv6Path: String,
     val hevSocks5TunnelPath: String,
+)
+
+internal fun Context.synchronizeResourceAssets(state: AppState): AppState {
+    val store = AndroidResourceFileStore(this)
+    store.migrateRegistered(state.customResourceFiles)
+    return state.withScannedResourceFiles(store.scanCustomResources(state.customResourceFiles))
+}
+
+internal fun AppState.withScannedResourceFiles(files: List<CustomResourceFileState>): AppState = copy(
+    customResourceFiles = files,
+    nextCustomResourceFileId = maxOf(nextCustomResourceFileId, (files.maxOfOrNull { it.id } ?: 0) + 1),
 )
 
 internal fun Context.singBoxResourceFilesDir(): File {

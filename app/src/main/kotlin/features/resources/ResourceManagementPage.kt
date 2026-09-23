@@ -5,6 +5,8 @@
 
 package features.resources
 
+import features.resources.runtime.withScannedResourceFiles
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -331,8 +333,14 @@ fun ResourceManagementPage(
         showCustomSourceEditor = true
     }
 
-    LaunchedEffect(appState.customResourceFiles, updateQueueState.completionRevision) {
-        status = resourceFileUseCase.status(appState.customResourceFiles)
+    LaunchedEffect(appState.customResourceFiles, updateQueueState.completionRevision, resourceActionRunning) {
+        if (resourceActionRunning) return@LaunchedEffect
+        val registered = appState.customResourceFiles
+        status = resourceFileUseCase.status(registered)
+        val scanned = status.customResourceFiles.map { it.file }
+        updateAppState { current ->
+            if (current.customResourceFiles == registered) current.withScannedResourceFiles(scanned) else current
+        }
     }
     val resourceCatalogUpdateOptions = appState.resourceFileUpdateOptions()
     LaunchedEffect(

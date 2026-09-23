@@ -3,7 +3,7 @@
 
 package features.resources.runtime
 
-import utils.writeAtomically
+import features.resources.runtime.writeResourceAtomically as writeAtomically
 import java.io.File
 import java.net.URI
 

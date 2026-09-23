@@ -103,6 +103,9 @@ internal fun validateCustomResourceDraft(
     val cleanUrl = url.trim()
     val fileName = customResourceFileNameOrNull(cleanName)
         ?: return CustomResourceDraftValidation(cleanName, cleanUrl, CustomResourceDraftError.InvalidName)
+    if (!isSupportedCustomResourceName(fileName)) {
+        return CustomResourceDraftValidation(fileName, cleanUrl, CustomResourceDraftError.InvalidName)
+    }
     val format = fileName.singBoxRuleSetFormatOrNull()
     if (format == null) {
         return CustomResourceDraftValidation(fileName, cleanUrl, CustomResourceDraftError.UnsupportedExtension)
