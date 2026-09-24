@@ -16,7 +16,7 @@ internal fun singBoxOptionLabel(
     val normalizedValue = rawValue.trim()
     return if (
         normalizedValue.isEmpty() ||
-        label.equals(normalizedValue, ignoreCase = true) ||
+        label.replace('-', ' ').equals(normalizedValue.replace('-', ' '), ignoreCase = true) ||
         isManagedSingBoxTag(normalizedValue)
     ) {
         label

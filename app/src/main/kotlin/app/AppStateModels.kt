@@ -110,6 +110,7 @@ val SupportedSingBoxEndpointTypes = listOf(
     "tailscale",
     "openconnect",
     "openvpn-client",
+    "masque-client",
 )
 
 @Stable

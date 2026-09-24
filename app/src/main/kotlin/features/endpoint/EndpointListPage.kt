@@ -557,6 +557,7 @@ internal fun endpointTypeTitle(type: String): String = stringResource(
         "tailscale" -> R.string.endpoint_type_tailscale
         "openconnect" -> R.string.endpoint_type_openconnect
         "openvpn-client" -> R.string.endpoint_type_openvpn_client
+        "masque-client" -> R.string.endpoint_type_masque_client
         else -> R.string.endpoint_editor_invalid
     },
 )
@@ -568,6 +569,7 @@ internal fun endpointTypeSummary(type: String): String = stringResource(
         "tailscale" -> R.string.endpoint_type_tailscale_summary
         "openconnect" -> R.string.endpoint_type_openconnect_summary
         "openvpn-client" -> R.string.endpoint_type_openvpn_client_summary
+        "masque-client" -> R.string.endpoint_type_masque_client_summary
         else -> R.string.endpoint_editor_invalid
     },
 )
@@ -577,6 +579,7 @@ internal fun endpointTypeIcon(type: String): ImageVector = when (type) {
     "tailscale" -> Icons.Rounded.Hub
     "openconnect" -> Icons.Rounded.Security
     "openvpn-client" -> Icons.Rounded.VpnLock
+    "masque-client" -> Icons.Rounded.Router
     else -> Icons.Rounded.Router
 }
 

@@ -935,8 +935,10 @@
     <string name="endpoint_type_tailscale_summary">将本设备接入 Tailscale 网络</string>
     <string name="endpoint_type_openconnect">OpenConnect</string>
     <string name="endpoint_type_openconnect_summary">连接兼容 AnyConnect 的 VPN 服务器</string>
-    <string name="endpoint_type_openvpn_client">OpenVPN 客户端</string>
+    <string name="endpoint_type_openvpn_client">OpenVPN Client</string>
     <string name="endpoint_type_openvpn_client_summary">使用 OpenVPN 客户端配置建立连接</string>
+    <string name="endpoint_type_masque_client">MASQUE Client</string>
+    <string name="endpoint_type_masque_client_summary">通过 HTTP 建立 IP 代理连接（CONNECT-IP）</string>
     <string name="outbound_editor_value">值</string>
     <string name="outbound_editor_tls_required">此协议必须启用</string>
     <string name="outbound_editor_section_identity">标识</string>
@@ -1277,7 +1279,7 @@
     <string name="settings_dns_server_type_tailscale">Tailscale</string>
     <string name="settings_dns_server_type_openconnect">OpenConnect</string>
     <string name="settings_dns_server_type_openvpn">OpenVPN</string>
-    <string name="settings_dns_server_type_resolved">systemd-resolved</string>
+    <string name="settings_dns_server_type_resolved">Resolved</string>
     <string name="settings_dns_action_route">路由</string>
     <string name="settings_dns_action_evaluate">评估</string>
     <string name="settings_dns_action_respond">响应</string>

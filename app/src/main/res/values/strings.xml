@@ -952,6 +952,8 @@
     <string name="endpoint_type_openconnect_summary">Connect to an AnyConnect-compatible VPN server</string>
     <string name="endpoint_type_openvpn_client">OpenVPN Client</string>
     <string name="endpoint_type_openvpn_client_summary">Connect using an OpenVPN client profile</string>
+    <string name="endpoint_type_masque_client">MASQUE Client</string>
+    <string name="endpoint_type_masque_client_summary">Connect using IP proxying over HTTP (CONNECT-IP)</string>
     <string name="outbound_editor_value">Value</string>
     <string name="outbound_editor_tls_required">Required by this protocol</string>
     <string name="outbound_editor_section_identity">Identity</string>
@@ -1296,7 +1298,7 @@
     <string name="settings_dns_server_type_tailscale">Tailscale</string>
     <string name="settings_dns_server_type_openconnect">OpenConnect</string>
     <string name="settings_dns_server_type_openvpn">OpenVPN</string>
-    <string name="settings_dns_server_type_resolved">systemd-resolved</string>
+    <string name="settings_dns_server_type_resolved">Resolved</string>
     <string name="settings_dns_action_route">Route</string>
     <string name="settings_dns_action_evaluate">Evaluate</string>
     <string name="settings_dns_action_respond">Respond</string>
