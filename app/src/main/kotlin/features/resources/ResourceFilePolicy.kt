@@ -16,4 +16,4 @@ internal fun isSupportedResourceName(name: String): Boolean =
     ResourceFileKind.entries.any { it != ResourceFileKind.SingBoxCore && it.fileName == name } ||
         isSupportedCustomResourceName(name)
 
-private val SupportedResourceExtensions = setOf("srs", "json")
+private val SupportedResourceExtensions = setOf("srs", "json", "hosts")

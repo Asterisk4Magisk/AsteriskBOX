@@ -114,6 +114,20 @@ internal fun JsonCodeEditor(
 }
 
 @Composable
+internal fun HostsCodeEditor(
+    state: SingBoxCodeEditorState,
+    modifier: Modifier = Modifier,
+    readOnly: Boolean = false,
+) {
+    SoraCodeEditor(
+        state = state,
+        language = SingBoxCodeLanguage.Hosts,
+        readOnly = readOnly,
+        modifier = modifier,
+    )
+}
+
+@Composable
 private fun SoraCodeEditor(
     state: SingBoxCodeEditorState,
     language: SingBoxCodeLanguage,

@@ -79,7 +79,7 @@ internal fun customResourceDisplayActions(file: CustomResourceFileState): List<R
         if (file.url.isNotBlank()) add(ResourceDisplayAction.Update)
         add(ResourceDisplayAction.Replace)
         add(ResourceDisplayAction.Edit)
-        if (file.name.isSingBoxJsonRuleSet()) add(ResourceDisplayAction.Modify)
+        if (file.name.isEditableResource()) add(ResourceDisplayAction.Modify)
         add(ResourceDisplayAction.Delete)
     }
 }
@@ -107,10 +107,10 @@ internal fun validateCustomResourceDraft(
         return CustomResourceDraftValidation(fileName, cleanUrl, CustomResourceDraftError.InvalidName)
     }
     val format = fileName.singBoxRuleSetFormatOrNull()
-    if (format == null) {
+    if (format == null && !fileName.isHostsResource()) {
         return CustomResourceDraftValidation(fileName, cleanUrl, CustomResourceDraftError.UnsupportedExtension)
     }
-    if (fileName.dropLast(format.fileExtension.length).isBlank()) {
+    if (fileName.substringBeforeLast('.').isBlank()) {
         return CustomResourceDraftValidation(fileName, cleanUrl, CustomResourceDraftError.InvalidName)
     }
     if (reservedNames.any { reserved -> reserved.equals(fileName, ignoreCase = true) }) {
@@ -135,6 +135,10 @@ internal fun String.singBoxRuleSetFormatOrNull(): SingBoxRuleSetFileFormat? = wh
 
 internal fun String.isSingBoxJsonRuleSet(): Boolean =
     singBoxRuleSetFormatOrNull() == SingBoxRuleSetFileFormat.Source
+
+internal fun String.isHostsResource(): Boolean = endsWith(".hosts", ignoreCase = true)
+
+internal fun String.isEditableResource(): Boolean = isSingBoxJsonRuleSet() || isHostsResource()
 
 internal fun String.isValidHttpResourceUrl(): Boolean {
     return runCatching {

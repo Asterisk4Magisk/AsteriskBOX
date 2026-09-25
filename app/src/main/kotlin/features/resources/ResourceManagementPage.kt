@@ -47,7 +47,7 @@ import app.navigation.Route
 import app.nextAvailableCustomResourceFileId
 import app.resourceFileUpdateSource
 import app.statusOf
-import app.withRemovedManagedRuleSets
+import app.withRemovedManagedResourceFiles
 import features.resources.runtime.ResourceFileBatchDownloadFailedException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
@@ -581,7 +581,7 @@ fun ResourceManagementPage(
                             editingCustomResourceFile = file
                         },
                         onModify = { file ->
-                            navigator.push(Route.ResourceJsonEdit(resourceId = file.id))
+                            navigator.push(Route.ResourceTextEdit(resourceId = file.id))
                         },
                         onDelete = { file ->
                             val remaining = appState.customResourceFiles
@@ -593,7 +593,7 @@ fun ResourceManagementPage(
                                 successMessage = deletedMessage.formatTemplate("name" to file.name),
                                 onSuccess = {
                                     updateAppState { state ->
-                                        state.withRemovedManagedRuleSets(setOf(file.name))
+                                        state.withRemovedManagedResourceFiles(setOf(file.name))
                                             .copy(
                                                 customResourceFiles =
                                                     state.customResourceFiles.filterNot {

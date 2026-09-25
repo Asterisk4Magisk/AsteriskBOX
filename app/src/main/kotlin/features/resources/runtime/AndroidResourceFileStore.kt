@@ -15,6 +15,7 @@ import app.ResourceFileStatus
 import app.ResourceFilesStatus
 import features.resources.isSupportedCustomResourceName
 import features.resources.isSupportedResourceName
+import features.resources.isHostsResource
 import features.resources.ResourceFileSourceDefault
 import features.resources.bundledRuleSetOrNull
 import features.resources.hasSingBoxRuleSetExtension
@@ -95,6 +96,16 @@ internal class AndroidResourceFileStore(
             .filter { resourceFile -> resourceFile.isFile && resourceFile.length() > 0L }
             .distinctBy { resourceFile -> resourceFile.absolutePath }
     }
+
+    fun singBoxHostsFiles(
+        customResourceFiles: List<CustomResourceFileState>,
+        fileOverrides: Map<Int, File> = emptyMap(),
+    ): Map<Int, File> = customResourceFiles
+        .filter { it.name.isHostsResource() }
+        .mapNotNull { resource ->
+            val target = fileOverrides[resource.id] ?: file(resource)
+            target.takeIf(File::isFile)?.let { resource.id to it }
+        }.toMap()
 
     fun restoreBundledDefaults(resourceFileSource: Int = ResourceFileSourceDefault) {
         val bundledUpdatedAtMillis = appContext.packageUpdatedAtMillis()
@@ -285,7 +296,9 @@ internal class AndroidResourceFileStore(
                 output.flush()
                 output.fd.sync()
             }
-            require(candidate.length() > 0L) { "${customFile.name} candidate is empty" }
+            require(customFile.name.isHostsResource() || candidate.length() > 0L) {
+                "${customFile.name} candidate is empty"
+            }
             return candidate
         } catch (error: Throwable) {
             candidate.delete()
@@ -407,6 +420,11 @@ internal fun Context.singBoxRuleSetFiles(
     customResourceFiles: List<CustomResourceFileState>,
 ): List<File> = AndroidResourceFileStore(this).singBoxRuleSetFiles(customResourceFiles)
 
+internal fun Context.singBoxHostsFiles(
+    customResourceFiles: List<CustomResourceFileState>,
+    fileOverrides: Map<Int, File> = emptyMap(),
+): Map<Int, File> = AndroidResourceFileStore(this).singBoxHostsFiles(customResourceFiles, fileOverrides)
+
 private fun Context.packageUpdatedAtMillis(): Long {
     return runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -432,15 +450,16 @@ internal fun resourceFileExists(
     kind: ResourceFileKind?,
     targetExists: Boolean,
     targetLength: Long,
+    allowEmpty: Boolean = false,
 ): Boolean {
-    return targetExists && (kind == ResourceFileKind.SingBoxCore || targetLength > 0)
+    return targetExists && (allowEmpty || kind == ResourceFileKind.SingBoxCore || targetLength > 0)
 }
 
 private fun File.toStatus(kind: ResourceFileKind? = null): ResourceFileStatus {
     val targetExists = exists()
     val targetLength = takeIf { targetExists }?.length() ?: 0L
     return ResourceFileStatus(
-        exists = resourceFileExists(kind, targetExists, targetLength),
+        exists = resourceFileExists(kind, targetExists, targetLength, allowEmpty = name.isHostsResource()),
         sizeBytes = targetLength,
         updatedAtMillis = takeIf { targetExists }?.lastModified() ?: 0,
     )

@@ -66,7 +66,7 @@ import features.outbound.OutboundEditorPage
 import features.outbound.OutboundGroupListPage
 import features.outbound.OutboundListPage
 import features.proxy.app.ProxyAppListPage
-import features.resources.ResourceJsonEditorPage
+import features.resources.ResourceTextEditorPage
 import features.resources.ResourceManagementPage
 import features.routing.RouteRuleEditorPage
 import features.routing.RoutingManagementPage
@@ -163,9 +163,9 @@ fun AppContent(
                 entry<Route.ResourceManagement> {
                     ResourceManagementPage(padding = padding)
                 }
-                entry<Route.ResourceJsonEdit> { route ->
+                entry<Route.ResourceTextEdit> { route ->
                     key(route.resourceId) {
-                        ResourceJsonEditorPage(
+                        ResourceTextEditorPage(
                             padding = padding,
                             resourceId = route.resourceId,
                         )

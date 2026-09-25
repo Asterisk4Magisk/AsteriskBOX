@@ -6,7 +6,7 @@ package features.resources.runtime
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
-import features.resources.ResourceJsonFileOrigin
+import features.resources.ResourceTextFileOrigin
 import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
@@ -149,11 +149,11 @@ internal fun String.resourceFileRevision(): ResourceFileRevision {
     )
 }
 
-internal fun ResourceJsonFileOrigin.expectedResourceFileRevision(): ResourceFileRevision =
+internal fun ResourceTextFileOrigin.expectedResourceFileRevision(): ResourceFileRevision =
     when (this) {
-        ResourceJsonFileOrigin.Missing ->
+        ResourceTextFileOrigin.Missing ->
             ResourceFileRevision(exists = false, sizeBytes = 0L, sha256 = "")
-        is ResourceJsonFileOrigin.Existing -> content.resourceFileRevision()
+        is ResourceTextFileOrigin.Existing -> content.resourceFileRevision()
     }
 
 internal fun requireResourceFileRevisionUnchanged(
@@ -170,12 +170,13 @@ internal fun publishValidatedResourceCandidate(
     target: File,
     mode: ResourceFilePublicationMode = ResourceFilePublicationMode.Replace,
     atomicOperations: ResourceFileAtomicOperations = AndroidResourceFileAtomicOperations,
+    allowEmpty: Boolean = false,
     validate: (File) -> Unit,
 ) {
     synchronized(publicationLockFor(target)) {
         var stagedFile: File? = null
         try {
-            require(candidate.isFile && candidate.length() > 0L) {
+            require(candidate.isFile && (allowEmpty || candidate.length() > 0L)) {
                 "${target.name} candidate is empty"
             }
             validate(candidate)

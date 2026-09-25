@@ -13,6 +13,7 @@ internal data class SingBoxCodeEditorBehavior(
 
 internal enum class SingBoxCodeLanguage {
     Json,
+    Hosts,
 }
 
 internal enum class CodeLexState {
@@ -48,9 +49,18 @@ internal fun tokenizeCodeLine(
     language: SingBoxCodeLanguage,
     state: CodeLexState = CodeLexState.Normal,
 ): CodeLineTokens {
-    check(language == SingBoxCodeLanguage.Json)
     check(state == CodeLexState.Normal)
-    return tokenizeJsonLine(line.toString())
+    return when (language) {
+        SingBoxCodeLanguage.Json -> tokenizeJsonLine(line.toString())
+        SingBoxCodeLanguage.Hosts -> {
+            val text = line.toString()
+            val comment = text.indexOf('#').let { if (it < 0) text.length else it }
+            CodeLineTokens(text, state, buildList {
+                add(CodeToken(0, comment, CodeTokenKind.Normal))
+                if (comment < text.length) add(CodeToken(comment, text.length, CodeTokenKind.Comment))
+            })
+        }
+    }
 }
 
 private fun tokenizeJsonLine(line: String): CodeLineTokens {

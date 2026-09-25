@@ -45,6 +45,7 @@ import engine.singbox.EbpfLocalDataPlanes
 import engine.singbox.EbpfSharedDataPlanes
 import engine.singbox.singBoxControlConfig
 import engine.vpn.toTunOptions
+import features.resources.runtime.singBoxHostsFiles
 import features.resources.SingBoxRuleSetFileFormat
 import features.resources.runtime.singBoxRuleSetFiles
 import features.resources.singBoxRuleSetFormatOrNull
@@ -78,16 +79,20 @@ internal object SingBoxConfigCompiler {
         appState: AppState,
         runMode: Int = appState.runMode,
         exposePorts: Boolean = true,
-        customRuleSetFileOverrides: Map<Int, File> = emptyMap(),
+        customResourceFileOverrides: Map<Int, File> = emptyMap(),
     ): String {
         val canonicalState = appState.withCanonicalManagedTagReferences()
         val filesByName = context.singBoxRuleSetFiles(canonicalState.customResourceFiles)
             .associateByTo(linkedMapOf()) { file -> file.name.lowercase() }
         canonicalState.customResourceFiles.forEach { customFile ->
-            customRuleSetFileOverrides[customFile.id]
+            customResourceFileOverrides[customFile.id]
                 ?.takeIf { file -> file.isFile && file.length() > 0L }
                 ?.let { file -> filesByName[customFile.name.lowercase()] = file }
         }
+        val hostsResourcePaths = context.singBoxHostsFiles(
+            canonicalState.customResourceFiles,
+            customResourceFileOverrides,
+        ).mapValues { (_, file) -> file.absolutePath }
         val choicesByFileName = canonicalState
             .managedRuleSetChoices(filesByName.keys)
             .associateBy { choice -> choice.fileName }
@@ -110,6 +115,7 @@ internal object SingBoxConfigCompiler {
             runMode = runMode,
             exposePorts = exposePorts,
             localRuleSets = localRuleSets,
+            hostsResourcePaths = hostsResourcePaths,
             rootUidPolicy = if (runMode == RunModeEbpf || runMode == RunModeTun) {
                 context.resolveRootInboundUidPolicy(runtimeState)
             } else {
@@ -124,6 +130,7 @@ internal object SingBoxConfigCompiler {
         exposePorts: Boolean = true,
         localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
         rootUidPolicy: RootInboundUidPolicy = RootInboundUidPolicy(),
+        hostsResourcePaths: Map<Int, String> = emptyMap(),
     ): String {
         val encoded = encodeSingBoxJson(
             compileGeneratedRoot(
@@ -131,6 +138,7 @@ internal object SingBoxConfigCompiler {
                 runMode = runMode,
                 exposePorts = exposePorts,
                 localRuleSets = localRuleSets,
+                hostsResourcePaths = hostsResourcePaths,
                 rootUidPolicy = rootUidPolicy,
             ),
         )
@@ -144,12 +152,14 @@ internal object SingBoxConfigCompiler {
         exposePorts: Boolean = true,
         localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
         rootUidPolicy: RootInboundUidPolicy = RootInboundUidPolicy(),
+        hostsResourcePaths: Map<Int, String> = emptyMap(),
     ): JsonObject = generateRoot(
         sourceRoot = JsonObject(emptyMap()),
         appState = appState.withCanonicalManagedTagReferences(),
         runMode = runMode,
         exposePorts = exposePorts,
         localRuleSets = localRuleSets,
+        hostsResourcePaths = hostsResourcePaths,
         rootUidPolicy = rootUidPolicy,
     )
 
@@ -160,10 +170,11 @@ internal object SingBoxConfigCompiler {
         exposePorts: Boolean = true,
         localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
         rootUidPolicy: RootInboundUidPolicy = RootInboundUidPolicy(),
+        hostsResourcePaths: Map<Int, String> = emptyMap(),
     ): JsonObject {
         val managedSourceRoot = sourceRoot.withLocalRuleSets(localRuleSets)
         val availableRuleSetTags = localRuleSets.mapTo(linkedSetOf(), SingBoxLocalRuleSet::tag)
-        val dnsResult = SingBoxDnsCompiler.compile(appState)
+        val dnsResult = SingBoxDnsCompiler.compile(appState, hostsResourcePaths)
         var runtime = managedSourceRoot
             .updated("log", compileLog(managedSourceRoot["log"] as? JsonObject, appState))
             .updated(

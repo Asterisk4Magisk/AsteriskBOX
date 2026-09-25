@@ -33,7 +33,10 @@ internal data class SingBoxDnsCompileResult(
 )
 
 internal object SingBoxDnsCompiler {
-    fun compile(appState: AppState): SingBoxDnsCompileResult? {
+    fun compile(
+        appState: AppState,
+        hostsResourcePaths: Map<Int, String> = emptyMap(),
+    ): SingBoxDnsCompileResult? {
         if (!appState.effectiveLocalDnsEnabled) return null
 
         val sourceServers = appState.dnsServers.ifEmpty { DefaultSingBoxDnsServers }
@@ -45,7 +48,17 @@ internal object SingBoxDnsCompiler {
             require(normalized.type in SingBoxDnsServerTypes) {
                 "Unsupported DNS server type: ${normalized.type}"
             }
-            normalized.toJson()
+            normalized.toJson(
+                hostsPaths = if (normalized.type == "hosts") {
+                    resolveHostsResourcePaths(
+                        normalized.hostsResourceIds,
+                        appState.customResourceFiles,
+                        hostsResourcePaths,
+                    )
+                } else {
+                    emptyList()
+                },
+            )
         }
         val serverTags = servers.map { server -> (server["tag"] as JsonPrimitive).content }
         val defaultServer = appState.dnsFinal.trim().takeIf { tag -> tag in serverTags }
@@ -135,7 +148,7 @@ internal fun SingBoxDnsServerState.sanitized(): SingBoxDnsServerState =
         server = server.trim(),
         serverPort = serverPort.trim(),
         path = path.trim(),
-        hostsPaths = hostsPaths.toTrimmedNonEmptyDistinctList(),
+        hostsResourceIds = hostsResourceIds.distinct(),
         predefinedHosts = predefinedHosts.toTrimmedNonEmptyDistinctList(),
         interfaceName = interfaceName.trim(),
         interfaceNames = interfaceNames.toTrimmedNonEmptyDistinctList(),
@@ -192,7 +205,7 @@ internal fun SingBoxDnsRuleMatchState.sanitized(): SingBoxDnsRuleMatchState =
         values = values.toTrimmedNonEmptyDistinctList(),
     )
 
-private fun SingBoxDnsServerState.toJson(): JsonObject = buildJsonObject {
+private fun SingBoxDnsServerState.toJson(hostsPaths: List<String>): JsonObject = buildJsonObject {
     put("type", type)
     put("tag", tag)
 

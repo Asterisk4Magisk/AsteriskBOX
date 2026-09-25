@@ -393,16 +393,21 @@ internal fun AppState.managedRuleSetChoices(
     return custom
 }
 
-internal fun AppState.withRemovedManagedRuleSets(
+internal fun AppState.withRemovedManagedResourceFiles(
     fileNames: Set<String>,
 ): AppState {
     val normalizedNames = fileNames.mapTo(mutableSetOf()) { name -> name.lowercase() }
-    val removedTags = customResourceFiles
+    val removedFiles = customResourceFiles
         .filter { file -> file.name.lowercase() in normalizedNames }
+    val removedIds = removedFiles.mapTo(mutableSetOf(), CustomResourceFileState::id)
+    val removedTags = removedFiles
         .mapTo(mutableSetOf()) { file -> managedCustomRuleSetTag(file.id, file.name) }
     if (removedTags.isEmpty()) return this
     return copy(
         tunBypassRuleSetTags = tunBypassRuleSetTags.filterNot(removedTags::contains),
+        dnsServers = dnsServers.map { server ->
+            server.copy(hostsResourceIds = server.hostsResourceIds.filterNot(removedIds::contains))
+        },
         routeRules = routeRules.map { rule ->
             rule.updateManagedRuleSetReferences { tag -> tag.takeUnless(removedTags::contains) }
         },

@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -44,6 +45,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.ManagedOutboundChoice
+import app.LocalAppStateStore
+import app.collectAppState
+import features.resources.runtime.singBoxHostsFiles
 import app.ManagedReferenceChoice
 import app.SingBoxDnsRuleActions
 import app.SingBoxDnsRuleLogicalModeAnd
@@ -487,6 +491,12 @@ private fun DnsServerEditorSheet(
     onDismissRequest: () -> Unit,
     onSave: (SingBoxDnsServerState) -> Unit,
 ) {
+    val appState by LocalAppStateStore.current.collectAppState()
+    val context = LocalContext.current
+    val hostsResources = remember(context, show, appState.customResourceFiles) {
+        val availableIds = context.singBoxHostsFiles(appState.customResourceFiles).keys
+        appState.customResourceFiles.filter { it.id in availableIds }
+    }
     val server = editor.server
     val outboundProxyTags = outboundProxyChoices.map(ManagedOutboundChoice::tag)
     val serverTypeLabels = SingBoxDnsServerTypes.map { type -> dnsServerTypeLabel(type) }
@@ -638,12 +648,21 @@ private fun DnsServerEditorSheet(
                     )
                     }
                     DnsServerFieldKind.Hosts -> {
-                    StringListEditor(
-                        editorKey = "dns-server-host-path:${editor.index}",
-                        title = stringResource(R.string.settings_dns_hosts_path),
-                        values = server.hostsPaths,
-                        onValuesChange = { onEditorChange(server.copy(hostsPaths = it)) },
-                        emptyText = stringResource(R.string.settings_dns_list_empty),
+                    ReferenceSelectionCard(
+                        title = stringResource(R.string.settings_dns_hosts_resources),
+                        emptyText = stringResource(R.string.settings_dns_hosts_resources_empty),
+                        choices = hostsResources.map { it.id.toString() to it.name },
+                        selected = server.hostsResourceIds.map(Int::toString).toSet(),
+                        onToggle = { value ->
+                            val id = value.toInt()
+                            val ids = if (id in server.hostsResourceIds) {
+                                server.hostsResourceIds - id
+                            } else {
+                                server.hostsResourceIds + id
+                            }
+                            onEditorChange(server.copy(hostsResourceIds = ids))
+                        },
+                        modifier = Modifier.padding(horizontal = 16.dp),
                     )
                     Spacer(Modifier.height(8.dp))
                     StringListEditor(

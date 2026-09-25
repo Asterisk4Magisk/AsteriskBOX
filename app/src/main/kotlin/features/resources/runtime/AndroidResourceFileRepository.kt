@@ -19,13 +19,16 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import features.resources.ResourceFileUpdateOptions
-import features.resources.ResourceJsonEditorSnapshot
-import features.resources.ResourceJsonFileOrigin
+import features.resources.ResourceTextEditorSnapshot
+import features.resources.ResourceTextFileOrigin
 import engine.root.publication.RootCoreRemovalCommand
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.resources.isSingBoxJsonRuleSet
+import features.resources.isEditableResource
+import features.resources.isHostsResource
+import features.resources.requireValidHostsResource
 import features.resources.InvalidSingBoxJsonRuleSetException
-import features.resources.resourceJsonEditorSnapshot
+import features.resources.resourceTextEditorSnapshot
 import features.resources.requireValidJsonRuleSetStructure
 import system.AndroidRootShellGateway
 import system.RootShellGateway
@@ -257,7 +260,7 @@ internal class AndroidResourceFileRepository(
         if (ResourceFileKind.entries.any { kind -> kind.fileName == target.name }) return null
         val updateUrl = url.trim()
         if (updateUrl.isBlank()) return null
-        if (!name.isSingBoxJsonRuleSet()) {
+        if (!name.isEditableResource()) {
             return ResourceFileDownloadTarget(
                 displayName = name,
                 url = updateUrl,
@@ -298,7 +301,7 @@ internal class AndroidResourceFileRepository(
         uri: Uri,
         customResourceFiles: List<CustomResourceFileState> = emptyList(),
     ): ResourceFilesStatus = withContext(Dispatchers.IO) {
-        if (customFile.name.isSingBoxJsonRuleSet()) {
+        if (customFile.name.isEditableResource()) {
             val expectedTargetRevision = store.file(customFile).resourceFileRevision()
             publishCustomCandidate(
                 customFile = customFile,
@@ -311,19 +314,19 @@ internal class AndroidResourceFileRepository(
         store.currentStatus(customResourceFiles)
     }
 
-    suspend fun readCustomJson(
+    suspend fun readCustomText(
         customFile: CustomResourceFileState,
-    ): ResourceJsonEditorSnapshot = withContext(Dispatchers.IO) {
-        require(customFile.name.isSingBoxJsonRuleSet()) { "${customFile.name} is not a JSON rule set" }
-        resourceJsonEditorSnapshot(store.readCustomTextOrNull(customFile))
+    ): ResourceTextEditorSnapshot = withContext(Dispatchers.IO) {
+        require(customFile.name.isEditableResource()) { "${customFile.name} is not an editable resource" }
+        resourceTextEditorSnapshot(store.readCustomTextOrNull(customFile), customFile.name)
     }
 
-    suspend fun saveCustomJson(
+    suspend fun saveCustomText(
         customFile: CustomResourceFileState,
         content: String,
-        expectedOrigin: ResourceJsonFileOrigin,
+        expectedOrigin: ResourceTextFileOrigin,
     ): ResourceFilesStatus = withContext(Dispatchers.IO) {
-        require(customFile.name.isSingBoxJsonRuleSet()) { "${customFile.name} is not a JSON rule set" }
+        require(customFile.name.isEditableResource()) { "${customFile.name} is not an editable resource" }
         val liveFiles = currentAppState().customResourceFiles
         publishCustomCandidate(
             customFile = customFile,
@@ -449,6 +452,7 @@ internal class AndroidResourceFileRepository(
                 candidate = candidate,
                 target = target,
                 mode = expectedTargetRevision.publicationMode(),
+                allowEmpty = customFile.name.isHostsResource(),
             ) { stagedFile ->
                 expectedLiveFile?.let { expected ->
                     requireCurrentCustomFile(expected, currentAppState())
@@ -471,11 +475,14 @@ internal class AndroidResourceFileRepository(
                 if (customFile.name.isSingBoxJsonRuleSet()) {
                     requireValidJsonRuleSetStructure(stagedFile.readText())
                 }
+                if (customFile.name.isHostsResource()) {
+                    requireValidHostsResource(stagedFile.readText())
+                }
                 try {
                     validateSingBoxRuntimeConfiguration(
                         context = appContext,
                         state = validationState,
-                        customRuleSetFileOverrides = mapOf(customFile.id to stagedFile),
+                        customResourceFileOverrides = mapOf(customFile.id to stagedFile),
                     )
                 } catch (error: Throwable) {
                     if (!customFile.name.isSingBoxJsonRuleSet()) throw error

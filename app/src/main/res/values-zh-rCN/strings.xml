@@ -404,7 +404,7 @@
     <string name="settings_resource_files_add_source_hint">选择规则集文件的来源</string>
     <string name="settings_resource_files_add_geosite_summary">添加来自 sing-geosite 的域名规则集</string>
     <string name="settings_resource_files_add_geoip_summary">添加来自 sing-geoip 的 IP 规则集</string>
-    <string name="settings_resource_files_add_custom_summary">输入下载地址，或选取本地 .srs/.json 文件</string>
+    <string name="settings_resource_files_add_custom_summary">输入下载地址，或选取本地 .srs/.json/.hosts 文件</string>
     <string name="settings_resource_files_catalog_title">%1$s 资源</string>
     <string name="settings_resource_files_catalog_search">搜索文件名</string>
     <string name="settings_resource_files_catalog_loading">正在获取最新文件列表…</string>
@@ -426,7 +426,7 @@
     <string name="settings_resource_files_custom_section">自定义资源</string>
     <string name="settings_resource_files_local_only">仅支持本地替换</string>
     <string name="settings_resource_files_custom_name_invalid">文件名无效</string>
-    <string name="settings_resource_files_custom_name_rule_set_required">文件名必须以 .srs 或 .json 结尾</string>
+    <string name="settings_resource_files_custom_name_rule_set_required">文件名必须以 .srs、.json 或 .hosts 结尾</string>
     <string name="settings_resource_files_custom_name_duplicate">文件名已被占用</string>
     <string name="settings_resource_files_modify">修改</string>
     <string name="settings_resource_json_editor_title">修改 JSON 规则集</string>
@@ -533,7 +533,6 @@
     <string name="settings_dns_port_invalid">端口范围应为 0 到 65535</string>
     <string name="settings_dns_prefer_go">优先使用 Go 解析器</string>
     <string name="settings_dns_neighbor_domain">邻居域名</string>
-    <string name="settings_dns_hosts_path">Hosts 文件路径</string>
     <string name="settings_dns_predefined_hosts">预定义 Hosts</string>
     <string name="settings_dns_predefined_hosts_format">格式：域名=地址1,地址2,…</string>
     <string name="settings_dns_tls_server_name">TLS 服务器名称（可选）</string>
@@ -1387,4 +1386,14 @@
     <string name="settings_service_control_lock_stop">锁屏时停止</string>
     <string name="settings_service_control_unlock_start">解锁时启动</string>
     <string name="settings_service_control_unlock_stop">解锁时停止</string>
+    <string name="settings_dns_hosts_resources">Hosts 资源文件</string>
+    <string name="settings_dns_hosts_resources_empty">请先在资源管理中添加 .hosts 文件</string>
+    <string name="settings_resource_hosts_editor_title">修改 Hosts 文件</string>
+    <string name="settings_resource_hosts_editor_summary">Hosts 资源文件</string>
+    <string name="settings_resource_hosts_editor_loading">正在加载 Hosts 文件…</string>
+    <string name="settings_resource_hosts_editor_missing">该 Hosts 资源文件不可用</string>
+    <string name="settings_resource_hosts_editor_save_failed">无法保存该 Hosts 文件</string>
+    <string name="settings_resource_hosts_editor_content">Hosts 内容</string>
+    <string name="settings_resource_hosts_editor_content_summary">每行填写一个 IP 地址及其对应的主机名，以 # 开头的部分为注释。</string>
+    <string name="settings_resource_hosts_editor_invalid">第 %1$d 行 Hosts 条目无效，请填写 IP 地址及其对应的主机名。</string>
 </resources>

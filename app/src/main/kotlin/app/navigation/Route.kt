@@ -32,7 +32,7 @@ sealed interface Route : NavKey {
     data object ResourceManagement : Route
 
     @Serializable
-    data class ResourceJsonEdit(
+    data class ResourceTextEdit(
         val resourceId: Int,
     ) : Route
 

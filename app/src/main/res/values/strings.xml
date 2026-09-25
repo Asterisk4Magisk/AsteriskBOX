@@ -408,7 +408,7 @@
     <string name="settings_resource_files_add_source_hint">Choose where the rule-set file comes from</string>
     <string name="settings_resource_files_add_geosite_summary">Add domain rule sets from sing-geosite</string>
     <string name="settings_resource_files_add_geoip_summary">Add IP rule sets from sing-geoip</string>
-    <string name="settings_resource_files_add_custom_summary">Enter a download URL or choose a local .srs/.json file</string>
+    <string name="settings_resource_files_add_custom_summary">Enter a download URL or choose a local .srs/.json/.hosts file</string>
     <string name="settings_resource_files_catalog_title">%1$s resources</string>
     <string name="settings_resource_files_catalog_search">Search file names</string>
     <string name="settings_resource_files_catalog_loading">Loading the latest file list…</string>
@@ -431,7 +431,7 @@
     <string name="settings_resource_files_custom_section">Custom resources</string>
     <string name="settings_resource_files_local_only">Local replacement only</string>
     <string name="settings_resource_files_custom_name_invalid">Invalid file name</string>
-    <string name="settings_resource_files_custom_name_rule_set_required">File name must end with .srs or .json</string>
+    <string name="settings_resource_files_custom_name_rule_set_required">File name must end with .srs, .json or .hosts</string>
     <string name="settings_resource_files_custom_name_duplicate">File name is already used</string>
     <string name="settings_resource_files_modify">Modify</string>
     <string name="settings_resource_json_editor_title">Modify JSON rule set</string>
@@ -539,7 +539,6 @@
     <string name="settings_dns_port_invalid">Port must be between 0 and 65535</string>
     <string name="settings_dns_prefer_go">Prefer Go resolver</string>
     <string name="settings_dns_neighbor_domain">Neighbor domains</string>
-    <string name="settings_dns_hosts_path">Hosts file paths</string>
     <string name="settings_dns_predefined_hosts">Predefined hosts</string>
     <string name="settings_dns_predefined_hosts_format">Format: domain=address1,address2,…</string>
     <string name="settings_dns_tls_server_name">TLS server name (optional)</string>
@@ -1406,4 +1405,14 @@
     <string name="settings_service_control_lock_stop">Stop on lock</string>
     <string name="settings_service_control_unlock_start">Start on unlock</string>
     <string name="settings_service_control_unlock_stop">Stop on unlock</string>
+    <string name="settings_dns_hosts_resources">Hosts resources</string>
+    <string name="settings_dns_hosts_resources_empty">Add a .hosts file in Resource management first</string>
+    <string name="settings_resource_hosts_editor_title">Modify Hosts file</string>
+    <string name="settings_resource_hosts_editor_summary">Hosts resource file</string>
+    <string name="settings_resource_hosts_editor_loading">Loading Hosts file…</string>
+    <string name="settings_resource_hosts_editor_missing">This Hosts resource is unavailable</string>
+    <string name="settings_resource_hosts_editor_save_failed">Could not save this Hosts file</string>
+    <string name="settings_resource_hosts_editor_content">Hosts content</string>
+    <string name="settings_resource_hosts_editor_content_summary">One IP address followed by host names per line; # starts a comment.</string>
+    <string name="settings_resource_hosts_editor_invalid">Invalid Hosts entry at line %1$d. Use an IP address followed by host names.</string>
 </resources>

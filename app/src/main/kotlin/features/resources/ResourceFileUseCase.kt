@@ -107,18 +107,18 @@ class ResourceFileUseCase(
         return repository.replaceCustom(customFile, uri, customResourceFiles)
     }
 
-    internal suspend fun readCustomJson(
+    internal suspend fun readCustomText(
         customFile: CustomResourceFileState,
-    ): ResourceJsonEditorSnapshot {
-        return repository.readCustomJson(customFile)
+    ): ResourceTextEditorSnapshot {
+        return repository.readCustomText(customFile)
     }
 
-    internal suspend fun saveCustomJson(
+    internal suspend fun saveCustomText(
         customFile: CustomResourceFileState,
         content: String,
-        expectedOrigin: ResourceJsonFileOrigin,
+        expectedOrigin: ResourceTextFileOrigin,
     ): ResourceFilesStatus {
-        return repository.saveCustomJson(customFile, content, expectedOrigin)
+        return repository.saveCustomText(customFile, content, expectedOrigin)
     }
 
     suspend fun restoreBundled(

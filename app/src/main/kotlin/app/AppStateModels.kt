@@ -247,7 +247,7 @@ data class SingBoxDnsServerState(
     val server: String = "",
     val serverPort: String = "",
     val path: String = "",
-    val hostsPaths: List<String> = emptyList(),
+    val hostsResourceIds: List<Int> = emptyList(),
     val predefinedHosts: List<String> = emptyList(),
     val interfaceName: String = "",
     val interfaceNames: List<String> = emptyList(),

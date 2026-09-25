@@ -42,6 +42,7 @@ import app.LocalIsWideScreen
 import app.LocalNavigator
 import app.collectAppState
 import features.logs.FailureLogContext
+import features.singbox.HostsCodeEditor
 import features.singbox.JsonCodeEditor
 import features.singbox.SingBoxCodeEditorState
 import kotlinx.coroutines.CancellationException
@@ -53,7 +54,7 @@ import ui.theme.AsteriskShapeTokens
 import ui.icons.AsteriskIcons as Icons
 
 @Composable
-internal fun ResourceJsonEditorPage(
+internal fun ResourceTextEditorPage(
     padding: PaddingValues,
     resourceId: Int,
 ) {
@@ -64,21 +65,23 @@ internal fun ResourceJsonEditorPage(
     val scope = rememberCoroutineScope()
     val file = appState.customResourceFiles
         .firstOrNull { candidate -> candidate.id == resourceId }
-        ?.takeIf { candidate -> candidate.name.isSingBoxJsonRuleSet() }
+        ?.takeIf { candidate -> candidate.name.isEditableResource() }
+    val isHosts = file?.name?.isHostsResource() == true
     val editorState = remember(resourceId) { SingBoxCodeEditorState("") }
     var loadState by remember(resourceId) {
-        mutableStateOf<ResourceJsonEditorLoadState>(ResourceJsonEditorLoadState.Loading)
+        mutableStateOf<ResourceTextEditorLoadState>(ResourceTextEditorLoadState.Loading)
     }
     var saving by remember(resourceId) { mutableStateOf(false) }
     var loadedSnapshot by remember(resourceId) {
-        mutableStateOf<ResourceJsonEditorSnapshot?>(null)
+        mutableStateOf<ResourceTextEditorSnapshot?>(null)
     }
-    val transitionSpec = AsteriskMotion.fadeThrough<ResourceJsonEditorLoadState>(
+    val transitionSpec = AsteriskMotion.fadeThrough<ResourceTextEditorLoadState>(
         AsteriskMotion.fastEffects(),
     )
     val invalidJsonMessage = stringResource(R.string.settings_resource_json_editor_invalid_json)
-    val missingMessage = stringResource(R.string.settings_resource_json_editor_missing)
-    val saveFailedMessage = stringResource(R.string.settings_resource_json_editor_save_failed)
+    val missingMessage = stringResource(if (isHosts) R.string.settings_resource_hosts_editor_missing else R.string.settings_resource_json_editor_missing)
+    val saveFailedMessage = stringResource(if (isHosts) R.string.settings_resource_hosts_editor_save_failed else R.string.settings_resource_json_editor_save_failed)
+    val invalidHostsMessage = stringResource(R.string.settings_resource_hosts_editor_invalid)
     val invalidRuleSetMessage = stringResource(R.string.settings_resource_json_editor_invalid_rule_set)
     val changedMessage = stringResource(R.string.settings_resource_json_editor_changed)
     val savedMessage = stringResource(
@@ -98,25 +101,25 @@ internal fun ResourceJsonEditorPage(
     )
 
     LaunchedEffect(resourceId, file?.name) {
-        loadState = ResourceJsonEditorLoadState.Loading
+        loadState = ResourceTextEditorLoadState.Loading
         loadedSnapshot = null
         if (file == null) {
-            loadState = ResourceJsonEditorLoadState.Unavailable
+            loadState = ResourceTextEditorLoadState.Unavailable
             return@LaunchedEffect
         }
         try {
-            val snapshot = services.resourceFileUseCase.readCustomJson(file)
+            val snapshot = services.resourceFileUseCase.readCustomText(file)
             editorState.replaceText(snapshot.content)
             loadedSnapshot = snapshot
-            loadState = ResourceJsonEditorLoadState.Ready
+            loadState = ResourceTextEditorLoadState.Ready
         } catch (error: CancellationException) {
             throw error
         } catch (error: Throwable) {
-            loadState = ResourceJsonEditorLoadState.Unavailable
+            loadState = ResourceTextEditorLoadState.Unavailable
             services.tipNotifier.showError(
                 error = error,
                 fallbackMessage = missingMessage,
-                failureContext = FailureLogContext(operation = "resource_json_load"),
+                failureContext = FailureLogContext(operation = "resource_text_load"),
             )
         }
     }
@@ -130,16 +133,18 @@ internal fun ResourceJsonEditorPage(
     fun save() {
         val currentFile = file ?: return
         val snapshot = loadedSnapshot ?: return
-        if (saving || loadState != ResourceJsonEditorLoadState.Ready) return
+        if (saving || loadState != ResourceTextEditorLoadState.Ready) return
         val content = editorState.snapshotText()
-        validateJsonRuleSetStructure(content)?.let { error ->
-            scope.launch { services.tipNotifier.show(validationMessages.getValue(error)) }
-            return
+        if (!isHosts) {
+            validateJsonRuleSetStructure(content)?.let { error ->
+                scope.launch { services.tipNotifier.show(validationMessages.getValue(error)) }
+                return
+            }
         }
         saving = true
         scope.launch {
             try {
-                services.resourceFileUseCase.saveCustomJson(
+                services.resourceFileUseCase.saveCustomText(
                     customFile = currentFile,
                     content = content,
                     expectedOrigin = snapshot.origin,
@@ -152,7 +157,9 @@ internal fun ResourceJsonEditorPage(
                 val fallback = (error as? InvalidJsonRuleSetStructureException)
                     ?.reason
                     ?.let(validationMessages::getValue)
-                    ?: if (error is InvalidSingBoxJsonRuleSetException) {
+                    ?: if (error is InvalidHostsResourceException) {
+                        invalidHostsMessage.format(error.lineNumber)
+                    } else if (error is InvalidSingBoxJsonRuleSetException) {
                         invalidRuleSetMessage
                     } else if (error is features.resources.runtime.ResourceFileChangedException) {
                         changedMessage
@@ -162,7 +169,7 @@ internal fun ResourceJsonEditorPage(
                 services.tipNotifier.showError(
                     error = error,
                     fallbackMessage = fallback,
-                    failureContext = FailureLogContext(operation = "resource_json_save"),
+                    failureContext = FailureLogContext(operation = "resource_text_save"),
                 )
             } finally {
                 saving = false
@@ -175,32 +182,32 @@ internal fun ResourceJsonEditorPage(
         isWideScreen = isWideScreen,
         title = {
             Column {
-                Text(stringResource(R.string.settings_resource_json_editor_title))
+                Text(stringResource(if (isHosts) R.string.settings_resource_hosts_editor_title else R.string.settings_resource_json_editor_title))
                 Text(
-                    file?.name ?: stringResource(R.string.settings_resource_json_editor_summary),
+                    file?.name ?: stringResource(if (isHosts) R.string.settings_resource_hosts_editor_summary else R.string.settings_resource_json_editor_summary),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         },
         saving = saving,
-        saveEnabled = loadState == ResourceJsonEditorLoadState.Ready,
+        saveEnabled = loadState == ResourceTextEditorLoadState.Ready,
         onBack = navigator::pop,
         onSave = ::save,
     ) { contentPadding ->
         AnimatedContent(
             targetState = loadState,
             transitionSpec = transitionSpec,
-            label = "resource-json-editor-state",
+            label = "resource-text-editor-state",
             modifier = Modifier.fillMaxSize().padding(contentPadding),
         ) { state ->
             when (state) {
-                ResourceJsonEditorLoadState.Loading -> ResourceJsonEditorMessage {
+                ResourceTextEditorLoadState.Loading -> ResourceTextEditorMessage {
                     CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.height(12.dp))
-                    Text(stringResource(R.string.settings_resource_json_editor_loading))
+                    Text(stringResource(if (isHosts) R.string.settings_resource_hosts_editor_loading else R.string.settings_resource_json_editor_loading))
                 }
-                ResourceJsonEditorLoadState.Unavailable -> ResourceJsonEditorMessage {
+                ResourceTextEditorLoadState.Unavailable -> ResourceTextEditorMessage {
                     Icon(
                         Icons.Rounded.ErrorOutline,
                         contentDescription = null,
@@ -209,11 +216,11 @@ internal fun ResourceJsonEditorPage(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        stringResource(R.string.settings_resource_json_editor_missing),
+                        stringResource(if (isHosts) R.string.settings_resource_hosts_editor_missing else R.string.settings_resource_json_editor_missing),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                ResourceJsonEditorLoadState.Ready -> Column(
+                ResourceTextEditorLoadState.Ready -> Column(
                     modifier = Modifier.fillMaxSize().padding(vertical = 12.dp),
                 ) {
                     AnimatedVisibility(
@@ -223,7 +230,7 @@ internal fun ResourceJsonEditorPage(
                     ) {
                         Column {
                             Text(
-                                stringResource(R.string.settings_resource_json_editor_content),
+                                stringResource(if (isHosts) R.string.settings_resource_hosts_editor_content else R.string.settings_resource_json_editor_content),
                                 style = MaterialTheme.typography.titleMedium,
                             )
                             AnimatedVisibility(
@@ -256,7 +263,7 @@ internal fun ResourceJsonEditorPage(
                                 }
                             }
                             Text(
-                                stringResource(R.string.settings_resource_json_editor_content_summary),
+                                stringResource(if (isHosts) R.string.settings_resource_hosts_editor_content_summary else R.string.settings_resource_json_editor_content_summary),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
@@ -264,12 +271,20 @@ internal fun ResourceJsonEditorPage(
                         }
                     }
                     Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                        JsonCodeEditor(
-                            state = editorState,
-                            readOnly = saving,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                        Surface(
+                        if (isHosts) {
+                            HostsCodeEditor(
+                                state = editorState,
+                                readOnly = saving,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            JsonCodeEditor(
+                                state = editorState,
+                                readOnly = saving,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        if (!isHosts) Surface(
                             modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
                             shape = AsteriskShapeTokens.InnerContainer,
                             color = MaterialTheme.colorScheme.primaryContainer,
@@ -293,7 +308,7 @@ internal fun ResourceJsonEditorPage(
 }
 
 @Composable
-private fun ResourceJsonEditorMessage(content: @Composable () -> Unit) {
+private fun ResourceTextEditorMessage(content: @Composable () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -302,7 +317,7 @@ private fun ResourceJsonEditorMessage(content: @Composable () -> Unit) {
     )
 }
 
-private enum class ResourceJsonEditorLoadState {
+private enum class ResourceTextEditorLoadState {
     Loading,
     Ready,
     Unavailable,
