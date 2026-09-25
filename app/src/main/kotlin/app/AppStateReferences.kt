@@ -11,6 +11,7 @@ import app.modes.RunModeTun2Socks
 import app.modes.RunModeVpnService
 import engine.network.isIpAddress
 import engine.singbox.config.SingBoxJson
+import engine.singbox.config.inheritedGroupDetour
 import engine.singbox.config.APP_DIRECT_OUTBOUND
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.config.APP_LOCAL_INBOUND
@@ -122,6 +123,39 @@ internal fun selectableDetourOutbounds(
     return choices.filterNot { choice -> choice.tag in globalDependents }
 }
 
+internal fun selectableGroupDetourOutbounds(
+    state: AppState,
+    groupId: Int,
+): List<ManagedOutboundChoice> {
+    // Evaluate a replacement independently of the group's currently inherited edges.
+    val candidateState = state.copy(
+        outboundGroups = state.outboundGroups.map { group ->
+            if (group.id == groupId) group.copy(detour = "") else group
+        },
+    )
+    val index = ManagedOutboundReferenceIndex(candidateState)
+    val globalDependents = index.tagsDependingOn(setOf(APP_GLOBAL_SELECTOR))
+    val inheritingTags = state.outbounds
+        .filter { outbound -> outbound.groupId == groupId }
+        .filter { outbound ->
+            outbound.jsonObject()?.let { parsed ->
+                outbound.inheritedGroupDetour(APP_DIRECT_OUTBOUND, parsed) != null
+            } == true
+        }
+        .mapTo(mutableSetOf(), OutboundState::tag)
+    return index.selectableChoices(
+        excludedTag = "",
+        excludedManagedGroupId = groupId,
+        includeEndpoints = true,
+        includeDirect = true,
+        includeGlobalSelector = false,
+    ).filterNot { choice ->
+        // The chosen member will not inherit the group detour, but other members will.
+        choice.tag in globalDependents ||
+            choice.tag in index.tagsDependingOn(inheritingTags - choice.tag)
+    }
+}
+
 internal fun AppState.withCanonicalManagedTagReferences(): AppState {
     val tagsByIdentity = currentManagedTagsByIdentity()
     val resolve: (String) -> String = { value ->
@@ -130,6 +164,7 @@ internal fun AppState.withCanonicalManagedTagReferences(): AppState {
             ?: value
     }
     val canonical = copy(
+        outboundGroups = outboundGroups.map { group -> group.copy(detour = resolve(group.detour)) },
         outbounds = outbounds.map { outbound ->
             outbound.withCanonicalManagedReferences(resolve)
         },
@@ -174,6 +209,7 @@ internal fun AppState.withReplacedManagedTag(
         if (value == previousTag) replacementTag else value
     }
     val replaced = copy(
+        outboundGroups = outboundGroups.map { group -> group.copy(detour = resolve(group.detour)) },
         outbounds = outbounds.map { outbound -> outbound.withCanonicalManagedReferences(resolve) },
         endpoints = endpoints.map { endpoint -> endpoint.withCanonicalManagedReferences(resolve) },
         selectors = selectors.map { selector ->
@@ -893,9 +929,17 @@ private class ManagedOutboundReferenceIndex(state: AppState) {
                     .mapNotNull { value -> (value as? JsonPrimitive)?.contentOrNull }
                     .filter(String::isNotBlank)
             } else {
-                managedJson
+                val inherited = if (managedOutbound != null && managedJson != null) {
+                    managedOutbound.value.inheritedGroupDetour(
+                        enabledGroupsById[managedOutbound.value.groupId]?.value?.detour.orEmpty(),
+                        managedJson,
+                    )
+                } else {
+                    null
+                }
+                (inherited ?: managedJson
                     ?.get("detour")
-                    ?.let { value -> (value as? JsonPrimitive)?.contentOrNull }
+                    ?.let { value -> (value as? JsonPrimitive)?.contentOrNull })
                     ?.takeIf(String::isNotBlank)
                     ?.let(::listOf)
                     .orEmpty()

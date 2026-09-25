@@ -4,6 +4,7 @@
 package data
 
 import androidx.room.Entity
+import androidx.room.ColumnInfo
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import app.OutboundGroupState
@@ -28,6 +29,7 @@ internal data class OutboundGroupEntity(
     val name: String,
     val url: String,
     val userAgent: String,
+    @ColumnInfo(defaultValue = "''") val detour: String,
     val updateInterval: String,
     val hwid: String,
     val updateViaProxy: Boolean,
@@ -55,6 +57,7 @@ internal data class OutboundGroupEntity(
             name = name,
             url = url,
             userAgent = userAgent,
+            detour = detour,
             updateInterval = updateInterval,
             hwid = hwid,
             updateViaProxy = updateViaProxy,
@@ -89,6 +92,7 @@ internal data class OutboundGroupEntity(
                 name = group.name,
                 url = group.url,
                 userAgent = group.userAgent,
+                detour = group.detour,
                 updateInterval = group.updateInterval,
                 hwid = group.hwid,
                 updateViaProxy = group.updateViaProxy,

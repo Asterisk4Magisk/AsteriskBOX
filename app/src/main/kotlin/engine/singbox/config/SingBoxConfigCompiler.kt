@@ -447,6 +447,7 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
     val enabledGroups = appState.outboundGroups
         .filter { group -> group.enabled }
     val enabledGroupIds = enabledGroups.mapTo(mutableSetOf()) { group -> group.id }
+    val groupDetours = enabledGroups.associate { group -> group.id to group.detour }
     val managedOutbounds = appState.outbounds
         .asSequence()
         .filter { outbound -> outbound.groupId in enabledGroupIds }
@@ -460,6 +461,8 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
                             putAll(parsed)
                             put("type", JsonPrimitive(outbound.type))
                             put("tag", JsonPrimitive(outbound.tag))
+                            outbound.inheritedGroupDetour(groupDetours[outbound.groupId].orEmpty(), parsed)
+                                ?.let { detour -> put("detour", JsonPrimitive(detour)) }
                         },
                     )
                 }

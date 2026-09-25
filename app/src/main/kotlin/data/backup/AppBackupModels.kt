@@ -170,6 +170,7 @@ internal data class AppBackupOutboundGroup(
     val name: String = "",
     val url: String = "",
     val userAgent: String = "",
+    val detour: String = "",
     val updateInterval: String = "",
     val hwid: String = "",
     val updateViaProxy: Boolean = false,

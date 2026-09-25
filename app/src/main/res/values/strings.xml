@@ -741,6 +741,7 @@
     <string name="outbound_group_url_optional">Subscription URL (optional)</string>
     <string name="outbound_group_url_invalid">Enter a valid HTTP or HTTPS URL</string>
     <string name="outbound_group_hwid">HWID</string>
+    <string name="outbound_group_detour">Pre-proxy</string>
     <string name="outbound_group_user_agent">User-Agent</string>
     <string name="outbound_group_user_agent_sing_box">sing-box</string>
     <string name="outbound_group_user_agent_v2rayng">v2rayNG</string>

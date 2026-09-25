@@ -733,6 +733,7 @@
     <string name="outbound_group_url_optional">订阅地址（可选）</string>
     <string name="outbound_group_url_invalid">请输入有效的 HTTP 或 HTTPS 地址</string>
     <string name="outbound_group_hwid">HWID</string>
+    <string name="outbound_group_detour">前置代理</string>
     <string name="outbound_group_user_agent">User-Agent</string>
     <string name="outbound_group_user_agent_sing_box">sing-box</string>
     <string name="outbound_group_user_agent_v2rayng">v2rayNG</string>

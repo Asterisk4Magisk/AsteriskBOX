@@ -74,6 +74,7 @@ data class OutboundGroupState(
     val name: String,
     val url: String = "",
     val userAgent: String = DefaultOutboundSubscriptionUserAgent,
+    val detour: String = "",
     val updateInterval: String = "",
     val hwid: String = "",
     val updateViaProxy: Boolean = false,
@@ -505,6 +506,9 @@ fun AppState.withRemovedManagedOutboundTags(
         }
         .mapTo(mutableSetOf(), SingBoxDnsServerState::tag)
     return copy(
+        outboundGroups = outboundGroups.map { group ->
+            group.copy(detour = group.detour.takeUnless(transitivelyUnavailableTags::contains).orEmpty())
+        },
         outbounds = transitivelyUnavailableTags.fold(updatedOutbounds) { currentOutbounds, tag ->
             currentOutbounds.replaceManagedReference(
                 field = "detour",

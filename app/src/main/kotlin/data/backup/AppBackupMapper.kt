@@ -201,6 +201,7 @@ private fun OutboundGroupState.toBackup(): AppBackupOutboundGroup =
         name = name,
         url = url,
         userAgent = userAgent,
+        detour = detour,
         updateInterval = updateInterval,
         hwid = hwid,
         updateViaProxy = updateViaProxy,
@@ -382,6 +383,7 @@ private fun AppBackupOutboundGroup.toState(): OutboundGroupState =
         name = name,
         url = url,
         userAgent = userAgent,
+        detour = detour,
         updateInterval = updateInterval,
         hwid = hwid,
         updateViaProxy = updateViaProxy,
@@ -447,6 +449,7 @@ private fun AppBackupCustomResourceFile.toState(): CustomResourceFileState =
 private fun AppState.restoreWarnings(): List<AppBackupWarning> {
     val availableOutbounds = selectableManagedOutbounds(this).mapTo(mutableSetOf()) { choice -> choice.tag }
     val outboundReferences = buildList {
+        outboundGroups.forEach { group -> add(group.detour) }
         selectors.forEach { selector ->
             addAll(selector.outbounds)
             add(selector.default)
