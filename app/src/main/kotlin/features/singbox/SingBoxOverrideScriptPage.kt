@@ -5,6 +5,7 @@
 
 package features.singbox
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import features.settings.SettingsSectionCard
@@ -55,6 +56,8 @@ import ui.clipboard.setPlainText
 import ui.components.AsteriskScaffold
 import ui.components.AsteriskTopAppBar
 import ui.layout.pageContentPaddingWithCutout
+import ui.layout.codeEditorShowsSupportingContent
+import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 import ui.icons.AsteriskIcons as Icons
 
@@ -136,14 +139,20 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
                 .padding(horizontal = 16.dp, vertical = 12.dp)
                 .imePadding(),
         ) {
-            SettingsSectionCard {
-                SettingsSwitchRow(
-                    title = stringResource(R.string.singbox_override_script_enable),
-                    icon = Icons.Rounded.Code,
-                    checked = scriptEnabled,
-                    onCheckedChange = { scriptEnabled = it },
-                    accent = IconAccent.MaskPurple,
-                )
+            AnimatedVisibility(
+                visible = codeEditorShowsSupportingContent(editorState.isFocused),
+                enter = AsteriskMotion.contentEnter(),
+                exit = AsteriskMotion.contentExit(),
+            ) {
+                SettingsSectionCard {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.singbox_override_script_enable),
+                        icon = Icons.Rounded.Code,
+                        checked = scriptEnabled,
+                        onCheckedChange = { scriptEnabled = it },
+                        accent = IconAccent.MaskPurple,
+                    )
+                }
             }
             JavaScriptCodeEditor(
                 state = editorState,
