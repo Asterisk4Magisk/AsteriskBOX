@@ -20,8 +20,6 @@ internal object RootPublicationCommand {
                 appendConditionalStop(layout, owner)
             }
             appendStatusMustBePublishable(layout)
-            RootLegacyMigrationCommand.appendGate(this, layout)
-            appendStatusMustBePublishable(layout)
             appendServiceLogCleanup(layout)
         }.trimEnd()
     }
@@ -116,8 +114,6 @@ internal const val RootServiceLogCleanupWarningPrefix = "Failed to clear service
 
 internal val RootPublicationRequiredTools = listOf(
     "grep",
-    "stat",
-    "tr",
     "mkdir",
     "chmod",
     "rm",
