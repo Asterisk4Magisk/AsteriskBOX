@@ -512,7 +512,7 @@ private fun ResourceVisualKind.icon(): ImageVector {
         ResourceVisualKind.Core -> Icons.Rounded.Memory
         ResourceVisualKind.RuleSet -> Icons.Rounded.Policy
         ResourceVisualKind.Cidr -> Icons.Rounded.Route
-        ResourceVisualKind.Custom -> Icons.Rounded.DataObject
+        ResourceVisualKind.Custom -> Icons.Rounded.Description
     }
 }
 

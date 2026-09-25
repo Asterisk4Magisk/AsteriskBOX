@@ -120,7 +120,7 @@ internal fun AboutRuntimeSection(
         AboutRuntimeRow(
             "AndroidLibBoxLite",
             ProjectInfo.ANDROID_LIB_BOX_LITE_VERSION,
-            Icons.Rounded.Extension,
+            Icons.Rounded.Memory,
         )
         AboutRuntimeRow("hev-socks5-tunnel", ProjectInfo.HEV_SOCKS5_TUNNEL_VERSION, Icons.Rounded.VpnLock)
     }
