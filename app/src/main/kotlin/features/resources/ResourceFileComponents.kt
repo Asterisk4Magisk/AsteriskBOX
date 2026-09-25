@@ -313,6 +313,7 @@ internal fun ResourceFileCard(
     }
     ResourceFileCardSurface(
         fileName = fileName,
+        visualKind = resourceVisualKind(fileName),
         status = status,
         modifier = modifier,
         description = description,
@@ -344,6 +345,7 @@ internal fun CustomResourceFileCard(
     )
     ResourceFileCardSurface(
         fileName = file.name,
+        visualKind = ResourceVisualKind.Custom,
         status = fileStatus.status,
         description = if (file.url.isBlank()) {
             stringResource(R.string.settings_resource_files_local_only)
@@ -367,6 +369,7 @@ private data class ResourceMenuEntry(
 @Composable
 private fun ResourceFileCardSurface(
     fileName: String,
+    visualKind: ResourceVisualKind,
     status: ResourceFileStatus,
     updateState: ResourceFileUpdateDisplayState,
     actionsEnabled: Boolean,
@@ -392,7 +395,7 @@ private fun ResourceFileCardSurface(
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
             ) {
                 Icon(
-                    imageVector = resourceVisualKind(fileName).icon(),
+                    imageVector = visualKind.icon(),
                     contentDescription = null,
                     modifier = Modifier.padding(10.dp).size(22.dp),
                     tint = MaterialTheme.colorScheme.primary,
