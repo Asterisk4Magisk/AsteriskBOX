@@ -3,6 +3,7 @@
 
 package features.settings
 
+import android.os.Build
 import app.modes.RunModeBpf2Socks
 import app.modes.RunModeEbpf
 import app.modes.RunModeTun
@@ -299,14 +300,16 @@ internal fun SettingsProxyModeSections(
                     onCheckedChange = onEnableTrafficStatsNotificationChange,
                     accent = IconAccent.MaskPink,
                 )
-                SwitchPreference(
-                    title = stringResource(R.string.settings_vpn_append_http_proxy),
-                    icon = Icons.Rounded.Http,
-                    summary = stringResource(R.string.settings_vpn_append_http_proxy_summary),
-                    checked = enableVpnAppendHttpProxy,
-                    onCheckedChange = onEnableVpnAppendHttpProxyChange,
-                    accent = IconAccent.MaskOrange,
-                )
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    SwitchPreference(
+                        title = stringResource(R.string.settings_vpn_append_http_proxy),
+                        icon = Icons.Rounded.Http,
+                        summary = stringResource(R.string.settings_vpn_append_http_proxy_summary),
+                        checked = enableVpnAppendHttpProxy,
+                        onCheckedChange = onEnableVpnAppendHttpProxyChange,
+                        accent = IconAccent.MaskOrange,
+                    )
+                }
                 SwitchPreference(
                     title = stringResource(R.string.settings_vpn_hev_tun),
                     icon = Icons.Rounded.Memory,
