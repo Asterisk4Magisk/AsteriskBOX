@@ -1390,14 +1390,18 @@ private fun CustomSubscriptionUserAgentDialog(
             )
         },
         dismissButton = {
-            TextButton(onClick = onDismissRequest) {
-                Text(stringResource(R.string.common_cancel))
-            }
+            AsteriskActionButton(
+                text = stringResource(R.string.common_cancel),
+                icon = Icons.Rounded.Close,
+                onClick = onDismissRequest,
+            )
         },
         confirmButton = {
-            TextButton(onClick = onSave) {
-                Text(stringResource(R.string.common_save))
-            }
+            AsteriskActionButton(
+                text = stringResource(R.string.common_save),
+                icon = Icons.Rounded.Save,
+                onClick = onSave,
+            )
         },
     )
 }

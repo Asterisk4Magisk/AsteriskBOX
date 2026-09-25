@@ -13,19 +13,16 @@ import features.settings.SettingsSwitchRow
 import ui.components.IconAccent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +50,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ui.clipboard.setPlainText
+import ui.components.AsteriskActionButton
 import ui.components.AsteriskScaffold
 import ui.components.AsteriskTopAppBar
 import ui.layout.pageContentPaddingWithCutout
@@ -87,8 +85,10 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
                     }
                 },
                 actions = {
-                    TextButton(
-                        enabled = !debugging,
+                    AsteriskActionButton(
+                        text = stringResource(if (debugging) R.string.singbox_override_script_debug_running else R.string.singbox_override_script_debug_run),
+                        icon = Icons.Rounded.BugReport,
+                        loading = debugging,
                         onClick = {
                             val script = editorState.snapshotText()
                             val snapshot = appState
@@ -109,26 +109,18 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
                                 }
                             }
                         },
-                    ) {
-                        if (debugging) {
-                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Rounded.BugReport, contentDescription = null)
-                        }
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(if (debugging) R.string.singbox_override_script_debug_running else R.string.singbox_override_script_debug_run))
-                    }
-                    TextButton(onClick = {
-                        val script = editorState.snapshotText()
-                        updateAppState { state ->
-                            state.copy(configOverrideScript = script, enableConfigOverrideScript = scriptEnabled)
-                        }
-                        navigator.pop()
-                    }) {
-                        Icon(Icons.Rounded.Save, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.common_save))
-                    }
+                    )
+                    AsteriskActionButton(
+                        text = stringResource(R.string.common_save),
+                        icon = Icons.Rounded.Save,
+                        onClick = {
+                            val script = editorState.snapshotText()
+                            updateAppState { state ->
+                                state.copy(configOverrideScript = script, enableConfigOverrideScript = scriptEnabled)
+                            }
+                            navigator.pop()
+                        },
+                    )
                 },
             )
         },
