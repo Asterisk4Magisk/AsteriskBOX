@@ -277,6 +277,10 @@
 
     <!-- Settings -->
     <string name="settings_tools">工具</string>
+    <string name="settings_config_preview">配置预览</string>
+    <string name="settings_config_preview_summary">预览当前 sing-box 配置文件</string>
+    <string name="settings_config_preview_failed">预览配置失败</string>
+    <string name="common_complete">完成</string>
     <string name="settings_title">设置</string>
     <string name="settings_app">外观</string>
     <string name="settings_search_results">搜索结果</string>

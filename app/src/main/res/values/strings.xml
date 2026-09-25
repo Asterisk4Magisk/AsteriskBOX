@@ -279,6 +279,10 @@
 
     <!-- Settings -->
     <string name="settings_tools">Tools</string>
+    <string name="settings_config_preview">Configuration preview</string>
+    <string name="settings_config_preview_summary">Preview the current sing-box configuration file</string>
+    <string name="settings_config_preview_failed">Failed to preview the configuration</string>
+    <string name="common_complete">Done</string>
     <string name="settings_title">Settings</string>
     <string name="settings_app">Appearance</string>
     <string name="settings_search_results">Search results</string>

@@ -71,12 +71,20 @@ internal fun SettingsAppSection(
 
 @Composable
 internal fun SettingsToolsSection(
+    onOpenConfigPreview: () -> Unit,
     onOpenNetworkQualityTest: () -> Unit,
 ) {
     SmallTitle(text = stringResource(R.string.settings_tools))
     SettingsSectionCard {
         SettingsToolsItems.forEach { item ->
             when (item) {
+                SettingsToolsItem.ConfigPreview -> ArrowPreference(
+                    title = stringResource(R.string.settings_config_preview),
+                    icon = Icons.Rounded.DataObject,
+                    summary = stringResource(R.string.settings_config_preview_summary),
+                    onClick = onOpenConfigPreview,
+                    accent = IconAccent.MaskBlue,
+                )
                 SettingsToolsItem.NetworkQualityTest -> ArrowPreference(
                     title = stringResource(R.string.settings_network_quality_test),
                     icon = Icons.Rounded.Speed,

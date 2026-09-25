@@ -6,10 +6,12 @@ package features.settings
 import engine.singbox.SingBoxLogLevels
 
 internal enum class SettingsToolsItem {
+    ConfigPreview,
     NetworkQualityTest,
 }
 
 internal val SettingsToolsItems = listOf(
+    SettingsToolsItem.ConfigPreview,
     SettingsToolsItem.NetworkQualityTest,
 )
 

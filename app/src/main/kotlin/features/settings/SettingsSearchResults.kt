@@ -234,6 +234,11 @@ internal fun settingsTopLevelSearchItems(
             value = ebpfLocalDnsMode,
             optionText = engine.singbox.EbpfDnsModes,
         ) else null,
+        SettingsSearchItem(
+            SettingsSectionId.Apps,
+            stringResource(R.string.settings_config_preview),
+            stringResource(R.string.settings_config_preview_summary),
+        ),
         SettingsSearchItem(SettingsSectionId.Apps, stringResource(R.string.settings_core_logs)),
         SettingsSearchItem(SettingsSectionId.Apps, stringResource(R.string.settings_logcat)),
         SettingsSearchItem(

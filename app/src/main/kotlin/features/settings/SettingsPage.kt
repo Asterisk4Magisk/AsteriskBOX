@@ -133,6 +133,7 @@ private fun SettingsContent(
     val tipNotifier = services.tipNotifier
     val scope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
+    var showConfigPreview by remember { mutableStateOf(false) }
     var runModeSwitchInProgress by rememberSaveable { mutableStateOf(false) }
     var rootBootScriptSwitchInProgress by rememberSaveable { mutableStateOf(false) }
     var rootEbpfSwitchInProgress by rememberSaveable { mutableStateOf(false) }
@@ -584,6 +585,7 @@ private fun SettingsContent(
             }
             item(key = "settings_tools") {
                 SettingsToolsSection(
+                    onOpenConfigPreview = { showConfigPreview = true },
                     onOpenNetworkQualityTest = { sheetState.openNetworkQualityTest() },
                 )
             }
@@ -641,6 +643,12 @@ private fun SettingsContent(
                     onOpenLicenses = { navigator.push(Route.License) },
                 )
             }
+        }
+        if (showConfigPreview) {
+            ConfigPreviewDialog(
+                appState = appState,
+                onDismissRequest = { showConfigPreview = false },
+            )
         }
         SettingsBottomSheetsHost(
             appState = appState,
