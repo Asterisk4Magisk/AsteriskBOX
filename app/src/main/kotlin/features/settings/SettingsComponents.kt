@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Card
@@ -40,10 +39,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.R
 import app.modes.RunModeBpf2Socks
 import app.modes.RunModeTproxy
 import app.modes.RunModeTun2Socks
-import app.R
 import ui.components.AsteriskDropdownAnchor
 import ui.components.AsteriskDropdownMenuItem
 import ui.components.IconAccent
@@ -316,7 +315,7 @@ private fun SettingsRow(
 }
 
 @Composable
-private fun settingsRowMatchesQuery(
+internal fun settingsRowMatchesQuery(
     title: String,
     summary: String,
     value: String,

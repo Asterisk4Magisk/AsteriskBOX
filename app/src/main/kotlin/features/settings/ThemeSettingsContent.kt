@@ -57,17 +57,35 @@ internal fun ThemeSettingsContent(
     onColorModeChange: (Int) -> Unit,
     onSeedIndexChange: (Int) -> Unit,
 ) {
+    val showColorMode = settingsRowMatchesQuery(
+        title = stringResource(R.string.settings_color_mode),
+        summary = "",
+        value = colorModeOptions.getOrNull(colorMode).orEmpty(),
+        optionText = colorModeOptions,
+    )
+    val showThemeColor = settingsRowMatchesQuery(
+        title = stringResource(R.string.settings_theme_color),
+        summary = "",
+        value = keyColorOptions.getOrNull(seedIndex).orEmpty(),
+        optionText = keyColorOptions,
+    )
+    if (!showColorMode && !showThemeColor) return
+
     SettingsSectionCard {
-        ThemeModeSegmentedRow(
-            options = colorModeOptions,
-            selectedIndex = colorMode,
-            onSelectedIndexChange = onColorModeChange,
-        )
-        ThemeColorDotPicker(
-            options = keyColorOptions,
-            selectedIndex = seedIndex,
-            onSelectedIndexChange = onSeedIndexChange,
-        )
+        if (showColorMode) {
+            ThemeModeSegmentedRow(
+                options = colorModeOptions,
+                selectedIndex = colorMode,
+                onSelectedIndexChange = onColorModeChange,
+            )
+        }
+        if (showThemeColor) {
+            ThemeColorDotPicker(
+                options = keyColorOptions,
+                selectedIndex = seedIndex,
+                onSelectedIndexChange = onSeedIndexChange,
+            )
+        }
     }
 }
 
