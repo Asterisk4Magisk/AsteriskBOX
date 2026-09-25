@@ -390,6 +390,7 @@ private fun SettingsContent(
                     enableBroadcastControl = appState.enableBroadcastControl,
                     enableIpv6 = appState.enableIpv6,
                     enableIpv6Prefer = appState.enableIpv6Prefer,
+                    onOpenConfigOverrideScript = { navigator.push(Route.ConfigOverrideScript) },
                     runModeOptions = runModeOptions,
                     selectedRunModeIndex = selectedRunModeIndex,
                     onEnableBroadcastControlChange = { enabled ->

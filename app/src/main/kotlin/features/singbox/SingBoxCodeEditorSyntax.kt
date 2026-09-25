@@ -12,12 +12,15 @@ internal data class SingBoxCodeEditorBehavior(
 }
 
 internal enum class SingBoxCodeLanguage {
+    JavaScript,
     Json,
     Hosts,
 }
 
 internal enum class CodeLexState {
     Normal,
+    JavaScriptBlockComment,
+    JavaScriptTemplateString,
 }
 
 internal enum class CodeTokenKind {
@@ -49,8 +52,8 @@ internal fun tokenizeCodeLine(
     language: SingBoxCodeLanguage,
     state: CodeLexState = CodeLexState.Normal,
 ): CodeLineTokens {
-    check(state == CodeLexState.Normal)
     return when (language) {
+        SingBoxCodeLanguage.JavaScript -> tokenizeJavaScriptLine(line.toString(), state)
         SingBoxCodeLanguage.Json -> tokenizeJsonLine(line.toString())
         SingBoxCodeLanguage.Hosts -> {
             val text = line.toString()
@@ -108,7 +111,7 @@ private fun tokenizeJsonLine(line: String): CodeLineTokens {
     return CodeLineTokens(line, CodeLexState.Normal, tokens)
 }
 
-private fun String.quotedTokenEnd(start: Int): Int {
+private fun String.quotedTokenEnd(start: Int, quote: Char = '"'): Int {
     var index = start + 1
     var escaped = false
     while (index < length) {
@@ -116,7 +119,7 @@ private fun String.quotedTokenEnd(start: Int): Int {
         when {
             escaped -> escaped = false
             char == '\\' -> escaped = true
-            char == '"' -> return index + 1
+            char == quote -> return index + 1
         }
         index += 1
     }
@@ -147,3 +150,182 @@ private fun String.isJsonTokenStart(index: Int): Boolean {
 private val JsonOperators = setOf('[', ']', '{', '}', ',', ':')
 private val JsonNumberCharacters = setOf('+', '-', '.', 'e', 'E') + ('0'..'9')
 private val JsonLiterals = setOf("true", "false", "null")
+
+private fun tokenizeJavaScriptLine(
+    line: String,
+    initialState: CodeLexState,
+): CodeLineTokens {
+    val tokens = mutableListOf<CodeToken>()
+    var state = initialState
+    var index = 0
+
+    if (state == CodeLexState.JavaScriptBlockComment) {
+        val end = line.indexOf("*/")
+        if (end < 0) {
+            tokens += CodeToken(0, line.length, CodeTokenKind.Comment)
+            return CodeLineTokens(line, state, tokens)
+        }
+        index = end + 2
+        tokens += CodeToken(0, index, CodeTokenKind.Comment)
+        state = CodeLexState.Normal
+    } else if (state == CodeLexState.JavaScriptTemplateString) {
+        val end = line.findUnescaped('`')
+        if (end < 0) {
+            tokens += CodeToken(0, line.length, CodeTokenKind.String)
+            return CodeLineTokens(line, state, tokens)
+        }
+        index = end + 1
+        tokens += CodeToken(0, index, CodeTokenKind.String)
+        state = CodeLexState.Normal
+    }
+
+    while (index < line.length) {
+        val start = index
+        when {
+            line.startsWith("//", index) -> {
+                tokens += CodeToken(index, line.length, CodeTokenKind.Comment)
+                index = line.length
+            }
+
+            line.startsWith("/*", index) -> {
+                val end = line.indexOf("*/", startIndex = index + 2)
+                if (end < 0) {
+                    tokens += CodeToken(index, line.length, CodeTokenKind.Comment)
+                    state = CodeLexState.JavaScriptBlockComment
+                    index = line.length
+                } else {
+                    index = end + 2
+                    tokens += CodeToken(start, index, CodeTokenKind.Comment)
+                }
+            }
+
+            line[index] == '`' -> {
+                val end = line.findUnescaped('`', index + 1)
+                if (end < 0) {
+                    tokens += CodeToken(index, line.length, CodeTokenKind.String)
+                    state = CodeLexState.JavaScriptTemplateString
+                    index = line.length
+                } else {
+                    index = end + 1
+                    tokens += CodeToken(start, index, CodeTokenKind.String)
+                }
+            }
+
+            line[index] == '\'' || line[index] == '"' -> {
+                index = line.quotedTokenEnd(index, line[index])
+                tokens += CodeToken(start, index, CodeTokenKind.String)
+            }
+
+            line[index].isDigit() ||
+                (line[index] == '.' && line.getOrNull(index + 1)?.isDigit() == true) -> {
+                index = line.javaScriptNumberEnd(index)
+                tokens += CodeToken(start, index, CodeTokenKind.Number)
+            }
+
+            line[index].isJavaScriptIdentifierStart() -> {
+                index += 1
+                while (index < line.length && line[index].isJavaScriptIdentifierPart()) {
+                    index += 1
+                }
+                val identifier = line.substring(start, index)
+                val kind = when {
+                    identifier in JavaScriptKeywords -> CodeTokenKind.Keyword
+                    identifier in JavaScriptLiterals -> CodeTokenKind.Literal
+                    line.nextNonWhitespace(index) == '(' -> CodeTokenKind.Function
+                    else -> CodeTokenKind.Normal
+                }
+                tokens += CodeToken(start, index, kind)
+            }
+
+            line[index] in JavaScriptOperators -> {
+                index += 1
+                while (index < line.length && line[index] in JavaScriptOperators) {
+                    index += 1
+                }
+                tokens += CodeToken(start, index, CodeTokenKind.Operator)
+            }
+
+            else -> {
+                index += 1
+                while (
+                    index < line.length &&
+                    !line.isJavaScriptTokenStart(index)
+                ) {
+                    index += 1
+                }
+                tokens += CodeToken(start, index, CodeTokenKind.Normal)
+            }
+        }
+    }
+    if (tokens.isEmpty()) {
+        tokens += CodeToken(0, 0, CodeTokenKind.Normal)
+    }
+    return CodeLineTokens(line, state, tokens)
+}
+
+
+private fun String.findUnescaped(char: Char, startIndex: Int = 0): Int {
+    var index = startIndex
+    var escaped = false
+    while (index < length) {
+        val current = this[index]
+        when {
+            escaped -> escaped = false
+            current == '\\' -> escaped = true
+            current == char -> return index
+        }
+        index += 1
+    }
+    return -1
+}
+
+private fun String.javaScriptNumberEnd(start: Int): Int {
+    var index = start + 1
+    while (index < length && this[index] in JavaScriptNumberCharacters) {
+        index += 1
+    }
+    return index
+}
+
+
+private fun String.isJavaScriptTokenStart(index: Int): Boolean {
+    val char = this[index]
+    return startsWith("//", index) ||
+        startsWith("/*", index) ||
+        char == '`' ||
+        char == '\'' ||
+        char == '"' ||
+        char.isDigit() ||
+        char.isJavaScriptIdentifierStart() ||
+        char in JavaScriptOperators
+}
+
+
+private fun Char.isJavaScriptIdentifierStart(): Boolean = isLetter() || this == '_' || this == '$'
+
+private fun Char.isJavaScriptIdentifierPart(): Boolean = isLetterOrDigit() || this == '_' || this == '$'
+
+
+private val JavaScriptOperators = setOf(
+    '{', '}', '[', ']', '(', ')', ':', ',', '.', ';', '+', '-', '*', '/', '%', '=', '!', '<', '>', '?', '&', '|', '~', '^',
+)
+
+private val JavaScriptNumberCharacters = setOf(
+    '-', '+', '.', '_', 'e', 'E', 'x', 'X', 'b', 'B', 'o', 'O',
+) + ('0'..'9') + ('a'..'f') + ('A'..'F')
+
+private val JavaScriptLiterals = setOf(
+    "true",
+    "false",
+    "null",
+    "undefined",
+    "NaN",
+    "Infinity",
+)
+
+private val JavaScriptKeywords = setOf(
+    "async", "await", "break", "case", "catch", "class", "const", "continue", "debugger",
+    "default", "delete", "do", "else", "export", "extends", "finally", "for", "from", "function",
+    "get", "if", "import", "in", "instanceof", "let", "new", "of", "return", "set", "static",
+    "super", "switch", "this", "throw", "try", "typeof", "var", "void", "while", "with", "yield",
+)

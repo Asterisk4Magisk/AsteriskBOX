@@ -1400,4 +1400,22 @@
     <string name="settings_resource_hosts_editor_content">Hosts 内容</string>
     <string name="settings_resource_hosts_editor_content_summary">每行填写一个 IP 地址及其对应的主机名，以 # 开头的部分为注释。</string>
     <string name="settings_resource_hosts_editor_invalid">第 %1$d 行 Hosts 条目无效，请填写 IP 地址及其对应的主机名。</string>
+
+    <string name="singbox_override_script_debug_run">调试</string>
+    <string name="singbox_override_script_debug_title">调试</string>
+    <string name="singbox_override_script_debug_running">调试中…</string>
+    <string name="singbox_override_script_debug_success">成功</string>
+    <string name="singbox_override_script_debug_failed">失败</string>
+    <string name="singbox_override_script_debug_copy">复制报告</string>
+    <string name="singbox_override_script_debug_error">错误</string>
+    <string name="singbox_override_script_debug_logs">Console</string>
+    <string name="singbox_override_script_debug_no_logs">没有 console 输出</string>
+    <string name="singbox_override_script_debug_no_output">没有输出 YAML</string>
+    <string name="singbox_override_script_debug_output">输出 JSON</string>
+    <string name="singbox_override_script_title">覆写脚本</string>
+    <string name="singbox_override_script_enable">启用覆写脚本</string>
+    <string name="singbox_override_script_summary">生成配置后使用 JavaScript 进行覆写</string>
+    <string name="code_editor_format_javascript">格式化 JavaScript</string>
+    <string name="code_editor_format_failed">格式化失败，请检查语法</string>
+    <string name="code_editor_format_content_changed">内容已修改，请重新格式化</string>
 </resources>

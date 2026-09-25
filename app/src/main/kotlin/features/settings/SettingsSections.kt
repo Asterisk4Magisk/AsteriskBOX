@@ -196,6 +196,7 @@ internal fun SettingsAdvancedSection(
     enableBroadcastControl: Boolean,
     enableIpv6: Boolean,
     enableIpv6Prefer: Boolean,
+    onOpenConfigOverrideScript: () -> Unit,
     runModeOptions: List<String>,
     selectedRunModeIndex: Int,
     onEnableBroadcastControlChange: (Boolean) -> Unit,
@@ -235,6 +236,13 @@ internal fun SettingsAdvancedSection(
                 accent = IconAccent.MaskGreen,
             )
         }
+        ArrowPreference(
+            title = stringResource(R.string.singbox_override_script_title),
+            icon = Icons.Rounded.Code,
+            summary = stringResource(R.string.singbox_override_script_summary),
+            onClick = onOpenConfigOverrideScript,
+            accent = IconAccent.MaskPurple,
+        )
         OverlayDropdownPreference(
             title = stringResource(R.string.settings_run_mode),
             icon = Icons.Rounded.SettingsEthernet,

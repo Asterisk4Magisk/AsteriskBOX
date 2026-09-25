@@ -1419,4 +1419,22 @@
     <string name="settings_resource_hosts_editor_content">Hosts content</string>
     <string name="settings_resource_hosts_editor_content_summary">One IP address followed by host names per line; # starts a comment.</string>
     <string name="settings_resource_hosts_editor_invalid">Invalid Hosts entry at line %1$d. Use an IP address followed by host names.</string>
+
+    <string name="singbox_override_script_debug_run">Debug</string>
+    <string name="singbox_override_script_debug_title">Debug</string>
+    <string name="singbox_override_script_debug_running">Debugging…</string>
+    <string name="singbox_override_script_debug_success">Succeeded</string>
+    <string name="singbox_override_script_debug_failed">Failed</string>
+    <string name="singbox_override_script_debug_copy">Copy report</string>
+    <string name="singbox_override_script_debug_error">Error</string>
+    <string name="singbox_override_script_debug_logs">Console</string>
+    <string name="singbox_override_script_debug_no_logs">No console output</string>
+    <string name="singbox_override_script_debug_no_output">No output YAML</string>
+    <string name="singbox_override_script_debug_output">Output JSON</string>
+    <string name="singbox_override_script_title">Override script</string>
+    <string name="singbox_override_script_enable">Enable override script</string>
+    <string name="singbox_override_script_summary">Override the generated configuration with JavaScript</string>
+    <string name="code_editor_format_javascript">Format JavaScript</string>
+    <string name="code_editor_format_failed">Formatting failed. Check the syntax.</string>
+    <string name="code_editor_format_content_changed">Content changed. Format again.</string>
 </resources>

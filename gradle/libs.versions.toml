@@ -19,6 +19,7 @@ ksp = "2.3.12"
 ktor = "3.6.0"
 libsu = "6.0.0"
 material-kolor = "5.0.1"
+quickjs-kt = "1.0.15"
 reorderable = "3.1.0"
 sora-editor = "0.24.6"
 snakeyaml-engine = "3.1.1"
@@ -47,6 +48,7 @@ kage = { module = "com.github.android-password-store:kage", version.ref = "kage"
 ktor-http = { module = "io.ktor:ktor-http", version.ref = "ktor" }
 libsu-core = { module = "com.github.topjohnwu.libsu:core", version.ref = "libsu" }
 material-kolor = { module = "com.materialkolor:material-kolor", version.ref = "material-kolor" }
+quickjs-kt-android = { module = "io.github.dokar3:quickjs-kt-android", version.ref = "quickjs-kt" }
 reorderable = { module = "sh.calvin.reorderable:reorderable", version.ref = "reorderable" }
 sora-editor = { module = "io.github.rosemoe:editor", version.ref = "sora-editor" }
 snakeyaml-engine = { module = "org.snakeyaml:snakeyaml-engine", version.ref = "snakeyaml-engine" }

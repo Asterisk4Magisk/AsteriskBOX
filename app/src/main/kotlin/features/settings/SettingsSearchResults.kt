@@ -135,6 +135,11 @@ internal fun settingsTopLevelSearchItems(
         ),
         SettingsSearchItem(
             SettingsSectionId.Advanced,
+            stringResource(R.string.singbox_override_script_title),
+            stringResource(R.string.singbox_override_script_summary),
+        ),
+        SettingsSearchItem(
+            SettingsSectionId.Advanced,
             stringResource(R.string.settings_run_mode),
             value = optionValue(runModeOptions, selectedRunModeIndex),
             optionText = runModeOptions,

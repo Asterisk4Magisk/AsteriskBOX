@@ -128,7 +128,7 @@ internal fun HostsCodeEditor(
 }
 
 @Composable
-private fun SoraCodeEditor(
+internal fun SoraCodeEditor(
     state: SingBoxCodeEditorState,
     language: SingBoxCodeLanguage,
     readOnly: Boolean,

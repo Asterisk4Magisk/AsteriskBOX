@@ -235,6 +235,19 @@
             ]
         },
         {
+            "uniqueId": "npm:js-beautify",
+            "artifactVersion": "2.0.3",
+            "name": "JS Beautify",
+            "description": "Offline JavaScript code formatting.",
+            "website": "https://beautifier.io",
+            "scm": {
+                "url": "https://github.com/beautifier/js-beautify"
+            },
+            "licenses": [
+                "MIT"
+            ]
+        },
+        {
             "uniqueId": "com.github.android-password-store:kage",
             "artifactVersion": "0.7.0",
             "name": "kage",
@@ -333,6 +346,19 @@
             "website": "https://github.com/JetBrains/compose-multiplatform",
             "scm": {
                 "url": "https://github.com/JetBrains/compose-multiplatform"
+            },
+            "licenses": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "uniqueId": "io.github.dokar3:quickjs-kt-android",
+            "artifactVersion": "1.0.15",
+            "name": "quickjs-kt",
+            "description": "A QuickJS binding for idiomatic Kotlin, with Async/DSL/ES Modules support.",
+            "website": "https://github.com/dokar3/quickjs-kt",
+            "scm": {
+                "url": "https://github.com/dokar3/quickjs-kt"
             },
             "licenses": [
                 "Apache-2.0"

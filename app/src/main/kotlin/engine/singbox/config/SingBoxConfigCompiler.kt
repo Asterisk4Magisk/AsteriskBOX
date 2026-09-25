@@ -80,7 +80,18 @@ internal object SingBoxConfigCompiler {
         runMode: Int = appState.runMode,
         exposePorts: Boolean = true,
         customResourceFileOverrides: Map<Int, File> = emptyMap(),
-    ): String {
+    ): String = finalizeConfig(
+        generate(context, appState, runMode, exposePorts, customResourceFileOverrides),
+        appState,
+    )
+
+    internal fun generate(
+        context: Context,
+        appState: AppState,
+        runMode: Int = appState.runMode,
+        exposePorts: Boolean = true,
+        customResourceFileOverrides: Map<Int, File> = emptyMap(),
+    ): JsonObject {
         val canonicalState = appState.withCanonicalManagedTagReferences()
         val filesByName = context.singBoxRuleSetFiles(canonicalState.customResourceFiles)
             .associateByTo(linkedMapOf()) { file -> file.name.lowercase() }
@@ -110,7 +121,7 @@ internal object SingBoxConfigCompiler {
                 localRuleSets.mapTo(mutableSetOf(), SingBoxLocalRuleSet::tag),
             )
             .withPrunedDnsServerReferences()
-        return compileGenerated(
+        return compileGeneratedRoot(
             appState = runtimeState,
             runMode = runMode,
             exposePorts = exposePorts,
@@ -124,24 +135,11 @@ internal object SingBoxConfigCompiler {
         )
     }
 
-    internal fun compileGenerated(
-        appState: AppState,
-        runMode: Int = appState.runMode,
-        exposePorts: Boolean = true,
-        localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
-        rootUidPolicy: RootInboundUidPolicy = RootInboundUidPolicy(),
-        hostsResourcePaths: Map<Int, String> = emptyMap(),
-    ): String {
-        val encoded = encodeSingBoxJson(
-            compileGeneratedRoot(
-                appState = appState,
-                runMode = runMode,
-                exposePorts = exposePorts,
-                localRuleSets = localRuleSets,
-                hostsResourcePaths = hostsResourcePaths,
-                rootUidPolicy = rootUidPolicy,
-            ),
+    private fun finalizeConfig(root: JsonObject, appState: AppState): String {
+        val overridden = applySingBoxConfigOverride(
+            root, appState.enableConfigOverrideScript, appState.configOverrideScript,
         )
+        val encoded = encodeSingBoxJson(overridden)
         SingBoxConfigChecker.check(encoded)
         return encoded
     }

@@ -73,6 +73,7 @@ import features.routing.RoutingManagementPage
 import features.selector.SelectorEditorPage
 import features.selector.SelectorManagementPage
 import features.settings.SettingsPage
+import features.singbox.SingBoxOverrideScriptPage
 import features.singbox.SingBoxDashboardPage
 import features.singbox.SingBoxProxyDestination
 import ui.components.AsteriskFloatingNavigationBar
@@ -159,6 +160,9 @@ fun AppContent(
                 }
                 entry<Route.LogcatLogs> {
                     LogcatLogsPage(padding = padding)
+                }
+                entry<Route.ConfigOverrideScript> {
+                    SingBoxOverrideScriptPage(padding = padding)
                 }
                 entry<Route.ResourceManagement> {
                     ResourceManagementPage(padding = padding)
