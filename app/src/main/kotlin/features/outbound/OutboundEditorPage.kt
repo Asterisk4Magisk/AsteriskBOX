@@ -438,7 +438,10 @@ private fun OutboundKeyValueField(
                     }
                 }
             }
-            TextButton(onClick = { entries = entries + ("" to "") }) {
+            TextButton(
+                onClick = { entries = entries + ("" to "") },
+                modifier = Modifier.align(Alignment.End),
+            ) {
                 Icon(Icons.Rounded.Add, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
                 Text(stringResource(R.string.common_add))
