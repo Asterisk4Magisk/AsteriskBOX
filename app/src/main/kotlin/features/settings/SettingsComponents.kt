@@ -189,6 +189,7 @@ internal fun SettingsSwitchRow(
     summary: String = "",
     enabled: Boolean = true,
     accent: IconAccent = IconAccent.Surface,
+    horizontalPadding: Dp = 16.dp,
 ) {
     if (!settingsRowMatchesQuery(title, summary, checked.toString())) return
     SettingsRow(
@@ -206,6 +207,7 @@ internal fun SettingsSwitchRow(
             )
         },
         accent = accent,
+        horizontalPadding = horizontalPadding,
     )
 }
 
@@ -220,6 +222,7 @@ internal fun SettingsDropdownRow(
     summary: String = "",
     enabled: Boolean = true,
     accent: IconAccent = IconAccent.Surface,
+    horizontalPadding: Dp = 16.dp,
 ) {
     if (items.isEmpty()) return
     val safeIndex = selectedIndex.coerceIn(items.indices)
@@ -254,6 +257,7 @@ internal fun SettingsDropdownRow(
                 }
             },
             accent = accent,
+            horizontalPadding = horizontalPadding,
         )
     }
 }
@@ -267,12 +271,13 @@ private fun SettingsRow(
     value: String = "",
     trailing: (@Composable () -> Unit)? = null,
     accent: IconAccent = IconAccent.Surface,
+    horizontalPadding: Dp = 16.dp,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = horizontalPadding, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         MaskedPreferenceIcon(icon = icon, accent = accent)

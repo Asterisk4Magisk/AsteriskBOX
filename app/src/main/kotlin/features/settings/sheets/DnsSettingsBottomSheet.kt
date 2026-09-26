@@ -1123,6 +1123,7 @@ internal fun DnsRuleEditorScaffold(
                         )
                         WindowDropdownPreference(
                             title = stringResource(R.string.routing_logical_mode),
+                            horizontalPadding = 0.dp,
                             icon = Icons.Rounded.AccountTree,
                             items = listOf(
                                 singBoxOptionLabel(
@@ -1179,6 +1180,7 @@ internal fun DnsRuleEditorScaffold(
                             item(key = "ip-version") {
                                 WindowDropdownPreference(
                                     title = dnsRuleMatcherLabel("ip_version"),
+                                    horizontalPadding = 0.dp,
                                     icon = Icons.Rounded.Language,
                                     items = listOf(
                                         stringResource(R.string.settings_dns_any),
@@ -1203,6 +1205,7 @@ internal fun DnsRuleEditorScaffold(
                             item(key = "network") {
                                 WindowDropdownPreference(
                                     title = dnsRuleMatcherLabel("network"),
+                                    horizontalPadding = 0.dp,
                                     icon = Icons.Rounded.Lan,
                                     items = listOf(
                                         stringResource(R.string.settings_dns_any),
@@ -1489,6 +1492,7 @@ private fun DnsRuleMatchFieldEditor(
                 title = dnsRuleMatcherLabel(matcher),
                 icon = Icons.Rounded.Policy,
                 items = listOf(stringResource(R.string.common_not_specified)) + labels,
+                horizontalPadding = 0.dp,
                 selectedIndex = selectedIndex,
                 onSelectedIndexChange = { index ->
                     onRuleChange(
@@ -1548,6 +1552,7 @@ private fun DnsRuleMatchFieldEditor(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 WindowDropdownPreference(
                     title = dnsRuleMatcherLabel(matcher),
+                    horizontalPadding = 0.dp,
                     icon = Icons.Rounded.Policy,
                     items = listOf(stringResource(R.string.common_not_specified)) +
                         namedCodes +
@@ -1658,6 +1663,7 @@ private fun DnsRuleMatchFieldEditor(
                 items = listOf(
                     stringResource(R.string.settings_dns_match_response_unavailable),
                 ) + matchResponseChoices.map { choice -> choice.second },
+                horizontalPadding = 0.dp,
                 selectedIndex = selectedIndex,
                 onSelectedIndexChange = { index ->
                     val nextValues = matchResponseChoices

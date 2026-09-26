@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import features.settings.SettingsDropdownRow
 import features.settings.SettingsSwitchRow
@@ -73,6 +74,7 @@ internal fun WindowDropdownPreference(
     selectedIndex: Int,
     onSelectedIndexChange: (Int) -> Unit,
     summary: String = "",
+    horizontalPadding: Dp = 16.dp,
 ) {
     SettingsDropdownRow(
         title = title,
@@ -81,6 +83,7 @@ internal fun WindowDropdownPreference(
         items = items,
         selectedIndex = selectedIndex,
         onSelectedIndexChange = onSelectedIndexChange,
+        horizontalPadding = horizontalPadding,
     )
 }
 

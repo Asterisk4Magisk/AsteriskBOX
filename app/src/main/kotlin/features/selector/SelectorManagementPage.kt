@@ -960,6 +960,7 @@ internal fun SelectorEditorScaffold(
             item(key = "type") {
                 SettingsDropdownRow(
                     title = stringResource(R.string.selector_editor_type),
+                    horizontalPadding = 0.dp,
                     summary = stringResource(R.string.selector_editor_type_summary),
                     icon = Icons.Rounded.Tune,
                     items = typeLabels,
@@ -976,6 +977,7 @@ internal fun SelectorEditorScaffold(
                 Column {
                     SettingsSwitchRow(
                         title = stringResource(R.string.selector_editor_interrupt),
+                        horizontalPadding = 0.dp,
                         summary = stringResource(R.string.selector_editor_interrupt_summary),
                         icon = Icons.Rounded.Sync,
                         checked = interrupt,
@@ -1124,6 +1126,7 @@ internal fun SelectorEditorScaffold(
                     ) {
                         SettingsDropdownRow(
                             title = stringResource(R.string.selector_editor_default),
+                            horizontalPadding = 0.dp,
                             icon = Icons.AutoMirrored.Rounded.AltRoute,
                             items = defaultOptionTags.map { member ->
                                 member?.let { tag ->

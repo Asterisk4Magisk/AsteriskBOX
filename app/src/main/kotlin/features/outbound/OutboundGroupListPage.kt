@@ -1313,6 +1313,7 @@ private fun OutboundGroupEditorSheet(
                     Spacer(Modifier.height(GroupEditorSectionSpacing))
                     SettingsDropdownRow(
                         title = stringResource(R.string.outbound_group_detour),
+                        horizontalPadding = 0.dp,
                         icon = Icons.AutoMirrored.Rounded.AltRoute,
                         items = detourValues.map { value ->
                             if (value.isBlank()) notSpecified else detourLabels[value] ?: unavailable
@@ -1333,6 +1334,7 @@ private fun OutboundGroupEditorSheet(
                         Column(verticalArrangement = Arrangement.spacedBy(GroupEditorSectionSpacing)) {
                             SettingsDropdownRow(
                                 title = stringResource(R.string.outbound_group_user_agent),
+                                horizontalPadding = 0.dp,
                                 summary = userAgent
                                     .takeUnless { it == selectedUserAgentLabel }
                                     .orEmpty(),
@@ -1351,12 +1353,14 @@ private fun OutboundGroupEditorSheet(
                             )
                             SettingsSwitchRow(
                                 title = stringResource(R.string.outbound_group_update_via_proxy),
+                                horizontalPadding = 0.dp,
                                 icon = Icons.Rounded.CloudSync,
                                 checked = updateViaProxy,
                                 onCheckedChange = { updateViaProxy = it },
                             )
                             SettingsSwitchRow(
                                 title = stringResource(R.string.outbound_group_strict_import),
+                                horizontalPadding = 0.dp,
                                 summary = stringResource(
                                     R.string.outbound_group_strict_import_summary,
                                 ),

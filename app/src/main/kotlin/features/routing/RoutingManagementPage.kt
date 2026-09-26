@@ -862,6 +862,7 @@ internal fun RouteRuleEditorScaffold(
                         )
                         SettingsDropdownRow(
                             title = stringResource(R.string.routing_logical_mode),
+                            horizontalPadding = 0.dp,
                             icon = Icons.Rounded.AccountTree,
                             items = listOf(
                                 singBoxOptionLabel(
@@ -915,6 +916,7 @@ internal fun RouteRuleEditorScaffold(
                     val modes = listOf("") + SingBoxRouteRuleClashModes
                     SettingsDropdownRow(
                         title = routeRuleMatcherLabel("clash_mode"),
+                        horizontalPadding = 0.dp,
                         icon = Icons.Rounded.Tune,
                         items = listOf(
                             stringResource(R.string.common_not_specified),
@@ -941,6 +943,7 @@ internal fun RouteRuleEditorScaffold(
                     val versions = listOf(0, 4, 6)
                     SettingsDropdownRow(
                         title = routeRuleMatcherLabel("ip_version"),
+                        horizontalPadding = 0.dp,
                         icon = Icons.Rounded.Language,
                         items = listOf(
                             stringResource(R.string.routing_ip_version_any),
