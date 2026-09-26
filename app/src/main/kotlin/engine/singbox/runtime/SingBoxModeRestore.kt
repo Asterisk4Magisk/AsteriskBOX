@@ -27,13 +27,13 @@ internal suspend fun restoreRootSingBoxMode(appState: AppState) = withContext(Di
     )
     try {
         // asteriskd may report the child as running just before its API starts listening.
-        for (attempt in 0 until 3) {
+        for (attempt in 0 until 10) {
             try {
                 client.connect(modeOnly = true)
                 break
             } catch (error: Exception) {
-                if (error is CancellationException || attempt == 2) throw error
-                delay(250L.milliseconds)
+                if (error is CancellationException || attempt == 9) throw error
+                delay(500L.milliseconds)
             }
         }
         client.setMode(appState.singBoxModeName())
