@@ -3,6 +3,12 @@
 
 package engine.singbox
 
+import engine.network.isCidrAddress
+import engine.network.isIpAddress
+import engine.singbox.config.DnsConfigurationMatchFields
+import engine.singbox.config.DnsRuleBooleanMatchers
+import engine.singbox.config.isDnsConfigurationEntry
+
 internal const val SingBoxUnsigned16Max = 65_535
 internal const val SingBoxUnsigned32Max = 4_294_967_295L
 
@@ -52,3 +58,57 @@ private val SingBoxDnsRCodeNames = setOf(
     "DSOTYPENI", "BADSIG", "BADKEY", "BADTIME", "BADMODE", "BADNAME",
     "BADALG", "BADTRUNC", "BADCOOKIE",
 )
+
+internal fun singBoxRuleMatcherValueError(
+    matcher: String,
+    input: String,
+    invalidMessage: String,
+): String? {
+    val value = input.trim()
+    if (value.isEmpty()) return invalidMessage
+    return when (matcher) {
+        in DnsConfigurationMatchFields ->
+            if (isDnsConfigurationEntry(matcher, value)) null else invalidMessage
+        in DnsRuleBooleanMatchers ->
+            if (value.toBooleanStrictOrNull() != null) null else invalidMessage
+        "user_id" -> if (value.toIntOrNull() != null) null else invalidMessage
+        "source_ip_cidr", "ip_cidr", "query_client_subnet" ->
+            if (isIpAddress(value) || isCidrAddress(value)) null else invalidMessage
+        in SingBoxRuleAddressMapMatchers -> {
+            val separator = value.indexOf('=')
+            val name = value.substring(0, separator.coerceAtLeast(0)).trim()
+            val addresses = if (separator in 1..<value.lastIndex) {
+                value.substring(separator + 1).split(',').map(String::trim)
+            } else {
+                emptyList()
+            }
+            if (
+                name.isNotEmpty() &&
+                (matcher != "network_interface_address" || name in SingBoxRuleNetworkTypes) &&
+                addresses.isNotEmpty() &&
+                addresses.all { address ->
+                    isIpAddress(address) || isCidrAddress(address)
+                }
+            ) {
+                null
+            } else {
+                invalidMessage
+            }
+        }
+        "source_port", "port" ->
+            if (isSingBoxUnsigned16(value)) null else invalidMessage
+        "query_type" ->
+            if (isSingBoxDnsQueryType(value)) null else invalidMessage
+        "response_rcode" ->
+            if (isSingBoxDnsRCode(value)) null else invalidMessage
+        "match_response" -> null
+        "source_port_range", "port_range" ->
+            if (isSingBoxPortRange(value)) null else invalidMessage
+        "domain_regex", "process_path_regex", "package_name_regex" ->
+            if (runCatching { Regex(value) }.isSuccess) null else invalidMessage
+        else -> null
+    }
+}
+
+private val SingBoxRuleNetworkTypes = setOf("wifi", "cellular", "ethernet", "other")
+private val SingBoxRuleAddressMapMatchers = setOf("network_interface_address")

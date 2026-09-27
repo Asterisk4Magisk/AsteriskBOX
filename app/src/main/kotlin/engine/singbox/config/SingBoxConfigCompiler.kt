@@ -778,7 +778,7 @@ internal fun compileRoute(
     val existingRules = (sourceRoute?.get("rules") as? JsonArray)
         .orEmptyObjects()
     val managedRules = appState.routeRules
-        .filter(SingBoxRouteRuleState::enabled)
+        .filter { it.enabled && !it.hasLegacyRouteModeMatcher() }
         .map(::compileManagedRouteRule)
     val injectedRules = buildList {
         addAll(SingBoxSniffCompiler.compile(appState))
@@ -878,10 +878,19 @@ private fun List<String>.sanitizedRouteNetworkTypes(): List<String> {
     return SingBoxRouteNetworkTypes.filter(selected::contains)
 }
 
-internal fun compileManagedRouteRule(rule: SingBoxRouteRuleState): JsonObject =
-    JsonObject(
+internal fun SingBoxRouteRuleState.hasLegacyRouteModeMatcher(): Boolean =
+    if (type == SingBoxRouteRuleTypeLogical) {
+        logicalRules.any { it.enabled && it.hasLegacyRouteModeMatcher() }
+    } else {
+        clashMode.isNotBlank()
+    }
+
+internal fun compileManagedRouteRule(rule: SingBoxRouteRuleState): JsonObject {
+    require(!rule.hasLegacyRouteModeMatcher()) { "Rule mode is managed by the application" }
+    return JsonObject(
         compileManagedRouteMatch(rule) + compileManagedRouteAction(rule),
     )
+}
 
 private fun compileManagedRouteAction(rule: SingBoxRouteRuleState): JsonObject =
     buildJsonObject {
@@ -917,9 +926,34 @@ private fun compileManagedRouteMatch(rule: SingBoxRouteRuleState): JsonObject =
             return@buildJsonObject
         }
         putStringArray("inbound", rule.inbound)
-        rule.clashMode.takeIf(String::isNotEmpty)?.let { mode ->
-            put("clash_mode", mode)
+        putStringArray("process_name", rule.processName)
+        putStringArray("process_path", rule.processPath)
+        putStringArray("process_path_regex", rule.processPathRegex)
+        putStringArray("user", rule.user)
+        if (rule.userId.isNotEmpty()) {
+            putJsonArray("user_id") {
+                rule.userId.map { requireNotNull(it.trim().toIntOrNull()) { "Invalid user_id" } }.distinct().forEach(::add)
+            }
         }
+
+        putStringArray("auth_user", rule.authUser)
+        putStringArray("client", rule.client)
+        putStringArray("package_name_regex", rule.packageNameRegex)
+        if (rule.networkInterfaceAddress.isNotEmpty()) {
+            require(rule.networkInterfaceAddress.all {
+                engine.singbox.singBoxRuleMatcherValueError("network_interface_address", it, "invalid") == null
+            }) { "Invalid network_interface_address" }
+            putJsonObject("network_interface_address") {
+                parseRuleAddressMap(rule.networkInterfaceAddress).forEach { (name, addresses) ->
+                    putJsonArray(name) { addresses.forEach(::add) }
+                }
+            }
+        }
+        putStringArray("source_mac_address", rule.sourceMacAddress)
+        putStringArray("source_hostname", rule.sourceHostname)
+        putStringArray("preferred_by", rule.preferredBy)
+        if (rule.networkIsExpensive) put("network_is_expensive", true)
+
         if (rule.ipVersion == 4 || rule.ipVersion == 6) {
             put("ip_version", rule.ipVersion)
         }

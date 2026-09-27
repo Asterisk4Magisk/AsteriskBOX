@@ -75,7 +75,6 @@ import app.LocalNavigator
 import app.LocalUpdateAppState
 import app.SingBoxRouteRuleActionReject
 import app.SingBoxRouteRuleActionRoute
-import app.SingBoxRouteRuleClashModes
 import app.SingBoxRouteRuleLogicalModeAnd
 import app.SingBoxRouteRuleLogicalModeOr
 import app.SingBoxRouteRuleState
@@ -84,6 +83,8 @@ import app.SingBoxRouteRuleTypeLogical
 import app.collectAppState
 import app.managedInboundTags
 import app.managedRuleSetChoices
+import app.selectablePreferredByRouteEndpoints
+import engine.singbox.singBoxRuleMatcherValueError
 import app.selectableManagedOutbounds
 import engine.network.isCidrAddress
 import engine.singbox.config.APP_GLOBAL_SELECTOR
@@ -657,6 +658,8 @@ internal fun RouteRuleEditorScaffold(
     var draft by remember(rule.id) { mutableStateOf<SingBoxRouteRuleState?>(rule) }
     val pendingDnsMatchers = remember(rule.id) { mutableStateMapOf<String, Boolean>() }
     val appState by LocalAppStateStore.current.collectAppState()
+    val preferredByChoices = selectablePreferredByRouteEndpoints(appState).map { it.tag to it.remarks }
+    val invalidMatcherMessage = stringResource(R.string.settings_dns_rule_value_invalid)
     val configurationTags = appState.dnsServers.filter { it.type in DnsConfigurationServerTypes }
         .mapTo(mutableSetOf()) { it.tag }
     var pendingChildDelete by remember { mutableStateOf<SingBoxRouteRuleState?>(null) }
@@ -688,6 +691,7 @@ internal fun RouteRuleEditorScaffold(
         saving = saving,
         saveEnabled = draft != null &&
             draft?.hasValidDnsConfigurationMatchers(configurationTags) == true &&
+            draft?.hasValidAdditionalRouteMatchers(preferredByChoices.map { it.first }.toSet()) == true &&
             (draft?.type == SingBoxRouteRuleTypeLogical || pendingDnsMatchers.values.none { it }),
         onBack = onDismiss,
         onSave = { draft?.let(onSave) },
@@ -709,7 +713,7 @@ internal fun RouteRuleEditorScaffold(
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                 item(key = "basic-title") {
-                    RuleEditorSectionTitle(stringResource(R.string.routing_section_basic))
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_basic))
                 }
                 item(key = "name") {
                     RuleEditorTextField(
@@ -873,7 +877,7 @@ internal fun RouteRuleEditorScaffold(
                 }
                 if (visibleType == SingBoxRouteRuleTypeLogical) {
                     item(key = "logic-title") {
-                        RuleEditorSectionTitle(stringResource(R.string.routing_section_logic))
+                        RuleEditorSectionTitle(stringResource(R.string.rule_section_logic))
                     }
                     item(key = "logic-mode") {
                         val modes = listOf(
@@ -930,34 +934,7 @@ internal fun RouteRuleEditorScaffold(
                     }
                 } else {
                     item(key = "network-title") {
-                    RuleEditorSectionTitle(stringResource(R.string.routing_section_network))
-                }
-                item(key = "clash-mode") {
-                    val modes = listOf("") + SingBoxRouteRuleClashModes
-                    SettingsDropdownRow(
-                        title = routeRuleMatcherLabel("clash_mode"),
-                        horizontalPadding = 0.dp,
-                        icon = Icons.Rounded.Tune,
-                        items = listOf(
-                            stringResource(R.string.common_not_specified),
-                            singBoxOptionLabel(
-                                stringResource(R.string.sing_box_mode_rule),
-                                "Rule",
-                            ),
-                            singBoxOptionLabel(
-                                stringResource(R.string.sing_box_mode_global),
-                                "Global",
-                            ),
-                            singBoxOptionLabel(
-                                stringResource(R.string.sing_box_mode_direct),
-                                "Direct",
-                            ),
-                        ),
-                        selectedIndex = modes.indexOf(current.clashMode).coerceAtLeast(0),
-                        onSelectedIndexChange = { index ->
-                            draft = current.copy(clashMode = modes[index])
-                        },
-                    )
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_network))
                 }
                 item(key = "ip-version") {
                     val versions = listOf(0, 4, 6)
@@ -1027,8 +1004,53 @@ internal fun RouteRuleEditorScaffold(
                         },
                     )
                 }
+                item(key = "auth_user") {
+                    RouteStringList(
+                        key = current.id,
+                        title = routeRuleMatcherLabel("auth_user"),
+                        values = current.authUser,
+                        onChange = { draft = current.copy(authUser = it) },
+                        validate = { value -> singBoxRuleMatcherValueError("auth_user", value, invalidMatcherMessage) },
+                        onPendingChange = { pendingDnsMatchers["auth_user"] = it },
+                    )
+                }
+                item(key = "client") {
+                    RouteStringList(
+                        key = current.id,
+                        title = routeRuleMatcherLabel("client"),
+                        values = current.client,
+                        onChange = { draft = current.copy(client = it) },
+                        validate = { value -> singBoxRuleMatcherValueError("client", value, invalidMatcherMessage) },
+                        onPendingChange = { pendingDnsMatchers["client"] = it },
+                    )
+                }
                 item(key = "destination-title") {
-                    RuleEditorSectionTitle(stringResource(R.string.routing_section_destination))
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_destination))
+                }
+                item(key = "ip-private") {
+                    RuleEditorSwitchCard(
+                        title = routeRuleMatcherLabel("ip_is_private"),
+                        checked = current.ipIsPrivate,
+                        onCheckedChange = { checked -> draft = current.copy(ipIsPrivate = checked) },
+                    )
+                }
+                item(key = "rule-sets") {
+                    RouteRuleSetCard(
+                        choices = ruleSetChoices,
+                        selected = current.ruleSet.toSet(),
+                        onToggle = { value ->
+                            draft = current.copy(ruleSet = current.ruleSet.toggle(value))
+                        },
+                    )
+                }
+                item(key = "preferred-by") {
+                    ReferenceSelectionCard(
+                        title = routeRuleMatcherLabel("preferred_by"),
+                        emptyText = stringResource(R.string.managed_preferred_by_empty),
+                        choices = preferredByChoices,
+                        selected = current.preferredBy.toSet(),
+                        onToggle = { draft = current.copy(preferredBy = current.preferredBy.toggle(it)) },
+                    )
                 }
                 item(key = "domain") {
                     RouteStringList(
@@ -1072,13 +1094,6 @@ internal fun RouteRuleEditorScaffold(
                         validate = { value -> if (isCidrAddress(value)) null else invalidMessage },
                     )
                 }
-                item(key = "ip-private") {
-                    RuleEditorSwitchCard(
-                        title = routeRuleMatcherLabel("ip_is_private"),
-                        checked = current.ipIsPrivate,
-                        onCheckedChange = { checked -> draft = current.copy(ipIsPrivate = checked) },
-                    )
-                }
                 item(key = "port") {
                     val invalidMessage = stringResource(R.string.routing_port_invalid)
                     RouteStringList(
@@ -1099,17 +1114,17 @@ internal fun RouteRuleEditorScaffold(
                         validate = { value -> if (isRoutePortRange(value)) null else invalidMessage },
                     )
                 }
-                item(key = "rule-sets") {
-                    RouteRuleSetCard(
-                        choices = ruleSetChoices,
-                        selected = current.ruleSet.toSet(),
-                        onToggle = { value ->
-                            draft = current.copy(ruleSet = current.ruleSet.toggle(value))
+                item(key = "source-title") {
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_source))
+                }
+                item(key = "source-ip-private") {
+                    RuleEditorSwitchCard(
+                        title = routeRuleMatcherLabel("source_ip_is_private"),
+                        checked = current.sourceIpIsPrivate,
+                        onCheckedChange = { checked ->
+                            draft = current.copy(sourceIpIsPrivate = checked)
                         },
                     )
-                }
-                item(key = "source-title") {
-                    RuleEditorSectionTitle(stringResource(R.string.routing_section_source))
                 }
                 item(key = "source-ip-cidr") {
                     val invalidMessage = stringResource(R.string.routing_cidr_invalid)
@@ -1119,15 +1134,6 @@ internal fun RouteRuleEditorScaffold(
                         values = current.sourceIpCidr,
                         onChange = { draft = current.copy(sourceIpCidr = it) },
                         validate = { value -> if (isCidrAddress(value)) null else invalidMessage },
-                    )
-                }
-                item(key = "source-ip-private") {
-                    RuleEditorSwitchCard(
-                        title = routeRuleMatcherLabel("source_ip_is_private"),
-                        checked = current.sourceIpIsPrivate,
-                        onCheckedChange = { checked ->
-                            draft = current.copy(sourceIpIsPrivate = checked)
-                        },
                     )
                 }
                 item(key = "source-port") {
@@ -1150,8 +1156,95 @@ internal fun RouteRuleEditorScaffold(
                         validate = { value -> if (isRoutePortRange(value)) null else invalidMessage },
                     )
                 }
-                item(key = "android-title") {
-                    RuleEditorSectionTitle(stringResource(R.string.routing_section_android))
+                item(key = "source_mac_address") {
+                    RouteStringList(
+                        key = current.id,
+                        title = routeRuleMatcherLabel("source_mac_address"),
+                        values = current.sourceMacAddress,
+                        onChange = { draft = current.copy(sourceMacAddress = it) },
+                        validate = { value -> singBoxRuleMatcherValueError("source_mac_address", value, invalidMatcherMessage) },
+                        onPendingChange = { pendingDnsMatchers["source_mac_address"] = it },
+                    )
+                }
+                item(key = "source_hostname") {
+                    RouteStringList(
+                        key = current.id,
+                        title = routeRuleMatcherLabel("source_hostname"),
+                        values = current.sourceHostname,
+                        onChange = { draft = current.copy(sourceHostname = it) },
+                        validate = { value -> singBoxRuleMatcherValueError("source_hostname", value, invalidMatcherMessage) },
+                        onPendingChange = { pendingDnsMatchers["source_hostname"] = it },
+                    )
+                }
+                item(key = "dns-title") {
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_dns))
+                }
+                items(DnsConfigurationMatchFields.toList(), key = { it }) { field ->
+                    DnsConfigurationMatchEditor(
+                        editorKey = current.id,
+                        field = field,
+                        title = routeRuleMatcherLabel(field),
+                        dnsServers = appState.dnsServers,
+                        values = if (field == "dns_server_address") current.dnsServerAddress else current.dnsSearchDomain,
+                        onValuesChange = { values ->
+                            draft = if (field == "dns_server_address") current.copy(dnsServerAddress = values)
+                            else current.copy(dnsSearchDomain = values)
+                        },
+                        onPendingChange = { pendingDnsMatchers[field] = it },
+                    )
+                }
+                item(key = "process-title") {
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_process))
+                }
+                item(key = "process_name") {
+                    RouteStringList(
+                        key = current.id,
+                        title = routeRuleMatcherLabel("process_name"),
+                        values = current.processName,
+                        onChange = { draft = current.copy(processName = it) },
+                        validate = { value -> singBoxRuleMatcherValueError("process_name", value, invalidMatcherMessage) },
+                        onPendingChange = { pendingDnsMatchers["process_name"] = it },
+                    )
+                }
+                item(key = "process_path") {
+                    RouteStringList(
+                        key = current.id,
+                        title = routeRuleMatcherLabel("process_path"),
+                        values = current.processPath,
+                        onChange = { draft = current.copy(processPath = it) },
+                        validate = { value -> singBoxRuleMatcherValueError("process_path", value, invalidMatcherMessage) },
+                        onPendingChange = { pendingDnsMatchers["process_path"] = it },
+                    )
+                }
+                item(key = "process_path_regex") {
+                    RouteStringList(
+                        key = current.id,
+                        title = routeRuleMatcherLabel("process_path_regex"),
+                        values = current.processPathRegex,
+                        onChange = { draft = current.copy(processPathRegex = it) },
+                        validate = { value -> singBoxRuleMatcherValueError("process_path_regex", value, invalidMatcherMessage) },
+                        onPendingChange = { pendingDnsMatchers["process_path_regex"] = it },
+                    )
+                }
+                item(key = "user") {
+                    RouteStringList(
+                        key = current.id,
+                        title = routeRuleMatcherLabel("user"),
+                        values = current.user,
+                        onChange = { draft = current.copy(user = it) },
+                        validate = { value -> singBoxRuleMatcherValueError("user", value, invalidMatcherMessage) },
+                        onPendingChange = { pendingDnsMatchers["user"] = it },
+                    )
+                }
+                item(key = "user_id") {
+                    RouteStringList(
+                        key = current.id,
+                        title = routeRuleMatcherLabel("user_id"),
+                        values = current.userId,
+                        onChange = { draft = current.copy(userId = it) },
+                        validate = { value -> singBoxRuleMatcherValueError("user_id", value, invalidMatcherMessage) },
+                        onPendingChange = { pendingDnsMatchers["user_id"] = it },
+                    )
                 }
                 item(key = "package-name") {
                     RouteStringList(
@@ -1159,6 +1252,26 @@ internal fun RouteRuleEditorScaffold(
                         title = routeRuleMatcherLabel("package_name"),
                         values = current.packageName,
                         onChange = { draft = current.copy(packageName = it) },
+                    )
+                }
+                item(key = "package_name_regex") {
+                    RouteStringList(
+                        key = current.id,
+                        title = routeRuleMatcherLabel("package_name_regex"),
+                        values = current.packageNameRegex,
+                        onChange = { draft = current.copy(packageNameRegex = it) },
+                        validate = { value -> singBoxRuleMatcherValueError("package_name_regex", value, invalidMatcherMessage) },
+                        onPendingChange = { pendingDnsMatchers["package_name_regex"] = it },
+                    )
+                }
+                item(key = "environment-title") {
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_environment))
+                }
+                item(key = "network_is_expensive") {
+                    RuleEditorSwitchCard(
+                        title = routeRuleMatcherLabel("network_is_expensive"),
+                        checked = current.networkIsExpensive,
+                        onCheckedChange = { draft = current.copy(networkIsExpensive = it) },
                     )
                 }
                 item(key = "network-type") {
@@ -1188,6 +1301,17 @@ internal fun RouteRuleEditorScaffold(
                         },
                     )
                 }
+                item(key = "network_interface_address") {
+                    RouteStringList(
+                        key = current.id,
+                        title = routeRuleMatcherLabel("network_interface_address"),
+                        description = stringResource(R.string.settings_dns_rule_map_values_summary),
+                        values = current.networkInterfaceAddress,
+                        onChange = { draft = current.copy(networkInterfaceAddress = it) },
+                        validate = { value -> singBoxRuleMatcherValueError("network_interface_address", value, invalidMatcherMessage) },
+                        onPendingChange = { pendingDnsMatchers["network_interface_address"] = it },
+                    )
+                }
                 item(key = "wifi-ssid") {
                     RouteStringList(
                         key = current.id,
@@ -1202,20 +1326,6 @@ internal fun RouteRuleEditorScaffold(
                         title = routeRuleMatcherLabel("wifi_bssid"),
                         values = current.wifiBssid,
                         onChange = { draft = current.copy(wifiBssid = it) },
-                    )
-                }
-                items(DnsConfigurationMatchFields.toList(), key = { it }) { field ->
-                    DnsConfigurationMatchEditor(
-                        editorKey = current.id,
-                        field = field,
-                        title = routeRuleMatcherLabel(field),
-                        dnsServers = appState.dnsServers,
-                        values = if (field == "dns_server_address") current.dnsServerAddress else current.dnsSearchDomain,
-                        onValuesChange = { values ->
-                            draft = if (field == "dns_server_address") current.copy(dnsServerAddress = values)
-                            else current.copy(dnsSearchDomain = values)
-                        },
-                        onPendingChange = { pendingDnsMatchers[field] = it },
                     )
                 }
                 }
@@ -1435,14 +1545,18 @@ private fun RouteStringList(
     values: List<String>,
     onChange: (List<String>) -> Unit,
     validate: (String) -> String? = { null },
+    onPendingChange: ((Boolean) -> Unit)? = null,
+    description: String? = null,
 ) {
     StringListEditor(
         editorKey = key,
         title = title,
         values = values,
+        description = description,
         onValuesChange = onChange,
         emptyText = stringResource(R.string.routing_list_empty),
         validateInput = validate,
+        onPendingChange = onPendingChange,
         horizontalPadding = 0.dp,
     )
 }
@@ -1509,18 +1623,9 @@ private fun routeRuleMatchValueLabel(
     }.single()
     "inbound",
     "rule_set",
+    "preferred_by",
     -> app.visibleManagedReference(value, referenceLabels, unavailableLabel)
     "protocol" -> singBoxProtocolChoices().toMap()[value] ?: value
-    "clash_mode" -> singBoxOptionLabel(
-        stringResource(
-            when (value) {
-                "Rule" -> R.string.sing_box_mode_rule
-                "Global" -> R.string.sing_box_mode_global
-                else -> R.string.sing_box_mode_direct
-            },
-        ),
-        value,
-    )
     "ip_version" -> singBoxOptionLabel(
         stringResource(
             if (value == "4") R.string.routing_ipv4 else R.string.routing_ipv6,
@@ -1577,32 +1682,7 @@ private fun routeRuleMatchSummary(rule: SingBoxRouteRuleState): String {
 }
 
 private fun SingBoxRouteRuleState.matcherCount(): Int =
-    listOf(
-        inbound,
-        network,
-        protocol,
-        domain,
-        domainSuffix,
-        domainKeyword,
-        domainRegex,
-        sourceIpCidr,
-        ipCidr,
-        sourcePort,
-        sourcePortRange,
-        port,
-        portRange,
-        packageName,
-        networkType,
-        wifiSsid,
-        wifiBssid,
-        dnsServerAddress,
-        dnsSearchDomain,
-        ruleSet,
-    ).count(List<String>::isNotEmpty) +
-        (if (clashMode.isNotEmpty()) 1 else 0) +
-        (if (ipVersion != 0) 1 else 0) +
-        (if (sourceIpIsPrivate) 1 else 0) +
-        (if (ipIsPrivate) 1 else 0)
+    routeRuleCardMatches().count { it.field != "all" && it.field != "logical" }
 
 private fun <T> List<T>.toggle(value: T): List<T> =
     if (value in this) filterNot { item -> item == value } else this + value

@@ -273,6 +273,7 @@ internal fun SingBoxRouteRuleState.withCanonicalManagedReferences(
     logicalRules = logicalRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
     inbound = inbound.map(resolve),
     ruleSet = ruleSet.map(resolve),
+    preferredBy = preferredBy.map(resolve),
     dnsServerAddress = mapDnsConfigurationTags(dnsServerAddress, resolve),
     dnsSearchDomain = mapDnsConfigurationTags(dnsSearchDomain, resolve),
     outbound = resolve(outbound),
@@ -387,6 +388,27 @@ internal fun managedInboundTags(state: AppState): List<String> = buildList {
 internal fun selectablePreferredByDnsServerTags(state: AppState): List<String> =
     selectablePreferredByDnsServers(state).map(ManagedReferenceChoice::tag)
 
+internal fun selectablePreferredByRouteEndpointTags(state: AppState): List<String> =
+    selectablePreferredByRouteEndpoints(state).map(ManagedReferenceChoice::tag)
+
+internal fun selectablePreferredByRouteEndpoints(state: AppState): List<ManagedReferenceChoice> =
+    state.endpoints
+        .filter { endpoint ->
+            endpoint.type in PreferredByRouteEndpointTypes &&
+                endpoint.type in SupportedSingBoxEndpointTypes
+        }
+        .map { endpoint -> ManagedReferenceChoice(tag = endpoint.tag, remarks = endpoint.remarks) }
+        .distinctBy(ManagedReferenceChoice::tag)
+
+internal fun AppState.withPrunedRoutePreferredByReferences(): AppState {
+    val availableTags = selectablePreferredByRouteEndpointTags(this).toSet()
+    return copy(
+        routeRules = routeRules.map { rule ->
+            rule.updateManagedPreferredByReferences { tag -> tag.takeIf(availableTags::contains) }
+        },
+    )
+}
+
 internal fun selectablePreferredByDnsServers(state: AppState): List<ManagedReferenceChoice> =
     state.dnsServers
         .filter { server -> server.type in PreferredByDnsServerTypes }
@@ -475,16 +497,18 @@ internal fun AppState.withUnavailableManagedRuleSetsDisabled(
         },
     ).withPrunedDnsEvaluationReferences()
 
-internal fun AppState.withPrunedDnsEvaluationReferences(): AppState {
+internal fun AppState.withPrunedDnsEvaluationReferences(): AppState =
+    copy(dnsRules = dnsRules.withPrunedDnsEvaluationReferences())
+
+internal fun List<SingBoxDnsRuleState>.withPrunedDnsEvaluationReferences(): List<SingBoxDnsRuleState> {
     val taggedResponses = mutableSetOf<String>()
-    val updatedRules = dnsRules.map { rule ->
+    return map { rule ->
         val updatedRule = rule.disableUnavailableDnsEvaluationReferences(taggedResponses)
         if (updatedRule.enabled && updatedRule.action == SingBoxDnsEvaluateAction) {
             taggedResponses += updatedRule.evaluationTag
         }
         updatedRule
     }
-    return copy(dnsRules = updatedRules)
 }
 
 internal fun List<OutboundState>.replaceManagedReference(
@@ -633,7 +657,7 @@ internal fun AppState.withPrunedDnsServerReferences(): AppState {
                 tag.takeIf(preferredByTags::contains)
             }.disableUnavailableDnsConfigurationReferences(configurationTags)
         },
-    ).withPrunedDnsEvaluationReferences()
+    ).withPrunedDnsEvaluationReferences().withPrunedRoutePreferredByReferences()
 }
 
 internal fun AppState.withRemovedManagedDnsServers(
@@ -1008,6 +1032,27 @@ internal fun List<ManagedOutboundChoice>.stableSortedByKindPriority(): List<Mana
     }
 }
 
+internal fun SingBoxRouteRuleState.updateManagedPreferredByReferences(
+    transform: (String) -> String?,
+): SingBoxRouteRuleState {
+    val updatedPreferredBy = preferredBy.mapNotNull(transform).distinct()
+    val updatedLogicalRules = logicalRules.map { rule ->
+        rule.updateManagedPreferredByReferences(transform)
+    }
+    val lostRequiredReference = type != SingBoxRouteRuleTypeLogical &&
+        preferredBy.isNotEmpty() && updatedPreferredBy.isEmpty()
+    val lostEnabledChild =
+        type == SingBoxRouteRuleTypeLogical &&
+            logicalRules.zip(updatedLogicalRules).any { (previous, updated) ->
+                previous.enabled && !updated.enabled
+            }
+    return copy(
+        enabled = enabled && !lostRequiredReference && !lostEnabledChild,
+        preferredBy = updatedPreferredBy,
+        logicalRules = updatedLogicalRules,
+    )
+}
+
 private fun SingBoxRouteRuleState.updateManagedRuleSetReferences(
     transform: (String) -> String?,
 ): SingBoxRouteRuleState {
@@ -1207,6 +1252,7 @@ private val NetworkDnsServerTypesWithDomainResolver =
     setOf("udp", "tcp", "tls", "quic", "https", "h3")
 private val PreferredByDnsServerTypes =
     setOf("hosts", "local", "mdns", "tailscale", "openconnect", "resolved")
+private val PreferredByRouteEndpointTypes = setOf("tailscale", "wireguard", "bridge")
 
 private fun MutableMap<String, String>.putVisibleRemarks(tag: String, remarks: String) {
     remarks.trim()

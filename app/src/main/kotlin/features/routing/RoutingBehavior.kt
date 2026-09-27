@@ -12,30 +12,44 @@ import engine.singbox.isSingBoxUnsigned16
 import app.R
 
 internal val RouteRuleMatcherLabelResources = linkedMapOf(
-    "clash_mode" to R.string.routing_clash_mode,
-    "ip_version" to R.string.routing_ip_version,
-    "network" to R.string.routing_network,
-    "inbound" to R.string.routing_inbound,
-    "protocol" to R.string.routing_protocol,
-    "domain" to R.string.routing_domain,
-    "domain_suffix" to R.string.routing_domain_suffix,
-    "domain_keyword" to R.string.routing_domain_keyword,
-    "domain_regex" to R.string.routing_domain_regex,
+    "process_name" to R.string.rule_matcher_process_name,
+    "process_path" to R.string.rule_matcher_process_path,
+    "process_path_regex" to R.string.rule_matcher_process_path_regex,
+    "user" to R.string.rule_matcher_user,
+    "user_id" to R.string.rule_matcher_user_id,
+
+    "auth_user" to R.string.rule_matcher_auth_user,
+    "client" to R.string.routing_client,
+    "package_name_regex" to R.string.rule_matcher_package_name_regex,
+    "network_interface_address" to R.string.rule_matcher_network_interface_address,
+    "source_mac_address" to R.string.rule_matcher_source_mac_address,
+    "source_hostname" to R.string.rule_matcher_source_hostname,
+    "preferred_by" to R.string.rule_matcher_preferred_by,
+    "network_is_expensive" to R.string.rule_matcher_network_is_expensive,
+
+    "ip_version" to R.string.rule_matcher_ip_version,
+    "network" to R.string.rule_matcher_network,
+    "inbound" to R.string.rule_matcher_inbound,
+    "protocol" to R.string.rule_matcher_protocol,
+    "domain" to R.string.rule_matcher_domain,
+    "domain_suffix" to R.string.rule_matcher_domain_suffix,
+    "domain_keyword" to R.string.rule_matcher_domain_keyword,
+    "domain_regex" to R.string.rule_matcher_domain_regex,
     "ip_cidr" to R.string.routing_ip_cidr,
     "ip_is_private" to R.string.routing_ip_is_private,
-    "port" to R.string.routing_port,
-    "port_range" to R.string.routing_port_range,
-    "rule_set" to R.string.routing_rule_sets,
-    "source_ip_cidr" to R.string.routing_source_ip_cidr,
-    "source_ip_is_private" to R.string.routing_source_ip_is_private,
-    "source_port" to R.string.routing_source_port,
-    "source_port_range" to R.string.routing_source_port_range,
-    "package_name" to R.string.routing_package_name,
-    "network_type" to R.string.routing_network_type,
-    "wifi_ssid" to R.string.routing_wifi_ssid,
-    "wifi_bssid" to R.string.routing_wifi_bssid,
-    "dns_server_address" to R.string.settings_dns_matcher_dns_server_address,
-    "dns_search_domain" to R.string.settings_dns_matcher_dns_search_domain,
+    "port" to R.string.rule_matcher_port,
+    "port_range" to R.string.rule_matcher_port_range,
+    "rule_set" to R.string.rule_matcher_rule_set,
+    "source_ip_cidr" to R.string.rule_matcher_source_ip_cidr,
+    "source_ip_is_private" to R.string.rule_matcher_source_ip_is_private,
+    "source_port" to R.string.rule_matcher_source_port,
+    "source_port_range" to R.string.rule_matcher_source_port_range,
+    "package_name" to R.string.rule_matcher_package_name,
+    "network_type" to R.string.rule_matcher_network_type,
+    "wifi_ssid" to R.string.rule_matcher_wifi_ssid,
+    "wifi_bssid" to R.string.rule_matcher_wifi_bssid,
+    "dns_server_address" to R.string.rule_matcher_dns_server_address,
+    "dns_search_domain" to R.string.rule_matcher_dns_search_domain,
 )
 
 internal fun AppState.withRouteRuleEnabled(
@@ -74,23 +88,35 @@ internal val RouteRuleCardMatch.officialFieldName: String?
 
 internal fun SingBoxRouteRuleState.routeRuleCardMatches(): List<RouteRuleCardMatch> {
     if (type == SingBoxRouteRuleTypeLogical) {
-        return listOf(
-            RouteRuleCardMatch(
+        return buildList {
+            add(RouteRuleCardMatch(
                 field = "logical",
                 values = listOf(logicalMode, logicalRules.size.toString()),
-            ),
-        )
+            ))
+        }
     }
 
     val matches = buildList {
-        clashMode.takeIf(String::isNotEmpty)?.let {
-            add(RouteRuleCardMatch("clash_mode", listOf(it)))
-        }
         ipVersion.takeIf { it != 0 }?.let {
             add(RouteRuleCardMatch("ip_version", listOf(it.toString())))
         }
         addRouteCardMatch("network", network)
         addRouteCardMatch("inbound", inbound)
+        addRouteCardMatch("process_name", processName)
+        addRouteCardMatch("process_path", processPath)
+        addRouteCardMatch("process_path_regex", processPathRegex)
+        addRouteCardMatch("user", user)
+        addRouteCardMatch("user_id", userId)
+
+        addRouteCardMatch("auth_user", authUser)
+        addRouteCardMatch("client", client)
+        addRouteCardMatch("package_name_regex", packageNameRegex)
+        addRouteCardMatch("network_interface_address", networkInterfaceAddress)
+        addRouteCardMatch("source_mac_address", sourceMacAddress)
+        addRouteCardMatch("source_hostname", sourceHostname)
+        addRouteCardMatch("preferred_by", preferredBy)
+        if (networkIsExpensive) add(RouteRuleCardMatch("network_is_expensive"))
+
         addRouteCardMatch("protocol", protocol)
         addRouteCardMatch("domain", domain)
         addRouteCardMatch("domain_suffix", domainSuffix)

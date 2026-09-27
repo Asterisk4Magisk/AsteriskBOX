@@ -3,10 +3,11 @@
 
 package features.routing
 
+import engine.singbox.singBoxRuleMatcherValueError
 import app.AppState
 import app.SingBoxRouteRuleActionReject
 import app.SingBoxRouteRuleActionRoute
-import app.SingBoxRouteRuleClashModes
+import engine.singbox.config.hasLegacyRouteModeMatcher
 import app.SingBoxRouteRuleLogicalModeAnd
 import app.SingBoxRouteRuleLogicalModeOr
 import app.SingBoxRouteRuleState
@@ -69,7 +70,22 @@ internal fun SingBoxRouteRuleState.sanitized(): SingBoxRouteRuleState {
         } ?: SingBoxRouteRuleLogicalModeAnd,
         logicalRules = logicalRules.map(SingBoxRouteRuleState::sanitized),
         inbound = inbound.normalized(),
-        clashMode = clashMode.takeIf(SingBoxRouteRuleClashModes::contains).orEmpty(),
+        processName = processName.normalized(),
+        processPath = processPath.normalized(),
+        processPathRegex = processPathRegex.normalized(),
+        user = user.normalized(),
+        userId = userId.normalized(),
+
+        authUser = authUser.normalized(),
+        client = client.normalized(),
+        packageNameRegex = packageNameRegex.normalized(),
+        networkInterfaceAddress = networkInterfaceAddress.normalized(),
+        sourceMacAddress = sourceMacAddress.normalized(),
+        sourceHostname = sourceHostname.normalized(),
+        preferredBy = preferredBy.normalized(),
+
+        enabled = enabled && !hasLegacyRouteModeMatcher(),
+        clashMode = "",
         network = network.normalized(),
         protocol = protocol.normalized(),
         domain = domain.normalized(),
@@ -100,3 +116,25 @@ internal fun SingBoxRouteRuleState.sanitized(): SingBoxRouteRuleState {
 
 private fun List<String>.normalized(): List<String> =
     map(String::trim).filter(String::isNotEmpty).distinct()
+
+internal fun SingBoxRouteRuleState.hasValidAdditionalRouteMatchers(preferredByTags: Set<String>): Boolean {
+    if (type == SingBoxRouteRuleTypeLogical) {
+        return logicalRules.all { it.hasValidAdditionalRouteMatchers(preferredByTags) }
+    }
+    if (preferredBy.any { it !in preferredByTags }) return false
+    return listOf(
+        "process_name" to processName,
+        "process_path" to processPath,
+        "process_path_regex" to processPathRegex,
+        "user" to user,
+        "user_id" to userId,
+        "auth_user" to authUser,
+        "client" to client,
+        "package_name_regex" to packageNameRegex,
+        "network_interface_address" to networkInterfaceAddress,
+        "source_mac_address" to sourceMacAddress,
+        "source_hostname" to sourceHostname,
+    ).all { (field, values) ->
+        values.all { singBoxRuleMatcherValueError(field, it, "invalid") == null }
+    }
+}

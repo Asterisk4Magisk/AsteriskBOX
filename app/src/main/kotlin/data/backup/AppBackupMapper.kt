@@ -478,9 +478,11 @@ private fun AppState.restoreWarnings(): List<AppBackupWarning> {
     val missingDnsServerCount = dnsReferences.countMissingManagedReferences(availableDnsServers)
 
     val availableEndpoints = endpoints.mapTo(mutableSetOf()) { endpoint -> endpoint.tag }
-    val missingEndpointCount = dnsServers
-        .map { server -> server.endpoint }
-        .countMissingManagedReferences(availableEndpoints)
+    val endpointReferences = buildList {
+        dnsServers.forEach { server -> add(server.endpoint) }
+        routeRules.forEach { rule -> addAll(rule.preferredByEndpointReferences()) }
+    }
+    val missingEndpointCount = endpointReferences.countMissingManagedReferences(availableEndpoints)
 
     return buildList {
         if (missingOutboundCount > 0) {
@@ -494,6 +496,12 @@ private fun AppState.restoreWarnings(): List<AppBackupWarning> {
         }
     }
 }
+
+private fun SingBoxRouteRuleState.preferredByEndpointReferences(): List<String> =
+    buildList {
+        addAll(preferredBy)
+        logicalRules.forEach { rule -> addAll(rule.preferredByEndpointReferences()) }
+    }
 
 private fun SingBoxRouteRuleState.outboundReferences(): List<String> =
     buildList {

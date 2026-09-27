@@ -16,6 +16,12 @@ import features.resources.ResourceFileSingBoxCoreName
 import features.resources.ResourceFileSourceCustom
 import features.resources.ResourceFileSourceDefault
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonTransformingSerializer
 
 @Stable
 data class SubscriptionInfo(
@@ -160,7 +166,6 @@ const val SingBoxRouteRuleTypeDefault = "default"
 const val SingBoxRouteRuleTypeLogical = "logical"
 const val SingBoxRouteRuleLogicalModeAnd = "and"
 const val SingBoxRouteRuleLogicalModeOr = "or"
-val SingBoxRouteRuleClashModes = listOf("Rule", "Global", "Direct")
 val SingBoxRouteNetworkStrategies = listOf("default", "hybrid", "fallback")
 val SingBoxRouteNetworkTypes = listOf("wifi", "cellular", "ethernet", "other")
 
@@ -174,6 +179,7 @@ data class SingBoxRouteRuleState(
     val logicalMode: String = SingBoxRouteRuleLogicalModeAnd,
     val logicalRules: List<SingBoxRouteRuleState> = emptyList(),
     val inbound: List<String> = emptyList(),
+    // Read legacy user conditions so they can be disabled instead of becoming unconditional.
     val clashMode: String = "",
     val ipVersion: Int = 0,
     val network: List<String> = emptyList(),
@@ -202,6 +208,19 @@ data class SingBoxRouteRuleState(
     val outbound: String = "",
     val rejectMethod: String = "default",
     val rejectNoDrop: Boolean = false,
+    val authUser: List<String> = emptyList(),
+    val client: List<String> = emptyList(),
+    val packageNameRegex: List<String> = emptyList(),
+    val networkInterfaceAddress: List<String> = emptyList(),
+    val sourceMacAddress: List<String> = emptyList(),
+    val sourceHostname: List<String> = emptyList(),
+    val preferredBy: List<String> = emptyList(),
+    val networkIsExpensive: Boolean = false,
+    val processName: List<String> = emptyList(),
+    val processPath: List<String> = emptyList(),
+    val processPathRegex: List<String> = emptyList(),
+    val user: List<String> = emptyList(),
+    val userId: List<String> = emptyList(),
 )
 
 const val DefaultOutboundSubscriptionUserAgent = "sing-box"
@@ -296,7 +315,8 @@ data class SingBoxDnsRuleState(
     val logicalRules: List<SingBoxDnsRuleState> = emptyList(),
     val matches: List<SingBoxDnsRuleMatchState> = emptyList(),
     val ipVersion: String = "",
-    val network: String = "",
+    @Serializable(with = DnsRuleNetworkSerializer::class)
+    val network: List<String> = emptyList(),
     val invert: Boolean = false,
     val action: String = "route",
     val server: String = "",
@@ -313,6 +333,18 @@ data class SingBoxDnsRuleState(
 ) {
     val evaluationTag: String
         get() = managedDnsEvaluationTag(id, remarks)
+}
+
+// Persisted DNS rules used a string before transport matching became multi-select.
+internal object DnsRuleNetworkSerializer : JsonTransformingSerializer<List<String>>(
+    ListSerializer(String.serializer()),
+) {
+    override fun transformDeserialize(element: JsonElement): JsonElement =
+        if (element is JsonPrimitive && element.isString) {
+            JsonArray(element.content.trim().takeIf(String::isNotEmpty)?.let { listOf(JsonPrimitive(it)) }.orEmpty())
+        } else {
+            element
+        }
 }
 
 val SingBoxDnsServerTypes = listOf(
@@ -349,16 +381,10 @@ val SingBoxDnsRuleMatchers = listOf(
     "source_port_range",
     "port",
     "port_range",
-    "process_name",
-    "process_path",
-    "process_path_regex",
     "package_name",
     "package_name_regex",
-    "clash_mode",
     "network_type",
-    "interface_address",
     "network_interface_address",
-    "default_interface_address",
     "source_mac_address",
     "source_hostname",
     "preferred_by",
@@ -371,6 +397,18 @@ val SingBoxDnsRuleMatchers = listOf(
     "response_answer",
     "response_ns",
     "response_extra",
+    "query_client_subnet",
+    "query_dnssec",
+    "source_ip_is_private",
+    "network_is_expensive",
+    "ip_cidr",
+    "ip_is_private",
+    "ip_accept_any",
+    "process_name",
+    "process_path",
+    "process_path_regex",
+    "user",
+    "user_id",
 )
 
 val SingBoxDnsRuleActions = listOf(
@@ -535,11 +573,9 @@ fun AppState.withRemovedManagedOutboundTags(
             .takeUnless(transitivelyUnavailableTags::contains)
             .orEmpty(),
         routeRules = routeRules.map { rule ->
-            if (rule.outbound in transitivelyUnavailableTags) {
-                rule.copy(outbound = "")
-            } else {
-                rule
-            }
+            rule.updateManagedPreferredByReferences { tag ->
+                tag.takeUnless(transitivelyUnavailableTags::contains)
+            }.copy(outbound = rule.outbound.takeUnless(transitivelyUnavailableTags::contains).orEmpty())
         },
         dnsServers = dnsServers.map { server ->
             server.copy(
