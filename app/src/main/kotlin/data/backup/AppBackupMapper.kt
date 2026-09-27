@@ -3,6 +3,9 @@
 
 package data.backup
 
+import engine.singbox.config.DnsConfigurationMatchFields
+import engine.singbox.config.dnsConfigurationEntryTag
+
 import app.AppState
 import features.resources.withInitializedBundledRuleSets
 import app.ServiceControlSchedule
@@ -470,6 +473,7 @@ private fun AppState.restoreWarnings(): List<AppBackupWarning> {
         add(routeDefaultDomainResolver)
         dnsServers.forEach { server -> add(server.domainResolver) }
         dnsRules.forEach { rule -> addAll(rule.dnsServerReferences(includeAction = true)) }
+        routeRules.forEach { rule -> addAll(rule.dnsConfigurationReferences()) }
     }
     val missingDnsServerCount = dnsReferences.countMissingManagedReferences(availableDnsServers)
 
@@ -497,6 +501,13 @@ private fun SingBoxRouteRuleState.outboundReferences(): List<String> =
         logicalRules.forEach { rule -> addAll(rule.outboundReferences()) }
     }
 
+private fun SingBoxRouteRuleState.dnsConfigurationReferences(): List<String> =
+    if (type == app.SingBoxRouteRuleTypeLogical) {
+        logicalRules.flatMap { it.dnsConfigurationReferences() }
+    } else {
+        (dnsServerAddress + dnsSearchDomain).map(::dnsConfigurationEntryTag)
+    }
+
 private fun SingBoxDnsRuleState.dnsServerReferences(
     includeAction: Boolean,
 ): List<String> = buildList {
@@ -513,6 +524,8 @@ private fun SingBoxDnsRuleState.dnsServerReferences(
         matches
             .filter { match -> match.field == "preferred_by" }
             .forEach { match -> addAll(match.values) }
+        matches.filter { it.field in DnsConfigurationMatchFields }
+            .forEach { match -> addAll(match.values.map(::dnsConfigurationEntryTag)) }
     }
 }
 

@@ -5,6 +5,7 @@ package features.dns
 
 import app.AppState
 import app.withPrunedDnsServerReferences
+import app.withCanonicalManagedTagReferences
 import features.settings.DnsSettingsDraft
 import features.settings.replaceDnsPreferredByTagReferences
 import features.settings.replaceDnsServerTagReferences
@@ -26,5 +27,5 @@ internal fun AppState.withDnsSettings(draft: DnsSettingsDraft): AppState {
         dnsRules = dnsRules
             .replaceDnsServerTagReferences(draft.dnsServerTagReplacements)
             .replaceDnsPreferredByTagReferences(draft.dnsPreferredByTagReplacements),
-    ).withPrunedDnsServerReferences()
+    ).withCanonicalManagedTagReferences().withPrunedDnsServerReferences()
 }

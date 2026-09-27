@@ -3,6 +3,10 @@
 
 package app
 
+import engine.singbox.config.DnsConfigurationMatchFields
+import engine.singbox.config.DnsConfigurationServerTypes
+import engine.singbox.config.mapDnsConfigurationTags
+
 import app.modes.RunModeBpf2Socks
 import app.modes.RunModeEbpf
 import app.modes.RunModeTproxy
@@ -269,6 +273,8 @@ internal fun SingBoxRouteRuleState.withCanonicalManagedReferences(
     logicalRules = logicalRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
     inbound = inbound.map(resolve),
     ruleSet = ruleSet.map(resolve),
+    dnsServerAddress = mapDnsConfigurationTags(dnsServerAddress, resolve),
+    dnsSearchDomain = mapDnsConfigurationTags(dnsSearchDomain, resolve),
     outbound = resolve(outbound),
 )
 
@@ -278,7 +284,9 @@ internal fun SingBoxDnsRuleState.withCanonicalManagedReferences(
     logicalRules = logicalRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
     server = resolve(server),
     matches = matches.map { match ->
-        if (match.field in CanonicalDnsReferenceFields) {
+        if (match.field in DnsConfigurationMatchFields) {
+            match.copy(values = mapDnsConfigurationTags(match.values, resolve))
+        } else if (match.field in CanonicalDnsReferenceFields) {
             match.copy(values = match.values.map(resolve))
         } else {
             match
@@ -594,7 +602,10 @@ internal fun AppState.withPrunedDnsServerReferences(): AppState {
         server.tag.trim().takeIf(String::isNotEmpty)
     }
     val preferredByTags = selectablePreferredByDnsServerTags(this).toSet()
+    val configurationTags = dnsServers.filter { it.type in DnsConfigurationServerTypes }
+        .mapTo(mutableSetOf(), SingBoxDnsServerState::tag)
     return copy(
+        routeRules = routeRules.map { it.disableUnavailableDnsConfigurationReferences(configurationTags) },
         routeDefaultDomainResolver = routeDefaultDomainResolver
             .takeIf { tag -> tag.isBlank() || tag in availableTags }
             .orEmpty(),
@@ -620,7 +631,7 @@ internal fun AppState.withPrunedDnsServerReferences(): AppState {
         dnsRules = dnsRules.map { rule ->
             rule.updateManagedMatchReferences("preferred_by") { tag ->
                 tag.takeIf(preferredByTags::contains)
-            }
+            }.disableUnavailableDnsConfigurationReferences(configurationTags)
         },
     ).withPrunedDnsEvaluationReferences()
 }

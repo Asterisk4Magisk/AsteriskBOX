@@ -5,6 +5,9 @@
 
 package features.dns
 
+import app.hasValidDnsConfigurationMatchers
+import engine.singbox.config.DnsConfigurationServerTypes
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -168,6 +171,11 @@ internal fun DnsManagementPage(
         pendingEnableRuleId = ruleId
         scope.launch {
             try {
+                val tags = candidateState.dnsServers.filter { it.type in DnsConfigurationServerTypes }
+                    .mapTo(mutableSetOf()) { it.tag }
+                require(candidateState.dnsRules.first { it.id == ruleId }.hasValidDnsConfigurationMatchers(tags)) {
+                    "Invalid DNS configuration matcher reference"
+                }
                 val committed = validateAndCommitDnsRuleState(
                     baseState = baseState,
                     candidateState = candidateState,

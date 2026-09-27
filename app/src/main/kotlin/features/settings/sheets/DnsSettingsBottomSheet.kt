@@ -3,6 +3,12 @@
 
 package features.settings.sheets
 
+import features.dns.DnsConfigurationMatchEditor
+import engine.singbox.config.DnsConfigurationMatchFields
+import engine.singbox.config.isDnsConfigurationEntry
+import engine.singbox.config.DnsConfigurationServerTypes
+import app.hasValidDnsConfigurationMatchers
+
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -906,6 +912,9 @@ internal fun DnsRuleEditorScaffold(
     nested: Boolean = false,
 ) {
     val rule = editor.rule
+    val appState by LocalAppStateStore.current.collectAppState()
+    val configurationTags = appState.dnsServers.filter { it.type in DnsConfigurationServerTypes }
+        .mapTo(mutableSetOf()) { it.tag }
     var pendingChildDelete by remember { mutableStateOf<SingBoxDnsRuleState?>(null) }
     val pendingMatchers = remember(editor.index, rule.id, rule.type) {
         mutableStateMapOf<String, Boolean>()
@@ -981,6 +990,7 @@ internal fun DnsRuleEditorScaffold(
         hasPendingMatchers = pendingMatchers.isNotEmpty(),
     ) &&
         ruleTreeValid(rule) &&
+        rule.hasValidDnsConfigurationMatchers(configurationTags) &&
         listOf(serverError, timeoutError, ttlError, subnetError, rcodeError).all { it == null }
     val actionSizeMotion = AsteriskMotion.contentSize()
     val actionEffectsMotion = AsteriskMotion.effects<Float>()
@@ -1232,6 +1242,7 @@ internal fun DnsRuleEditorScaffold(
                         ) { matcher ->
                             DnsRuleMatchFieldEditor(
                                 rule = rule,
+                                dnsServers = appState.dnsServers,
                                 matcher = matcher,
                                 inboundChoices = inboundChoices,
                                 preferredByChoices = preferredByChoices,
@@ -1446,6 +1457,7 @@ private fun DnsRuleActionFields(
 @Composable
 private fun DnsRuleMatchFieldEditor(
     rule: SingBoxDnsRuleState,
+    dnsServers: List<SingBoxDnsServerState>,
     matcher: String,
     inboundChoices: List<Pair<String, String>>,
     preferredByChoices: List<Pair<String, String>>,
@@ -1459,6 +1471,17 @@ private fun DnsRuleMatchFieldEditor(
     val matchState = rule.matches.firstOrNull { match -> match.field == matcher }
     val values = matchState?.values.orEmpty()
     when (matcher) {
+        in DnsConfigurationMatchFields -> {
+            DnsConfigurationMatchEditor(
+                editorKey = rule.id,
+                field = matcher,
+                title = dnsRuleMatcherLabel(matcher),
+                values = values,
+                dnsServers = dnsServers,
+                onValuesChange = { onRuleChange(rule.withDnsRuleMatchValues(matcher, it)) },
+                onPendingChange = onPendingChange,
+            )
+        }
         "protocol" -> {
             ReferenceSelectionCard(
                 title = dnsRuleMatcherLabel(matcher),
@@ -2036,6 +2059,8 @@ private fun dnsRuleMatcherLabelResource(field: String): Int = when (field) {
     "source_mac_address" -> R.string.settings_dns_matcher_source_mac_address
     "source_hostname" -> R.string.settings_dns_matcher_source_hostname
     "preferred_by" -> R.string.settings_dns_matcher_preferred_by
+    "dns_server_address" -> R.string.settings_dns_matcher_dns_server_address
+    "dns_search_domain" -> R.string.settings_dns_matcher_dns_search_domain
     "wifi_ssid" -> R.string.settings_dns_matcher_wifi_ssid
     "wifi_bssid" -> R.string.settings_dns_matcher_wifi_bssid
     "match_response" -> R.string.settings_dns_matcher_match_response
@@ -2068,6 +2093,8 @@ internal fun dnsRuleValueError(
     val value = input.trim()
     if (value.isEmpty()) return invalidMessage
     return when (matcher) {
+        in DnsConfigurationMatchFields ->
+            if (isDnsConfigurationEntry(matcher, value)) null else invalidMessage
         "source_ip_cidr" ->
             if (isCidrAddress(value)) null else invalidMessage
         "default_interface_address" ->

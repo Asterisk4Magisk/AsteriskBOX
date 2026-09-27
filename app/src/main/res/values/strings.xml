@@ -1338,6 +1338,12 @@
     <string name="settings_dns_matcher_source_mac_address">Source MAC address</string>
     <string name="settings_dns_matcher_source_hostname">Source hostname</string>
     <string name="settings_dns_matcher_preferred_by">Preferred by</string>
+    <string name="settings_dns_matcher_dns_server_address">DNS server addresses</string>
+    <string name="settings_dns_matcher_dns_search_domain">DNS search domains</string>
+    <string name="settings_dns_server_address_match_summary">Enter IP addresses or CIDR ranges. Each selected server must match at least one value.</string>
+    <string name="settings_dns_search_domain_match_summary">Enter full search domains. Case and trailing dots are ignored. Each selected server must match at least one value.</string>
+    <string name="settings_dns_configuration_servers_empty">No DNS servers support this condition</string>
+    <string name="settings_dns_configuration_values_required">Add a matching value or deselect this server</string>
     <string name="settings_dns_matcher_wifi_ssid">Wi-Fi SSID</string>
     <string name="settings_dns_matcher_wifi_bssid">Wi-Fi BSSID</string>
     <string name="settings_dns_matcher_match_response">Match response</string>

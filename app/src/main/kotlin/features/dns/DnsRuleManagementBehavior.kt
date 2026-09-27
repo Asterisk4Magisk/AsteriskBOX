@@ -11,6 +11,8 @@ import app.nextAvailableDnsRuleId
 import app.visibleManagedReference
 import app.withPrunedDnsEvaluationReferences
 import engine.singbox.config.sanitized
+import engine.singbox.config.DnsConfigurationMatchFields
+import engine.singbox.config.mapDnsConfigurationTags
 
 internal val DnsRuleMatcherGroups = listOf(
     listOf(
@@ -48,6 +50,8 @@ internal val DnsRuleMatcherGroups = listOf(
         "network_interface_address",
         "default_interface_address",
         "preferred_by",
+        "dns_server_address",
+        "dns_search_domain",
         "wifi_ssid",
         "wifi_bssid",
     ),
@@ -59,16 +63,6 @@ internal val DnsRuleMatcherGroups = listOf(
         "response_extra",
     ),
 )
-
-internal fun List<SingBoxDnsRuleState>.moveDnsRule(
-    fromIndex: Int,
-    toIndex: Int,
-): List<SingBoxDnsRuleState> {
-    if (fromIndex !in indices || toIndex !in indices || fromIndex == toIndex) return this
-    return toMutableList().apply {
-        add(toIndex, removeAt(fromIndex))
-    }
-}
 
 internal fun AppState.withDnsRuleEnabled(
     ruleId: Int,
@@ -173,7 +167,11 @@ internal fun SingBoxDnsRuleState.withVisibleManagedReferences(
         rule.withVisibleManagedReferences(labels, unavailableLabel)
     },
     matches = matches.map { match ->
-        if (match.field in ManagedDnsReferenceFields) {
+        if (match.field in DnsConfigurationMatchFields) {
+            match.copy(values = mapDnsConfigurationTags(match.values) { tag ->
+                visibleManagedReference(tag, labels, unavailableLabel)
+            })
+        } else if (match.field in ManagedDnsReferenceFields) {
             match.copy(
                 values = match.values.map { value ->
                     visibleManagedReference(value, labels, unavailableLabel)

@@ -1319,6 +1319,12 @@
     <string name="settings_dns_matcher_source_mac_address">来源 MAC 地址</string>
     <string name="settings_dns_matcher_source_hostname">来源主机名</string>
     <string name="settings_dns_matcher_preferred_by">首选来源</string>
+    <string name="settings_dns_matcher_dns_server_address">DNS 服务器地址</string>
+    <string name="settings_dns_matcher_dns_search_domain">DNS 搜索域</string>
+    <string name="settings_dns_server_address_match_summary">填写 IP 地址或 CIDR 网段。每个已选服务器均须匹配至少一个值。</string>
+    <string name="settings_dns_search_domain_match_summary">填写完整搜索域，忽略大小写和末尾的点。每个已选服务器均须匹配至少一个值。</string>
+    <string name="settings_dns_configuration_servers_empty">没有支持此条件的 DNS 服务器</string>
+    <string name="settings_dns_configuration_values_required">请添加匹配值，或取消选择此服务器</string>
     <string name="settings_dns_matcher_wifi_ssid">Wi-Fi SSID</string>
     <string name="settings_dns_matcher_wifi_bssid">Wi-Fi BSSID</string>
     <string name="settings_dns_matcher_match_response">匹配响应</string>

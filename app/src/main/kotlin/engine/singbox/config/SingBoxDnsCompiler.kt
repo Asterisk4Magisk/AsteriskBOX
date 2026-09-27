@@ -330,6 +330,9 @@ private fun compileDnsRuleMatch(rule: SingBoxDnsRuleState): JsonObject = buildJs
                         ?: put(match.field, value)
                 }
             }
+            "dns_server_address", "dns_search_domain" -> {
+                putDnsConfigurationMatch(match.field, match.values)
+            }
             "interface_address", "network_interface_address" -> {
                 val addressMap = parseDnsAddressMap(match.values)
                 if (addressMap.isNotEmpty()) {

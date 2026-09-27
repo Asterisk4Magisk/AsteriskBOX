@@ -34,6 +34,8 @@ internal val RouteRuleMatcherLabelResources = linkedMapOf(
     "network_type" to R.string.routing_network_type,
     "wifi_ssid" to R.string.routing_wifi_ssid,
     "wifi_bssid" to R.string.routing_wifi_bssid,
+    "dns_server_address" to R.string.settings_dns_matcher_dns_server_address,
+    "dns_search_domain" to R.string.settings_dns_matcher_dns_search_domain,
 )
 
 internal fun AppState.withRouteRuleEnabled(
@@ -107,6 +109,8 @@ internal fun SingBoxRouteRuleState.routeRuleCardMatches(): List<RouteRuleCardMat
         addRouteCardMatch("network_type", networkType)
         addRouteCardMatch("wifi_ssid", wifiSsid)
         addRouteCardMatch("wifi_bssid", wifiBssid)
+        addRouteCardMatch("dns_server_address", dnsServerAddress)
+        addRouteCardMatch("dns_search_domain", dnsSearchDomain)
     }
     return matches.ifEmpty { listOf(RouteRuleCardMatch(field = "all")) }
 }

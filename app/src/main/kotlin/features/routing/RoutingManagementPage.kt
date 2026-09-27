@@ -8,6 +8,13 @@
 
 package features.routing
 
+import androidx.compose.runtime.mutableStateMapOf
+import features.dns.DnsConfigurationMatchEditor
+import engine.singbox.config.DnsConfigurationMatchFields
+import engine.singbox.config.mapDnsConfigurationTags
+import engine.singbox.config.DnsConfigurationServerTypes
+import app.hasValidDnsConfigurationMatchers
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -24,6 +31,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -150,6 +158,7 @@ internal fun RoutingManagementPage(
         putAll(outboundLabels)
         putAll(inboundChoices)
         putAll(ruleSetChoices)
+        appState.dnsServers.forEach { server -> put(server.tag, server.remarks.ifBlank { server.tag }) }
     }
 
     fun validateAndCommitEnable(
@@ -161,6 +170,11 @@ internal fun RoutingManagementPage(
         pendingEnableRuleId = ruleId
         scope.launch {
             try {
+                val tags = candidateState.dnsServers.filter { it.type in DnsConfigurationServerTypes }
+                    .mapTo(mutableSetOf()) { it.tag }
+                require(candidateState.routeRules.first { it.id == ruleId }.hasValidDnsConfigurationMatchers(tags)) {
+                    "Invalid DNS configuration matcher reference"
+                }
                 withContext(Dispatchers.IO) {
                     validateSingBoxRuntimeConfiguration(context, candidateState)
                 }
@@ -641,6 +655,10 @@ internal fun RouteRuleEditorScaffold(
     nested: Boolean = false,
 ) {
     var draft by remember(rule.id) { mutableStateOf<SingBoxRouteRuleState?>(rule) }
+    val pendingDnsMatchers = remember(rule.id) { mutableStateMapOf<String, Boolean>() }
+    val appState by LocalAppStateStore.current.collectAppState()
+    val configurationTags = appState.dnsServers.filter { it.type in DnsConfigurationServerTypes }
+        .mapTo(mutableSetOf()) { it.tag }
     var pendingChildDelete by remember { mutableStateOf<SingBoxRouteRuleState?>(null) }
     LaunchedEffect(rule) {
         draft = rule
@@ -668,7 +686,9 @@ internal fun RouteRuleEditorScaffold(
             )
         },
         saving = saving,
-        saveEnabled = draft != null,
+        saveEnabled = draft != null &&
+            draft?.hasValidDnsConfigurationMatchers(configurationTags) == true &&
+            (draft?.type == SingBoxRouteRuleTypeLogical || pendingDnsMatchers.values.none { it }),
         onBack = onDismiss,
         onSave = { draft?.let(onSave) },
     ) { contentPadding ->
@@ -1184,6 +1204,20 @@ internal fun RouteRuleEditorScaffold(
                         onChange = { draft = current.copy(wifiBssid = it) },
                     )
                 }
+                items(DnsConfigurationMatchFields.toList(), key = { it }) { field ->
+                    DnsConfigurationMatchEditor(
+                        editorKey = current.id,
+                        field = field,
+                        title = routeRuleMatcherLabel(field),
+                        dnsServers = appState.dnsServers,
+                        values = if (field == "dns_server_address") current.dnsServerAddress else current.dnsSearchDomain,
+                        onValuesChange = { values ->
+                            draft = if (field == "dns_server_address") current.copy(dnsServerAddress = values)
+                            else current.copy(dnsSearchDomain = values)
+                        },
+                        onPendingChange = { pendingDnsMatchers[field] = it },
+                    )
+                }
                 }
             }
         }
@@ -1470,6 +1504,9 @@ private fun routeRuleMatchValueLabel(
     referenceLabels: Map<String, String>,
     unavailableLabel: String,
 ): String = when (field) {
+    in DnsConfigurationMatchFields -> mapDnsConfigurationTags(listOf(value)) { tag ->
+        app.visibleManagedReference(tag, referenceLabels, unavailableLabel)
+    }.single()
     "inbound",
     "rule_set",
     -> app.visibleManagedReference(value, referenceLabels, unavailableLabel)
@@ -1558,6 +1595,8 @@ private fun SingBoxRouteRuleState.matcherCount(): Int =
         networkType,
         wifiSsid,
         wifiBssid,
+        dnsServerAddress,
+        dnsSearchDomain,
         ruleSet,
     ).count(List<String>::isNotEmpty) +
         (if (clashMode.isNotEmpty()) 1 else 0) +

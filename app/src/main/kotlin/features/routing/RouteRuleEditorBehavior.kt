@@ -86,6 +86,8 @@ internal fun SingBoxRouteRuleState.sanitized(): SingBoxRouteRuleState {
         networkType = networkType.normalized(),
         wifiSsid = wifiSsid.normalized(),
         wifiBssid = wifiBssid.normalized(),
+        dnsServerAddress = dnsServerAddress.normalized(),
+        dnsSearchDomain = dnsSearchDomain.normalized(),
         ruleSet = ruleSet.normalized(),
         action = action.takeIf {
             it == SingBoxRouteRuleActionRoute || it == SingBoxRouteRuleActionReject

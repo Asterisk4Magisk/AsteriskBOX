@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.DnsResolver
 import android.net.IpPrefix
+import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.ProxyInfo
@@ -233,6 +234,9 @@ internal class AndroidLibboxPlatformInterface(
             override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) =
                 updateDefaultInterface(listener, network)
 
+            override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) =
+                updateDefaultInterface(listener, network)
+
             override fun onLost(network: Network) = updateDefaultInterface(listener, connectivityManager.activeNetwork)
         }
         defaultNetworkCallback = callback
@@ -278,6 +282,9 @@ internal class AndroidLibboxPlatformInterface(
                 dnsServer = androidNetwork?.first?.dnsServers
                     .orEmpty()
                     .mapNotNull { it.hostAddress }
+                    .toStringIterator()
+                dnsSearchDomain = androidNetwork?.first?.domains
+                    .toDnsSearchDomains()
                     .toStringIterator()
                 metered = androidNetwork?.second
                     ?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
@@ -389,6 +396,10 @@ internal class AndroidLibboxPlatformInterface(
         const val LogTag = "AndroidLibboxPlatform"
     }
 }
+
+// LinkProperties exposes the DNS search list as a space-separated string.
+private fun String?.toDnsSearchDomains(): List<String> =
+    orEmpty().split(Regex("\\s+")).filter(String::isNotEmpty).distinct()
 
 internal class LibboxStringIterator(
     private val values: Iterator<String>,

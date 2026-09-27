@@ -939,6 +939,8 @@ private fun compileManagedRouteMatch(rule: SingBoxRouteRuleState): JsonObject =
         putStringArray("network_type", rule.networkType)
         putStringArray("wifi_ssid", rule.wifiSsid)
         putStringArray("wifi_bssid", rule.wifiBssid)
+        putDnsConfigurationMatch("dns_server_address", rule.dnsServerAddress)
+        putDnsConfigurationMatch("dns_search_domain", rule.dnsSearchDomain)
         putStringArray("rule_set", rule.ruleSet)
         if (rule.sourceIpIsPrivate) put("source_ip_is_private", true)
         if (rule.ipIsPrivate) put("ip_is_private", true)
