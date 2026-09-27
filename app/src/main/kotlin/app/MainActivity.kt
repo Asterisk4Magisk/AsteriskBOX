@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import androidx.annotation.StringRes
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,7 +38,7 @@ import ui.feedback.AndroidToastTipNotifier
 
 class MainActivity : ComponentActivity() {
     private val vpnPermissionRequester = AndroidVpnPermissionRequester {
-        getString(R.string.error_vpn_permission_launcher_missing)
+        appString(R.string.error_vpn_permission_launcher_missing)
     }
 
     private val qrCodeScanRequester = AndroidQrCodeScanRequester(
@@ -45,27 +46,27 @@ class MainActivity : ComponentActivity() {
             checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         },
         permissionDeniedMessage = {
-            getString(R.string.error_qr_camera_permission_denied)
+            appString(R.string.error_qr_camera_permission_denied)
         },
         missingLauncherMessage = {
-            getString(R.string.error_qr_scan_launcher_missing)
+            appString(R.string.error_qr_scan_launcher_missing)
         },
     )
 
     private val resourceFilePicker = AndroidResourceFilePicker(
         missingLauncherMessage = {
-            getString(R.string.error_resource_file_picker_missing)
+            appString(R.string.error_resource_file_picker_missing)
         },
     )
 
     private val logFileCreator = AndroidLogFileCreator(
         missingLauncherMessage = {
-            getString(R.string.error_log_export_launcher_missing)
+            appString(R.string.error_log_export_launcher_missing)
         },
     )
     private val backupFileCreator = AndroidLogFileCreator(
         missingLauncherMessage = {
-            getString(R.string.error_backup_file_creator_missing)
+            appString(R.string.error_backup_file_creator_missing)
         },
     )
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -104,6 +105,11 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri ->
         backupFileCreator.complete(uri)
+    }
+
+    private fun appString(@StringRes id: Int, vararg args: Any): String {
+        val languageMode = (application as AsteriskApplication).stateStore.state.value.languageMode
+        return applicationContext.localizedAppContext(languageMode).getString(id, *args)
     }
 
     override fun attachBaseContext(newBase: Context) {
@@ -152,13 +158,13 @@ class MainActivity : ComponentActivity() {
         val config = parseSubscriptionDeepLink(raw)
         application.appScope.launch {
             if (config == null) {
-                notifier.show(getString(R.string.subscription_install_link_invalid))
+                notifier.show(appString(R.string.subscription_install_link_invalid))
                 return@launch
             }
             try {
                 when (val result = application.subscriptionInstallConfig.install(config)) {
                     is OutboundSubscriptionUpdateResult.Success -> notifier.show(
-                        getString(
+                        appString(
                             R.string.import_result_summary,
                             result.outcome.accepted.size,
                             result.outcome.skippedCount,
@@ -166,8 +172,8 @@ class MainActivity : ComponentActivity() {
                         ),
                     )
                     is OutboundSubscriptionUpdateResult.Partial -> notifier.show(
-                        getString(R.string.import_result_partial_title) + "\n" +
-                            getString(
+                        appString(R.string.import_result_partial_title) + "\n" +
+                            appString(
                                 R.string.import_result_summary,
                                 result.outcome.accepted.size,
                                 result.outcome.skippedCount,
@@ -175,7 +181,7 @@ class MainActivity : ComponentActivity() {
                             ),
                     )
                     OutboundSubscriptionUpdateResult.NotModified -> notifier.show(
-                        getString(R.string.outbound_group_sync_not_modified),
+                        appString(R.string.outbound_group_sync_not_modified),
                     )
                     is OutboundSubscriptionUpdateResult.Failed -> {
                         reportImportFailure(
@@ -184,10 +190,10 @@ class MainActivity : ComponentActivity() {
                             result.stage,
                             result.error,
                         )
-                        notifier.show(getString(R.string.subscription_install_failed))
+                        notifier.show(appString(R.string.subscription_install_failed))
                     }
                     is OutboundSubscriptionUpdateResult.Cancelled -> notifier.show(
-                        getString(R.string.subscription_install_failed),
+                        appString(R.string.subscription_install_failed),
                     )
                 }
             } catch (error: CancellationException) {
@@ -199,7 +205,7 @@ class MainActivity : ComponentActivity() {
                     ImportStage.COMMIT,
                     error,
                 )
-                notifier.show(getString(R.string.subscription_install_failed))
+                notifier.show(appString(R.string.subscription_install_failed))
             }
         }
     }
