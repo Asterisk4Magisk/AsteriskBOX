@@ -149,7 +149,29 @@ private enum class OutboundOptionsMenuLevel {
     MAIN,
     LAYOUT,
     SORT,
+    DELETE,
 }
+
+private data class OutboundBatchDeletion(
+    val action: OutboundBatchDeleteAction,
+    val groupName: String,
+    val outbounds: List<OutboundState>,
+    val groupOutbounds: List<OutboundState>,
+)
+
+private val OutboundBatchDeleteAction.titleResource: Int
+    get() = when (this) {
+        OutboundBatchDeleteAction.DUPLICATES -> R.string.outbound_delete_duplicates
+        OutboundBatchDeleteAction.INVALID -> R.string.outbound_delete_invalid
+        OutboundBatchDeleteAction.ALL -> R.string.outbound_delete_all
+    }
+
+private val OutboundBatchDeleteAction.emptyResource: Int
+    get() = when (this) {
+        OutboundBatchDeleteAction.DUPLICATES -> R.string.outbound_no_duplicates
+        OutboundBatchDeleteAction.INVALID -> R.string.outbound_no_invalid
+        OutboundBatchDeleteAction.ALL -> R.string.outbound_no_nodes_to_delete
+    }
 
 private enum class OutboundCardMenuLevel {
     MAIN,
@@ -214,13 +236,15 @@ internal fun OutboundListPage(
     var query by rememberSaveable { mutableStateOf("") }
     var pendingDelete by remember { mutableStateOf<OutboundState?>(null) }
     var deletingOutboundId by remember { mutableStateOf<Int?>(null) }
+    var pendingBatchDelete by remember { mutableStateOf<OutboundBatchDeletion?>(null) }
+    var deletingBatch by remember { mutableStateOf(false) }
     val reorderMutex = remember { Mutex() }
     var qrCodeDialogState by remember { mutableStateOf<OutboundQrDialogState?>(null) }
     var importResultPresentation by remember {
         mutableStateOf<ImportResultPresentation?>(null)
     }
     val interactionActive = activeOperations > 0 || activeChildInteractions > 0 ||
-        importMenuExpanded || pendingDelete != null || qrCodeDialogState != null ||
+        importMenuExpanded || pendingDelete != null || pendingBatchDelete != null || qrCodeDialogState != null ||
         importResultPresentation != null
     SideEffect {
         // Nested effects can acquire interaction during apply, after this composition read.
@@ -431,7 +455,7 @@ internal fun OutboundListPage(
         result: OutboundCommandResult,
         expectedSuccess: OutboundCommandResult,
         operation: String,
-        onSuccess: () -> Unit = {},
+        onSuccess: suspend () -> Unit = {},
     ) {
         when (result) {
             expectedSuccess -> onSuccess()
@@ -641,6 +665,45 @@ internal fun OutboundListPage(
                             onSortChange = { sort ->
                                 updateAppState { state -> state.copy(outboundListSort = sort) }
                             },
+                            toolsEnabled = selectedGroup != null && activeOperations == 0,
+                            onCopyAllUrls = {
+                                val groupId = selectedGroup?.id
+                                val targets = stateStore.state.value.outbounds.filter { it.groupId == groupId }
+                                launchOperation {
+                                    val urls = withContext(Dispatchers.Default) { outboundUrls(targets) }
+                                    if (urls.isBlank()) {
+                                        services.tipNotifier.show(resources.getString(R.string.outbound_no_urls))
+                                    } else {
+                                        clipboard.setPlainText(urls)
+                                        services.tipNotifier.show(copiedMessage)
+                                    }
+                                }
+                            },
+                            onDeleteOutbounds = { action ->
+                                val group = selectedGroup
+                                if (group != null) {
+                                    val snapshot = stateStore.state.value
+                                    val targets = snapshot.outbounds.filter { it.groupId == group.id }
+                                    val selectedTags = snapshot.selectorSelections.values.toSet() +
+                                        services.singBoxRuntime.state.value.proxies.groups.map { it.now }
+                                    launchOperation {
+                                        val deletions = withContext(Dispatchers.Default) {
+                                            when (action) {
+                                                OutboundBatchDeleteAction.DUPLICATES ->
+                                                    duplicateOutbounds(targets, selectedTags)
+                                                OutboundBatchDeleteAction.INVALID ->
+                                                    targets.filter { isInvalidOutbound(it) }
+                                                OutboundBatchDeleteAction.ALL -> targets
+                                            }
+                                        }
+                                        if (deletions.isEmpty()) {
+                                            services.tipNotifier.show(resources.getString(action.emptyResource))
+                                        } else {
+                                            pendingBatchDelete = OutboundBatchDeletion(action, group.name, deletions, targets)
+                                        }
+                                    }
+                                }
+                            },
                         )
                     },
                 )
@@ -836,6 +899,44 @@ internal fun OutboundListPage(
         },
         busy = deletingOutboundId != null,
     )
+
+    pendingBatchDelete?.let { deletion ->
+        WarningConfirmDialog(
+            show = true,
+            title = stringResource(deletion.action.titleResource),
+            summary = stringResource(
+                R.string.outbound_batch_delete_message,
+                deletion.groupName,
+                deletion.outbounds.size,
+            ),
+            dismissText = stringResource(R.string.common_cancel),
+            confirmText = stringResource(R.string.common_delete),
+            onDismissRequest = { if (!deletingBatch) pendingBatchDelete = null },
+            onConfirm = {
+                if (!deletingBatch) {
+                    deletingBatch = true
+                    launchOperation {
+                        try {
+                            handleOutboundCommandResult(
+                                result = services.outboundRepository.delete(deletion.outbounds, deletion.groupOutbounds),
+                                expectedSuccess = OutboundCommandResult.Deleted,
+                                operation = "outbound_batch_delete",
+                                onSuccess = {
+                                    services.tipNotifier.show(
+                                        resources.getString(R.string.outbound_nodes_deleted, deletion.outbounds.size),
+                                    )
+                                },
+                            )
+                        } finally {
+                            pendingBatchDelete = null
+                            deletingBatch = false
+                        }
+                    }
+                }
+            },
+            busy = deletingBatch,
+        )
+    }
 
     qrCodeDialogState?.let { state ->
         OutboundQrCodeDialog(
@@ -1268,6 +1369,9 @@ private fun OutboundOptionsMenu(
     onPing: () -> Unit,
     onLayoutChange: (Int) -> Unit,
     onSortChange: (Int) -> Unit,
+    toolsEnabled: Boolean,
+    onCopyAllUrls: () -> Unit,
+    onDeleteOutbounds: (OutboundBatchDeleteAction) -> Unit,
     onInteractionCountChange: (Int) -> Unit = {},
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -1378,6 +1482,51 @@ private fun OutboundOptionsMenu(
                                 },
                                 onClick = { level = OutboundOptionsMenuLevel.SORT },
                             )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.outbound_copy_all_urls)) },
+                                leadingIcon = { Icon(Icons.Rounded.ContentCopy, contentDescription = null) },
+                                enabled = toolsEnabled,
+                                onClick = {
+                                    dismissMenu()
+                                    onCopyAllUrls()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.outbound_delete_nodes)) },
+                                leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                                trailingIcon = { Icon(Icons.Rounded.ChevronRight, contentDescription = null) },
+                                enabled = toolsEnabled,
+                                onClick = { level = OutboundOptionsMenuLevel.DELETE },
+                            )
+                        }
+
+                        OutboundOptionsMenuLevel.DELETE -> {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.outbound_delete_nodes)) },
+                                leadingIcon = { Icon(Icons.Rounded.ChevronLeft, contentDescription = null) },
+                                onClick = { level = OutboundOptionsMenuLevel.MAIN },
+                            )
+                            HorizontalDivider()
+                            OutboundBatchDeleteAction.entries.forEach { action ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(action.titleResource)) },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = when (action) {
+                                                OutboundBatchDeleteAction.DUPLICATES -> Icons.Rounded.ContentCopy
+                                                OutboundBatchDeleteAction.INVALID -> Icons.Rounded.ErrorOutline
+                                                OutboundBatchDeleteAction.ALL -> Icons.Rounded.Delete
+                                            },
+                                            contentDescription = null,
+                                        )
+                                    },
+                                    enabled = toolsEnabled,
+                                    onClick = {
+                                        dismissMenu()
+                                        onDeleteOutbounds(action)
+                                    },
+                                )
+                            }
                         }
 
                         OutboundOptionsMenuLevel.LAYOUT -> {

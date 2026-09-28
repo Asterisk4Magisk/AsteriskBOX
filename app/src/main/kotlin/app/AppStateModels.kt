@@ -588,15 +588,18 @@ fun AppState.withRemovedManagedOutboundTags(
 }
 
 fun AppState.withRemovedManagedOutbound(outboundId: Int): AppState {
-    val removed = outbounds.firstOrNull { outbound -> outbound.id == outboundId } ?: return this
-    val remaining = outbounds.filterNot { outbound -> outbound.id == outboundId }
-    val removedTags = mutableSetOf(removed.tag)
-    if (remaining.none { outbound -> outbound.groupId == removed.groupId }) {
-        outboundGroups
-            .firstOrNull { group -> group.id == removed.groupId }
-            ?.let { group ->
-                removedTags += managedOutboundGroupSelectorTag(group.id, group.name)
-            }
+    return withRemovedManagedOutbounds(setOf(outboundId))
+}
+
+internal fun AppState.withRemovedManagedOutbounds(outboundIds: Set<Int>): AppState {
+    val removed = outbounds.filter { outbound -> outbound.id in outboundIds }
+    if (removed.isEmpty()) return this
+    val remaining = outbounds.filterNot { outbound -> outbound.id in outboundIds }
+    val remainingGroupIds = remaining.mapTo(mutableSetOf(), OutboundState::groupId)
+    val emptiedGroupIds = removed.mapTo(mutableSetOf(), OutboundState::groupId) - remainingGroupIds
+    val removedTags = removed.mapTo(mutableSetOf(), OutboundState::tag)
+    outboundGroups.filter { group -> group.id in emptiedGroupIds }.forEach { group ->
+        removedTags += managedOutboundGroupSelectorTag(group.id, group.name)
     }
     return copy(outbounds = remaining).withRemovedManagedOutboundTags(removedTags)
 }

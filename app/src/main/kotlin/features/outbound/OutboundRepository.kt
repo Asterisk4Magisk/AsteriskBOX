@@ -8,6 +8,7 @@ import app.OutboundGroupState
 import app.OutboundState
 import app.managedOutboundGroupSelectorTag
 import app.withRemovedManagedOutbound
+import app.withRemovedManagedOutbounds
 import app.withRemovedManagedOutboundTags
 import app.withReplacedManagedTag
 import features.importing.importFingerprint
@@ -94,6 +95,40 @@ internal class OutboundRepository(
                     OutboundCommandResult.Deleted
                 }
             ) {
+                OutboundCommandResult.Conflict -> Unit
+                else -> return result
+            }
+        }
+        return OutboundCommandResult.Conflict
+    }
+
+    suspend fun delete(
+        expectedOutbounds: List<OutboundState>,
+        expectedGroupOutbounds: List<OutboundState>,
+    ): OutboundCommandResult {
+        currentCoroutineContext().ensureActive()
+        val expectedById = expectedOutbounds.associateBy(OutboundState::id)
+        if (expectedById.isEmpty()) return OutboundCommandResult.Conflict
+        val expectedGroupById = expectedGroupOutbounds.associateBy(OutboundState::id)
+        val groupId = expectedGroupOutbounds.firstOrNull()?.groupId ?: return OutboundCommandResult.Conflict
+        if (expectedGroupOutbounds.any { it.groupId != groupId } ||
+            expectedOutbounds.any { expectedGroupById[it.id] != it }
+        ) return OutboundCommandResult.Conflict
+        repeat(MaxCommitAttempts) {
+            val snapshot = gateway.snapshot()
+            val current = snapshot.outbounds.filter { it.groupId == groupId }.associateBy(OutboundState::id)
+            // Also verify kept copies: a subscription refresh may have removed them while
+            // the confirmation was open, leaving a deletion target as the last copy.
+            if (current != expectedGroupById) {
+                return OutboundCommandResult.Conflict
+            }
+            val updated = snapshot.withRemovedManagedOutbounds(expectedById.keys)
+            when (val result = commitPreparedAndRunPostEffects(snapshot, updated) {
+                expectedById.keys.forEach { id ->
+                    runPostPersistenceCallback(DeleteRuntimeRemoveOperation) { onOutboundRemoved(id) }
+                }
+                OutboundCommandResult.Deleted
+            }) {
                 OutboundCommandResult.Conflict -> Unit
                 else -> return result
             }
