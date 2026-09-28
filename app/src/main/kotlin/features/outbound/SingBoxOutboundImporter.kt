@@ -21,9 +21,6 @@ import features.importing.ImportMutation
 import features.importing.ImportMutationCode
 import features.importing.ImportOutcome
 import features.importing.ImportStage
-import features.importing.IndexedImportCandidate
-import features.importing.deduplicateImportCandidates
-import features.importing.importFingerprint
 import features.importing.requireImportCandidateCount
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -409,47 +406,9 @@ internal fun AppState.planOutboundImport(
     require(outboundGroups.any { group -> group.id == groupId }) {
         "Outbound group does not exist: $groupId"
     }
-    val existingFingerprints = if (replaceGroup) {
-        emptySet()
-    } else {
-        outbounds
-            .asSequence()
-            .filter { outbound -> outbound.groupId == groupId }
-            .map { outbound ->
-                importFingerprint(
-                    type = outbound.type,
-                    remarks = outbound.remarks,
-                    json = outbound.json,
-                )
-            }
-            .toSet()
-    }
-    val deduplicated = deduplicateImportCandidates(
-        candidates = parsed.accepted.map { outbound ->
-            IndexedImportCandidate(
-                sourceIndex = outbound.sourceIndex,
-                value = outbound,
-            )
-        },
-        existingFingerprints = existingFingerprints,
-    ) { outbound ->
-        importFingerprint(
-            type = outbound.type,
-            remarks = outbound.remarks,
-            json = outbound.json,
-        )
-    }
-    val duplicateCount = parsed.duplicateCount + deduplicated.duplicateCount
-    val baseMutations = parsed.mutations + deduplicated.mutations
-    val preliminaryOutcome = ImportOutcome(
-        format = parsed.format,
-        detectedCount = parsed.detectedCount,
-        accepted = deduplicated.accepted,
-        duplicateCount = duplicateCount,
-        issues = parsed.issues,
-        mutations = baseMutations,
-        priorOmittedDetailCount = parsed.omittedDetailCount,
-    )
+    // Preserve every accepted node, including duplicates. Storage assigns each
+    // occurrence its own ID and managed tag, just like a repeated manual import.
+    val preliminaryOutcome = parsed
 
     if (replaceGroup && strict && preliminaryOutcome.skippedCount > 0) {
         return OutboundImportPlan(

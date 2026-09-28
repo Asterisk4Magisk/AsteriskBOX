@@ -5,6 +5,8 @@ package features.outbound
 
 import app.OutboundState
 import engine.singbox.config.SingBoxJson
+import features.importing.ImportFingerprint
+import features.importing.importFingerprint
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -49,14 +51,57 @@ internal fun matchImportedOutbounds(
         .groupBy(Pair<OutboundConnectionIdentity, Int>::first)
 
     return buildMap {
+        // Match identical occurrences one-to-one before the unique-connection
+        // fallback so repeated subscription entries retain their managed tags.
+        val reusedIds = mutableSetOf<Int>()
+        fun matchContent(ignoreRewrittenReferences: Boolean) {
+            val previousByContent = previous.filterNot { it.id in reusedIds }.groupBy { outbound ->
+                outboundIdentityFingerprint(outbound.type, outbound.remarks, outbound.json, ignoreRewrittenReferences)
+            }.mapValues { (_, matches) -> ArrayDeque(matches) }
+            imported.forEachIndexed { index, outbound ->
+                if (index in this) return@forEachIndexed
+                val fingerprint = outboundIdentityFingerprint(
+                    outbound.type, outbound.remarks, outbound.json, ignoreRewrittenReferences,
+                ) ?: return@forEachIndexed
+                val matched = previousByContent[fingerprint]?.removeFirstOrNull()
+                    ?: return@forEachIndexed
+                put(index, matched.id)
+                reusedIds += matched.id
+            }
+        }
+        matchContent(ignoreRewrittenReferences = false)
+        // Storage resolves/removes these references. Treat reference-only changes
+        // as configuration updates, retaining names, credentials and protocol fields
+        // for matching otherwise identical occurrences.
+        matchContent(ignoreRewrittenReferences = true)
         importedByIdentity.forEach { (identity, importedMatches) ->
             val previousMatches = previousByIdentity[identity]
             if (importedMatches.size == 1 && previousMatches?.size == 1) {
-                put(importedMatches.single().second, previousMatches.single().second.id)
+                val index = importedMatches.single().second
+                val id = previousMatches.single().second.id
+                if (index !in this && id !in reusedIds) {
+                    put(index, id)
+                    reusedIds += id
+                }
             }
         }
     }
 }
+
+private fun outboundIdentityFingerprint(
+    type: String,
+    remarks: String,
+    json: String,
+    ignoreRewrittenReferences: Boolean,
+): ImportFingerprint? = runCatching {
+    val normalized = if (ignoreRewrittenReferences) {
+        val outbound = SingBoxJson.parseToJsonElement(json) as? JsonObject ?: return@runCatching null
+        JsonObject(outbound - "detour" - "domain_resolver").toString()
+    } else {
+        json
+    }
+    importFingerprint(type, remarks, normalized)
+}.getOrNull()
 
 private fun JsonObject.connectionPort(): String? =
     identityStringValue("server_port")?.canonicalPort()
