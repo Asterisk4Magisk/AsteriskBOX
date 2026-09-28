@@ -8,51 +8,39 @@ An Android sing-box GUI client.
 
 [Asterisk4Magisk](https://t.me/Asterisk4Magisk)
 
-## Features
-
-- VPN Service, TPROXY(ROOT), TUN(ROOT), eBPF(ROOT), TUN2SOCKS(ROOT), and BPF2SOCKS(ROOT) run modes
-- Import and manage strict sing-box JSON configurations from QR codes, local files, or URL subscriptions
-- Outbound, DNS, routing, rule-set, and resource management
-- Live status, traffic, connections, proxy selection, and delay tests through the official sing-box command API
-- Material 3 Compose UI
-
 ## Run Modes
 
 ### VPN Service
 
 - Works without root permission.
-- Runs sing-box in the app process through AndroidLibBoxLite and Android `VpnService`.
-- The optional Hev TUN path uses `hev-socks5-tunnel`.
+- Uses Android `VpnService`.
 
 ### TPROXY(ROOT)
 
-- Runs the bundled sing-box binary with a TPROXY inbound.
+- Runs the local sing-box executable directly with libsu.
 - Uses iptables and policy routing for transparent proxy traffic.
 
 ### TUN(ROOT)
 
-- Runs the bundled sing-box binary with the fixed TUN device `asterisk0`.
-- Uses sing-box-managed `auto_route` and `auto_redirect` instead of app-managed transparent routing.
-- Selected rule-set IP CIDRs are passed to `route_exclude_address_set`; domain rules do not apply.
-- Exact downstream interface names can be included for hotspot and tethering traffic.
+- Runs the local sing-box executable directly with libsu.
+- Uses `auto_route` and `auto_redirect` in the sing-box TUN inbound to manage routing.
 
 ### eBPF(ROOT)
 
-- Uses the reF1nd sing-box eBPF inbound without a TUN device or local SOCKS5 intermediary.
-- Uses the TC data plane for local traffic and optional `socket_assign` for exact downstream interfaces.
-- Shares TUN mode's rule-set selection and passes its IP CIDRs to `bypass_rule_set`; domain rules do not apply.
-- Availability depends on device kernel, cgroup v2, and eBPF support.
+- Runs the local sing-box executable directly with libsu.
+- Uses the sing-box eBPF inbound to capture traffic.
+- Availability depends on eBPF support in the device kernel.
 
 ### TUN2SOCKS(ROOT)
 
-- Uses `hev-socks5-tunnel` to create the fixed TUN device `asterisk0`.
-- Sends tunnel traffic to a local sing-box SOCKS5 inbound.
+- Runs the local sing-box executable directly with libsu.
+- Uses `hev-socks5-tunnel` to create a TUN device and send traffic to the sing-box SOCKS5 inbound.
 
 ### BPF2SOCKS(ROOT)
 
-- Uses eBPF and the native `bpf2socks` helper without creating a TUN device.
-- Sends captured TCP and UDP traffic to a local sing-box SOCKS5 inbound.
-- Requires the eBPF capability probe to pass before startup.
+- Runs the local sing-box executable directly with libsu.
+- Uses `bpf2socks` to capture traffic and send it to the sing-box SOCKS5 inbound.
+- Availability depends on eBPF support in the device kernel.
 
 ### asteriskd
 
@@ -62,8 +50,7 @@ An Android sing-box GUI client.
 ## Resource Files
 
 - ROOT runtime files are stored in the app-private `files/sing-box` directory.
-- The bundled reF1nd sing-box ROOT core can be replaced from Resource Management.
-- Direct CIDR and custom resource files can be replaced locally or updated from configured URLs; rule sets remain part of the sing-box JSON configuration.
+- Custom resources can be added or replaced locally and updated from configured URLs.
 
 ## Broadcast Control
 
@@ -107,15 +94,9 @@ On macOS or Linux:
 ./gradlew assembleDebug
 ```
 
-The build resolves the configured AndroidLibBoxLite and reF1nd sing-box versions, builds the native helper submodules, and produces ABI split APKs plus a universal APK.
+The build downloads the pinned AndroidLibBoxLite AAR, builds the native submodules, and produces ABI split APKs plus a universal APK.
 
 If Gradle cannot find the Android NDK, configure it through Android Studio, `ndk.dir` in `local.properties`, or `ANDROID_NDK_HOME`.
-
-## WSA
-
-```bash
-appops set org.asterisk.zcc.abox ACTIVATE_VPN allow
-```
 
 ## License
 
