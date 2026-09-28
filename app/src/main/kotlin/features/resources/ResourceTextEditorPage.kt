@@ -221,7 +221,7 @@ internal fun ResourceTextEditorPage(
                     )
                 }
                 ResourceTextEditorLoadState.Ready -> Column(
-                    modifier = Modifier.fillMaxSize().padding(vertical = 12.dp),
+                    modifier = Modifier.fillMaxSize().padding(bottom = 12.dp),
                 ) {
                     AnimatedVisibility(
                         visible = codeEditorShowsSupportingContent(editorState.isFocused),

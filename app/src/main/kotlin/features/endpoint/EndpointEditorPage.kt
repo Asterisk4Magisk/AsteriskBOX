@@ -273,7 +273,7 @@ internal fun EndpointEditorPage(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding)
-                    .padding(vertical = 12.dp),
+                    .padding(bottom = 12.dp),
             ) {
                 AnimatedVisibility(
                     visible = showProperties,
