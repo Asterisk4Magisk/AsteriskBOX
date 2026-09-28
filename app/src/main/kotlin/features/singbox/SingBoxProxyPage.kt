@@ -430,6 +430,8 @@ fun SingBoxProxyPage(
                             searchQuery,
                             appState.singBoxProxySort,
                             pageDisplayNames,
+                            runtimeState.delayTestingBaselines,
+                            runtimeState.delayFailedNodes,
                         ) {
                             reduceSingBoxProxyNodeNames(
                                 group = group,
@@ -437,6 +439,8 @@ fun SingBoxProxyPage(
                                 query = searchQuery,
                                 sort = resolveSingBoxProxySort(appState.singBoxProxySort),
                                 displayNames = pageDisplayNames,
+                                testingBaselines = runtimeState.delayTestingBaselines,
+                                failedNodes = runtimeState.delayFailedNodes,
                             )
                         }
                         val pageGridState = rememberLazyGridState()

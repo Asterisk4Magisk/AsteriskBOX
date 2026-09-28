@@ -65,6 +65,8 @@ internal fun reduceSingBoxProxyNodeNames(
     query: String,
     sort: Int,
     displayNames: Map<String, String> = emptyMap(),
+    testingBaselines: Map<String, Long> = emptyMap(),
+    failedNodes: Set<String> = emptySet(),
 ): List<String> {
     val keyword = query.trim()
     return group?.all
@@ -81,6 +83,8 @@ internal fun reduceSingBoxProxyNodeNames(
             proxies = proxies,
             sort = resolveSingBoxProxySort(sort),
             displayNames = displayNames,
+            testingBaselines = testingBaselines,
+            failedNodes = failedNodes,
         )
         .orEmpty()
 }
@@ -159,6 +163,8 @@ private fun List<String>.sortSingBoxProxyNodeNames(
     proxies: SingBoxProxiesState,
     sort: Int,
     displayNames: Map<String, String>,
+    testingBaselines: Map<String, Long>,
+    failedNodes: Set<String>,
 ): List<String> {
     return when (sort) {
         SingBoxProxySortName -> sortedWith(
@@ -168,7 +174,20 @@ private fun List<String>.sortSingBoxProxyNodeNames(
         )
         SingBoxProxySortDelay -> sortedWith(
             compareBy<String> { nodeName ->
-                proxies.node(nodeName).delay.toSingBoxProxyDelaySortValue()
+                val node = proxies.node(nodeName)
+                // Command snapshots retain old delays while a new test is running.
+                // Sort by the same effective result that the node card displays.
+                when (resolveSingBoxProxyDelayStatus(
+                    nodeName = nodeName,
+                    delay = node.delay,
+                    delayUpdatedAtEpochSeconds = node.delayUpdatedAtEpochSeconds,
+                    testingBaselines = testingBaselines,
+                    failedNodes = failedNodes,
+                )) {
+                    SingBoxProxyDelayStatus.Measured -> node.delay.toSingBoxProxyDelaySortValue()
+                    SingBoxProxyDelayStatus.Failed -> Int.MAX_VALUE - 1
+                    SingBoxProxyDelayStatus.Testing, SingBoxProxyDelayStatus.NotTested -> Int.MAX_VALUE
+                }
             }.thenBy(String.CASE_INSENSITIVE_ORDER) { nodeName ->
                 displayNames[nodeName] ?: proxies.node(nodeName).name
             },
