@@ -551,15 +551,20 @@ private fun SelectorCard(
         )
     val cardColors = CardDefaults.cardColors(containerColor = containerColor)
     val content: @Composable () -> Unit = {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .animateContentSize(AsteriskMotion.contentSize()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
+        Box(Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = 16.dp,
+                        top = 16.dp,
+                        end = if (menu != null) 56.dp else 16.dp,
+                        bottom = 16.dp,
+                    )
+                    .animateContentSize(AsteriskMotion.contentSize()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column {
                     Text(
                         title,
                         style = MaterialTheme.typography.titleMedium,
@@ -577,22 +582,27 @@ private fun SelectorCard(
                         )
                     }
                 }
-                menu?.invoke()
-            }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                badges.forEach { badge ->
-                    AsteriskInfoChip(text = badge, emphasized = enabled)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    badges.forEach { badge ->
+                        AsteriskInfoChip(text = badge, emphasized = enabled)
+                    }
+                    AsteriskInfoChip(
+                        text = pluralStringResource(
+                            R.plurals.selector_member_count,
+                            memberCount,
+                            memberCount,
+                        ),
+                    )
                 }
-                AsteriskInfoChip(
-                    text = pluralStringResource(
-                        R.plurals.selector_member_count,
-                        memberCount,
-                        memberCount,
-                    ),
-                )
+            }
+            // Preserve the touch target without letting the menu push the title down.
+            if (menu != null) {
+                Box(Modifier.align(Alignment.CenterEnd).padding(4.dp)) {
+                    menu()
+                }
             }
         }
     }

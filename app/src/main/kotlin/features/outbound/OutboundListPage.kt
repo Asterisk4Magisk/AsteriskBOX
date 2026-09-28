@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -1628,10 +1629,12 @@ private fun OutboundMenuItem(
 ) {
     DropdownMenuItem(
         text = { Text(text) },
-        leadingIcon = if (icon == null) {
-            null
-        } else {
-            { Icon(icon, contentDescription = null) }
+        leadingIcon = {
+            if (icon == null) {
+                Spacer(Modifier.size(24.dp))
+            } else {
+                Icon(icon, contentDescription = null)
+            }
         },
         enabled = enabled,
         onClick = onClick,
