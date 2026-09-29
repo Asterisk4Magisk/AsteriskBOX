@@ -12,6 +12,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import app.R
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
@@ -36,6 +38,7 @@ internal fun EditorPageScaffold(
     onBack: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
+    topExtra: Dp = 8.dp,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
@@ -79,6 +82,7 @@ internal fun EditorPageScaffold(
                     outerPadding = outerPadding,
                     isWideScreen = isWideScreen,
                 ),
+                topExtra = topExtra,
             ),
         )
     }

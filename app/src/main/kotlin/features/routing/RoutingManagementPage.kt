@@ -674,6 +674,7 @@ internal fun RouteRuleEditorScaffold(
     EditorPageScaffold(
         outerPadding = outerPadding,
         isWideScreen = isWideScreen,
+        topExtra = 0.dp,
         title = {
             Text(
                 stringResource(

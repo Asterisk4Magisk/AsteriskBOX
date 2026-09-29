@@ -999,6 +999,7 @@ internal fun DnsRuleEditorScaffold(
     EditorPageScaffold(
         outerPadding = outerPadding,
         isWideScreen = isWideScreen,
+        topExtra = 0.dp,
         title = {
             Text(
                 stringResource(

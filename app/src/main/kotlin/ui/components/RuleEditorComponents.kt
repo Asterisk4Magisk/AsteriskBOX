@@ -187,7 +187,7 @@ internal fun RuleEditorSwitchCard(
 internal fun RuleEditorSectionTitle(text: String) {
     Text(
         text = text,
-        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 10.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 8.dp),
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.SemiBold,
