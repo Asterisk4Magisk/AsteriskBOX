@@ -810,19 +810,12 @@ internal fun compileRoute(
             },
         )
     }
-    val ruleModeFallback = listOf(
-        buildJsonObject {
-            put("clash_mode", "Rule")
-            put("action", "route")
-            put("outbound", finalOutbound)
-        },
-    )
     return JsonObject(
         buildMap {
             sourceRoute
                 ?.filterKeys { key -> key !in ManagedRouteSettingKeys }
                 ?.let(::putAll)
-            put("rules", JsonArray(injectedRules + managedRules + existingRules + ruleModeFallback))
+            put("rules", JsonArray(injectedRules + managedRules + existingRules))
             put("final", JsonPrimitive(finalOutbound))
             if (defaultDomainResolver != null) {
                 put("default_domain_resolver", JsonPrimitive(defaultDomainResolver))
