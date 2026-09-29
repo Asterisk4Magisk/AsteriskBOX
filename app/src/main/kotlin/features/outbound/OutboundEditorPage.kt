@@ -190,6 +190,8 @@ internal fun OutboundEditorPage(
     EditorPageScaffold(
         outerPadding = padding,
         isWideScreen = isWideScreen,
+        // The first section title provides the top content spacing.
+        topExtra = 0.dp,
         title = {
             Column {
                 Text(

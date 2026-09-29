@@ -292,7 +292,12 @@ internal fun SelectorManagementPage(padding: PaddingValues) {
             outerPadding = padding,
             isWideScreen = isWideScreen,
         )
-        val listContentPadding = pageListPadding(contentPadding, bottomExtra = 24.dp)
+        val listContentPadding = pageListPadding(
+            contentPadding,
+            bottomExtra = 24.dp,
+            // Non-empty lists start with a section title that supplies its own spacing.
+            topExtra = if (managedGroups.isNotEmpty() || customSelectors.isNotEmpty()) 0.dp else 8.dp,
+        )
         val gridState = rememberLazyGridState()
         val reorderEnabled = isSelectorReorderEnabled(query, appState.selectors.size)
         val preview = rememberReorderPreview(customSelectors, SingBoxSelectorState::id, enabled = reorderEnabled) { ids ->
