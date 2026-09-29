@@ -43,7 +43,9 @@ internal class AndroidResourceFileStore(
         return ResourceFilesStatus(
             resourceFiles = ResourceFileKind.entries.associateWith { kind ->
                 val target = if (kind == ResourceFileKind.SingBoxCore) effectiveSingBoxCoreFile() else file(kind)
-                target.toStatus(kind)
+                target.toStatus(kind).copy(
+                    isBundledCore = kind == ResourceFileKind.SingBoxCore && target != file(kind),
+                )
             },
             customResourceFiles = scanCustomResources(customResourceFiles).map { customFile ->
                 CustomResourceFileStatus(
