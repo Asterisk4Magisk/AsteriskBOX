@@ -469,7 +469,8 @@ private fun ConnectionCard(
     referenceLabels: Map<String, String>,
     unavailableLabel: String,
 ) {
-    val visibleChains = connection.chains.map { chain ->
+    // The core reports the final outbound first, followed by its enclosing groups.
+    val visibleChains = connection.chains.asReversed().map { chain ->
         visibleManagedReference(chain, referenceLabels, unavailableLabel)
     }
     Card(
