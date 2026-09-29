@@ -30,7 +30,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
+import ui.components.SectionedLazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -708,13 +708,13 @@ internal fun RouteRuleEditorScaffold(
                 contentAlignment = Alignment.TopStart,
                 label = "routing-rule-type-fields",
             ) { visibleType ->
-                LazyColumn(
+                SectionedLazyColumn(
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = contentPadding,
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    itemSpacing = 14.dp,
                 ) {
-                item(key = "basic-title") {
-                    RuleEditorSectionTitle(stringResource(R.string.rule_section_basic))
+                sectionTitleItem(key = "basic-title") {
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_basic), topPadding = 0.dp)
                 }
                 item(key = "name") {
                     RuleEditorTextField(
@@ -877,8 +877,8 @@ internal fun RouteRuleEditorScaffold(
                     )
                 }
                 if (visibleType == SingBoxRouteRuleTypeLogical) {
-                    item(key = "logic-title") {
-                        RuleEditorSectionTitle(stringResource(R.string.rule_section_logic))
+                    sectionTitleItem(key = "logic-title") {
+                        RuleEditorSectionTitle(stringResource(R.string.rule_section_logic), topPadding = 0.dp)
                     }
                     item(key = "logic-mode") {
                         val modes = listOf(
@@ -934,8 +934,8 @@ internal fun RouteRuleEditorScaffold(
                         )
                     }
                 } else {
-                    item(key = "network-title") {
-                    RuleEditorSectionTitle(stringResource(R.string.rule_section_network))
+                    sectionTitleItem(key = "network-title") {
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_network), topPadding = 0.dp)
                 }
                 item(key = "ip-version") {
                     val versions = listOf(0, 4, 6)
@@ -1025,8 +1025,8 @@ internal fun RouteRuleEditorScaffold(
                         onPendingChange = { pendingDnsMatchers["client"] = it },
                     )
                 }
-                item(key = "destination-title") {
-                    RuleEditorSectionTitle(stringResource(R.string.rule_section_destination))
+                sectionTitleItem(key = "destination-title") {
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_destination), topPadding = 0.dp)
                 }
                 item(key = "ip-private") {
                     RuleEditorSwitchCard(
@@ -1115,8 +1115,8 @@ internal fun RouteRuleEditorScaffold(
                         validate = { value -> if (isRoutePortRange(value)) null else invalidMessage },
                     )
                 }
-                item(key = "source-title") {
-                    RuleEditorSectionTitle(stringResource(R.string.rule_section_source))
+                sectionTitleItem(key = "source-title") {
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_source), topPadding = 0.dp)
                 }
                 item(key = "source-ip-private") {
                     RuleEditorSwitchCard(
@@ -1177,8 +1177,8 @@ internal fun RouteRuleEditorScaffold(
                         onPendingChange = { pendingDnsMatchers["source_hostname"] = it },
                     )
                 }
-                item(key = "dns-title") {
-                    RuleEditorSectionTitle(stringResource(R.string.rule_section_dns))
+                sectionTitleItem(key = "dns-title") {
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_dns), topPadding = 0.dp)
                 }
                 items(DnsConfigurationMatchFields.toList(), key = { it }) { field ->
                     DnsConfigurationMatchEditor(
@@ -1194,8 +1194,8 @@ internal fun RouteRuleEditorScaffold(
                         onPendingChange = { pendingDnsMatchers[field] = it },
                     )
                 }
-                item(key = "process-title") {
-                    RuleEditorSectionTitle(stringResource(R.string.rule_section_process))
+                sectionTitleItem(key = "process-title") {
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_process), topPadding = 0.dp)
                 }
                 item(key = "process_name") {
                     RouteStringList(
@@ -1265,8 +1265,8 @@ internal fun RouteRuleEditorScaffold(
                         onPendingChange = { pendingDnsMatchers["package_name_regex"] = it },
                     )
                 }
-                item(key = "environment-title") {
-                    RuleEditorSectionTitle(stringResource(R.string.rule_section_environment))
+                sectionTitleItem(key = "environment-title") {
+                    RuleEditorSectionTitle(stringResource(R.string.rule_section_environment), topPadding = 0.dp)
                 }
                 item(key = "network_is_expensive") {
                     RuleEditorSwitchCard(

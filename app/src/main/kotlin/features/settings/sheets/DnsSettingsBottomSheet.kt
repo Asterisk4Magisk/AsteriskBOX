@@ -1811,8 +1811,7 @@ private fun DnsSheetSection(
 ) {
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp),
+            .fillMaxWidth(),
     ) {
         Text(
             text = title,

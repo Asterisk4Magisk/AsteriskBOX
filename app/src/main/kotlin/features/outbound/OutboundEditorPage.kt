@@ -231,7 +231,6 @@ internal fun OutboundEditorPage(
     ) { contentPadding ->
         LazyColumn(
             contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item(key = "identity") {
                 EditorSectionCard(
