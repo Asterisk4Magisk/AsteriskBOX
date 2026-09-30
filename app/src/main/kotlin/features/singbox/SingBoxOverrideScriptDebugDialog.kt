@@ -45,6 +45,7 @@ import ui.theme.AsteriskMotion
 import ui.icons.AsteriskIcons as Icons
 
 import engine.singbox.config.SingBoxScriptResult
+import engine.singbox.config.SingBoxScriptStatus
 import engine.singbox.config.encodeSingBoxJson
 
 @Composable
@@ -54,6 +55,7 @@ internal fun SingBoxOverrideScriptDebugDialog(
     onCopy: (SingBoxScriptResult) -> Unit,
 ) {
     if (result == null) return
+    val status = result.status
     var showOutput by remember(result) { mutableStateOf(false) }
     val consoleText = result.logs.takeIf(List<*>::isNotEmpty)
         ?.joinToString(separator = "\n") { log -> "[${log.level}] ${log.message}" }
@@ -89,18 +91,23 @@ internal fun SingBoxOverrideScriptDebugDialog(
                     )
                     Surface(
                         shape = MaterialTheme.shapes.small,
-                        color = if (result.success) {
-                            MaterialTheme.colorScheme.primaryContainer
-                        } else {
-                            MaterialTheme.colorScheme.errorContainer
+                        color = when (status) {
+                            SingBoxScriptStatus.Success -> MaterialTheme.colorScheme.primaryContainer
+                            SingBoxScriptStatus.Warning -> MaterialTheme.colorScheme.tertiaryContainer
+                            SingBoxScriptStatus.Failed -> MaterialTheme.colorScheme.errorContainer
+                        },
+                        contentColor = when (status) {
+                            SingBoxScriptStatus.Success -> MaterialTheme.colorScheme.onPrimaryContainer
+                            SingBoxScriptStatus.Warning -> MaterialTheme.colorScheme.onTertiaryContainer
+                            SingBoxScriptStatus.Failed -> MaterialTheme.colorScheme.onErrorContainer
                         },
                     ) {
                         Text(
                             text = stringResource(
-                                if (result.success) {
-                                    R.string.singbox_override_script_debug_success
-                                } else {
-                                    R.string.singbox_override_script_debug_failed
+                                when (status) {
+                                    SingBoxScriptStatus.Success -> R.string.singbox_override_script_debug_success
+                                    SingBoxScriptStatus.Warning -> R.string.singbox_override_script_debug_warning
+                                    SingBoxScriptStatus.Failed -> R.string.singbox_override_script_debug_failed
                                 },
                             ),
                             style = MaterialTheme.typography.labelLarge,
@@ -123,6 +130,14 @@ internal fun SingBoxOverrideScriptDebugDialog(
                                     title = stringResource(R.string.singbox_override_script_debug_error),
                                     body = error,
                                     error = true,
+                                    modifier = Modifier.padding(top = 14.dp),
+                                )
+                            }
+                            result.warning?.takeIf(String::isNotBlank)?.let { warning ->
+                                DebugSection(
+                                    title = stringResource(R.string.singbox_override_script_debug_warning),
+                                    body = warning,
+                                    warning = true,
                                     modifier = Modifier.padding(top = 14.dp),
                                 )
                             }
@@ -198,34 +213,32 @@ private fun DebugSection(
     body: String,
     modifier: Modifier = Modifier,
     error: Boolean = false,
+    warning: Boolean = false,
 ) {
+    val contentColor = when {
+        error -> MaterialTheme.colorScheme.onErrorContainer
+        warning -> MaterialTheme.colorScheme.onTertiaryContainer
+        else -> MaterialTheme.colorScheme.onSurface
+    }
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        color = if (error) {
-            MaterialTheme.colorScheme.errorContainer
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
+        color = when {
+            error -> MaterialTheme.colorScheme.errorContainer
+            warning -> MaterialTheme.colorScheme.tertiaryContainer
+            else -> MaterialTheme.colorScheme.surfaceContainerLow
         },
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelLarge,
-                color = if (error) {
-                    MaterialTheme.colorScheme.onErrorContainer
-                } else {
-                    MaterialTheme.colorScheme.primary
-                },
+                color = if (error || warning) contentColor else MaterialTheme.colorScheme.primary,
             )
             Text(
                 text = body,
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                color = if (error) {
-                    MaterialTheme.colorScheme.onErrorContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
+                color = contentColor,
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
@@ -234,11 +247,20 @@ private fun DebugSection(
 
 internal fun SingBoxScriptResult.toClipboardReport(): String {
     return buildString {
-        appendLine(if (success) "Script debug: success" else "Script debug: failed")
+        appendLine(when (status) {
+            SingBoxScriptStatus.Success -> "Script debug: success"
+            SingBoxScriptStatus.Warning -> "Script debug: warning"
+            SingBoxScriptStatus.Failed -> "Script debug: failed"
+        })
         error?.takeIf(String::isNotBlank)?.let { error ->
             appendLine()
             appendLine("Error:")
             appendLine(error)
+        }
+        warning?.takeIf(String::isNotBlank)?.let { warning ->
+            appendLine()
+            appendLine("Warning:")
+            appendLine(warning)
         }
         appendLine()
         appendLine("Console:")

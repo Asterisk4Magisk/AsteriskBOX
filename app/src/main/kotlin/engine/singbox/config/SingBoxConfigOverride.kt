@@ -15,12 +15,20 @@ import kotlinx.serialization.json.contentOrNull
 
 internal data class SingBoxScriptLog(val level: String, val message: String)
 
+internal enum class SingBoxScriptStatus { Success, Warning, Failed }
+
 internal data class SingBoxScriptResult(
     val logs: List<SingBoxScriptLog> = emptyList(),
     val output: JsonObject? = null,
     val error: String? = null,
+    val warning: String? = null,
 ) {
     val success: Boolean get() = error == null && output != null
+    val status: SingBoxScriptStatus get() = when {
+        !success -> SingBoxScriptStatus.Failed
+        warning != null -> SingBoxScriptStatus.Warning
+        else -> SingBoxScriptStatus.Success
+    }
 }
 
 internal fun applySingBoxConfigOverride(
@@ -77,7 +85,7 @@ internal fun debugSingBoxConfigOverride(root: JsonObject, script: String): SingB
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (error: Exception) {
-        result.copy(error = error.message ?: "Configuration validation failed")
+        result.copy(warning = error.message ?: "Configuration validation failed")
     }
 }
 

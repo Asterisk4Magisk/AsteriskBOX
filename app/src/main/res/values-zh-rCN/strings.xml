@@ -691,6 +691,7 @@
     <string name="singbox_override_script_debug_run">调试</string>
     <string name="singbox_override_script_debug_running">调试中…</string>
     <string name="singbox_override_script_debug_success">成功</string>
+    <string name="singbox_override_script_debug_warning">警告</string>
     <string name="singbox_override_script_debug_title">调试</string>
     <string name="singbox_override_script_enable">启用覆写脚本</string>
     <string name="singbox_override_script_summary">生成配置后使用 JavaScript 进行覆写</string>

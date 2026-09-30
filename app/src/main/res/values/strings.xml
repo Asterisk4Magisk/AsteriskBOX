@@ -701,6 +701,7 @@
     <string name="singbox_override_script_debug_run">Debug</string>
     <string name="singbox_override_script_debug_running">Debugging…</string>
     <string name="singbox_override_script_debug_success">Succeeded</string>
+    <string name="singbox_override_script_debug_warning">Warning</string>
     <string name="singbox_override_script_debug_title">Debug</string>
     <string name="singbox_override_script_enable">Enable override script</string>
     <string name="singbox_override_script_summary">Override the generated configuration with JavaScript</string>
