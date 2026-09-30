@@ -4,7 +4,9 @@
 package features.settings
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -20,15 +22,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.AppState
+import app.LocalAppServices
 import app.R
 import engine.singbox.SingBoxConfigFactory
 import engine.singbox.config.loadSingBoxConfigPreview
@@ -38,6 +44,8 @@ import features.singbox.SingBoxCodeEditorState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import ui.clipboard.setPlainText
 import ui.components.AsteriskActionButton
 import ui.icons.AsteriskIcons as Icons
 import java.io.File
@@ -48,6 +56,10 @@ internal fun ConfigPreviewDialog(
     onDismissRequest: () -> Unit,
 ) {
     val context = LocalContext.current
+    val clipboard = LocalClipboard.current
+    val services = LocalAppServices.current
+    val scope = rememberCoroutineScope()
+    val copiedMessage = stringResource(R.string.proxy_error_dialog_copied)
     var content by remember { mutableStateOf<String?>(null) }
     var failed by remember { mutableStateOf(false) }
     var attempt by remember { mutableIntStateOf(0) }
@@ -78,12 +90,14 @@ internal fun ConfigPreviewDialog(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
+                val previewContent = content
                 Text(
                     text = stringResource(R.string.settings_config_preview),
                     style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(bottom = 16.dp),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                 )
-                val previewContent = content
                 if (previewContent != null) {
                     val editorState = remember(previewContent) {
                         SingBoxCodeEditorState(previewContent).also {
@@ -93,11 +107,13 @@ internal fun ConfigPreviewDialog(
                     JsonCodeEditor(
                         state = editorState,
                         readOnly = true,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 360.dp, max = 560.dp),
+                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
+                            .heightIn(min = 360.dp, max = 560.dp),
                     )
                 } else {
                     Box(
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 360.dp, max = 560.dp),
+                        modifier = Modifier.fillMaxWidth().weight(1f, fill = false)
+                            .heightIn(min = 360.dp, max = 560.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         if (failed) {
@@ -115,12 +131,28 @@ internal fun ConfigPreviewDialog(
                         }
                     }
                 }
-                AsteriskActionButton(
-                    text = stringResource(R.string.common_complete),
-                    icon = Icons.Rounded.Check,
-                    onClick = onDismissRequest,
-                    modifier = Modifier.align(Alignment.End).padding(top = 8.dp),
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                ) {
+                    if (previewContent != null && previewContent.isNotBlank()) {
+                        AsteriskActionButton(
+                            text = stringResource(R.string.common_copy),
+                            icon = Icons.Rounded.ContentCopy,
+                            onClick = {
+                                scope.launch {
+                                    clipboard.setPlainText(previewContent)
+                                    services.tipNotifier.show(copiedMessage)
+                                }
+                            },
+                        )
+                    }
+                    AsteriskActionButton(
+                        text = stringResource(R.string.common_complete),
+                        icon = Icons.Rounded.Check,
+                        onClick = onDismissRequest,
+                    )
+                }
             }
         }
     }
