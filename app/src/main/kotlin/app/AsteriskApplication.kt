@@ -27,7 +27,7 @@ import features.logs.AndroidLogcatRepository
 import features.subscription.runtime.AndroidSubscriptionPreparer
 import features.subscription.runtime.AndroidSubscriptionScheduleGateway
 import features.subscription.runtime.OutboundSubscriptionScheduler
-import features.subscription.runtime.toSubscriptionFetchOptions
+import features.subscription.usecase.toSubscriptionFetchOptions
 import features.subscription.usecase.OutboundSubscriptionUpdater
 import features.subscription.usecase.SubscriptionStateGateway
 import features.subscription.usecase.prepareSubscription
@@ -132,10 +132,7 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
                     ageSecretKey = group.ageSecretKey,
                     localContent = null,
                     subscriptionPreparer = subscriptionPreparer,
-                    fetchOptions = toSubscriptionFetchOptions(
-                        useRunningProxy = group.updateViaProxy && state.proxyRunning,
-                        hwid = group.hwid,
-                    ),
+                    fetchOptions = state.toSubscriptionFetchOptions(group),
                     etag = group.subscriptionEtag,
                     lastModified = group.subscriptionLastModified,
                     verifyConfiguration = false,

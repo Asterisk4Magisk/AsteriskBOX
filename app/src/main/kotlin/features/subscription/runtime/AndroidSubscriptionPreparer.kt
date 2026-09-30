@@ -78,13 +78,14 @@ internal class AndroidSubscriptionPreparer(
             val source = if (sourceContent == null) {
                 onStage(SubscriptionSyncStage.Downloading)
                 stage = SubscriptionSyncStage.Downloading
+                val proxy = fetchOptions.toHttpProxy()
                 runCancellableHttpRequest { track ->
                     downloadSubscription(
                         track = track,
                         sourceUrl = sourceUrl,
                         userAgent = userAgent,
                         hwid = fetchOptions.hwid.trim().ifBlank { installationHwid },
-                        proxy = fetchOptions.toHttpProxy(),
+                        proxy = proxy,
                         etag = etag,
                         lastModified = lastModified,
                     )

@@ -4,6 +4,9 @@
 package features.subscription.usecase
 
 import app.SubscriptionInfo
+import app.AppState
+import app.OutboundGroupState
+import engine.proxy.toLocalProxyOptions
 import features.subscription.runtime.AndroidSubscriptionPreparation
 import features.subscription.runtime.AndroidSubscriptionPreparer
 import features.subscription.runtime.AndroidSubscriptionFetchOptions
@@ -91,4 +94,12 @@ internal suspend fun prepareSubscription(
             remoteName = result.remoteName,
         )
     }
+}
+
+internal fun AppState.toSubscriptionFetchOptions(group: OutboundGroupState): AndroidSubscriptionFetchOptions {
+    return AndroidSubscriptionFetchOptions(
+        useRunningProxy = group.updateViaProxy,
+        fallbackProxy = toLocalProxyOptions(),
+        hwid = group.hwid,
+    )
 }
