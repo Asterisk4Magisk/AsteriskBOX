@@ -10,6 +10,7 @@ import features.resources.ResourceFileUpdateCoordinator
 import features.resources.ResourceFileUpdateRequest
 import features.resources.runtime.AndroidResourceFileDownloadCancellation
 import android.app.Application
+import features.home.HomeServiceOperationState
 import data.AndroidAppStateStore
 import data.AppSettingsPreferences
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
@@ -48,6 +49,7 @@ import engine.vpn.AndroidLibboxRuntime
 
 class AsteriskApplication : Application(), SingletonImageLoader.Factory {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    internal val homeServiceOperationState = HomeServiceOperationState()
     internal val singBoxRuntime: SingBoxRuntimeRepository by lazy { SingBoxRuntimeRepository(appScope, this) }
     internal val outboundPingRuntime: OutboundPingRuntimeRepository by lazy {
         OutboundPingRuntimeRepository(

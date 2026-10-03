@@ -9,6 +9,9 @@ import engine.singbox.runtime.SingBoxTrafficState
 import features.monitoring.MonitoringState
 import ui.theme.FocusTone
 import utils.toReadableBytes
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 internal enum class HomeServiceStatus {
     Enabled,
@@ -146,3 +149,20 @@ internal fun formatHomeRuntimeBytes(bytes: Long?): String {
 
 private const val HomeNetworkSampleLimit = 60
 internal const val HomeUnavailableValue = "—"
+
+internal enum class HomeServiceOperation { Idle, Starting, Stopping }
+
+// Retain only operation state; UI callbacks must not retain an Activity.
+internal class HomeServiceOperationState {
+    var operation by mutableStateOf(HomeServiceOperation.Idle)
+    var modeOperationInProgress by mutableStateOf(false)
+}
+
+internal fun formatHomeServiceUptime(uptimeMillis: Long?): String? {
+    if (uptimeMillis == null || uptimeMillis < 0L) return null
+    val seconds = uptimeMillis / 1_000L
+    val hours = (seconds / 3_600L).toString().padStart(2, '0')
+    val minutes = (seconds / 60L % 60L).toString().padStart(2, '0')
+    val remainingSeconds = (seconds % 60L).toString().padStart(2, '0')
+    return "$hours:$minutes:$remainingSeconds"
+}

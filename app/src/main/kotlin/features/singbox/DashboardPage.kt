@@ -2,14 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @file:OptIn(
-    androidx.compose.material3.ExperimentalMaterial3Api::class,
     kotlinx.coroutines.FlowPreview::class,
 )
 
 package features.singbox
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,26 +23,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import ui.components.AsteriskScaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import ui.components.AsteriskTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -61,6 +49,7 @@ import app.LocalAppStateStore
 import app.LocalIsWideScreen
 import app.LocalNavigator
 import app.LocalUpdateAppState
+import app.R
 import app.collectAppState
 import app.modes.RunModeBpf2Socks
 import app.modes.RunModeEbpf
@@ -70,12 +59,11 @@ import app.modes.RunModeTun2Socks
 import app.modes.SingBoxModeDirect
 import app.modes.SingBoxModeGlobal
 import app.modes.SingBoxModeRule
-import engine.proxy.ProxyServiceResult
 import engine.singbox.runtime.SingBoxTrafficSample
 import engine.singbox.runtime.SingBoxTrafficState
 import features.home.HomeControllerState
-import features.home.HomeMonitoringOverviewState
 import features.home.HomeModeRuntimeAction
+import features.home.HomeMonitoringOverviewState
 import features.home.HomeNetworkActivityState
 import features.home.HomeNetworkRowKind
 import features.home.HomeServiceStatus
@@ -92,15 +80,15 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
-import app.R
 import ui.components.AsteriskExpressiveCard
 import ui.components.AsteriskFocusSurface
 import ui.components.AsteriskPageCard
+import ui.components.AsteriskScaffold
 import ui.components.AsteriskSegmentItem
 import ui.components.AsteriskSegmentedControl
+import ui.components.AsteriskTopAppBar
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
-import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 import ui.theme.ExpressiveShapeRole
 import ui.theme.FocusDensity
@@ -108,6 +96,15 @@ import utils.toReadableBytes
 import kotlin.time.Duration.Companion.milliseconds
 import app.navigation.Route as AppRoute
 import ui.icons.AsteriskIcons as Icons
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import app.LocalHomeServiceControl
+import features.home.formatHomeServiceUptime
+import kotlinx.coroutines.delay
 
 private data class HomeTrafficPresentation(
     val traffic: SingBoxTrafficState,
@@ -152,11 +149,11 @@ fun SingBoxDashboardPage(
     }.collectAsState(initial = services.homeMonitoringOverviewSnapshot())
     val navigator = LocalNavigator.current
     val isWideScreen = LocalIsWideScreen.current
-    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     ObserveMonitoring(MonitoringIntent.Home)
-    var serviceOperationInProgress by rememberSaveable { mutableStateOf(false) }
-    var modeOperationInProgress by rememberSaveable { mutableStateOf(false) }
+    val serviceControl = LocalHomeServiceControl.current
+    val serviceOperationInProgress = serviceControl.serviceOperationInProgress
+    val modeOperationInProgress = serviceControl.modeOperationInProgress
     val controllerState = remember(appState.proxyRunning, appState.runMode, appState.singBoxMode) {
         buildHomeControllerState(appState)
     }
@@ -169,54 +166,10 @@ fun SingBoxDashboardPage(
     }
     val latestAppState = rememberUpdatedState(appState)
 
-    val startFailedMessage = stringResource(R.string.sing_box_dashboard_start_failed)
-    val stopFailedMessage = stringResource(R.string.sing_box_dashboard_stop_failed)
-    val serviceStartedMessage = stringResource(R.string.proxy_service_started)
-    val serviceStoppedMessage = stringResource(R.string.proxy_service_stopped)
     val modeFailedMessage = stringResource(R.string.home_mode_change_failed)
 
-    suspend fun handleProxyServiceResult(result: ProxyServiceResult, wasRunning: Boolean) {
-        when (result) {
-            is ProxyServiceResult.Success -> {
-                updateAppState { state ->
-                    state.copy(
-                        proxyRunning = result.proxyRunning,
-                        localProxyPort = result.appState?.localProxyPort ?: state.localProxyPort,
-                        singBoxControlPort = result.appState?.singBoxControlPort ?: state.singBoxControlPort,
-                    )
-                }
-                services.tipNotifier.show(if (result.proxyRunning) serviceStartedMessage else serviceStoppedMessage)
-            }
-
-            is ProxyServiceResult.Failed -> {
-                updateAppState { state -> state.copy(proxyRunning = false) }
-                services.tipNotifier.showError(
-                    result.error,
-                    if (wasRunning) stopFailedMessage else startFailedMessage,
-                )
-            }
-        }
-    }
-
-    fun toggleService() {
-        if (serviceOperationInProgress || modeOperationInProgress) return
-        val stateSnapshot = appState
-        val wasRunning = stateSnapshot.proxyRunning
-        serviceOperationInProgress = true
-        val operationJob = services.appScope.launch {
-            handleProxyServiceResult(services.proxyServiceUseCase.toggle(stateSnapshot), wasRunning)
-        }
-        scope.launch {
-            try {
-                operationJob.join()
-            } finally {
-                serviceOperationInProgress = false
-            }
-        }
-    }
-
     fun changeMode(mode: Int) {
-        if (serviceOperationInProgress || modeOperationInProgress) return
+        if (serviceControl.busy) return
         val stateSnapshot = latestAppState.value
         val modeChange = buildHomeModeChange(
             appState = stateSnapshot,
@@ -229,33 +182,28 @@ fun SingBoxDashboardPage(
         }
         if (modeChange.runtimeAction != HomeModeRuntimeAction.None) {
             val operationState = buildHomeModeOperationState(modeChange.runtimeAction)
-            serviceOperationInProgress = operationState.serviceOperationInProgress
-            modeOperationInProgress = operationState.modeOperationInProgress
-            val operationJob = services.appScope.launch {
-                val failure = when (modeChange.runtimeAction) {
-                    HomeModeRuntimeAction.None -> null
-                    HomeModeRuntimeAction.PatchRuntime ->
-                        services.singBoxRuntime.patchMode(modeChange.runtimeAppState).exceptionOrNull()
-                }
-                failure?.let { error ->
-                    if (modeChange.persistSelection) {
-                        updateAppState { state ->
-                            if (state.singBoxMode == mode) {
-                                state.copy(singBoxMode = previousMode)
-                            } else {
-                                state
+            serviceControl.modeOperationInProgress = operationState.modeOperationInProgress
+            services.appScope.launch {
+                try {
+                    val failure = when (modeChange.runtimeAction) {
+                        HomeModeRuntimeAction.None -> null
+                        HomeModeRuntimeAction.PatchRuntime ->
+                            services.singBoxRuntime.patchMode(modeChange.runtimeAppState).exceptionOrNull()
+                    }
+                    failure?.let { error ->
+                        if (modeChange.persistSelection) {
+                            updateAppState { state ->
+                                if (state.singBoxMode == mode) {
+                                    state.copy(singBoxMode = previousMode)
+                                } else {
+                                    state
+                                }
                             }
                         }
+                        services.tipNotifier.showError(error, modeFailedMessage)
                     }
-                    services.tipNotifier.showError(error, modeFailedMessage)
-                }
-            }
-            scope.launch {
-                try {
-                    operationJob.join()
                 } finally {
-                    serviceOperationInProgress = false
-                    modeOperationInProgress = false
+                    serviceControl.modeOperationInProgress = false
                 }
             }
         }
@@ -288,7 +236,6 @@ fun SingBoxDashboardPage(
                     networkActivityState = networkActivityState,
                     serviceOperationInProgress = serviceOperationInProgress,
                     modeOperationInProgress = modeOperationInProgress,
-                    onToggleService = ::toggleService,
                     onModeSelected = ::changeMode,
                 )
             }
@@ -354,15 +301,8 @@ private fun HomeControllerCard(
     networkActivityState: HomeNetworkActivityState,
     serviceOperationInProgress: Boolean,
     modeOperationInProgress: Boolean,
-    onToggleService: () -> Unit,
     onModeSelected: (Int) -> Unit,
 ) {
-    val serviceMotion = AsteriskMotion.fastEffects<Float>()
-    val serviceSwitchAlpha by animateFloatAsState(
-        targetValue = if (serviceOperationInProgress) 0f else 1f,
-        animationSpec = serviceMotion,
-        label = "home-service-switch-alpha",
-    )
     AsteriskFocusSurface(
         title = if (controllerState.serviceStatus == HomeServiceStatus.Enabled) {
             stringResource(R.string.home_service_enabled)
@@ -388,28 +328,8 @@ private fun HomeControllerCard(
                 modifier = Modifier.weight(1f),
             )
         },
-        primaryAction = {
-            Box(
-                modifier = Modifier.size(52.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Switch(
-                    checked = controllerState.serviceStatus == HomeServiceStatus.Enabled,
-                    onCheckedChange = { onToggleService() },
-                    modifier = Modifier.alpha(serviceSwitchAlpha),
-                    enabled = !serviceOperationInProgress,
-                )
-                AnimatedVisibility(
-                    visible = serviceOperationInProgress,
-                    enter = AsteriskMotion.fadeEnter(serviceMotion),
-                    exit = AsteriskMotion.fadeExit(serviceMotion),
-                    label = "home-service-loading",
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
-                }
-            }
-        },
-        keepPrimaryActionInline = true,
+        primaryAction = { HomeServiceRuntimeSummary() },
+        forcePrimaryActionStacked = shouldStackHomeServiceRuntimeSummary(),
     ) {
         Box(modifier = Modifier.offset(y = HomeModeControlOffset)) {
             AsteriskSegmentedControl(
@@ -713,3 +633,35 @@ private val HomeControllerTrafficIconOffsetY = 0.5.dp
 private val HomeAccumulatedTrafficOffset = 6.dp
 private val HomeModeControlOffset = 10.dp
 private val HomeControllerItemTextSpacing = 14.dp
+
+@Composable
+private fun shouldStackHomeServiceRuntimeSummary(): Boolean =
+    LocalWindowInfo.current.containerSize.width / LocalDensity.current.density < 360f
+
+@Composable
+private fun HomeServiceRuntimeSummary() {
+    val appState by LocalAppStateStore.current.collectAppState()
+    val services = LocalAppServices.current
+    val uptimeMillis by produceState<Long?>(null, appState.proxyRunning, appState.runMode) {
+        value = null
+        if (!appState.proxyRunning) return@produceState
+        while (true) {
+            value = services.singBoxRuntime.state.value.serviceStartedAtMillis
+                .takeIf { it > 0L }
+                ?.let { (System.currentTimeMillis() - it).coerceAtLeast(0L) }
+            delay(1_000L.milliseconds)
+        }
+    }
+    val uptime = formatHomeServiceUptime(uptimeMillis)
+    if (appState.proxyRunning && uptime != null) {
+        val description = stringResource(R.string.home_service_uptime, uptime)
+        Text(
+            text = uptime,
+            modifier = Modifier.semantics { contentDescription = description },
+            style = MaterialTheme.typography.labelMedium,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+    }
+}
