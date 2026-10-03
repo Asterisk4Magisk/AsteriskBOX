@@ -385,8 +385,14 @@
     <string name="outbound_no_duplicates">No duplicate proxy nodes found</string>
     <string name="outbound_no_invalid">No invalid proxy nodes found</string>
     <string name="outbound_no_nodes_to_delete">No proxy nodes to delete</string>
-    <string name="outbound_batch_delete_message">Permanently delete %2$d proxy node(s) from group “%1$s”?</string>
-    <string name="outbound_nodes_deleted">Deleted %1$d proxy node(s)</string>
+    <plurals name="outbound_batch_delete_message">
+        <item quantity="one">Permanently delete %2$d proxy node from group “%1$s”?</item>
+        <item quantity="other">Permanently delete %2$d proxy nodes from group “%1$s”?</item>
+    </plurals>
+    <plurals name="outbound_nodes_deleted">
+        <item quantity="one">Deleted %1$d proxy node</item>
+        <item quantity="other">Deleted %1$d proxy nodes</item>
+    </plurals>
     <string name="outbound_sort_latency">Ping latency</string>
     <string name="outbound_sort_original">Manual order</string>
     <string name="outbound_sort_remarks">Remarks</string>

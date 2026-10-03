@@ -54,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -201,8 +202,8 @@ internal fun OutboundListPage(
     val resources = LocalResources.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
-    var activeOperations by remember { mutableStateOf(0) }
-    var activeChildInteractions by remember { mutableStateOf(0) }
+    var activeOperations by remember { mutableIntStateOf(0) }
+    var activeChildInteractions by remember { mutableIntStateOf(0) }
     val interactionCallback by rememberUpdatedState(onInteractionActiveChange)
     val onChildInteractionChange: (Int) -> Unit = remember {
         { delta ->
@@ -905,8 +906,9 @@ internal fun OutboundListPage(
         WarningConfirmDialog(
             show = true,
             title = stringResource(deletion.action.titleResource),
-            summary = stringResource(
-                R.string.outbound_batch_delete_message,
+            summary = pluralStringResource(
+                R.plurals.outbound_batch_delete_message,
+                deletion.outbounds.size,
                 deletion.groupName,
                 deletion.outbounds.size,
             ),
@@ -924,7 +926,11 @@ internal fun OutboundListPage(
                                 operation = "outbound_batch_delete",
                                 onSuccess = {
                                     services.tipNotifier.show(
-                                        resources.getString(R.string.outbound_nodes_deleted, deletion.outbounds.size),
+                                        resources.getQuantityString(
+                                            R.plurals.outbound_nodes_deleted,
+                                            deletion.outbounds.size,
+                                            deletion.outbounds.size,
+                                        ),
                                     )
                                 },
                             )
