@@ -91,6 +91,7 @@ internal fun EditorPageScaffold(
                                 placeholder = searchPlaceholder,
                                 clearContentDescription = stringResource(R.string.common_clear),
                                 modifier = fieldModifier,
+                                highlightContainerOnFocus = false,
                             )
                         }
                     },
