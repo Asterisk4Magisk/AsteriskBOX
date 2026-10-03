@@ -44,6 +44,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
+import ui.components.AsteriskTextFieldLabel
 import androidx.compose.material3.OutlinedTextField
 import ui.components.AsteriskScaffold
 import androidx.compose.material3.Text
@@ -960,7 +961,7 @@ internal fun SelectorEditorScaffold(
                 OutlinedTextField(
                     value = remarks,
                     onValueChange = { remarks = it },
-                    label = { Text(stringResource(R.string.selector_editor_remarks)) },
+                    label = { AsteriskTextFieldLabel(stringResource(R.string.selector_editor_remarks)) },
                     isError = normalizedRemarks.isEmpty(),
                     supportingText = if (normalizedRemarks.isEmpty()) {
                         { Text(stringResource(R.string.selector_editor_remarks_required)) }
@@ -1016,7 +1017,7 @@ internal fun SelectorEditorScaffold(
                                 value = url,
                                 onValueChange = { url = it },
                                 label = {
-                                    Text(stringResource(R.string.selector_editor_urltest_url))
+                                    AsteriskTextFieldLabel(stringResource(R.string.selector_editor_urltest_url))
                                 },
                                 isError = urlInvalid,
                                 supportingText = if (urlInvalid) {
@@ -1041,7 +1042,7 @@ internal fun SelectorEditorScaffold(
                                 value = interval,
                                 onValueChange = { interval = it },
                                 label = {
-                                    Text(
+                                    AsteriskTextFieldLabel(
                                         stringResource(
                                             R.string.selector_editor_urltest_interval,
                                         ),
@@ -1069,7 +1070,7 @@ internal fun SelectorEditorScaffold(
                                     tolerance = value.filter(Char::isDigit)
                                 },
                                 label = {
-                                    Text(
+                                    AsteriskTextFieldLabel(
                                         stringResource(
                                             R.string.selector_editor_urltest_tolerance,
                                         ),
@@ -1098,7 +1099,7 @@ internal fun SelectorEditorScaffold(
                                 value = idleTimeout,
                                 onValueChange = { idleTimeout = it },
                                 label = {
-                                    Text(
+                                    AsteriskTextFieldLabel(
                                         stringResource(
                                             R.string.selector_editor_urltest_idle_timeout,
                                         ),

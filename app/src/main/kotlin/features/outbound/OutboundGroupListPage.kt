@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import ui.components.AsteriskTextFieldLabel
 import androidx.compose.material3.OutlinedTextField
 import ui.components.AsteriskScaffold
 import androidx.compose.material3.Switch
@@ -1208,7 +1209,7 @@ private fun OutboundGroupEditorSheet(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.outbound_group_name)) },
+                    label = { AsteriskTextFieldLabel(stringResource(R.string.outbound_group_name)) },
                     placeholder = {
                         Text(stringResource(R.string.outbound_group_name_placeholder))
                     },
@@ -1223,7 +1224,7 @@ private fun OutboundGroupEditorSheet(
                     OutlinedTextField(
                         value = url,
                         onValueChange = { url = it },
-                        label = { Text(stringResource(R.string.outbound_group_url_optional)) },
+                        label = { AsteriskTextFieldLabel(stringResource(R.string.outbound_group_url_optional)) },
                         supportingText = if (!validUrl) {
                             { Text(stringResource(R.string.outbound_group_url_invalid)) }
                         } else {
@@ -1247,7 +1248,7 @@ private fun OutboundGroupEditorSheet(
                         OutlinedTextField(
                             value = hwid,
                             onValueChange = { hwid = it },
-                            label = { Text(stringResource(R.string.outbound_group_hwid)) },
+                            label = { AsteriskTextFieldLabel(stringResource(R.string.outbound_group_hwid)) },
                             singleLine = true,
                             shape = AsteriskShapeTokens.InnerContainer,
                             modifier = Modifier.fillMaxWidth(),
@@ -1300,7 +1301,7 @@ private fun OutboundGroupEditorSheet(
                         OutlinedTextField(
                             value = ageSecretKey,
                             onValueChange = { ageSecretKey = it },
-                            label = { Text(stringResource(R.string.outbound_group_age_secret_key)) },
+                            label = { AsteriskTextFieldLabel(stringResource(R.string.outbound_group_age_secret_key)) },
                             singleLine = true,
                             shape = AsteriskShapeTokens.InnerContainer,
                             modifier = Modifier.fillMaxWidth(),
@@ -1373,7 +1374,7 @@ private fun OutboundGroupEditorSheet(
                                 onValueChange = { value ->
                                     updateInterval = value.filter { it.isDigit() || it == '.' }
                                 },
-                                label = { Text(stringResource(R.string.outbound_group_update_interval)) },
+                                label = { AsteriskTextFieldLabel(stringResource(R.string.outbound_group_update_interval)) },
                                 isError = !validInterval,
                                 supportingText = if (!validInterval) {
                                     { Text(stringResource(R.string.common_error_update_interval)) }
@@ -1432,7 +1433,7 @@ private fun CustomSubscriptionUserAgentDialog(
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChange,
-                label = { Text(stringResource(R.string.outbound_group_custom_user_agent)) },
+                label = { AsteriskTextFieldLabel(stringResource(R.string.outbound_group_custom_user_agent)) },
                 singleLine = true,
                 shape = AsteriskShapeTokens.InnerContainer,
                 modifier = Modifier.fillMaxWidth(),

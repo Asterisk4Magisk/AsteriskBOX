@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import ui.components.AsteriskTextFieldLabel
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -317,7 +318,7 @@ internal fun EndpointEditorPage(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 16.dp, vertical = 6.dp),
-                                label = { Text(stringResource(R.string.endpoint_editor_remarks)) },
+                                label = { AsteriskTextFieldLabel(stringResource(R.string.endpoint_editor_remarks)) },
                                 singleLine = true,
                                 shape = AsteriskShapeTokens.InnerContainer,
                             )

@@ -34,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import ui.components.AsteriskTextFieldLabel
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -281,7 +282,7 @@ private fun ResourceUrlField(
     val invalid = value.isNotBlank() && !value.isValidHttpResourceUrl()
     OutlinedTextField(
         state = state,
-        label = { Text(label) },
+        label = { AsteriskTextFieldLabel(label) },
         lineLimits = TextFieldLineLimits.SingleLine,
         isError = invalid,
         supportingText = if (invalid) {
@@ -598,7 +599,7 @@ internal fun CustomResourceFileEditorSheet(
         ) {
             OutlinedTextField(
                 state = nameState,
-                label = { Text(stringResource(R.string.settings_resource_files_custom_name)) },
+                label = { AsteriskTextFieldLabel(stringResource(R.string.settings_resource_files_custom_name)) },
                 lineLimits = TextFieldLineLimits.SingleLine,
                 isError = error == CustomResourceDraftError.InvalidName ||
                     error == CustomResourceDraftError.UnsupportedExtension ||
@@ -609,7 +610,7 @@ internal fun CustomResourceFileEditorSheet(
             )
             OutlinedTextField(
                 state = urlState,
-                label = { Text(stringResource(R.string.settings_resource_files_custom_url_optional)) },
+                label = { AsteriskTextFieldLabel(stringResource(R.string.settings_resource_files_custom_url_optional)) },
                 lineLimits = TextFieldLineLimits.SingleLine,
                 isError = error == CustomResourceDraftError.InvalidUrl,
                 supportingText = if (error == CustomResourceDraftError.InvalidUrl) {
