@@ -1,10 +1,12 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-@file:OptIn(ExperimentalFoundationApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalFoundationApi::class)
 
 package features.singbox
 
+import ui.components.AsteriskSearchTopAppBar
+import ui.components.AsteriskTopBarControls
 import ui.components.AsteriskDropdownMenuItem
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -31,6 +33,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import ui.icons.AsteriskIcons as Icons
+import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -38,11 +42,8 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import ui.components.AsteriskScaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import ui.components.AsteriskTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -97,7 +98,6 @@ import app.modes.SingBoxProxySortDelay
 import app.modes.SingBoxProxySortName
 import ui.components.AsteriskFilterChip
 import ui.components.AsteriskInfoChip
-import ui.components.AsteriskPinnedSearchArea
 import ui.components.AsteriskSelectionCard
 import ui.components.localizedLabel
 import engine.singbox.config.APP_GLOBAL_SELECTOR
@@ -344,7 +344,11 @@ fun SingBoxProxyPage(
     AsteriskScaffold(
         topBar = {
             Column {
-                AsteriskTopAppBar(
+                AsteriskSearchTopAppBar(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    placeholder = stringResource(R.string.sing_box_proxies_search),
+                    searchAvailable = contentState != SingBoxProxyContentState.ServiceStopped,
                     title = { Text(stringResource(R.string.sing_box_proxies_title)) },
                     actions = {
                         AnimatedVisibility(
@@ -370,16 +374,11 @@ fun SingBoxProxyPage(
                     },
                 )
                 AnimatedVisibility(
-                    visible = contentState != SingBoxProxyContentState.ServiceStopped,
+                    visible = contentState != SingBoxProxyContentState.ServiceStopped && visibleProxies.groups.size > 1,
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
-                    AsteriskPinnedSearchArea(
-                        query = searchQuery,
-                        onQueryChange = { searchQuery = it },
-                        placeholder = stringResource(R.string.sing_box_proxies_search),
-                        clearContentDescription = stringResource(R.string.common_clear),
-                    ) {
+                    AsteriskTopBarControls {
                         if (visibleProxies.groups.size > 1) {
                             ProxyGroupTabs(
                                 groups = visibleProxies.groups,

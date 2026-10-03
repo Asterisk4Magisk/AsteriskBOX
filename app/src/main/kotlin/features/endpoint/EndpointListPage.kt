@@ -1,8 +1,6 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
-
 package features.endpoint
 
 import android.content.Context
@@ -23,6 +21,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,10 +31,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
+import ui.components.AsteriskSearchTopAppBar
 import ui.components.AsteriskScaffold
-import androidx.compose.material3.Text
-import ui.components.AsteriskTopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,7 +78,6 @@ import kotlinx.coroutines.withContext
 import app.R
 import ui.clipboard.getPlainText
 import ui.clipboard.setPlainText
-import ui.components.AsteriskPinnedSearchArea
 import ui.components.WarningConfirmDialog
 import ui.components.singBoxOptionLabel
 import ui.layout.pageContentPaddingWithCutout
@@ -227,7 +224,10 @@ internal fun EndpointListPage(padding: PaddingValues) {
     AsteriskScaffold(
         topBar = {
             Column {
-                AsteriskTopAppBar(
+                AsteriskSearchTopAppBar(
+                    query = query,
+                    onQueryChange = { query = it },
+                    placeholder = stringResource(R.string.endpoint_search),
                     title = {
                         Column {
                             Text(stringResource(R.string.endpoint_management))
@@ -356,12 +356,6 @@ internal fun EndpointListPage(padding: PaddingValues) {
                             }
                         }
                     },
-                )
-                AsteriskPinnedSearchArea(
-                    query = query,
-                    onQueryChange = { query = it },
-                    placeholder = stringResource(R.string.endpoint_search),
-                    clearContentDescription = stringResource(R.string.common_clear),
                 )
             }
         },

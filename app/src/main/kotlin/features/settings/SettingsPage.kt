@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.ExperimentalMaterial3Api
-import ui.components.AsteriskScaffold
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -35,7 +35,6 @@ import app.ProjectInfo
 import app.R
 import app.collectAppState
 import app.managedRuleSetChoices
-import app.withPrunedManagedInboundReferences
 import app.modes.RunModeBpf2Socks
 import app.modes.RunModeEbpf
 import app.modes.RunModeTproxy
@@ -44,17 +43,18 @@ import app.modes.RunModeTun2Socks
 import app.modes.RunModeVpnService
 import app.modes.isRootRunMode
 import app.navigation.Route
+import app.withPrunedManagedInboundReferences
 import data.backup.AppBackupRestorePreview
 import engine.proxy.ProxyServiceResult
 import engine.proxy.withResolvedDynamicLocalProxyPort
+import features.resources.runtime.singBoxRuleSetFiles
 import features.settings.sheets.externalInterfacesSummary
-import features.settings.sheets.tunBypassRuleSetSummary
-import features.settings.sheets.tunSharedNetworkInterfacesSummary
 import features.settings.sheets.ignoredInterfacesSummary
 import features.settings.sheets.privateAddressCidrsSummary
 import features.settings.sheets.snifferSettingsSummary
+import features.settings.sheets.tunBypassRuleSetSummary
 import features.settings.sheets.tunSettingsSummary
-import features.resources.runtime.singBoxRuleSetFiles
+import features.settings.sheets.tunSharedNetworkInterfacesSummary
 import features.settings.usecase.RootBootScriptResult
 import features.settings.usecase.RootEbpfProbeResult
 import features.settings.usecase.SwitchRunModeResult
@@ -62,8 +62,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import ui.KeyColors
 import ui.components.AsteriskContentHeader
-import ui.components.AsteriskPinnedSearchArea
-import ui.layout.AdaptiveTopAppBar
+import ui.components.AsteriskScaffold
+import ui.components.AsteriskSearchTopAppBar
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageHorizontalPadding
 import ui.layout.pageListPadding
@@ -76,30 +76,33 @@ private enum class SettingsBackupRestoreOperation {
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 fun SettingsPage(
     padding: PaddingValues,
 ) {
-    val isWideScreen = LocalIsWideScreen.current
     val topAppBarScrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     var searchQuery by rememberSaveable { mutableStateOf("") }
 
     AsteriskScaffold(
         topBar = {
-            Column {
-                AdaptiveTopAppBar(
-                    title = stringResource(R.string.settings_title),
-                    subtitle = "v${ProjectInfo.VERSION_NAME} (${ProjectInfo.VERSION_CODE})",
-                    isWideScreen = isWideScreen,
-                    scrollBehavior = topAppBarScrollBehavior,
-                )
-                AsteriskPinnedSearchArea(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                    placeholder = stringResource(R.string.common_search),
-                    clearContentDescription = stringResource(R.string.common_clear),
-                )
-            }
+            AsteriskSearchTopAppBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                placeholder = stringResource(R.string.common_search),
+                scrollBehavior = topAppBarScrollBehavior,
+                title = {
+                    Column {
+                        Text(
+                            stringResource(R.string.settings_title),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        Text(
+                            "v${ProjectInfo.VERSION_NAME} (${ProjectInfo.VERSION_CODE})",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+            )
         },
     ) { innerPadding ->
         SettingsContent(

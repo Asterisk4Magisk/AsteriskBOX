@@ -6,7 +6,6 @@ package ui.components
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
@@ -28,7 +27,6 @@ internal data class EditorPageScaffoldState(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 internal fun EditorPageScaffold(
     outerPadding: PaddingValues,
     isWideScreen: Boolean,
@@ -40,6 +38,10 @@ internal fun EditorPageScaffold(
     modifier: Modifier = Modifier,
     topExtra: Dp = 8.dp,
     actions: @Composable RowScope.() -> Unit = {},
+    searchQuery: String? = null,
+    onSearchQueryChange: (String) -> Unit = {},
+    searchPlaceholder: String = "",
+    searchField: @Composable ((Modifier) -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val state = EditorPageScaffoldState(saving, saveEnabled)
@@ -49,30 +51,57 @@ internal fun EditorPageScaffold(
     AsteriskScaffold(
         modifier = modifier,
         topBar = {
-            AsteriskTopAppBar(
-                title = title,
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBack,
-                        enabled = state.backEnabled,
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Rounded.ArrowBack,
-                            stringResource(R.string.common_back),
-                        )
-                    }
-                },
-                actions = {
-                    actions()
-                    AsteriskActionButton(
-                        text = stringResource(R.string.common_save),
-                        icon = Icons.Rounded.Save,
-                        onClick = onSave,
-                        enabled = state.saveEnabled,
-                        loading = saving,
+            val navigationIcon: @Composable () -> Unit = {
+                IconButton(
+                    onClick = onBack,
+                    enabled = state.backEnabled,
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowBack,
+                        stringResource(R.string.common_back),
                     )
-                },
-            )
+                }
+            }
+            val editorActions: @Composable RowScope.() -> Unit = {
+                actions()
+                AsteriskActionButton(
+                    text = stringResource(R.string.common_save),
+                    icon = Icons.Rounded.Save,
+                    onClick = onSave,
+                    enabled = state.saveEnabled,
+                    loading = saving,
+                )
+            }
+            if (searchQuery != null) {
+                AsteriskSearchTopAppBar(
+                    query = searchQuery,
+                    onQueryChange = onSearchQueryChange,
+                    placeholder = searchPlaceholder,
+                    title = title,
+                    navigationIcon = navigationIcon,
+                    actions = editorActions,
+                    searchAvailable = !saving,
+                    searchField = { fieldModifier ->
+                        if (searchField != null) {
+                            searchField(fieldModifier)
+                        } else {
+                            AsteriskSearchField(
+                                query = searchQuery,
+                                onQueryChange = onSearchQueryChange,
+                                placeholder = searchPlaceholder,
+                                clearContentDescription = stringResource(R.string.common_clear),
+                                modifier = fieldModifier,
+                            )
+                        }
+                    },
+                )
+            } else {
+                AsteriskTopAppBar(
+                    title = title,
+                    navigationIcon = navigationIcon,
+                    actions = editorActions,
+                )
+            }
         },
     ) { innerPadding ->
         content(
