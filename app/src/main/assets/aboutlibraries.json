@@ -197,7 +197,7 @@
         },
         {
             "uniqueId": "dev.chrisbanes.haze:haze",
-            "artifactVersion": "2.0.0",
+            "artifactVersion": "2.0.1",
             "name": "Haze",
             "description": "Haze",
             "website": "https://github.com/chrisbanes/haze/",
@@ -210,7 +210,7 @@
         },
         {
             "uniqueId": "dev.chrisbanes.haze:haze-blur",
-            "artifactVersion": "2.0.0",
+            "artifactVersion": "2.0.1",
             "name": "Haze Blur",
             "description": "Haze",
             "website": "https://github.com/chrisbanes/haze/",
@@ -249,7 +249,7 @@
         },
         {
             "uniqueId": "com.github.android-password-store:kage",
-            "artifactVersion": "0.7.0",
+            "artifactVersion": "0.8.0",
             "name": "kage",
             "description": "Kotlin implementation of the age file encryption library",
             "website": "https://github.com/Android-Password-Store/kage",
