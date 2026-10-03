@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -945,51 +946,6 @@ internal fun SelectorEditorScaffold(
         saveEnabled = canSave,
         onBack = onDismissRequest,
         onSave = { onSave(draft) },
-        searchQuery = query,
-        onSearchQueryChange = { query = it },
-        searchPlaceholder = stringResource(R.string.selector_editor_search_targets),
-        searchField = { searchModifier ->
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = {
-                    Text(stringResource(R.string.selector_editor_search_targets))
-                },
-                leadingIcon = {
-                    Icon(Icons.Rounded.Search, contentDescription = null)
-                },
-                trailingIcon = {
-                    Row {
-                        if (query.isNotEmpty()) {
-                            IconButton(onClick = { query = "" }) {
-                                Icon(Icons.Rounded.Clear, stringResource(R.string.common_clear))
-                            }
-                        }
-                        IconToggleButton(
-                            checked = regexEnabled,
-                            onCheckedChange = { regexEnabled = it },
-                            colors = IconButtonDefaults.iconToggleButtonColors(
-                                checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            ),
-                            modifier = Modifier.semantics {
-                                contentDescription = regexToggleDescription
-                            },
-                        ) {
-                            Text(
-                                text = ".*",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                    }
-                },
-                isError = searchInvalid,
-                singleLine = true,
-                shape = AsteriskShapeTokens.InnerContainer,
-                modifier = searchModifier,
-            )
-        },
     ) { contentPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxWidth(),
@@ -1204,16 +1160,63 @@ internal fun SelectorEditorScaffold(
                             enabled = effectiveMembers.isNotEmpty(),
                         )
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
+                    Text(
+                        stringResource(R.string.selector_editor_members),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            item(key = "target-search") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        placeholder = {
+                            Text(stringResource(R.string.selector_editor_search_targets))
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Rounded.Search, contentDescription = null)
+                        },
+                        trailingIcon = {
+                            IconToggleButton(
+                                checked = regexEnabled,
+                                onCheckedChange = { regexEnabled = it },
+                                colors = IconButtonDefaults.iconToggleButtonColors(
+                                    checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
+                                modifier = Modifier.semantics {
+                                    contentDescription = regexToggleDescription
+                                },
+                            ) {
+                                Text(
+                                    text = ".*",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        },
+                        isError = searchInvalid,
+                        supportingText = if (searchInvalid) {
+                            {
+                                Text(stringResource(R.string.selector_editor_regex_invalid))
+                            }
+                        } else {
+                            null
+                        },
+                        singleLine = true,
+                        shape = AsteriskShapeTokens.InnerContainer,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Box(
+                        modifier = Modifier.width(48.dp).height(56.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Text(
-                            stringResource(R.string.selector_editor_members),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.weight(1f),
-                        )
                         TriStateCheckbox(
                             state = toggleableState,
                             onClick = ::toggleVisibleMembers,
@@ -1224,15 +1227,6 @@ internal fun SelectorEditorScaffold(
                             },
                         )
                     }
-                }
-            }
-            if (searchInvalid) {
-                item(key = "target-search-error") {
-                    Text(
-                        stringResource(R.string.selector_editor_regex_invalid),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
                 }
             }
             item(key = "members-required") {
