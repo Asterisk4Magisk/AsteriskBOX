@@ -170,7 +170,7 @@ private val OutboundBatchDeleteAction.emptyResource: Int
     get() = when (this) {
         OutboundBatchDeleteAction.DUPLICATES -> R.string.outbound_no_duplicates
         OutboundBatchDeleteAction.INVALID -> R.string.outbound_no_invalid
-        OutboundBatchDeleteAction.ALL -> R.string.outbound_no_nodes_to_delete
+        OutboundBatchDeleteAction.ALL -> R.string.outbound_no_proxy_servers_to_delete
     }
 
 private enum class OutboundCardMenuLevel {
@@ -922,7 +922,7 @@ internal fun OutboundListPage(
                                 onSuccess = {
                                     services.tipNotifier.show(
                                         resources.getQuantityString(
-                                            R.plurals.outbound_nodes_deleted,
+                                            R.plurals.outbound_proxy_servers_deleted,
                                             deletion.outbounds.size,
                                             deletion.outbounds.size,
                                         ),
@@ -1494,7 +1494,7 @@ private fun OutboundOptionsMenu(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.outbound_delete_nodes)) },
+                                text = { Text(stringResource(R.string.outbound_delete_proxy_servers)) },
                                 leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
                                 trailingIcon = { Icon(Icons.Rounded.ChevronRight, contentDescription = null) },
                                 enabled = toolsEnabled,
@@ -1504,7 +1504,7 @@ private fun OutboundOptionsMenu(
 
                         OutboundOptionsMenuLevel.DELETE -> {
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.outbound_delete_nodes)) },
+                                text = { Text(stringResource(R.string.outbound_delete_proxy_servers)) },
                                 leadingIcon = { Icon(Icons.Rounded.ChevronLeft, contentDescription = null) },
                                 onClick = { level = OutboundOptionsMenuLevel.MAIN },
                             )

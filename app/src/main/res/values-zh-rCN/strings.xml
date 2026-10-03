@@ -334,10 +334,18 @@
     <string name="import_result_partial_title">部分导入完成</string>
     <string name="import_result_success_title">导入完成</string>
     <string name="import_result_summary">已导入：%1$d · 已跳过：%2$d · 重复：%3$d</string>
+    <plurals name="outbound_batch_delete_message">
+        <item quantity="other">确定永久删除分组“%1$s”中的 %2$d 个代理节点？</item>
+    </plurals>
+    <string name="outbound_copy_all_urls">复制所有节点URL</string>
     <plurals name="outbound_count">
         <item quantity="other">%1$d 个出站</item>
     </plurals>
+    <string name="outbound_delete_all">删除全部代理节点</string>
+    <string name="outbound_delete_duplicates">删除重复代理节点</string>
+    <string name="outbound_delete_invalid">删除无效代理节点</string>
     <string name="outbound_delete_message">出站“%1$s”将被永久删除。</string>
+    <string name="outbound_delete_proxy_servers">删除代理节点</string>
     <string name="outbound_delete_title">删除出站？</string>
     <string name="outbound_empty">当前分组暂无出站</string>
     <string name="outbound_empty_summary">点击添加按钮导入，或可视化配置一个出站。</string>
@@ -354,6 +362,10 @@
     <string name="outbound_management">出站管理</string>
     <string name="outbound_manual_add">添加出站</string>
     <string name="outbound_manual_edit">编辑出站</string>
+    <string name="outbound_no_duplicates">未发现重复代理节点</string>
+    <string name="outbound_no_invalid">未发现无效代理节点</string>
+    <string name="outbound_no_proxy_servers_to_delete">没有可删除的代理节点</string>
+    <string name="outbound_no_urls">没有可复制的节点URL</string>
     <string name="outbound_option_layout">布局</string>
     <string name="outbound_option_layout_auto">自动</string>
     <string name="outbound_option_layout_double">双列</string>
@@ -366,6 +378,9 @@
     <string name="outbound_ping_latency">%1$d ms</string>
     <string name="outbound_ping_no_targets">当前分组没有可 Ping 的服务器地址</string>
     <string name="outbound_ping_running">正在 Ping</string>
+    <plurals name="outbound_proxy_servers_deleted">
+        <item quantity="other">已删除 %1$d 个代理节点</item>
+    </plurals>
     <string name="outbound_qr_generate_failed">无法生成二维码</string>
     <string name="outbound_remarks">别名</string>
     <string name="outbound_search">搜索别名、协议或服务器</string>
@@ -375,21 +390,6 @@
     <string name="outbound_share_qr">生成二维码</string>
     <string name="outbound_share_url">复制 URL</string>
     <string name="outbound_sort">排序</string>
-    <string name="outbound_copy_all_urls">复制所有节点URL</string>
-    <string name="outbound_delete_nodes">删除代理节点</string>
-    <string name="outbound_delete_duplicates">删除重复代理节点</string>
-    <string name="outbound_delete_invalid">删除无效代理节点</string>
-    <string name="outbound_delete_all">删除全部代理节点</string>
-    <string name="outbound_no_urls">没有可复制的节点URL</string>
-    <string name="outbound_no_duplicates">未发现重复代理节点</string>
-    <string name="outbound_no_invalid">未发现无效代理节点</string>
-    <string name="outbound_no_nodes_to_delete">没有可删除的代理节点</string>
-    <plurals name="outbound_batch_delete_message">
-        <item quantity="other">确定永久删除分组“%1$s”中的 %2$d 个代理节点？</item>
-    </plurals>
-    <plurals name="outbound_nodes_deleted">
-        <item quantity="other">已删除 %1$d 个代理节点</item>
-    </plurals>
     <string name="outbound_sort_latency">Ping 延迟</string>
     <string name="outbound_sort_original">手动顺序</string>
     <string name="outbound_sort_remarks">别名</string>

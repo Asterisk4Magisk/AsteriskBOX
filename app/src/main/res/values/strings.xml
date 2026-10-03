@@ -298,7 +298,7 @@
     <string name="outbound_group_status_partial">Partial</string>
     <string name="outbound_group_status_updated">Updated %1$s</string>
     <string name="outbound_group_strict_import">Strict import</string>
-    <string name="outbound_group_strict_import_summary">Keep existing nodes if any subscription entry is invalid</string>
+    <string name="outbound_group_strict_import_summary">Keep existing proxy servers if any subscription entry is invalid</string>
     <string name="outbound_group_subscription_expire">Expires %1$s</string>
     <string name="outbound_group_subscription_traffic">Used %1$s / Total %2$s</string>
     <string name="outbound_group_sync_all">Update all group subscriptions</string>
@@ -338,11 +338,20 @@
     <string name="import_result_partial_title">Import partially complete</string>
     <string name="import_result_success_title">Import complete</string>
     <string name="import_result_summary">Imported: %1$d · Skipped: %2$d · Duplicates: %3$d</string>
+    <plurals name="outbound_batch_delete_message">
+        <item quantity="one">Permanently delete %2$d proxy server from group “%1$s”?</item>
+        <item quantity="other">Permanently delete %2$d proxy servers from group “%1$s”?</item>
+    </plurals>
+    <string name="outbound_copy_all_urls">Copy all proxy server URLs</string>
     <plurals name="outbound_count">
         <item quantity="one">%1$d outbound</item>
         <item quantity="other">%1$d outbounds</item>
     </plurals>
+    <string name="outbound_delete_all">Delete all proxy servers</string>
+    <string name="outbound_delete_duplicates">Delete duplicate proxy servers</string>
+    <string name="outbound_delete_invalid">Delete invalid proxy servers</string>
     <string name="outbound_delete_message">The outbound “%1$s” will be permanently deleted.</string>
+    <string name="outbound_delete_proxy_servers">Delete proxy servers</string>
     <string name="outbound_delete_title">Delete outbound?</string>
     <string name="outbound_empty">No outbounds in this group</string>
     <string name="outbound_empty_summary">Use the add button to import or visually configure an outbound.</string>
@@ -360,6 +369,10 @@
     <string name="outbound_management">Outbound management</string>
     <string name="outbound_manual_add">Add outbound</string>
     <string name="outbound_manual_edit">Edit outbound</string>
+    <string name="outbound_no_duplicates">No duplicate proxy servers found</string>
+    <string name="outbound_no_invalid">No invalid proxy servers found</string>
+    <string name="outbound_no_proxy_servers_to_delete">No proxy servers to delete</string>
+    <string name="outbound_no_urls">No proxy server URLs available to copy</string>
     <string name="outbound_option_layout">Layout</string>
     <string name="outbound_option_layout_auto">Automatic</string>
     <string name="outbound_option_layout_double">Double</string>
@@ -372,6 +385,10 @@
     <string name="outbound_ping_latency">%1$d ms</string>
     <string name="outbound_ping_no_targets">No outbound in this group has a server host to ping</string>
     <string name="outbound_ping_running">Ping in progress</string>
+    <plurals name="outbound_proxy_servers_deleted">
+        <item quantity="one">Deleted %1$d proxy server</item>
+        <item quantity="other">Deleted %1$d proxy servers</item>
+    </plurals>
     <string name="outbound_qr_generate_failed">Unable to generate QR code</string>
     <string name="outbound_remarks">Remarks</string>
     <string name="outbound_search">Search remarks, protocol, or server</string>
@@ -381,23 +398,6 @@
     <string name="outbound_share_qr">Generate QR code</string>
     <string name="outbound_share_url">Copy URL</string>
     <string name="outbound_sort">Sort</string>
-    <string name="outbound_copy_all_urls">Copy all node URLs</string>
-    <string name="outbound_delete_nodes">Delete proxy nodes</string>
-    <string name="outbound_delete_duplicates">Delete duplicate proxy nodes</string>
-    <string name="outbound_delete_invalid">Delete invalid proxy nodes</string>
-    <string name="outbound_delete_all">Delete all proxy nodes</string>
-    <string name="outbound_no_urls">No node URLs available to copy</string>
-    <string name="outbound_no_duplicates">No duplicate proxy nodes found</string>
-    <string name="outbound_no_invalid">No invalid proxy nodes found</string>
-    <string name="outbound_no_nodes_to_delete">No proxy nodes to delete</string>
-    <plurals name="outbound_batch_delete_message">
-        <item quantity="one">Permanently delete %2$d proxy node from group “%1$s”?</item>
-        <item quantity="other">Permanently delete %2$d proxy nodes from group “%1$s”?</item>
-    </plurals>
-    <plurals name="outbound_nodes_deleted">
-        <item quantity="one">Deleted %1$d proxy node</item>
-        <item quantity="other">Deleted %1$d proxy nodes</item>
-    </plurals>
     <string name="outbound_sort_latency">Ping latency</string>
     <string name="outbound_sort_original">Manual order</string>
     <string name="outbound_sort_remarks">Remarks</string>
