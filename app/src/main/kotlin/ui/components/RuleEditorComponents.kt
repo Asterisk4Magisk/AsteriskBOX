@@ -211,7 +211,7 @@ internal fun RuleEditorTextField(
         value = value,
         onValueChange = { proposed -> onValueChange(sanitizeInput(proposed)) },
         modifier = modifier.fillMaxWidth(),
-        label = { AsteriskTextFieldLabel(label) },
+        label = { Text(label) },
         singleLine = true,
         enabled = enabled,
         isError = errorText != null,

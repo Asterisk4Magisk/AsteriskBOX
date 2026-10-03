@@ -21,7 +21,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import ui.components.AsteriskTextFieldLabel
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -241,7 +240,7 @@ internal fun OutboundEditorPage(
                     OutlinedTextField(
                         value = remarks,
                         onValueChange = { remarks = it },
-                        label = { AsteriskTextFieldLabel(stringResource(R.string.outbound_remarks)) },
+                        label = { Text(stringResource(R.string.outbound_remarks)) },
                         singleLine = true,
                         shape = AsteriskShapeTokens.InnerContainer,
                         modifier = Modifier
@@ -345,7 +344,7 @@ internal fun OutboundEditorField(
         else -> OutlinedTextField(
             value = document.text(field.path),
             onValueChange = { value -> onDocumentChange(document.setText(field.path, value)) },
-            label = { AsteriskTextFieldLabel(field.localizedLabel()) },
+            label = { Text(field.localizedLabel()) },
             supportingText = when {
                 errorText != null -> ({ Text(errorText) })
                 field.kind == OutboundFieldKind.TEXT_LIST ->
@@ -416,7 +415,7 @@ private fun OutboundKeyValueField(
                         onValueChange = { newKey ->
                             update(entries.toMutableList().also { it[index] = newKey to value })
                         },
-                        label = { AsteriskTextFieldLabel(stringResource(R.string.outbound_editor_key)) },
+                        label = { Text(stringResource(R.string.outbound_editor_key)) },
                         singleLine = true,
                         shape = AsteriskShapeTokens.InnerContainer,
                         modifier = Modifier.weight(0.42f),
@@ -426,7 +425,7 @@ private fun OutboundKeyValueField(
                         onValueChange = { newValue ->
                             update(entries.toMutableList().also { it[index] = key to newValue })
                         },
-                        label = { AsteriskTextFieldLabel(stringResource(R.string.outbound_editor_value)) },
+                        label = { Text(stringResource(R.string.outbound_editor_value)) },
                         singleLine = true,
                         shape = AsteriskShapeTokens.InnerContainer,
                         modifier = Modifier.weight(0.58f),

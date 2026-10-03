@@ -29,8 +29,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ui.theme.AsteriskShapeTokens
 import engine.network.toPortOrNull
-import ui.components.AsteriskTextFieldLabel
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
 import ui.components.StringListStatusText
 
 private val SettingsSheetHorizontalPadding = 16.dp
@@ -107,7 +107,7 @@ internal fun SheetTextField(
     val focusManager = LocalFocusManager.current
 
     OutlinedTextField(
-        label = { AsteriskTextFieldLabel(label) },
+        label = { Text(label) },
         state = rememberTextFieldState(initialText = value),
         lineLimits = TextFieldLineLimits.SingleLine,
         shape = AsteriskShapeTokens.InnerContainer,
