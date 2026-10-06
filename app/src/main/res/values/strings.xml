@@ -186,6 +186,9 @@
     <string name="monitor_network_error_request">The request failed</string>
     <string name="monitor_network_error_response">The service returned an invalid address</string>
     <string name="monitor_network_error_timeout">The request timed out</string>
+    <string name="monitor_network_error_unavailable">Address not allocated</string>
+    <string name="monitor_network_probe_unallocated_ipv4">No IPv4 address allocated</string>
+    <string name="monitor_network_probe_unallocated_ipv6">No IPv6 address allocated</string>
     <string name="monitor_network_gateway">Default gateway</string>
     <string name="monitor_network_interface">Interface</string>
     <string name="monitor_network_local">Local network</string>
@@ -194,6 +197,9 @@
     <string name="monitor_network_privacy">Probe privacy</string>
     <string name="monitor_network_privacy_body">Entering this page or refreshing sends one address request to %1$s. The request contains no subscription, configuration, device identifier, account, or sing-box credential. Results remain in memory and are not logged or saved.</string>
     <string name="monitor_network_probe_source">Returned by the probe service</string>
+    <string name="monitor_network_probe_general">General Exit</string>
+    <string name="monitor_network_probe_cloudflare">Cloudflare Exit</string>
+    <string name="monitor_network_probe_warp">WARP</string>
     <string name="monitor_network_public">Public addresses</string>
     <string name="monitor_network_public_ipv4">Public IPv4</string>
     <string name="monitor_network_public_ipv6">Public IPv6</string>
