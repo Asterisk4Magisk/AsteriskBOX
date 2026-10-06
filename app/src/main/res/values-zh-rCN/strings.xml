@@ -184,6 +184,9 @@
     <string name="monitor_network_error_request">请求失败</string>
     <string name="monitor_network_error_response">探测服务返回了无效地址</string>
     <string name="monitor_network_error_timeout">请求超时</string>
+    <string name="monitor_network_error_unavailable">地址未分配</string>
+    <string name="monitor_network_probe_unallocated_ipv4">未分配 IPv4 地址</string>
+    <string name="monitor_network_probe_unallocated_ipv6">未分配 IPv6 地址</string>
     <string name="monitor_network_gateway">默认网关</string>
     <string name="monitor_network_interface">网络接口</string>
     <string name="monitor_network_local">本地网络</string>
@@ -192,6 +195,9 @@
     <string name="monitor_network_privacy">探测隐私说明</string>
     <string name="monitor_network_privacy_body">进入本页或刷新时，会分别向 %1$s 发送一次地址查询。请求不包含订阅、配置、设备标识、账号或 sing-box 凭据；结果仅保留在内存中，不写入日志或设置。</string>
     <string name="monitor_network_probe_source">由探测服务返回</string>
+    <string name="monitor_network_probe_general">通用出口</string>
+    <string name="monitor_network_probe_cloudflare">Cloudflare 节点出口</string>
+    <string name="monitor_network_probe_warp">WARP</string>
     <string name="monitor_network_public">公网地址</string>
     <string name="monitor_network_public_ipv4">公网 IPv4</string>
     <string name="monitor_network_public_ipv6">公网 IPv6</string>

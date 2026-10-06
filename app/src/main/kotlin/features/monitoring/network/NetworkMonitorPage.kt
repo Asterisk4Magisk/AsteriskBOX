@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -105,18 +106,20 @@ internal fun NetworkMonitorPage(padding: PaddingValues) {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        PublicAddressCard(
+                        PublicAddressFamilyCard(
                             family = AddressFamily.Ipv4,
-                            result = network.publicProbe.ipv4,
+                            generalResult = network.publicProbe.ipv4,
+                            cloudflareResult = network.publicProbe.cloudflareIpv4,
                             refreshing = network.publicProbe.refreshing,
-                            onCopy = { value -> copy(publicIpv4Label, value) },
+                            onCopy = { label, value -> copy(label, value) },
                             onRetry = { services.monitoring.refreshPublicNetworkProbe(AddressFamily.Ipv4) },
                         )
-                        PublicAddressCard(
+                        PublicAddressFamilyCard(
                             family = AddressFamily.Ipv6,
-                            result = network.publicProbe.ipv6,
+                            generalResult = network.publicProbe.ipv6,
+                            cloudflareResult = network.publicProbe.cloudflareIpv6,
                             refreshing = network.publicProbe.refreshing,
-                            onCopy = { value -> copy(publicIpv6Label, value) },
+                            onCopy = { label, value -> copy(label, value) },
                             onRetry = { services.monitoring.refreshPublicNetworkProbe(AddressFamily.Ipv6) },
                         )
                     }
@@ -170,68 +173,142 @@ internal fun NetworkMonitorPage(padding: PaddingValues) {
 }
 
 @Composable
-private fun PublicAddressCard(
+private fun PublicAddressFamilyCard(
     family: AddressFamily,
-    result: PublicAddressProbeResult,
+    generalResult: PublicAddressProbeResult,
+    cloudflareResult: PublicAddressProbeResult,
     refreshing: Boolean,
-    onCopy: (String) -> Unit,
+    onCopy: (String, String) -> Unit,
     onRetry: () -> Unit,
 ) {
+    val familyLabel = stringResource(
+        if (family == AddressFamily.Ipv4) R.string.common_ipv4 else R.string.common_ipv6
+    )
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         shape = MaterialTheme.shapes.large,
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = familyLabel,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                if (generalResult.hasRetryableError || cloudflareResult.hasRetryableError) {
+                    TextButton(
+                        onClick = onRetry,
+                        enabled = !refreshing,
+                    ) {
+                        Text(stringResource(R.string.monitor_retry))
+                    }
+                }
+            }
+
+            PublicAddressSection(
+                title = stringResource(R.string.monitor_network_probe_general),
+                result = generalResult,
+                family = family,
+                onCopy = { onCopy(familyLabel, it) },
+            )
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                modifier = Modifier.padding(vertical = 2.dp),
+            )
+
+            PublicAddressSection(
+                title = stringResource(R.string.monitor_network_probe_cloudflare),
+                result = cloudflareResult,
+                family = family,
+                onCopy = { onCopy(familyLabel, it) },
+            )
+        }
+    }
+}
+
+private val PublicAddressProbeResult.hasRetryableError: Boolean
+    get() = error != null && error != PublicProbeError.Unavailable
+
+@Composable
+private fun PublicAddressSection(
+    title: String,
+    result: PublicAddressProbeResult,
+    family: AddressFamily,
+    onCopy: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                if (result.error == PublicProbeError.Unavailable) {
                     Text(
-                        stringResource(
-                            if (family == AddressFamily.Ipv4) {
-                                R.string.common_ipv4
+                        text = stringResource(
+                            if (family == AddressFamily.Ipv6) {
+                                R.string.monitor_network_probe_unallocated_ipv6
                             } else {
-                                R.string.common_ipv6
-                            },
+                                R.string.monitor_network_probe_unallocated_ipv4
+                            }
                         ),
-                        style = MaterialTheme.typography.labelLarge,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                } else {
                     Text(
                         text = result.address.ifBlank { "—" },
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    result.durationMillis?.let { duration ->
-                        Text(
-                            stringResource(R.string.monitor_network_request_duration_value, duration),
-                            modifier = Modifier.padding(top = 6.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
-                if (result.address.isNotBlank()) {
-                    IconButton(onClick = { onCopy(result.address) }) {
-                        Icon(Icons.Rounded.ContentCopy, stringResource(R.string.monitor_copy_value))
-                    }
+                if (result.locationSummary.isNotBlank()) {
+                    Text(
+                        text = result.locationSummary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                result.durationMillis?.let { duration ->
+                    Text(
+                        stringResource(R.string.monitor_network_request_duration_value, duration),
+                        modifier = Modifier.padding(top = 2.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
-            if (result.error != null) {
-                Text(
-                    result.errorMessage.ifBlank { publicProbeErrorLabel(result.error) },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                if (result.stale) {
-                    Text(stringResource(R.string.monitor_data_stale), style = MaterialTheme.typography.bodySmall)
+            if (result.address.isNotBlank() && result.error != PublicProbeError.Unavailable) {
+                IconButton(onClick = { onCopy(result.address) }) {
+                    Icon(Icons.Rounded.ContentCopy, stringResource(R.string.monitor_copy_value))
                 }
-                TextButton(
-                    onClick = onRetry,
-                    enabled = !refreshing,
-                    modifier = Modifier.align(Alignment.End),
-                ) {
-                    Text(stringResource(R.string.monitor_retry))
-                }
+            }
+        }
+        if (result.error != null && result.error != PublicProbeError.Unavailable) {
+            Text(
+                result.errorMessage.ifBlank { publicProbeErrorLabel(result.error) },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            if (result.stale) {
+                Text(stringResource(R.string.monitor_data_stale), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -268,6 +345,7 @@ private fun publicProbeErrorLabel(error: PublicProbeError): String = stringResou
         PublicProbeError.Timeout -> R.string.monitor_network_error_timeout
         PublicProbeError.Network -> R.string.monitor_network_error_request
         PublicProbeError.InvalidResponse -> R.string.monitor_network_error_response
+        PublicProbeError.Unavailable -> R.string.monitor_network_error_unavailable
     },
 )
 

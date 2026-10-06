@@ -6,6 +6,9 @@ package features.monitoring
 import android.content.Context
 import app.modes.isRootRunMode
 import data.AndroidAppStateStore
+import engine.proxy.LocalProxyLoopbackAddress
+import engine.proxy.LocalProxyRuntime
+import engine.proxy.toLocalProxyOptions
 import engine.singbox.runtime.SingBoxConnection
 import engine.singbox.runtime.SingBoxConnectionsState
 import engine.singbox.runtime.SingBoxRuntimeRepository
@@ -14,6 +17,7 @@ import features.monitoring.network.AddressFamily
 import features.monitoring.network.AndroidNetworkMonitor
 import features.monitoring.network.PublicNetworkProbeClient
 import features.monitoring.network.PublicNetworkProbeMemoryCache
+import features.monitoring.network.PublicProbeProxy
 import features.monitoring.network.applyPublicProbeAttempt
 import features.monitoring.network.applyPublicProbeAttempts
 import features.monitoring.resource.AndroidProcessStatsSource
@@ -46,6 +50,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import system.AndroidRootShellGateway
+import utils.encodeBase64
+import java.net.InetSocketAddress
+import java.net.Proxy
 import kotlin.time.Duration.Companion.milliseconds
 
 internal class MonitoringRepository(
@@ -57,7 +64,9 @@ internal class MonitoringRepository(
 ) {
     private val processStatsSource = AndroidProcessStatsSource(context, rootAccess)
     private val networkMonitor = AndroidNetworkMonitor(context)
-    private val publicNetworkProbeClient = PublicNetworkProbeClient()
+    private val publicNetworkProbeClient = PublicNetworkProbeClient(
+        proxyProvider = { resolvePublicProbeProxy() },
+    )
     private val trafficLedgerStore = TrafficLedgerStore(context)
     private var previousProcessSnapshot: ProcessTickSnapshot? = null
     private var previousProcessSource: ProcessStatsSourceKind? = null
@@ -518,15 +527,14 @@ internal class MonitoringRepository(
                             publicProbe = if (family == null) {
                                 applyPublicProbeAttempts(
                                     previous = current.network.publicProbe,
-                                    ipv4 = checkNotNull(batch).first,
-                                    ipv6 = batch.second,
+                                    batch = checkNotNull(batch),
                                     completedAtMillis = completedAt,
                                 )
                             } else {
                                 applyPublicProbeAttempt(
                                     previous = current.network.publicProbe,
                                     family = family,
-                                    attempt = checkNotNull(single),
+                                    batch = checkNotNull(single),
                                     completedAtMillis = completedAt,
                                 )
                             },
@@ -549,6 +557,28 @@ internal class MonitoringRepository(
                 }
             }
         }
+    }
+
+    private fun resolvePublicProbeProxy(): PublicProbeProxy? {
+        val appState = stateStore.state.value
+        val isRunning = singBoxRuntime.state.value.running || appState.proxyRunning
+        if (!isRunning) return null
+        val runtimeOptions = LocalProxyRuntime.current()
+        val options = runtimeOptions ?: appState.toLocalProxyOptions()
+        val host = options.listenAddress.takeIf { it != "0.0.0.0" } ?: LocalProxyLoopbackAddress
+        val authHeader = if (options.username.isNotBlank()) {
+            "Basic " + "${options.username}:${options.password}".encodeBase64()
+        } else {
+            null
+        }
+        return PublicProbeProxy(
+            proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress(host, options.port)),
+            host = host,
+            port = options.port,
+            username = options.username,
+            password = options.password,
+            proxyAuthorization = authHeader,
+        )
     }
 }
 
