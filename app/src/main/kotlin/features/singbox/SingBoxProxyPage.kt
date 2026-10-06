@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,7 +39,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -223,6 +226,7 @@ fun SingBoxProxyPage(
     val proxyLayout = resolveSingBoxProxyLayout(appState.singBoxProxyLayout, isWideScreen)
     val columns = resolveSingBoxProxyColumns(proxyLayout)
     var pendingSelections by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var locateRequestTrigger by remember { mutableIntStateOf(0) }
     val resolvedSelectedGroupIndex = groupNames.indexOf(resolvedSelectedGroupName).coerceAtLeast(0)
     val groupPagerState = key(groupNames) {
         rememberPagerState(
@@ -384,6 +388,7 @@ fun SingBoxProxyPage(
                                 groups = visibleProxies.groups,
                                 selectedGroupName = resolvedSelectedGroupName,
                                 onSelectedGroupNameChange = { selectedGroupName = it },
+                                onReselectCurrentGroup = { locateRequestTrigger++ },
                             )
                         }
                     }
@@ -442,7 +447,28 @@ fun SingBoxProxyPage(
                                 failedNodes = runtimeState.delayFailedNodes,
                             )
                         }
+                        val selectedNodeName = (pendingSelections[group?.name] ?: group?.now).orEmpty().takeIf(String::isNotBlank)
                         val pageGridState = rememberLazyGridState()
+                        val isCurrentPage = groupPagerState.currentPage == page
+
+                        LaunchedEffect(locateRequestTrigger) {
+                            if (locateRequestTrigger == 0 || !isCurrentPage) return@LaunchedEffect
+                            if (group == null || pageNodes.isEmpty() || selectedNodeName == null) return@LaunchedEffect
+                            val selectedIndex = pageNodes.indexOf(selectedNodeName)
+                            if (selectedIndex < 0) return@LaunchedEffect
+                            val targetItemIndex = (selectedIndex / columns) * columns
+                            val firstVisible = pageGridState.firstVisibleItemIndex
+                            val distance = kotlin.math.abs(firstVisible - targetItemIndex)
+                            if (distance > 12) {
+                                val preIndex = if (targetItemIndex > firstVisible) {
+                                    (targetItemIndex - columns).coerceAtLeast(0)
+                                } else {
+                                    (targetItemIndex + columns).coerceAtMost(pageNodes.lastIndex)
+                                }
+                                pageGridState.scrollToItem(preIndex)
+                            }
+                            pageGridState.animateScrollToItem(targetItemIndex)
+                        }
 
                         Box(Modifier.fillMaxSize()) {
                             LazyVerticalGrid(
@@ -522,9 +548,11 @@ fun SingBoxProxyPage(
                         }
                     }
                     selectedGroup?.let { group ->
-                        ProxyDelayToolbar(
-                            enabled = runtimeAvailable && testingTarget == null,
+                        ProxyFloatingActions(
+                            runtimeAvailable = runtimeAvailable,
                             testing = testingTarget == group.name,
+                            canLocate = (pendingSelections[group.name] ?: group.now).isNotBlank(),
+                            onLocate = { locateRequestTrigger++ },
                             onDelayTest = { testGroup(group) },
                             bottomPadding = contentPadding.calculateBottomPadding(),
                             modifier = Modifier.align(Alignment.BottomEnd),
@@ -583,6 +611,7 @@ private fun ProxyGroupTabs(
     groups: List<SingBoxProxyGroup>,
     selectedGroupName: String,
     onSelectedGroupNameChange: (String) -> Unit,
+    onReselectCurrentGroup: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     if (groups.isEmpty()) return
@@ -615,7 +644,13 @@ private fun ProxyGroupTabs(
             groups.forEach { group ->
                 AsteriskFilterChip(
                     selected = group.name == selectedGroupName,
-                    onClick = { onSelectedGroupNameChange(group.name) },
+                    onClick = {
+                        if (group.name == selectedGroupName) {
+                            onReselectCurrentGroup()
+                        } else {
+                            onSelectedGroupNameChange(group.name)
+                        }
+                    },
                     label = group.displayName,
                     modifier = Modifier.onGloballyPositioned { coordinates ->
                         val bounds = ProxyGroupTabBounds(
@@ -995,24 +1030,43 @@ private fun String.visibleRuntimeName(unavailableLabel: String): String {
 }
 
 @Composable
-private fun ProxyDelayToolbar(
-    enabled: Boolean,
+private fun ProxyFloatingActions(
+    runtimeAvailable: Boolean,
     testing: Boolean,
+    canLocate: Boolean,
+    onLocate: () -> Unit,
     onDelayTest: () -> Unit,
     bottomPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
-    Box(
+    Row(
         modifier = modifier.padding(
             end = 20.dp,
             bottom = bottomPadding + SingBoxFloatingToolbarBottomSpacing,
         ),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (canLocate) {
+            FloatingActionButton(
+                onClick = onLocate,
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                shape = CircleShape,
+                modifier = Modifier.size(56.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.MyLocation,
+                    contentDescription = stringResource(R.string.sing_box_proxies_locate_selected),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
         ExtendedFloatingActionButton(
-            onClick = { if (enabled) onDelayTest() },
+            onClick = { if (runtimeAvailable && !testing) onDelayTest() },
             containerColor = MaterialTheme.colorScheme.primaryContainer,
             contentColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(
-                alpha = if (enabled && !testing) 1f else 0.45f,
+                alpha = if (runtimeAvailable && !testing) 1f else 0.45f,
             ),
             icon = {
                 if (testing) {
@@ -1031,8 +1085,7 @@ private fun ProxyDelayToolbar(
 }
 
 @Composable
-private fun DelayToolbarGlyph(
-) {
+private fun DelayToolbarGlyph() {
     Icon(
         imageVector = Icons.Rounded.Speed,
         contentDescription = stringResource(R.string.sing_box_proxies_group_test),

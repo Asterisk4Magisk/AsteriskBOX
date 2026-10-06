@@ -185,8 +185,15 @@ private fun List<String>.sortSingBoxProxyNodeNames(
                     failedNodes = failedNodes,
                 )) {
                     SingBoxProxyDelayStatus.Measured -> node.delay.toSingBoxProxyDelaySortValue()
+                    SingBoxProxyDelayStatus.Testing -> {
+                        if (node.delay != null && node.delay >= 0) {
+                            node.delay.toSingBoxProxyDelaySortValue()
+                        } else {
+                            Int.MAX_VALUE
+                        }
+                    }
                     SingBoxProxyDelayStatus.Failed -> Int.MAX_VALUE - 1
-                    SingBoxProxyDelayStatus.Testing, SingBoxProxyDelayStatus.NotTested -> Int.MAX_VALUE
+                    SingBoxProxyDelayStatus.NotTested -> Int.MAX_VALUE
                 }
             }.thenBy(String.CASE_INSENSITIVE_ORDER) { nodeName ->
                 displayNames[nodeName] ?: proxies.node(nodeName).name
