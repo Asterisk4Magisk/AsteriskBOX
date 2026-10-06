@@ -4,6 +4,7 @@
 package app
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -28,6 +30,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
@@ -380,13 +390,50 @@ private fun CompactScreenLayout(
     padding: PaddingValues,
     mainDestinationState: MainDestinationState,
 ) {
+    var isBottomBarVisible by remember { mutableStateOf(true) }
+
+    LaunchedEffect(mainDestinationState.current) {
+        isBottomBarVisible = true
+    }
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val delta = available.y
+                if (delta < -10f && isBottomBarVisible) {
+                    isBottomBarVisible = false
+                } else if (delta > 10f && !isBottomBarVisible) {
+                    isBottomBarVisible = true
+                }
+                return Offset.Zero
+            }
+        }
+    }
+
+    val bottomBarOffsetFraction by animateFloatAsState(
+        targetValue = if (isBottomBarVisible) 0f else 1f,
+        animationSpec = AsteriskMotion.spatial(),
+        label = "bottom-bar-visibility-offset",
+    )
+
     AsteriskScaffold(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(nestedScrollConnection),
         bottomBar = {
-            MainNavigationBar(
-                navigationItems = navigationItems,
-                mainDestinationState = mainDestinationState,
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        translationY = bottomBarOffsetFraction * size.height
+                        alpha = (1f - bottomBarOffsetFraction * 0.85f).coerceIn(0f, 1f)
+                    },
+            ) {
+                MainNavigationBar(
+                    navigationItems = navigationItems,
+                    mainDestinationState = mainDestinationState,
+                )
+            }
         },
     ) { innerPadding ->
         MainDestinationContent(
