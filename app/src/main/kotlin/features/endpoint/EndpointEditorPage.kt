@@ -57,6 +57,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import app.R
 import ui.clipboard.setPlainText
+import ui.components.AsteriskActionButton
 import ui.components.EditorPageScaffold
 import ui.components.localizedLabel
 import ui.theme.AsteriskMotion
@@ -237,7 +238,9 @@ internal fun EndpointEditorPage(
         onBack = navigator::pop,
         onSave = ::save,
         actions = {
-            IconButton(
+            AsteriskActionButton(
+                text = stringResource(R.string.common_copy),
+                icon = Icons.Rounded.ContentCopy,
                 onClick = {
                     scope.launch {
                         clipboard.setPlainText(editorState.snapshotText())
@@ -245,9 +248,7 @@ internal fun EndpointEditorPage(
                     }
                 },
                 enabled = !missing,
-            ) {
-                Icon(Icons.Rounded.ContentCopy, stringResource(R.string.common_copy))
-            }
+            )
         },
     ) { contentPadding ->
         if (missing) {

@@ -56,6 +56,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import app.R
 import ui.clipboard.setPlainText
+import ui.components.AsteriskActionButton
 import ui.components.AsteriskFilterChip
 import ui.components.EditorPageScaffold
 import ui.components.localizedLabel
@@ -213,7 +214,9 @@ internal fun OutboundEditorPage(
         onSave = ::save,
         actions = {
             if (editing != null) {
-                IconButton(
+                AsteriskActionButton(
+                    text = stringResource(R.string.common_copy),
+                    icon = Icons.Rounded.ContentCopy,
                     onClick = {
                         scope.launch {
                             clipboard.setPlainText(
@@ -223,9 +226,7 @@ internal fun OutboundEditorPage(
                         }
                     },
                     enabled = !saving,
-                ) {
-                    Icon(Icons.Rounded.ContentCopy, stringResource(R.string.common_copy))
-                }
+                )
             }
         },
     ) { contentPadding ->
