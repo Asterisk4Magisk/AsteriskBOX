@@ -221,8 +221,6 @@
     <string name="monitor_network_probe_general">通用出口</string>
     <string name="monitor_network_probe_cloudflare">Cloudflare 节点出口</string>
     <string name="monitor_network_public">公网地址</string>
-    <string name="monitor_network_public_ipv4">公网 IPv4</string>
-    <string name="monitor_network_public_ipv6">公网 IPv6</string>
     <string name="monitor_network_request_duration_value">请求耗时 %1$d ms</string>
     <string name="monitor_network_title">网络状态</string>
 
