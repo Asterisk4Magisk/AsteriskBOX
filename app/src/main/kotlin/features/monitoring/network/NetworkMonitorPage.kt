@@ -48,6 +48,7 @@ import kotlinx.coroutines.launch
 import app.R
 import ui.layout.rememberPageGutter
 import java.util.UUID
+import java.util.Locale
 import ui.icons.AsteriskIcons as Icons
 
 @Composable
@@ -60,8 +61,6 @@ internal fun NetworkMonitorPage(padding: PaddingValues) {
     val scope = rememberCoroutineScope()
     val pageSessionId = rememberSaveable { UUID.randomUUID().toString() }
     val copiedMessage = stringResource(R.string.common_copied)
-    val publicIpv4Label = stringResource(R.string.monitor_network_public_ipv4)
-    val publicIpv6Label = stringResource(R.string.monitor_network_public_ipv6)
     ObserveMonitoring(MonitoringIntent.Network, pageSessionId)
 
     fun copy(label: String, value: String) {
@@ -245,6 +244,7 @@ private fun PublicAddressSection(
     family: AddressFamily,
     onCopy: (String) -> Unit,
 ) {
+    val locationSummary = result.locationSummary(formatCloudflareColo(result.colo))
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             text = title,
@@ -277,9 +277,9 @@ private fun PublicAddressSection(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (result.locationSummary.isNotBlank()) {
+                if (locationSummary.isNotBlank()) {
                     Text(
-                        text = result.locationSummary,
+                        text = locationSummary,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                         maxLines = 2,
@@ -350,3 +350,38 @@ private fun publicProbeErrorLabel(error: PublicProbeError): String = stringResou
 )
 
 private val NetworkContentModifier = Modifier.fillMaxWidth().widthIn(max = 840.dp)
+
+@Composable
+internal fun formatCloudflareColo(colo: String): String {
+    val code = colo.trim().uppercase(Locale.ROOT)
+    if (code.isEmpty()) return ""
+    val cityResource = when (code) {
+        "AMS" -> R.string.monitor_network_colo_ams
+        "CDG" -> R.string.monitor_network_colo_cdg
+        "DFW" -> R.string.monitor_network_colo_dfw
+        "EWR" -> R.string.monitor_network_colo_ewr
+        "FRA" -> R.string.monitor_network_colo_fra
+        "HKG" -> R.string.monitor_network_colo_hkg
+        "IAD" -> R.string.monitor_network_colo_iad
+        "ICN" -> R.string.monitor_network_colo_icn
+        "KHH" -> R.string.monitor_network_colo_khh
+        "KIX" -> R.string.monitor_network_colo_kix
+        "LAX" -> R.string.monitor_network_colo_lax
+        "LHR" -> R.string.monitor_network_colo_lhr
+        "MEL" -> R.string.monitor_network_colo_mel
+        "NRT" -> R.string.monitor_network_colo_nrt
+        "ORD" -> R.string.monitor_network_colo_ord
+        "SEA" -> R.string.monitor_network_colo_sea
+        "SFO" -> R.string.monitor_network_colo_sfo
+        "SIN" -> R.string.monitor_network_colo_sin
+        "SJC" -> R.string.monitor_network_colo_sjc
+        "SYD" -> R.string.monitor_network_colo_syd
+        "TPE" -> R.string.monitor_network_colo_tpe
+        else -> null
+    }
+    return if (cityResource != null) {
+        stringResource(R.string.monitor_network_colo_named, stringResource(cityResource), code)
+    } else {
+        stringResource(R.string.monitor_network_colo_unknown, code)
+    }
+}

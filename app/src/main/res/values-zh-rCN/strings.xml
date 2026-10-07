@@ -180,6 +180,29 @@
     <string name="monitor_traffic_trend">5 分钟趋势</string>
 
     <!-- Monitoring - Network -->
+    <string name="monitor_network_colo_ams">阿姆斯特丹</string>
+    <string name="monitor_network_colo_cdg">巴黎</string>
+    <string name="monitor_network_colo_dfw">达拉斯</string>
+    <string name="monitor_network_colo_ewr">纽瓦克</string>
+    <string name="monitor_network_colo_fra">法兰克福</string>
+    <string name="monitor_network_colo_hkg">香港</string>
+    <string name="monitor_network_colo_iad">阿什本</string>
+    <string name="monitor_network_colo_icn">首尔</string>
+    <string name="monitor_network_colo_khh">高雄</string>
+    <string name="monitor_network_colo_kix">大阪</string>
+    <string name="monitor_network_colo_lax">洛杉矶</string>
+    <string name="monitor_network_colo_lhr">伦敦</string>
+    <string name="monitor_network_colo_mel">墨尔本</string>
+    <string name="monitor_network_colo_named">%1$s (%2$s)</string>
+    <string name="monitor_network_colo_nrt">东京</string>
+    <string name="monitor_network_colo_ord">芝加哥</string>
+    <string name="monitor_network_colo_sea">西雅图</string>
+    <string name="monitor_network_colo_sfo">旧金山</string>
+    <string name="monitor_network_colo_sin">新加坡</string>
+    <string name="monitor_network_colo_sjc">圣何塞</string>
+    <string name="monitor_network_colo_syd">悉尼</string>
+    <string name="monitor_network_colo_tpe">台北</string>
+    <string name="monitor_network_colo_unknown">%1$s 机房</string>
     <string name="monitor_network_dns">DNS 服务器</string>
     <string name="monitor_network_error_request">请求失败</string>
     <string name="monitor_network_error_response">探测服务返回了无效地址</string>

@@ -97,26 +97,25 @@ internal data class PublicAddressProbeResult(
     val colo: String = "",
     val warp: String = "",
 ) {
-    val locationSummary: String
-        get() {
-            val emoji = countryCodeToEmoji(countryCode)
-            val parts = mutableListOf<String>()
-            if (country.isNotBlank()) parts += country
-            val regionAndCity = listOf(region, city)
-                .filter { it.isNotBlank() && !it.equals(country, ignoreCase = true) }
-                .distinct()
-                .joinToString(" ")
-            if (regionAndCity.isNotBlank()) parts += regionAndCity
-            if (colo.isNotBlank()) {
-                parts += formatCloudflareColo(colo)
-            }
-            if (isp.isNotBlank()) parts += isp
-            if (warp.equals("on", ignoreCase = true)) {
-                parts += "WARP"
-            }
-            val text = parts.joinToString(" · ")
-            return if (emoji.isNotBlank()) "$emoji $text" else text
+    fun locationSummary(coloLabel: String): String {
+        val emoji = countryCodeToEmoji(countryCode)
+        val parts = mutableListOf<String>()
+        if (country.isNotBlank()) parts += country
+        val regionAndCity = listOf(region, city)
+            .filter { it.isNotBlank() && !it.equals(country, ignoreCase = true) }
+            .distinct()
+            .joinToString(" ")
+        if (regionAndCity.isNotBlank()) parts += regionAndCity
+        if (colo.isNotBlank()) {
+            parts += coloLabel
         }
+        if (isp.isNotBlank()) parts += isp
+        if (warp.equals("on", ignoreCase = true)) {
+            parts += "WARP"
+        }
+        val text = parts.joinToString(" · ")
+        return if (emoji.isNotBlank()) "$emoji $text" else text
+    }
 }
 
 internal data class PublicNetworkProbeState(
@@ -166,35 +165,6 @@ internal fun countryCodeToEmoji(countryCode: String?): String {
     val firstChar = Character.codePointAt(code, 0) - 0x41 + 0x1F1E6
     val secondChar = Character.codePointAt(code, 1) - 0x41 + 0x1F1E6
     return String(Character.toChars(firstChar)) + String(Character.toChars(secondChar))
-}
-
-internal fun formatCloudflareColo(colo: String): String {
-    val upper = colo.trim().uppercase()
-    val city = when (upper) {
-        "HKG" -> "香港"
-        "NRT" -> "东京"
-        "KIX" -> "大阪"
-        "SIN" -> "新加坡"
-        "TPE" -> "台北"
-        "KHH" -> "高雄"
-        "ICN" -> "首尔"
-        "SJC" -> "圣何塞"
-        "LAX" -> "洛杉矶"
-        "SFO" -> "旧金山"
-        "SEA" -> "西雅图"
-        "ORD" -> "芝加哥"
-        "DFW" -> "达拉斯"
-        "EWR" -> "纽瓦克"
-        "IAD" -> "阿什本"
-        "LHR" -> "伦敦"
-        "FRA" -> "法兰克福"
-        "AMS" -> "阿姆斯特丹"
-        "CDG" -> "巴黎"
-        "SYD" -> "悉尼"
-        "MEL" -> "墨尔本"
-        else -> upper
-    }
-    return if (city != upper) "$city ($upper)" else "$upper 机房"
 }
 
 internal sealed interface PublicProbeParseOutcome {
@@ -303,21 +273,6 @@ internal fun parsePublicProbeOutcome(
         return PublicProbeParseOutcome.FamilyUnavailable
     }
     return PublicProbeParseOutcome.Invalid
-}
-
-internal fun parsePublicProbeResponse(
-    body: String,
-    family: AddressFamily,
-    target: ProbeTarget = ProbeTarget.General,
-): ParsedPublicProbeAddress? {
-    return when (val outcome = parsePublicProbeOutcome(body, family, target)) {
-        is PublicProbeParseOutcome.Success -> outcome.parsed
-        else -> null
-    }
-}
-
-internal fun parsePublicAddressResponse(body: String, family: AddressFamily): String? {
-    return parsePublicProbeResponse(body, family)?.address
 }
 
 internal data class PublicProbeBatch(
