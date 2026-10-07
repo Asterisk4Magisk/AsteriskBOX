@@ -123,6 +123,7 @@ data class AppState(
     val enableRootBootScript: Boolean = false,
     val enableRootEbpfRules: Boolean = false,
     val enableRootEbpfDirectCidrBypass: Boolean = false,
+    val enableRootEbpfPrivateAddressBypass: Boolean = false,
     val ebpfLocalDataPlane: String = DefaultEbpfLocalDataPlane,
     val ebpfSharedDataPlane: String = DefaultEbpfSharedDataPlane,
     val ebpfLocalDnsMode: String = DefaultEbpfDnsMode,

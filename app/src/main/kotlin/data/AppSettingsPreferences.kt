@@ -236,6 +236,10 @@ internal class AppSettingsPreferences(
                 defaults.enableRootEbpfDirectCidrBypass,
             ),
             ebpfLocalDataPlane = preferences.getString(KeyEbpfLocalDataPlane, defaults.ebpfLocalDataPlane) ?: defaults.ebpfLocalDataPlane,
+            enableRootEbpfPrivateAddressBypass = preferences.getBoolean(
+                KeyEnableRootEbpfPrivateAddressBypass,
+                defaults.enableRootEbpfPrivateAddressBypass,
+            ),
             ebpfSharedDataPlane = preferences.getString(KeyEbpfSharedDataPlane, defaults.ebpfSharedDataPlane) ?: defaults.ebpfSharedDataPlane,
             ebpfLocalDnsMode = preferences.getString(KeyEbpfLocalDnsMode, defaults.ebpfLocalDnsMode) ?: defaults.ebpfLocalDnsMode,
             ebpfSharedDnsMode = preferences.getString(KeyEbpfSharedDnsMode, defaults.ebpfSharedDnsMode) ?: defaults.ebpfSharedDnsMode,
@@ -467,6 +471,7 @@ internal const val KeyTransparentProxyPort = "transparent_proxy_port"
 internal const val KeyEnableRootBootScript = "enable_root_boot_script"
 internal const val KeyEnableRootEbpfRules = "enable_root_ebpf_rules"
 internal const val KeyEnableRootEbpfDirectCidrBypass = "enable_root_ebpf_direct_cidr_bypass"
+internal const val KeyEnableRootEbpfPrivateAddressBypass = "enable_root_ebpf_private_address_bypass"
 internal const val KeyEbpfLocalDataPlane = "ebpf_local_data_plane"
 internal const val KeyEbpfSharedDataPlane = "ebpf_shared_data_plane"
 internal const val KeyEbpfLocalDnsMode = "ebpf_local_dns_mode"

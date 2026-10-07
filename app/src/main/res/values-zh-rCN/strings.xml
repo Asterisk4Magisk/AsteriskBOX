@@ -1087,6 +1087,8 @@
     <string name="settings_root_boot_script_summary">生成 service.d 启动脚本</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs">绕过直连地址</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs_summary">默认为中国地址列表，可在资源管理中调整</string>
+    <string name="settings_root_ebpf_bypass_private_addresses">绕过私有地址</string>
+    <string name="settings_root_ebpf_bypass_private_addresses_summary">排除私有地址，不进入代理核心</string>
     <string name="settings_root_ebpf_matcher">使用 eBPF 匹配器</string>
     <string name="settings_root_ebpf_matcher_summary">提高大应用清单性能，并提供地址过滤支持</string>
     <string name="settings_root_ipv6_disabler">禁用系统 IPv6</string>

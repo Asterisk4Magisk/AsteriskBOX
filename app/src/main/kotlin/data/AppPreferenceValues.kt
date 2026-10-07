@@ -99,6 +99,7 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
     boolean(KeyEnableRootBootScript, enableRootBootScript)
     boolean(KeyEnableRootEbpfRules, enableRootEbpfRules)
     boolean(KeyEnableRootEbpfDirectCidrBypass, enableRootEbpfDirectCidrBypass)
+    boolean(KeyEnableRootEbpfPrivateAddressBypass, enableRootEbpfPrivateAddressBypass)
     string(KeyEbpfLocalDataPlane, ebpfLocalDataPlane)
     string(KeyEbpfSharedDataPlane, ebpfSharedDataPlane)
     string(KeyEbpfLocalDnsMode, ebpfLocalDnsMode)

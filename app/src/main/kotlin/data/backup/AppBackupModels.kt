@@ -115,6 +115,7 @@ internal data class AppBackupSettings(
     val ebpfLocalDnsMode: String = BackupDefaults.ebpfLocalDnsMode,
     val ebpfSharedDnsMode: String = BackupDefaults.ebpfSharedDnsMode,
     val enableRootEbpfDirectCidrBypass: Boolean = BackupDefaults.enableRootEbpfDirectCidrBypass,
+    val enableRootEbpfPrivateAddressBypass: Boolean = BackupDefaults.enableRootEbpfPrivateAddressBypass,
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     @SerialName("ebpfBypassRuleSetTags")
     val legacyEbpfBypassRuleSetTags: List<String> = emptyList(),

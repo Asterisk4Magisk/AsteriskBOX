@@ -188,6 +188,11 @@ internal fun settingsTopLevelSearchItems(
                 stringResource(R.string.settings_root_ebpf_bypass_direct_cidrs_summary)
             },
         ),
+        if (showEbpfOptions) SettingsSearchItem(
+            SettingsSectionId.Tproxy,
+            stringResource(R.string.settings_root_ebpf_bypass_private_addresses),
+            stringResource(R.string.settings_root_ebpf_bypass_private_addresses_summary),
+        ) else null,
         SettingsSearchItem(
             SettingsSectionId.Tproxy,
             stringResource(R.string.settings_root_ipv6_disabler),

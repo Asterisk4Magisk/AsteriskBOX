@@ -458,6 +458,7 @@ private fun SettingsContent(
                     enableRootBootScript = appState.enableRootBootScript,
                     enableRootEbpfRules = appState.enableRootEbpfRules,
                     enableRootEbpfDirectCidrBypass = appState.enableRootEbpfDirectCidrBypass,
+                    enableRootEbpfPrivateAddressBypass = appState.enableRootEbpfPrivateAddressBypass,
                     tunBypassRuleSetsSummary = tunBypassRuleSetsSummary,
                     enableIpv6 = appState.enableIpv6,
                     enableRootIpv6Disabler = appState.enableRootIpv6Disabler,
@@ -552,6 +553,9 @@ private fun SettingsContent(
                     },
                     onEnableRootEbpfDirectCidrBypassChange = { enabled ->
                         updateAppState { state -> state.copy(enableRootEbpfDirectCidrBypass = enabled) }
+                    },
+                    onEnableRootEbpfPrivateAddressBypassChange = { enabled ->
+                        updateAppState { state -> state.copy(enableRootEbpfPrivateAddressBypass = enabled) }
                     },
                     onOpenTunBypassRuleSets = {
                         sheetState.openTunBypassRuleSets(appState)

@@ -268,6 +268,7 @@ internal fun SettingsProxyModeSections(
     enableRootBootScript: Boolean,
     enableRootEbpfRules: Boolean,
     enableRootEbpfDirectCidrBypass: Boolean,
+    enableRootEbpfPrivateAddressBypass: Boolean,
     tunBypassRuleSetsSummary: String,
     enableIpv6: Boolean,
     enableRootIpv6Disabler: Boolean,
@@ -284,6 +285,7 @@ internal fun SettingsProxyModeSections(
     onEnableRootBootScriptChange: (Boolean) -> Unit,
     onEnableRootEbpfRulesChange: (Boolean) -> Unit,
     onEnableRootEbpfDirectCidrBypassChange: (Boolean) -> Unit,
+    onEnableRootEbpfPrivateAddressBypassChange: (Boolean) -> Unit,
     onOpenTunBypassRuleSets: () -> Unit,
     onEnableRootIpv6DisablerChange: (Boolean) -> Unit,
     onOpenExternalInterfaces: () -> Unit,
@@ -438,6 +440,20 @@ internal fun SettingsProxyModeSections(
                             )
                         }
                     }
+                }
+                AnimatedVisibility(
+                    visible = runMode == RunModeEbpf,
+                    enter = AsteriskMotion.contentEnter(),
+                    exit = AsteriskMotion.contentExit(),
+                ) {
+                    SwitchPreference(
+                        title = stringResource(R.string.settings_root_ebpf_bypass_private_addresses),
+                        icon = Icons.Rounded.Route,
+                        summary = stringResource(R.string.settings_root_ebpf_bypass_private_addresses_summary),
+                        checked = enableRootEbpfPrivateAddressBypass,
+                        onCheckedChange = onEnableRootEbpfPrivateAddressBypassChange,
+                        accent = IconAccent.MaskGreen,
+                    )
                 }
                 AnimatedVisibility(
                     visible = !enableIpv6,

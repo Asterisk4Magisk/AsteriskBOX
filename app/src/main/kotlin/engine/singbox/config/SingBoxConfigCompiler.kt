@@ -332,7 +332,7 @@ internal fun compileEbpfInbound(
             put("data_plane", appState.ebpfLocalDataPlane)
             put("dns_mode", appState.ebpfLocalDnsMode.effectiveEbpfDnsMode(appState.enableLocalDns))
             put("ipv6", appState.enableIpv6)
-            put("bypass_private_address", false)
+            put("bypass_private_address", appState.enableRootEbpfPrivateAddressBypass)
             if (bypassRuleSets.isNotEmpty()) {
                 putJsonArray("bypass_rule_set") {
                     bypassRuleSets.forEach(::add)
@@ -357,7 +357,7 @@ internal fun compileEbpfInbound(
                 putJsonArray("interface") {
                     sharedInterfaces.forEach(::add)
                 }
-                put("bypass_private_address", false)
+                put("bypass_private_address", appState.enableRootEbpfPrivateAddressBypass)
                 put("ipv6", appState.enableIpv6)
                 if (bypassRuleSets.isNotEmpty()) {
                     putJsonArray("bypass_rule_set") {

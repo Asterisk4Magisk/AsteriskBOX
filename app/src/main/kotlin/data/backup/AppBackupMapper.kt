@@ -132,6 +132,7 @@ private fun AppState.toBackupSettings(): AppBackupSettings =
         ebpfLocalDnsMode = ebpfLocalDnsMode,
         ebpfSharedDnsMode = ebpfSharedDnsMode,
         enableRootEbpfDirectCidrBypass = enableRootEbpfDirectCidrBypass,
+        enableRootEbpfPrivateAddressBypass = enableRootEbpfPrivateAddressBypass,
         tunBypassRuleSetTags = tunBypassRuleSetTags,
         enableRootIpv6Disabler = enableRootIpv6Disabler,
         socks5ProxyPort = socks5ProxyPort,
@@ -364,6 +365,7 @@ private fun AppBackupData.toAppState(): AppState {
         ebpfLocalDnsMode = settings.ebpfLocalDnsMode,
         ebpfSharedDnsMode = settings.ebpfSharedDnsMode,
         enableRootEbpfDirectCidrBypass = settings.enableRootEbpfDirectCidrBypass,
+        enableRootEbpfPrivateAddressBypass = settings.enableRootEbpfPrivateAddressBypass,
         tunBypassRuleSetTags = settings.tunBypassRuleSetTags
             ?: settings.legacyEbpfBypassRuleSetTags,
         enableRootIpv6Disabler = settings.enableRootIpv6Disabler,
