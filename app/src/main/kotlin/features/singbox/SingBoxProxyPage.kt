@@ -5,9 +5,6 @@
 
 package features.singbox
 
-import ui.components.AsteriskSearchTopAppBar
-import ui.components.AsteriskTopBarControls
-import ui.components.AsteriskDropdownMenuItem
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -18,7 +15,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,20 +29,18 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import ui.icons.AsteriskIcons as Icons
-import androidx.compose.material3.Text
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import ui.components.AsteriskScaffold
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -90,8 +84,6 @@ import app.R
 import app.collectAppState
 import app.isManagedSingBoxTag
 import app.managedOutboundGroupSelectorTag
-import app.selectableManagedOutbounds
-import app.withSelectorSelection
 import app.modes.SingBoxProxyLayoutAuto
 import app.modes.SingBoxProxyLayoutDouble
 import app.modes.SingBoxProxyLayoutMultiple
@@ -99,10 +91,8 @@ import app.modes.SingBoxProxyLayoutSingle
 import app.modes.SingBoxProxySortDefault
 import app.modes.SingBoxProxySortDelay
 import app.modes.SingBoxProxySortName
-import ui.components.AsteriskFilterChip
-import ui.components.AsteriskInfoChip
-import ui.components.AsteriskSelectionCard
-import ui.components.localizedLabel
+import app.selectableManagedOutbounds
+import app.withSelectorSelection
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.runtime.SingBoxProxiesState
 import engine.singbox.runtime.SingBoxProxyGroup
@@ -111,11 +101,20 @@ import engine.singbox.runtime.SingBoxRuntimeState
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
-import ui.layout.pageContentPaddingWithCutout
+import ui.components.AsteriskDropdownMenuItem
+import ui.components.AsteriskFilterChip
+import ui.components.AsteriskInfoChip
+import ui.components.AsteriskScaffold
+import ui.components.AsteriskSearchTopAppBar
+import ui.components.AsteriskSelectionCard
+import ui.components.AsteriskTopBarControls
+import ui.components.localizedLabel
 import ui.isInDarkTheme
+import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
+import kotlin.math.roundToInt
+import ui.icons.AsteriskIcons as Icons
 
 private data class SingBoxProxyPageRuntimeState(
     val proxies: SingBoxProxiesState,
@@ -611,8 +610,8 @@ private fun ProxyGroupTabs(
     groups: List<SingBoxProxyGroup>,
     selectedGroupName: String,
     onSelectedGroupNameChange: (String) -> Unit,
-    onReselectCurrentGroup: () -> Unit = {},
     modifier: Modifier = Modifier,
+    onReselectCurrentGroup: () -> Unit = {},
 ) {
     if (groups.isEmpty()) return
     val tabScrollState = rememberScrollState()
