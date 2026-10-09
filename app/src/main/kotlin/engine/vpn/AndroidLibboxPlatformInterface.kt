@@ -316,6 +316,7 @@ internal class AndroidLibboxPlatformInterface(
     override fun lookupSFTPServer(): String = unsupported("SFTP server")
     override fun lookupUser(username: String?): PlatformUser = unsupported("platform user")
     override fun usePlatformAutoRedirect(): Boolean = false
+    override fun createAutoRedirectListener(inet6: Boolean): Int = unsupported("platform auto redirect listener")
     override fun createAutoRedirect(options: ByteArray?, handler: AutoRedirectHandler?): AutoRedirectSession =
         unsupported("platform auto redirect")
 
