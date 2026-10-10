@@ -4,28 +4,27 @@
 package features.resources.runtime
 
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import app.AppState
 import app.CustomResourceFileState
 import app.CustomResourceFileStatus
 import app.ResourceFileKind
 import app.ResourceFileStatus
 import app.ResourceFilesStatus
-import features.resources.isSupportedCustomResourceName
-import features.resources.isSupportedResourceName
-import features.resources.isHostsResource
 import features.resources.ResourceFileSourceDefault
 import features.resources.bundledRuleSetOrNull
 import features.resources.hasSingBoxRuleSetExtension
+import features.resources.isHostsResource
+import features.resources.isSupportedCustomResourceName
+import features.resources.isSupportedResourceName
 import features.resources.singBoxRuleSetFormatOrNull
-import features.resources.runtime.writeResourceAtomically as writeAtomically
+import system.getPackageInfoCompat
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.util.zip.GZIPInputStream
 import java.util.zip.ZipInputStream
+import features.resources.runtime.writeResourceAtomically as writeAtomically
 
 internal class AndroidResourceFileStore(
     context: Context,
@@ -429,14 +428,7 @@ internal fun Context.singBoxHostsFiles(
 
 private fun Context.packageUpdatedAtMillis(): Long {
     return runCatching {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            packageManager
-                .getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
-                .lastUpdateTime
-        } else {
-            @Suppress("DEPRECATION")
-            packageManager.getPackageInfo(packageName, 0).lastUpdateTime
-        }
+        packageManager.getPackageInfoCompat(packageName).lastUpdateTime
     }.getOrDefault(0L)
 }
 
@@ -501,7 +493,7 @@ private fun File.extractGzip(target: File): Boolean {
         }
         true
     }.onFailure { error ->
-        AndroidResourceFileLogger.warn("Failed to extract gzip ${absolutePath}", error)
+        AndroidResourceFileLogger.warn("Failed to extract gzip $absolutePath", error)
     }.getOrDefault(false)
 }
 
