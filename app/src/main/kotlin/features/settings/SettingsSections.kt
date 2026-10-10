@@ -38,6 +38,8 @@ internal fun settingsCoreLogLevelLabels(): List<String> =
 
 @Composable
 internal fun SettingsAppSection(
+    hideRecentTasks: Boolean,
+    onHideRecentTasksChange: (Boolean) -> Unit,
     languageOptions: List<String>,
     languageMode: Int,
     colorModeOptions: List<String>,
@@ -67,6 +69,16 @@ internal fun SettingsAppSection(
         onColorModeChange = onColorModeChange,
         onSeedIndexChange = onSeedIndexChange,
     )
+    SettingsSectionCard {
+        SwitchPreference(
+            title = stringResource(R.string.settings_hide_recent_tasks),
+            icon = Icons.Rounded.Apps,
+            summary = stringResource(R.string.settings_hide_recent_tasks_summary),
+            checked = hideRecentTasks,
+            onCheckedChange = onHideRecentTasksChange,
+            accent = IconAccent.MaskGrey,
+        )
+    }
 }
 
 @Composable

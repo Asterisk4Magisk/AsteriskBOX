@@ -52,6 +52,7 @@ internal data class AppBackupSettings(
     val colorMode: Int = BackupDefaults.colorMode,
     val languageMode: Int = BackupDefaults.languageMode,
     val seedIndex: Int = BackupDefaults.seedIndex,
+    val hideRecentTasks: Boolean = BackupDefaults.hideRecentTasks,
     val outboundListLayout: Int = BackupDefaults.outboundListLayout,
     val outboundListSort: Int = BackupDefaults.outboundListSort,
     val selectorSelections: Map<String, String> = BackupDefaults.selectorSelections,

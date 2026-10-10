@@ -577,6 +577,8 @@ private fun SettingsContent(
             }
             item(key = "settings_app") {
                 SettingsAppSection(
+                    hideRecentTasks = appState.hideRecentTasks,
+                    onHideRecentTasksChange = { hidden -> updateAppState { it.copy(hideRecentTasks = hidden) } },
                     languageOptions = languageOptions,
                     languageMode = appState.languageMode,
                     colorModeOptions = listOf(

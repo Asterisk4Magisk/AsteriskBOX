@@ -72,6 +72,7 @@ private fun AppState.toBackupSettings(): AppBackupSettings =
         colorMode = colorMode,
         languageMode = languageMode,
         seedIndex = seedIndex,
+        hideRecentTasks = hideRecentTasks,
         outboundListLayout = outboundListLayout,
         outboundListSort = outboundListSort,
         selectorSelections = selectorSelections,
@@ -278,6 +279,7 @@ private fun AppBackupData.toAppState(): AppState {
         colorMode = settings.colorMode,
         languageMode = settings.languageMode,
         seedIndex = settings.seedIndex,
+        hideRecentTasks = settings.hideRecentTasks,
         outboundGroups = restoredOutboundGroups,
         nextOutboundGroupId = nextId(
             defaults.nextOutboundGroupId,

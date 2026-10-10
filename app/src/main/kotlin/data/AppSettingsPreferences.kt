@@ -51,6 +51,7 @@ internal class AppSettingsPreferences(
             colorMode = preferences.getInt(KeyColorMode, defaults.colorMode),
             languageMode = preferences.getInt(KeyLanguageMode, defaults.languageMode),
             seedIndex = preferences.getInt(KeySeedIndex, defaults.seedIndex),
+            hideRecentTasks = preferences.getBoolean(KeyHideRecentTasks, defaults.hideRecentTasks),
             outboundListLayout = preferences.getInt(
                 KeyOutboundListLayout,
                 defaults.outboundListLayout,
@@ -405,6 +406,7 @@ private const val ObsoleteSettingsPayloadKey = "settings"
 internal const val KeyColorMode = "color_mode"
 internal const val KeyLanguageMode = "language_mode"
 internal const val KeySeedIndex = "seed_index"
+internal const val KeyHideRecentTasks = "hide_recent_tasks"
 private const val KeySubscriptionHwid = "subscription_hwid"
 internal const val KeyOutboundListLayout = "outbound_list_layout"
 internal const val KeyOutboundListSort = "outbound_list_sort"
