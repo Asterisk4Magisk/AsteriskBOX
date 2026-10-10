@@ -14,7 +14,6 @@ import app.SingBoxDnsServerState
 import app.SingBoxRouteRuleState
 import app.SingBoxSelectorTypeSelector
 import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -48,7 +47,6 @@ internal data class AppBackupData(
     val proxyAppListSelectedApps: List<String> = emptyList(),
 )
 
-@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 internal data class AppBackupSettings(
     val colorMode: Int = BackupDefaults.colorMode,

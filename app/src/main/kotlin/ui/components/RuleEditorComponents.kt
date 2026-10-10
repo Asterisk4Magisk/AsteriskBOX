@@ -1,8 +1,6 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-
 package ui.components
 
 import androidx.compose.animation.AnimatedContent

@@ -3,12 +3,10 @@
 
 package engine.singbox.config
 
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-@OptIn(ExperimentalSerializationApi::class)
 internal val SingBoxJson = Json {
     ignoreUnknownKeys = false
     isLenient = false

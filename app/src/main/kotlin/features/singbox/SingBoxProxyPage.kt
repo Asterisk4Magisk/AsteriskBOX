@@ -1,13 +1,10 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-@file:OptIn(ExperimentalFoundationApi::class)
-
 package features.singbox
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
