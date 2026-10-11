@@ -3,6 +3,7 @@
 
 package engine.singbox.runtime
 
+import engine.root.dns.withRootDnsMutation
 import android.content.Context
 import app.AppState
 import app.modes.RunModeVpnService
@@ -78,7 +79,7 @@ internal class SingBoxRuntimeRepository(
                 return
             }
         }
-        replaceSession(target)
+        replaceSession(target, appState)
     }
 
     fun stop(resetSnapshots: Boolean = false) {
@@ -143,7 +144,9 @@ internal class SingBoxRuntimeRepository(
     suspend fun patchMode(appState: AppState): Result<Unit> = runCatching {
         val active = requireActiveSession(appState)
         modeMutex.withLock {
-            active.setMode(appState.singBoxModeName())
+            appContext.withRootDnsMutation(appState) {
+                active.setMode(appState.singBoxModeName())
+            }
         }
     }
 
@@ -170,7 +173,7 @@ internal class SingBoxRuntimeRepository(
                     refreshServiceStartedAt(activeGeneration, active)
                     throw error
                 }
-                replaceSession(appState.commandTarget())
+                replaceSession(appState.commandTarget(), appState)
             } else {
                 error("ROOT runtime configuration changes require a supervised restart")
             }
@@ -182,7 +185,10 @@ internal class SingBoxRuntimeRepository(
         groupName: String,
         proxyName: String,
     ): Result<Unit> = runCatching {
-        requireActiveSession(appState).selectOutbound(groupName, proxyName)
+        val active = requireActiveSession(appState)
+        appContext.withRootDnsMutation(appState) {
+            active.selectOutbound(groupName, proxyName)
+        }
         mutableState.update { current ->
             current.copy(
                 proxies = current.proxies.copy(
@@ -219,7 +225,7 @@ internal class SingBoxRuntimeRepository(
         }.getOrNull()
     }
 
-    private fun replaceSession(target: SingBoxCommandTarget) {
+    private fun replaceSession(target: SingBoxCommandTarget, appState: AppState) {
         val old: SingBoxCommandClient?
         val nextGeneration: Long
         lateinit var next: SingBoxCommandClient
@@ -232,7 +238,7 @@ internal class SingBoxRuntimeRepository(
             sessionTarget = target
             next = SingBoxCommandClient(
                 target,
-                commandListener(nextGeneration, target),
+                commandListener(nextGeneration, target, appState),
             )
             mutableState.update { current ->
                 current.copy(
@@ -268,7 +274,12 @@ internal class SingBoxRuntimeRepository(
                         refreshServiceStartedAt(nextGeneration, next)
                         runCatching {
                             // Read inside the lock: a reconnect must not restore its original snapshot.
-                            modeMutex.withLock { next.setMode(desiredMode) }
+                            modeMutex.withLock {
+                                appContext.withRootDnsMutation(appState) {
+                                    check(isCurrent(nextGeneration, target)) { "sing-box session changed before mode restore" }
+                                    next.setMode(desiredMode)
+                                }
+                            }
                         }.onFailure { error ->
                             if (error is CancellationException) throw error
                             AndroidAppLogger.warn(LogTag, "Failed to restore sing-box Clash mode", error)
@@ -297,6 +308,7 @@ internal class SingBoxRuntimeRepository(
     private fun commandListener(
         listenerGeneration: Long,
         target: SingBoxCommandTarget,
+        appState: AppState,
     ): SingBoxCommandListener =
         object : SingBoxCommandListener {
             override fun onConnected() {
@@ -335,7 +347,7 @@ internal class SingBoxRuntimeRepository(
                         delay(ReconnectDelayMillis.milliseconds)
                         synchronized(sessionLock) {
                             if (isCurrentLocked(listenerGeneration, target)) {
-                                replaceSession(target)
+                replaceSession(target, appState)
                             }
                         }
                     }

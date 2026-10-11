@@ -98,6 +98,7 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
     boolean(KeyStoreDns, storeDns)
     string(KeyTransparentProxyPort, transparentProxyPort)
     boolean(KeyEnableRootBootScript, enableRootBootScript)
+    boolean(KeyEnableAppListEnhancement, enableAppListEnhancement)
     boolean(KeyEnableRootEbpfRules, enableRootEbpfRules)
     boolean(KeyEnableRootEbpfDirectCidrBypass, enableRootEbpfDirectCidrBypass)
     boolean(KeyEnableRootEbpfPrivateAddressBypass, enableRootEbpfPrivateAddressBypass)

@@ -122,6 +122,7 @@ data class AppState(
 
     val transparentProxyPort: String = RootModeEngine.DefaultTproxyPort.toString(),
     val enableRootBootScript: Boolean = false,
+    val enableAppListEnhancement: Boolean = false,
     val enableRootEbpfRules: Boolean = false,
     val enableRootEbpfDirectCidrBypass: Boolean = false,
     val enableRootEbpfPrivateAddressBypass: Boolean = false,

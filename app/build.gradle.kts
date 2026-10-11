@@ -133,6 +133,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.dexlib2)
     implementation(dependencies.project(":asteriskd"))
+    implementation(dependencies.project(":enhance"))
     implementation(dependencies.project(":bpfmatcher"))
     implementation(dependencies.project(":bpf2socks"))
     implementation(dependencies.project(":hevtun"))

@@ -9,6 +9,8 @@ import app.modes.RunModeEbpf
 import app.modes.RunModeTun
 import app.modes.RunModeTun2Socks
 import app.modes.RunModeVpnService
+import features.enhancement.EnhancementModulePreference
+import app.modes.supportsAppListEnhancement
 import app.modes.isRootRunMode
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -466,6 +468,9 @@ internal fun SettingsProxyModeSections(
                         onCheckedChange = onEnableRootEbpfPrivateAddressBypassChange,
                         accent = IconAccent.MaskGreen,
                     )
+                }
+                if (runMode.supportsAppListEnhancement()) {
+                    EnhancementModulePreference()
                 }
                 AnimatedVisibility(
                     visible = !enableIpv6,

@@ -18,6 +18,7 @@ import features.resources.ResourceFileUpdateCoordinator
 import features.resources.ResourceFileUseCase
 import features.settings.usecase.SwitchRunModeUseCase
 import features.settings.usecase.ApplyServiceControlUseCase
+import features.enhancement.EnhancementModuleCoordinator
 import features.settings.usecase.RootBootScriptUseCase
 import features.settings.usecase.RootEbpfProbeUseCase
 import features.subscription.usecase.OutboundSubscriptionUpdater
@@ -51,6 +52,7 @@ internal data class AppServices(
     val proxyServiceUseCase: ProxyServiceUseCase,
     val switchRunModeUseCase: SwitchRunModeUseCase,
     val applyServiceControlUseCase: ApplyServiceControlUseCase,
+    val enhancementModuleCoordinator: EnhancementModuleCoordinator,
     val rootBootScriptUseCase: RootBootScriptUseCase,
     val rootEbpfProbeUseCase: RootEbpfProbeUseCase,
     val tipNotifier: AndroidToastTipNotifier,

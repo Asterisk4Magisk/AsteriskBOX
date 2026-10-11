@@ -305,6 +305,7 @@ private fun AppBackupData.toAppState(): AppState {
         routeRules = routeRules,
         nextRouteRuleId = nextId(defaults.nextRouteRuleId, routeRules.map(SingBoxRouteRuleState::id)),
         runMode = RunModeVpnService,
+        enableAppListEnhancement = false,
         singBoxMode = settings.singBoxMode,
         singBoxProxyLayout = settings.singBoxProxyLayout,
         singBoxProxySort = settings.singBoxProxySort,

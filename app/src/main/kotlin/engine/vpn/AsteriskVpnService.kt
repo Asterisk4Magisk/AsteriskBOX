@@ -23,7 +23,7 @@ import engine.proxy.LocalProxyLoopbackAddress
 import engine.proxy.LocalProxyRuntime
 import engine.vpn.hevtun.HevTunRuntime
 import features.logs.AndroidAppLogger
-import features.logs.clearServiceLogsAsApp
+import features.logs.clearVpnServiceLogsAsApp
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -138,7 +138,7 @@ class AsteriskVpnService : VpnService() {
 
     private fun startVpn(config: VpnServiceStartConfig) {
         stopVpn()
-        clearServiceLogsAsApp(File(config.coreLogPaths.logDirectoryPath()), LogTag)
+        clearVpnServiceLogsAsApp(File(config.coreLogPaths.logDirectoryPath()), LogTag)
         val hevConfig = config.hevSocks5TunnelConfig
         if (hevConfig == null) {
             libboxRuntime.start(config)

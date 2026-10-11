@@ -29,6 +29,9 @@ fun normalizeRunMode(value: Int): Int = when (value) {
     else -> RunModeVpnService
 }
 
+fun Int.supportsAppListEnhancement(): Boolean =
+    this == RunModeTproxy || this == RunModeTun2Socks || this == RunModeBpf2Socks
+
 const val SingBoxModeRule = 0
 const val SingBoxModeGlobal = 1
 const val SingBoxModeDirect = 2

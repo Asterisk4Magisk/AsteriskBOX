@@ -224,6 +224,7 @@ internal class AppSettingsPreferences(
                 KeyTransparentProxyPort,
                 defaults.transparentProxyPort,
             ) ?: defaults.transparentProxyPort,
+            enableAppListEnhancement = preferences.getBoolean(KeyEnableAppListEnhancement, defaults.enableAppListEnhancement),
             enableRootBootScript = preferences.getBoolean(
                 KeyEnableRootBootScript,
                 defaults.enableRootBootScript,
@@ -471,6 +472,7 @@ internal const val KeyStoreFakeIp = "store_fake_ip"
 internal const val KeyStoreDns = "store_dns"
 internal const val KeyTransparentProxyPort = "transparent_proxy_port"
 internal const val KeyEnableRootBootScript = "enable_root_boot_script"
+internal const val KeyEnableAppListEnhancement = "enable_app_list_enhancement"
 internal const val KeyEnableRootEbpfRules = "enable_root_ebpf_rules"
 internal const val KeyEnableRootEbpfDirectCidrBypass = "enable_root_ebpf_direct_cidr_bypass"
 internal const val KeyEnableRootEbpfPrivateAddressBypass = "enable_root_ebpf_private_address_bypass"
