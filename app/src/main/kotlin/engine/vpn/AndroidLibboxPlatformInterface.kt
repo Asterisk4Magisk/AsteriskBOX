@@ -3,6 +3,7 @@
 
 package engine.vpn
 
+import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
@@ -14,6 +15,7 @@ import android.net.NetworkCapabilities
 import android.net.ProxyInfo
 import android.net.VpnService
 import android.net.wifi.WifiManager
+import android.net.wifi.WifiInfo
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
@@ -47,6 +49,7 @@ import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import system.getInstalledApplicationsCompat
+import system.AndroidNetworks
 import utils.toTrimmedNonEmptyDistinctList
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -63,6 +66,7 @@ internal class AndroidLibboxPlatformInterface(
 ) : PlatformInterface {
     private val connectivityManager =
         service.getSystemService(ConnectivityManager::class.java)
+    private val networks = AndroidNetworks.get(service)
     private var activeConfig: VpnServiceStartConfig? = null
     private var tunFileDescriptor: ParcelFileDescriptor? = null
     private var defaultNetworkCallback: ConnectivityManager.NetworkCallback? = null
@@ -260,9 +264,8 @@ internal class AndroidLibboxPlatformInterface(
         listener.updateDefaultInterface(interfaceName, index, false, false)
     }
 
-    @Suppress("DEPRECATION")
     override fun getInterfaces(): NetworkInterfaceIterator {
-        val androidNetworks = connectivityManager.allNetworks.mapNotNull { network ->
+        val androidNetworks = networks.snapshot().mapNotNull { network ->
             val linkProperties = connectivityManager.getLinkProperties(network) ?: return@mapNotNull null
             val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return@mapNotNull null
             linkProperties.interfaceName.orEmpty() to (linkProperties to capabilities)
@@ -298,7 +301,7 @@ internal class AndroidLibboxPlatformInterface(
     override fun underNetworkExtension(): Boolean = false
     override fun includeAllNetworks(): Boolean = false
     override fun clearDNSCache() = Unit
-    override fun localDNSTransport(): LocalDNSTransport = AndroidLocalDnsTransport(connectivityManager)
+    override fun localDNSTransport(): LocalDNSTransport = AndroidLocalDnsTransport(service.applicationContext)
     override fun startNeighborMonitor(listener: NeighborUpdateListener?) = Unit
     override fun closeNeighborMonitor(listener: NeighborUpdateListener?) = Unit
     override fun usePlatformShell(): Boolean = false
@@ -324,10 +327,16 @@ internal class AndroidLibboxPlatformInterface(
     override fun createBridge(options: BridgeOptions?): BridgeSession = unsupported("platform bridge")
     override fun registerMyInterface(name: String?) = Unit
 
-    @Suppress("DEPRECATION")
     override fun readWIFIState(): WIFIState? {
-        val wifiManager = service.applicationContext.getSystemService(WifiManager::class.java)
-        val wifiInfo = wifiManager?.connectionInfo ?: return null
+        val wifiInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            networks.snapshot().firstNotNullOfOrNull { network ->
+                connectivityManager.getNetworkCapabilities(network)?.transportInfo as? WifiInfo
+            }
+        } else {
+            // WifiInfo moved to NetworkCapabilities in Android 12.
+            @Suppress("DEPRECATION")
+            service.applicationContext.getSystemService(WifiManager::class.java)?.connectionInfo
+        } ?: return null
         val ssid = wifiInfo.ssid
             .orEmpty()
             .removeSurrounding("\"")
@@ -374,7 +383,7 @@ internal class AndroidLibboxPlatformInterface(
 
     private fun NetworkInterface.toFlags(): Int {
         var value = 0
-        if (isUp) value = value or OsConstants.IFF_UP or OsConstants.IFF_RUNNING
+        if (isUp) value = 0 or OsConstants.IFF_UP or OsConstants.IFF_RUNNING
         if (isLoopback) value = value or OsConstants.IFF_LOOPBACK
         if (isPointToPoint) value = value or OsConstants.IFF_POINTOPOINT
         if (supportsMulticast()) value = value or OsConstants.IFF_MULTICAST
@@ -421,10 +430,24 @@ private class LibboxNetworkInterfaceIterator(
     override fun next(): LibboxNetworkInterface = values.next()
 }
 
-@Suppress("DEPRECATION")
 private class AndroidLocalDnsTransport(
-    private val connectivityManager: ConnectivityManager,
+    private val applicationContext: Context,
 ) : LocalDNSTransport {
+    private val connectivityManager = applicationContext.getSystemService(ConnectivityManager::class.java)
+    private var resolver: DnsResolver? = null
+
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
+    @Synchronized
+    private fun dnsResolver(): DnsResolver = resolver ?: run {
+        if (Build.VERSION.SDK_INT >= 37) {
+            DnsResolver(applicationContext, null)
+        } else {
+            // The context-based constructor is available from Android 17.
+            @Suppress("DEPRECATION")
+            DnsResolver.getInstance()
+        }
+    }.also { resolver = it }
+
     override fun raw(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 
     override fun exchange(context: ExchangeContext, message: ByteArray) {
@@ -441,7 +464,7 @@ private class AndroidLocalDnsTransport(
         suspendCancellableCoroutine { continuation ->
             val cancellation = CancellationSignal()
             context.onCancel(cancellation::cancel)
-            DnsResolver.getInstance().rawQuery(
+            dnsResolver().rawQuery(
                 network,
                 message,
                 DnsResolver.FLAG_NO_RETRY,
@@ -524,7 +547,7 @@ private class AndroidLocalDnsTransport(
                 else -> null
             }
             if (queryType == null) {
-                DnsResolver.getInstance().query(
+                dnsResolver().query(
                     defaultNetwork,
                     domain,
                     DnsResolver.FLAG_NO_RETRY,
@@ -533,7 +556,7 @@ private class AndroidLocalDnsTransport(
                     callback,
                 )
             } else {
-                DnsResolver.getInstance().query(
+                dnsResolver().query(
                     defaultNetwork,
                     domain,
                     queryType,
