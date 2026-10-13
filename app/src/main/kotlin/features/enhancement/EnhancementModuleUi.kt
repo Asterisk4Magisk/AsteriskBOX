@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,7 +45,7 @@ internal fun EnhancementModulePreference() {
     val coordinator = services.enhancementModuleCoordinator
     val moduleState by coordinator.state.collectAsState()
     val message = enhancementModuleMessages()
-    var choiceId by remember { mutableStateOf(0L) }
+    var choiceId by remember { mutableLongStateOf(0L) }
     var pendingInstall by remember { mutableStateOf<EnhancementModuleInstallRequest?>(null) }
     LaunchedEffect(appState.runMode) {
         pendingInstall = null
