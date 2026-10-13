@@ -317,16 +317,16 @@
     <string name="outbound_group_name_duplicate">%1$s(%2$d)</string>
     <string name="outbound_group_name_placeholder">Leave blank to auto-assign on first sync</string>
     <string name="outbound_group_required">Select a group</string>
-    <string name="outbound_group_status_checked">%1$s · Checked %2$s</string>
+    <string name="outbound_group_status_checked_at">Checked %1$s</string>
     <string name="outbound_group_status_failed">Failed</string>
     <string name="outbound_group_status_import_counts">Imported %1$d, skipped %2$d, duplicate %3$d</string>
-    <string name="outbound_group_status_labeled_updated">%1$s · Updated %2$s</string>
     <string name="outbound_group_status_not_modified">Not modified</string>
     <string name="outbound_group_status_partial">Partial</string>
     <string name="outbound_group_status_updated">Updated %1$s</string>
     <string name="outbound_group_strict_import">Strict import</string>
     <string name="outbound_group_strict_import_summary">Keep existing proxy servers if any subscription entry is invalid</string>
     <string name="outbound_group_subscription_expire">Expires %1$s</string>
+    <string name="outbound_group_subscription_info">Subscription information</string>
     <string name="outbound_group_subscription_traffic">Used %1$s / Total %2$s</string>
     <string name="outbound_group_sync_all">Update all group subscriptions</string>
     <string name="outbound_group_sync_all_cancelled">Update cancelled: updated %1$d; failed %2$d; skipped %3$d</string>
@@ -342,6 +342,7 @@
     <string name="outbound_group_sync_stage_parsing">Parsing outbounds</string>
     <string name="outbound_group_sync_stage_validating">Validating configuration</string>
     <string name="outbound_group_sync_stage_verifying">Verifying subscription</string>
+    <string name="outbound_group_update_details">Update details</string>
     <string name="outbound_group_update_interval">Update interval (hours, optional)</string>
     <string name="outbound_group_update_interval_value">Every %1$s h</string>
     <string name="outbound_group_update_via_proxy">Update through the running proxy</string>

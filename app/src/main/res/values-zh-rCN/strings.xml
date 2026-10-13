@@ -314,16 +314,16 @@
     <string name="outbound_group_name_duplicate">%1$s(%2$d)</string>
     <string name="outbound_group_name_placeholder">留空则首次同步后自动命名</string>
     <string name="outbound_group_required">请选择分组</string>
-    <string name="outbound_group_status_checked">%1$s · 检查于 %2$s</string>
+    <string name="outbound_group_status_checked_at">检查于 %1$s</string>
     <string name="outbound_group_status_failed">失败</string>
     <string name="outbound_group_status_import_counts">导入 %1$d，跳过 %2$d，重复 %3$d</string>
-    <string name="outbound_group_status_labeled_updated">%1$s · 更新于 %2$s</string>
     <string name="outbound_group_status_not_modified">未修改</string>
     <string name="outbound_group_status_partial">部分成功</string>
     <string name="outbound_group_status_updated">更新于 %1$s</string>
     <string name="outbound_group_strict_import">严格导入</string>
     <string name="outbound_group_strict_import_summary">订阅中任一条目无效时保留现有节点</string>
     <string name="outbound_group_subscription_expire">过期 %1$s</string>
+    <string name="outbound_group_subscription_info">订阅信息</string>
     <string name="outbound_group_subscription_traffic">已用 %1$s / 总量 %2$s</string>
     <string name="outbound_group_sync_all">更新全部分组订阅</string>
     <string name="outbound_group_sync_all_cancelled">已取消更新：成功 %1$d 个；失败 %2$d 个；跳过 %3$d 个</string>
@@ -339,6 +339,7 @@
     <string name="outbound_group_sync_stage_parsing">正在解析出站</string>
     <string name="outbound_group_sync_stage_validating">正在校验配置</string>
     <string name="outbound_group_sync_stage_verifying">正在验证订阅</string>
+    <string name="outbound_group_update_details">更新详情</string>
     <string name="outbound_group_update_interval">更新间隔（小时，可选）</string>
     <string name="outbound_group_update_interval_value">每 %1$s 小时</string>
     <string name="outbound_group_update_via_proxy">通过当前运行的代理更新</string>

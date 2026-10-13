@@ -3,11 +3,20 @@
 
 package features.outbound
 
+import androidx.compose.ui.window.PopupProperties
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.Box
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -50,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -875,7 +885,7 @@ internal fun OutboundGroupEmptyState(onAdd: () -> Unit) {
 }
 
 @Composable
-private fun OutboundGroupCard(
+internal fun OutboundGroupCard(
     group: OutboundGroupState,
     outboundCount: Int,
     syncing: Boolean,
@@ -906,12 +916,16 @@ private fun OutboundGroupCard(
         animationSpec = AsteriskMotion.fastEffects(),
         label = "outbound-group-card-shadow",
     )
+    var showUpdateInfo by remember(group.id) { mutableStateOf(false) }
+    var infoAnchorPosition by remember(group.id) { mutableStateOf<Offset?>(null) }
+    LaunchedEffect(syncing, isDragging, enabledChangeBusy, group) {
+        showUpdateInfo = false
+    }
     Card(
-        onClick = onEdit,
+        onClick = { showUpdateInfo = false; onEdit() },
         enabled = !enabledChangeBusy,
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 128.dp)
             .zIndex(if (isDragging) 1f else 0f)
             .graphicsLayer {
                 scaleX = scale
@@ -926,141 +940,144 @@ private fun OutboundGroupCard(
         shape = AsteriskShapeTokens.ListCard,
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
-        Column(Modifier.fillMaxWidth()) {
+        val status = group.subscriptionStatusPresentation()
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 16.dp, bottom = 10.dp),
+                modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.Folder,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(30.dp),
-                )
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = group.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = group.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            text = pluralStringResource(R.plurals.outbound_count, outboundCount, outboundCount),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.weight(1f, fill = false),
                         )
-                    }
-                    Text(
-                        text = group.url.ifBlank { stringResource(R.string.outbound_group_local) },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    val details = buildList {
-                        add(pluralStringResource(R.plurals.outbound_count, outboundCount, outboundCount))
-                        group.updateInterval.takeIf(String::isNotBlank)?.let {
-                            add(stringResource(R.string.outbound_group_update_interval_value, it))
-                        }
-                    }
-                    Text(
-                        text = details.joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (group.url.isNotBlank()) {
-                        val status = group.subscriptionStatusPresentation()
-                        val statusColor = when (status.status) {
-                            OutboundGroupUpdateStatus.FAILED ->
-                                MaterialTheme.colorScheme.error
-                            OutboundGroupUpdateStatus.PARTIAL ->
-                                MaterialTheme.colorScheme.tertiary
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                        status.line?.let { line ->
-                            val formattedTime = line.timestampMillis.toReadableDateTimeOrDash()
-                            val statusHeaderText = when (line.kind) {
-                                OutboundGroupStatusLineKind.UPDATED -> stringResource(
-                                    R.string.outbound_group_status_updated,
-                                    formattedTime,
-                                )
-                                OutboundGroupStatusLineKind.PARTIALLY_UPDATED -> stringResource(
-                                    R.string.outbound_group_status_labeled_updated,
-                                    stringResource(R.string.outbound_group_status_partial),
-                                    formattedTime,
-                                )
-                                OutboundGroupStatusLineKind.NOT_MODIFIED -> stringResource(
-                                    R.string.outbound_group_status_checked,
-                                    stringResource(R.string.outbound_group_status_not_modified),
-                                    formattedTime,
-                                )
-                                OutboundGroupStatusLineKind.FAILED -> stringResource(
-                                    R.string.outbound_group_status_checked,
-                                    stringResource(R.string.outbound_group_status_failed),
-                                    formattedTime,
-                                )
+                        if ((group.url.isNotBlank() && status.status != OutboundGroupUpdateStatus.NEVER) ||
+                            group.subscriptionInfo.expireAtSeconds > 0L) {
+                            val statusColor = when (status.status) {
+                                OutboundGroupUpdateStatus.FAILED -> MaterialTheme.colorScheme.error
+                                OutboundGroupUpdateStatus.PARTIAL -> MaterialTheme.colorScheme.tertiary
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
-                            val importCountsText = when (line.kind) {
-                                OutboundGroupStatusLineKind.UPDATED,
-                                OutboundGroupStatusLineKind.PARTIALLY_UPDATED,
-                                -> stringResource(
-                                    R.string.outbound_group_status_import_counts,
-                                    line.importedCount,
-                                    line.skippedCount,
-                                    line.duplicateCount,
-                                )
-                                OutboundGroupStatusLineKind.NOT_MODIFIED,
-                                OutboundGroupStatusLineKind.FAILED,
-                                -> null
+                            val statusLabel = stringResource(when (status.status) {
+                                OutboundGroupUpdateStatus.FAILED -> R.string.outbound_group_status_failed
+                                OutboundGroupUpdateStatus.PARTIAL -> R.string.outbound_group_status_partial
+                                OutboundGroupUpdateStatus.NOT_MODIFIED -> R.string.outbound_group_status_not_modified
+                                OutboundGroupUpdateStatus.NEVER -> R.string.outbound_group_subscription_info
+                                else -> R.string.outbound_group_update_details
+                            })
+                            val infoIconSize = with(LocalDensity.current) {
+                                MaterialTheme.typography.bodySmall.fontSize.toDp()
                             }
-                            Text(
-                                text = statusHeaderText,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = statusColor,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            importCountsText?.let {
-                                Text(
-                                    text = it,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = statusColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
+                            Box(
+                                modifier = Modifier.onGloballyPositioned { coordinates ->
+                                    val position = coordinates.positionInWindow()
+                                    if (infoAnchorPosition != null && infoAnchorPosition != position) {
+                                        showUpdateInfo = false
+                                    }
+                                    infoAnchorPosition = position
+                                },
+                            ) {
+                                IconButton(
+                                    onClick = { showUpdateInfo = !showUpdateInfo },
+                                    modifier = Modifier.size(width = 24.dp, height = 20.dp),
+                                ) {
+                                    Icon(
+                                        Icons.Rounded.Info,
+                                        contentDescription = statusLabel,
+                                        tint = statusColor,
+                                        modifier = Modifier.size(infoIconSize),
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = showUpdateInfo,
+                                    onDismissRequest = { showUpdateInfo = false },
+                                    properties = PopupProperties(focusable = false),
+                                    modifier = Modifier.widthIn(max = 320.dp).heightIn(max = 360.dp),
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Text(statusLabel, style = MaterialTheme.typography.titleSmall, color = statusColor)
+                                        status.line?.let { line ->
+                                            Text(
+                                                stringResource(
+                                                    if (line.kind == OutboundGroupStatusLineKind.UPDATED ||
+                                                        line.kind == OutboundGroupStatusLineKind.PARTIALLY_UPDATED)
+                                                        R.string.outbound_group_status_updated
+                                                    else R.string.outbound_group_status_checked_at,
+                                                    line.timestampMillis.toReadableDateTimeOrDash(),
+                                                ),
+                                                style = MaterialTheme.typography.bodySmall,
+                                            )
+                                            if ((line.kind == OutboundGroupStatusLineKind.FAILED ||
+                                                    line.kind == OutboundGroupStatusLineKind.NOT_MODIFIED) &&
+                                                group.lastUpdatedAtMillis > 0L) {
+                                                Text(
+                                                    stringResource(R.string.outbound_group_status_updated,
+                                                        group.lastUpdatedAtMillis.toReadableDateTimeOrDash()),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                )
+                                            }
+                                            if (line.kind == OutboundGroupStatusLineKind.UPDATED ||
+                                                line.kind == OutboundGroupStatusLineKind.PARTIALLY_UPDATED) {
+                                                Text(
+                                                    stringResource(R.string.outbound_group_status_import_counts,
+                                                        line.importedCount, line.skippedCount, line.duplicateCount),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                )
+                                            }
+                                        }
+                                        if (group.updateInterval.isNotBlank()) Text(
+                                            stringResource(R.string.outbound_group_update_interval_value, group.updateInterval),
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                        if (group.subscriptionInfo.expireAtSeconds > 0L) Text(
+                                            text = stringResource(
+                                                R.string.outbound_group_subscription_expire,
+                                                (group.subscriptionInfo.expireAtSeconds * 1000L).toReadableDateOrDash(),
+                                            ),
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                        if (status.summary.isNotBlank()) Text(
+                                            status.summary, style = MaterialTheme.typography.bodySmall, color = statusColor,
+                                        )
+                                    }
+                                }
                             }
                         }
-                        if (status.summary.isNotBlank()) {
-                            Text(
-                                text = status.summary,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = statusColor,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+                        if (group.url.isBlank()) Text(
+                            text = " · " + stringResource(R.string.outbound_group_local),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                    OutboundGroupSubscriptionInfo(info = group.subscriptionInfo)
                 }
                 Switch(
                     checked = group.enabled,
-                    onCheckedChange = onEnabledChange,
+                    onCheckedChange = { showUpdateInfo = false; onEnabledChange(it) },
                     enabled = !enabledChangeBusy,
-                    modifier = Modifier.padding(start = 8.dp),
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+            OutboundGroupSubscriptionInfo(info = group.subscriptionInfo)
+            FlowRow(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 horizontalArrangement = Arrangement.End,
             ) {
                 if (group.url.isNotBlank()) {
-                    TextButton(onClick = onSync, enabled = !syncing) {
+                    TextButton(onClick = { showUpdateInfo = false; onSync() }, enabled = !syncing) {
                         if (syncing) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                            )
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                         } else {
                             Icon(Icons.Rounded.Refresh, contentDescription = null)
                         }
@@ -1068,12 +1085,12 @@ private fun OutboundGroupCard(
                         Text(stringResource(R.string.common_update))
                     }
                 }
-                TextButton(onClick = onEdit, enabled = !enabledChangeBusy) {
+                TextButton(onClick = { showUpdateInfo = false; onEdit() }, enabled = !enabledChangeBusy) {
                     Icon(Icons.Rounded.Edit, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.common_edit))
                 }
-                TextButton(onClick = onDelete, enabled = !enabledChangeBusy) {
+                TextButton(onClick = { showUpdateInfo = false; onDelete() }, enabled = !enabledChangeBusy) {
                     Icon(Icons.Rounded.Delete, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.common_delete))
@@ -1494,60 +1511,31 @@ private fun OutboundGroupState.clearingSubscriptionMetadataChangedFrom(
 
 private val GroupEditorSectionSpacing = 12.dp
 
-/**
- * Subscription traffic summary for [OutboundGroupCard], rendered below the update
- * status row.
- *
- * Two optional rows, each on its own line:
- * - the quota: progress bar plus "Used X / Total Y", drawn only when the server
- *   reported a positive total (`hasMeteredQuota`);
- * - the expiry date, drawn only when the server reported one.
- *
- * Renders nothing when the server reported neither, so a group without
- * subscription information keeps its previous card height.
- */
+/** Metered traffic stays on the card; expiry and update details live in the info popup. */
 @Composable
 private fun OutboundGroupSubscriptionInfo(
     info: SubscriptionInfo,
     modifier: Modifier = Modifier,
 ) {
-    if (!info.hasTraffic) return
+    if (!info.hasMeteredQuota) return
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp, end = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier.fillMaxWidth().padding(top = 8.dp, end = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        if (info.hasMeteredQuota) {
-            LinearProgressIndicator(
-                progress = { info.usageProgress },
-                modifier = Modifier.fillMaxWidth().height(6.dp),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.primaryContainer,
-            )
-            Text(
-                text = stringResource(
-                    R.string.outbound_group_subscription_traffic,
-                    info.usedBytes.toReadableBytes(maxUnit = utils.ReadableByteUnit.GiB),
-                    info.totalBytes.toReadableBytes(maxUnit = utils.ReadableByteUnit.GiB),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (info.expireAtSeconds > 0L) {
-            Text(
-                text = stringResource(
-                    R.string.outbound_group_subscription_expire,
-                    (info.expireAtSeconds * 1000L).toReadableDateOrDash(),
-                ),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        LinearProgressIndicator(
+            progress = { info.usageProgress },
+            modifier = Modifier.fillMaxWidth().height(6.dp),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.primaryContainer,
+        )
+        Text(
+            text = stringResource(
+                R.string.outbound_group_subscription_traffic,
+                info.usedBytes.toReadableBytes(maxUnit = utils.ReadableByteUnit.GiB),
+                info.totalBytes.toReadableBytes(maxUnit = utils.ReadableByteUnit.GiB),
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
