@@ -48,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -84,6 +85,7 @@ import app.selectableManagedOutbounds
 import engine.network.isCidrAddress
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
+import engine.singbox.config.withoutInactiveFields
 import features.logs.FailureLogContext
 import features.logs.reportFailure
 import features.resources.runtime.singBoxRuleSetFiles
@@ -650,8 +652,13 @@ internal fun RouteRuleEditorScaffold(
     onEditChild: (SingBoxRouteRuleState, SingBoxRouteRuleState) -> Unit,
     nested: Boolean = false,
 ) {
-    var draft by remember(rule.id) { mutableStateOf<SingBoxRouteRuleState?>(rule) }
-    val pendingDnsMatchers = remember(rule.id) { mutableStateMapOf<String, Boolean>() }
+    var draft by remember(rule.id) {
+        mutableStateOf<SingBoxRouteRuleState?>(rule.withoutInactiveFields())
+    }
+    var typeGeneration by remember(rule.id) { mutableIntStateOf(0) }
+    val activePendingDnsMatchers = remember(rule.id, draft?.type, typeGeneration) {
+        mutableStateMapOf<String, Boolean>()
+    }
     val appState by LocalAppStateStore.current.collectAppState()
     val preferredByChoices = selectablePreferredByRouteEndpoints(appState).map { it.tag to it.remarks }
     val invalidMatcherMessage = stringResource(R.string.settings_dns_rule_value_invalid)
@@ -659,7 +666,7 @@ internal fun RouteRuleEditorScaffold(
         .mapTo(mutableSetOf()) { it.tag }
     var pendingChildDelete by remember { mutableStateOf<SingBoxRouteRuleState?>(null) }
     LaunchedEffect(rule) {
-        draft = rule
+        draft = rule.withoutInactiveFields()
         pendingChildDelete = null
     }
     val fieldEffectsMotion = AsteriskMotion.effects<Float>()
@@ -688,13 +695,13 @@ internal fun RouteRuleEditorScaffold(
         saveEnabled = draft != null &&
             draft?.hasValidDnsConfigurationMatchers(configurationTags) == true &&
             draft?.hasValidAdditionalRouteMatchers(preferredByChoices.map { it.first }.toSet()) == true &&
-            (draft?.type == SingBoxRouteRuleTypeLogical || pendingDnsMatchers.values.none { it }),
+            (draft?.type == SingBoxRouteRuleTypeLogical || activePendingDnsMatchers.values.none { it }),
         onBack = onDismiss,
         onSave = { draft?.let(onSave) },
     ) { contentPadding ->
         draft?.let { current ->
             AnimatedContent(
-                targetState = current.type,
+                targetState = current.type to typeGeneration,
                 modifier = Modifier.fillMaxWidth(),
                 transitionSpec = AsteriskMotion.fadeThrough(
                     effectsSpec = fieldEffectsMotion,
@@ -702,7 +709,14 @@ internal fun RouteRuleEditorScaffold(
                 ),
                 contentAlignment = Alignment.TopStart,
                 label = "routing-rule-type-fields",
-            ) { visibleType ->
+            ) { (visibleType, visibleGeneration) ->
+                val pendingDnsMatchers =
+                    if (visibleType == current.type && visibleGeneration == typeGeneration) {
+                        activePendingDnsMatchers
+                    } else {
+                        // Keep outgoing animation callbacks separate from active save validation.
+                        remember(visibleType, visibleGeneration) { mutableStateMapOf() }
+                    }
                 SectionedLazyColumn(
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = contentPadding,
@@ -746,7 +760,11 @@ internal fun RouteRuleEditorScaffold(
                             ),
                         ),
                         selectedValue = current.type,
-                        onSelected = { value -> draft = current.copy(type = value) },
+                        onSelected = { value ->
+                            // A rapid round trip must not reuse an outgoing editor's pending input.
+                            if (value != current.type) typeGeneration += 1
+                            draft = current.copy(type = value).withoutInactiveFields()
+                        },
                     )
                 }
                 if (!nested) {
@@ -771,7 +789,9 @@ internal fun RouteRuleEditorScaffold(
                                 ),
                             ),
                             selectedValue = current.action,
-                            onSelected = { value -> draft = current.copy(action = value) },
+                            onSelected = { value ->
+                                draft = current.copy(action = value).withoutInactiveFields()
+                            },
                         )
                     }
                     item(key = "action-fields") {

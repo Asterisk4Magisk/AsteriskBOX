@@ -15,6 +15,7 @@ import app.SingBoxRouteRuleTypeDefault
 import app.SingBoxRouteRuleTypeLogical
 import app.nextAvailableRouteRuleId
 import engine.singbox.config.APP_GLOBAL_SELECTOR
+import engine.singbox.config.withoutInactiveFields
 
 internal fun AppState.withSavedRouteRule(
     rule: SingBoxRouteRuleState,
@@ -111,7 +112,7 @@ internal fun SingBoxRouteRuleState.sanitized(): SingBoxRouteRuleState {
         outbound = outbound.trim().ifBlank { APP_GLOBAL_SELECTOR },
         rejectMethod = sanitizedRejectMethod,
         rejectNoDrop = rejectNoDrop && sanitizedRejectMethod != "drop",
-    )
+    ).withoutInactiveFields()
 }
 
 private fun List<String>.normalized(): List<String> =

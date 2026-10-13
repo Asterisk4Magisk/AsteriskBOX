@@ -157,9 +157,8 @@ private fun SingBoxDnsRuleState.hasValidDnsResponseIpMatchers(): Boolean {
             else -> false
         }
     }
-    if (!hasResponseIpMatcher) return true
     // Address filters without match_response use the deprecated legacy DNS path.
-    return matches.any { match ->
+    return !hasResponseIpMatcher || matches.any { match ->
         match.field == "match_response" && match.values.singleOrNull()?.let { value ->
             value.isNotBlank() && (match.encodeAsString || value != "false")
         } == true
@@ -237,7 +236,7 @@ internal fun SingBoxDnsRuleState.sanitized(): SingBoxDnsRuleState {
         answer = answer.toTrimmedNonEmptyDistinctList(),
         ns = ns.toTrimmedNonEmptyDistinctList(),
         extra = extra.toTrimmedNonEmptyDistinctList(),
-    )
+    ).withoutInactiveFields()
 }
 
 internal fun SingBoxDnsRuleMatchState.sanitized(): SingBoxDnsRuleMatchState =

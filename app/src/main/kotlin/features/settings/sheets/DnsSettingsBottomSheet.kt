@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -71,6 +72,7 @@ import engine.singbox.DefaultSingBoxDnsTimeout
 import engine.singbox.config.hasValidDnsRuleStructure
 import engine.singbox.config.DnsRuleBooleanMatchers
 import engine.singbox.config.sanitized
+import engine.singbox.config.withoutInactiveFields
 import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.isSingBoxDnsRCode
 import engine.singbox.isSingBoxUnsigned32
@@ -279,8 +281,8 @@ internal fun DnsSettingsBottomSheet(
                             onDraftChange(
                                 draft.copy(
                                     dnsOptimisticCache = enabled,
-                                    dnsDisableCache = if (enabled) false else draft.dnsDisableCache,
-                                    dnsDisableExpire = if (enabled) false else draft.dnsDisableExpire,
+                                    dnsDisableCache = !enabled && draft.dnsDisableCache,
+                                    dnsDisableExpire = !enabled && draft.dnsDisableExpire,
                                 ),
                             )
                         },
@@ -909,12 +911,14 @@ internal fun DnsRuleEditorScaffold(
     onEditChild: (SingBoxDnsRuleState, SingBoxDnsRuleState) -> Unit,
     nested: Boolean = false,
 ) {
-    val rule = editor.rule
+    val rule = editor.rule.withoutInactiveFields()
     val appState by LocalAppStateStore.current.collectAppState()
     val configurationTags = appState.dnsServers.filter { it.type in DnsConfigurationServerTypes }
         .mapTo(mutableSetOf()) { it.tag }
     var pendingChildDelete by remember { mutableStateOf<SingBoxDnsRuleState?>(null) }
-    val pendingMatchers = remember(editor.index, rule.id, rule.type) {
+    var typeGeneration by remember(editor.index, rule.id) { mutableIntStateOf(0) }
+    var actionGeneration by remember(editor.index, rule.id) { mutableIntStateOf(0) }
+    val pendingMatchers = remember(editor.index, rule.id, rule.type, typeGeneration) {
         mutableStateMapOf<String, Boolean>()
     }
     val actionLabels = SingBoxDnsRuleActions.map { action -> dnsRuleActionLabel(action) }
@@ -924,19 +928,20 @@ internal fun DnsRuleEditorScaffold(
     val durationMessage = stringResource(R.string.settings_dns_duration_invalid)
     val invalidMatchMessage = stringResource(R.string.settings_dns_rule_value_invalid)
     val routeAction = rule.action == "route" || rule.action == "evaluate"
+    val routeOptionsAction = routeAction || rule.action == "route-options"
     val serverError = if (!nested && routeAction && rule.server !in serverTags) {
         stringResource(R.string.settings_dns_server_required)
     } else {
         null
     }
-    val timeoutError = rule.timeout.takeIf { value -> !nested && value.isNotBlank() }?.let {
+    val timeoutError = rule.timeout.takeIf { value -> !nested && routeOptionsAction && value.isNotBlank() }?.let {
         dnsDurationError(it, durationMessage)
     }
-    val ttlError = rule.rewriteTtl.takeIf { value -> !nested && value.isNotBlank() }?.let { value ->
+    val ttlError = rule.rewriteTtl.takeIf { value -> !nested && routeOptionsAction && value.isNotBlank() }?.let { value ->
         if (isSingBoxUnsigned32(value)) null
         else stringResource(R.string.settings_dns_ttl_invalid)
     }
-    val subnetError = rule.clientSubnet.takeIf { value -> !nested && value.isNotBlank() }?.let { value ->
+    val subnetError = rule.clientSubnet.takeIf { value -> !nested && routeOptionsAction && value.isNotBlank() }?.let { value ->
         if (isIpAddress(value) || isCidrAddress(value)) null
         else stringResource(R.string.settings_dns_cidr_invalid)
     }
@@ -1018,7 +1023,7 @@ internal fun DnsRuleEditorScaffold(
         onSave = { onSave(rule.sanitized()) },
     ) { contentPadding ->
         AnimatedContent(
-            targetState = rule.type,
+            targetState = rule.type to typeGeneration,
             modifier = Modifier.fillMaxWidth(),
             transitionSpec = AsteriskMotion.fadeThrough(
                 effectsSpec = fieldEffectsMotion,
@@ -1026,7 +1031,7 @@ internal fun DnsRuleEditorScaffold(
             ),
             contentAlignment = Alignment.TopStart,
             label = "dns-rule-type-fields",
-        ) { visibleType ->
+        ) { (visibleType, visibleGeneration) ->
             LazyColumn(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = contentPadding,
@@ -1068,7 +1073,10 @@ internal fun DnsRuleEditorScaffold(
                             ),
                         ),
                         selectedValue = rule.type,
-                        onSelected = { value -> onEditorChange(rule.copy(type = value)) },
+                        onSelected = { value ->
+                            if (value != rule.type) typeGeneration += 1
+                            onEditorChange(rule.copy(type = value).withoutInactiveFields())
+                        },
                     )
                 }
                 if (!nested) {
@@ -1079,13 +1087,14 @@ internal fun DnsRuleEditorScaffold(
                             choices = ruleEditorChoices(SingBoxDnsRuleActions, actionLabels),
                             selectedValue = rule.action,
                             onSelected = { action ->
-                                onEditorChange(rule.copy(action = action))
+                                if (action != rule.action) actionGeneration += 1
+                                onEditorChange(rule.copy(action = action).withoutInactiveFields())
                             },
                         )
                     }
                     item(key = "action-fields") {
                         AnimatedContent(
-                            targetState = rule.action,
+                            targetState = rule.action to actionGeneration,
                             modifier = Modifier.fillMaxWidth(),
                             transitionSpec = AsteriskMotion.fadeThrough(
                                 effectsSpec = actionEffectsMotion,
@@ -1093,7 +1102,7 @@ internal fun DnsRuleEditorScaffold(
                             ),
                             contentAlignment = Alignment.TopStart,
                             label = "dns-rule-action-fields",
-                        ) { currentAction ->
+                        ) { (currentAction, _) ->
                             DnsRuleActionFields(
                                 action = currentAction,
                                 rule = rule,
@@ -1231,10 +1240,13 @@ internal fun DnsRuleEditorScaffold(
                                 invalidMessage = invalidMatchMessage,
                                 onRuleChange = onEditorChange,
                                 onPendingChange = { pending ->
-                                    if (pending) {
-                                        pendingMatchers[matcher] = true
-                                    } else {
-                                        pendingMatchers.remove(matcher)
+                                    // Outgoing animated fields must not validate the new editor.
+                                    if (visibleType == rule.type && visibleGeneration == typeGeneration) {
+                                        if (pending) {
+                                            pendingMatchers[matcher] = true
+                                        } else {
+                                            pendingMatchers.remove(matcher)
+                                        }
                                     }
                                 },
                             )
