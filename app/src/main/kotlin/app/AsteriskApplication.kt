@@ -45,6 +45,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import system.AndroidAppIconFetcher
 import engine.singbox.runtime.SingBoxRuntimeRepository
+import engine.proxy.AndroidProxyEngine
+import system.AndroidRootShellGateway
 import engine.vpn.AndroidLibboxRuntime
 
 class AsteriskApplication : Application(), SingletonImageLoader.Factory {
@@ -62,6 +64,14 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
     }
     internal val stateStore: AndroidAppStateStore by lazy {
         AndroidAppStateStore.get(applicationContext)
+    }
+
+    /** Shared by every entry point so proxy and traffic stats operations are serialized. */
+    internal val proxyEngine: AndroidProxyEngine by lazy {
+        AndroidProxyEngine(
+            context = applicationContext,
+            rootAccess = AndroidRootShellGateway(),
+        )
     }
     internal val subscriptionInstallConfig by lazy {
         SubscriptionInstallConfig(

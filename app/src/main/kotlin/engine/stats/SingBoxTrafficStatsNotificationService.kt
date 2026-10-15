@@ -64,6 +64,8 @@ class SingBoxTrafficStatsNotificationService : Service() {
     private val serviceScope = CoroutineScope(serviceJob + Dispatchers.IO)
     private val monitor = TrafficStatsMonitor(serviceScope)
     private var activeRuntime: SingBoxTrafficStatsRuntime? = null
+    private var foregroundStarted = false
+    private var latestStartId = 0
     private val notificationManager by lazy { getSystemService(NotificationManager::class.java) }
     private val contentIntent by lazy {
         packageManager
@@ -86,6 +88,7 @@ class SingBoxTrafficStatsNotificationService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        latestStartId = startId
         if (intent?.action == ActionStop) {
             stopStats()
             stopSelf(startId)
@@ -95,8 +98,19 @@ class SingBoxTrafficStatsNotificationService : Service() {
         // Runtime values are supplied by the owning proxy engine because resolved API
         // options can include dynamic ports that are not safe to reconstruct after a
         // sticky service restart.
-        val runtime = intent?.readRuntime()
+        val runtime = if (intent?.action == ActionStart) {
+            // Every startForegroundService() request must reach startForeground() before the
+            // service may stop, including requests superseded by a later stop request.
+            if (!foregroundStarted && !startForegroundNotification(startId)) {
+                requests.consumeStart()
+                return START_NOT_STICKY
+            }
+            requests.consumeStart()
+        } else {
+            intent?.readRuntime()
+        }
         if (runtime == null) {
+            stopStats()
             stopSelf(startId)
             return START_NOT_STICKY
         }
@@ -105,17 +119,23 @@ class SingBoxTrafficStatsNotificationService : Service() {
         }
 
         activeRuntime = runtime
-        val foregroundStarted = tryStartTrafficStatsService(
-            start = { startForegroundCompat(buildNotification(TrafficStatsSnapshot())) },
+        if (!startForegroundNotification(startId)) return START_NOT_STICKY
+        startMonitor(runtime)
+        return START_NOT_STICKY
+    }
+
+    private fun startForegroundNotification(startId: Int): Boolean {
+        return tryStartTrafficStatsService(
+            start = {
+                startForegroundCompat(buildNotification(TrafficStatsSnapshot()))
+                foregroundStarted = true
+            },
             onFailure = { error ->
                 AndroidAppLogger.warn(LogTag, "Failed to start traffic stats foreground service", error)
                 stopStats()
                 stopSelf(startId)
             },
         )
-        if (!foregroundStarted) return START_NOT_STICKY
-        startMonitor(runtime)
-        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
@@ -148,7 +168,9 @@ class SingBoxTrafficStatsNotificationService : Service() {
                     AndroidAppLogger.warn(LogTag, "Stopping traffic stats notification after repeated stream failures")
                     publish {
                         stopStats()
-                        stopSelf()
+                        // A newer start request keeps the service alive and is still
+                        // required to reach startForeground().
+                        stopSelf(latestStartId)
                     }
                     return@start
                 }
@@ -259,6 +281,7 @@ class SingBoxTrafficStatsNotificationService : Service() {
         monitor.cancel()
         activeRuntime = null
         stopForegroundCompat()
+        foregroundStarted = false
         notificationManager.cancel(NotificationId)
     }
 
@@ -289,6 +312,8 @@ class SingBoxTrafficStatsNotificationService : Service() {
     }
 
     companion object {
+        private val requests = TrafficStatsServiceRequests<SingBoxTrafficStatsRuntime>()
+
         internal fun reconcile(context: Context, runtime: SingBoxTrafficStatsRuntime?) {
             if (runtime == null) {
                 stop(context)
@@ -303,19 +328,23 @@ class SingBoxTrafficStatsNotificationService : Service() {
                 action = ActionStart
                 putRuntime(runtime)
             }
-            tryStartTrafficStatsService(
-                start = { ContextCompat.startForegroundService(appContext, intent) },
-                onFailure = { error ->
-                    AndroidAppLogger.warn(LogTag, "Failed to request traffic stats foreground service start", error)
-                },
-            )
+            requests.start(runtime) {
+                tryStartTrafficStatsService(
+                    start = { ContextCompat.startForegroundService(appContext, intent) },
+                    onFailure = { error ->
+                        AndroidAppLogger.warn(LogTag, "Failed to request traffic stats foreground service start", error)
+                    },
+                )
+            }
         }
 
         internal fun stop(context: Context) {
             val appContext = context.applicationContext
-            appContext.stopService(Intent(appContext, SingBoxTrafficStatsNotificationService::class.java).apply {
-                action = ActionStop
-            })
+            requests.stop {
+                appContext.stopService(Intent(appContext, SingBoxTrafficStatsNotificationService::class.java).apply {
+                    action = ActionStop
+                })
+            }
             appContext.getSystemService(NotificationManager::class.java).cancel(NotificationId)
         }
     }

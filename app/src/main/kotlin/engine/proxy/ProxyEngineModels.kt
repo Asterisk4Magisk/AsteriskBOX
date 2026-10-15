@@ -3,9 +3,16 @@
 
 package engine.proxy
 
+import android.content.Intent
 import app.AppState
 import engine.root.runtime.model.RootRuntimeOwner
 import engine.root.runtime.model.RootRuntimeSnapshot
+
+/** Asks the user for VPN consent; returns whether it was granted. */
+typealias VpnPermissionRequester = suspend (Intent) -> Boolean
+
+/** Used by entry points that cannot show the system VPN consent dialog. */
+val DenyVpnPermission: VpnPermissionRequester = { false }
 
 internal data class ProxyEngineStartRequest(
     val appState: AppState,
