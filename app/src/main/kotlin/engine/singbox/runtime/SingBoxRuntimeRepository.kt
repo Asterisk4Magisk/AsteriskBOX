@@ -478,8 +478,9 @@ internal class SingBoxRuntimeRepository(
             }
             try {
                 delay(DelayTestTimestampBoundaryWaitMillis.milliseconds)
-                val submissions = submitSingBoxDelayCommands(
+                val submissions = submitSingBoxDelayCommandsAsync(
                     commandGroupNames = plan.commandGroupNames,
+                    concurrency = appState.connectionTestConcurrent,
                     submit = { groupName ->
                         synchronized(sessionLock) {
                             check(generation == runGeneration && session === active) {
@@ -503,7 +504,9 @@ internal class SingBoxRuntimeRepository(
                     baselineTimes = baselineTimes,
                     knownFailures = knownFailures,
                     idleTimeoutMillis = DelayTestNoProgressTimeoutMillis,
-                    hardTimeoutMillis = plan.deadlineMillis(),
+                    hardTimeoutMillis = plan.deadlineMillis(
+                        appState.connectionTestTimeoutMillis,
+                    ),
                 )
                 val result = plan.finish(
                     delays = completed.freshDelays,

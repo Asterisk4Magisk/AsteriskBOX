@@ -626,6 +626,7 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
                         retained += buildUrlTestOutbound(
                             selector = selector,
                             members = members,
+                            appState = appState,
                         )
                     }
                 }
@@ -688,13 +689,21 @@ private fun buildSelectorOutbound(
 private fun buildUrlTestOutbound(
     selector: app.SingBoxSelectorState,
     members: List<String>,
+    appState: app.AppState,
 ): JsonObject = buildJsonObject {
     put("type", SingBoxSelectorTypeUrlTest)
     put("tag", selector.tag)
     putJsonArray("outbounds") {
         members.forEach(::add)
     }
-    put("url", selector.url.trim())
+    // URL priority: per-group URL wins when non-blank, else the global
+    // `connectionTestUrl` preference (mirrors husi behavior where the
+    // global `connectionTestURL` is used for all URL tests, but keeps
+    // existing per-group customizations intact).
+    val effectiveUrl = selector.url.trim()
+        .takeIf(String::isNotEmpty)
+        ?: appState.connectionTestUrl.trim()
+    put("url", effectiveUrl)
     put("interval", selector.interval.trim())
     put("tolerance", selector.tolerance)
     put("idle_timeout", selector.idleTimeout.trim())

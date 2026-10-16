@@ -4,12 +4,16 @@
 package engine.singbox.runtime
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
@@ -158,16 +162,30 @@ internal fun SingBoxDelayTestPlan.freshnessBaselines(
     )
 }
 
-internal fun submitSingBoxDelayCommands(
+internal suspend fun submitSingBoxDelayCommandsAsync(
     commandGroupNames: List<String>,
-    submit: (String) -> Unit,
+    concurrency: Int,
+    submit: suspend (String) -> Unit,
 ): SingBoxDelayCommandSubmissions {
+    val distinctNames = commandGroupNames.distinct()
+    if (distinctNames.isEmpty()) {
+        return SingBoxDelayCommandSubmissions(
+            successfulGroupNames = emptySet(),
+            failedGroupNames = emptySet(),
+        )
+    }
+    val semaphore = Semaphore(concurrency.coerceAtLeast(1))
     val successfulGroupNames = linkedSetOf<String>()
     val failedGroupNames = linkedSetOf<String>()
-    commandGroupNames.distinct().forEach { groupName ->
-        runCatching { submit(groupName) }
-            .onSuccess { successfulGroupNames += groupName }
-            .onFailure { failedGroupNames += groupName }
+    coroutineScope {
+        distinctNames.forEach { groupName ->
+            launch {
+                runCatching {
+                    semaphore.withPermit { submit(groupName) }
+                }.onSuccess { successfulGroupNames += groupName }
+                    .onFailure { failedGroupNames += groupName }
+            }
+        }
     }
     return SingBoxDelayCommandSubmissions(
         successfulGroupNames = successfulGroupNames,
@@ -189,10 +207,19 @@ internal fun SingBoxDelayTestPlan.knownSubmissionFailures(
         .minus(successfulCoverage)
 }
 
-internal fun SingBoxDelayTestPlan.deadlineMillis(): Long {
+internal fun SingBoxDelayTestPlan.deadlineMillis(
+    connectionTestTimeoutMillis: Int,
+): Long {
+    val perOutbound: Long = connectionTestTimeoutMillis.coerceAtLeast(1_000).toLong()
+    // Old behaviour was: per-batch timeout × batches + grace. We keep
+    // that as a floor so tiny test plans don't return instantly, but
+    // scale the hard cap with the configured per-outbound timeout.
     val batches = (maxDirectTargetCount.coerceAtLeast(1) + SingBoxDelayBatchSize - 1) /
         SingBoxDelayBatchSize
-    return batches * SingBoxDelayBatchTimeoutMillis + SingBoxDelayDeadlineGraceMillis
+    val batchBased = batches * SingBoxDelayBatchTimeoutMillis + SingBoxDelayDeadlineGraceMillis
+    val perTargetBased = maxDirectTargetCount.coerceAtLeast(1) * perOutbound +
+        SingBoxDelayDeadlineGraceMillis
+    return maxOf(batchBased, perTargetBased)
 }
 
 internal fun SingBoxDelayTestPlan.freshDelays(
