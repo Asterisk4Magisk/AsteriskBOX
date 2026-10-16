@@ -608,6 +608,39 @@ private fun SettingsContent(
                     onOpenNetworkQualityTest = { sheetState.openNetworkQualityTest() },
                 )
             }
+            item(key = "settings_connection_test") {
+                SettingsConnectionTestSection(
+                    connectionTestUrl = appState.connectionTestUrl,
+                    connectionTestConcurrent = appState.connectionTestConcurrent,
+                    connectionTestTimeoutMillis = appState.connectionTestTimeoutMillis,
+                    connectionTestUnifiedDelay = appState.connectionTestUnifiedDelay,
+                    connectionTestIgnoreHandshakeTime = appState.connectionTestIgnoreHandshakeTime,
+                    onConnectionTestUrlChange = { url ->
+                        updateAppState { state -> state.copy(connectionTestUrl = url) }
+                    },
+                    onConnectionTestConcurrentChange = { value ->
+                        updateAppState { state ->
+                            state.copy(connectionTestConcurrent = value)
+                        }
+                    },
+                    onConnectionTestTimeoutChange = { value ->
+                        updateAppState { state ->
+                            state.copy(connectionTestTimeoutMillis = value)
+                        }
+                    },
+                    onConnectionTestUnifiedDelayChange = { enabled ->
+                        updateAppState { state ->
+                            state.copy(connectionTestUnifiedDelay = enabled)
+                        }
+                    },
+                    onConnectionTestIgnoreHandshakeTimeChange = { enabled ->
+                        updateAppState { state ->
+                            state.copy(connectionTestIgnoreHandshakeTime = enabled)
+                        }
+                    },
+                    urlTestOptionsAvailable = false,
+                )
+            }
             item(key = "settings_backup_restore") {
                 SettingsBackupRestoreSection(
                     progressText = backupRestoreProgressText,

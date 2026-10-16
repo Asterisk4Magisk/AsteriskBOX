@@ -19,8 +19,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,12 +31,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
 import engine.singbox.DefaultSingBoxLogLevel
 import engine.singbox.EbpfLocalDataPlanes
 import engine.singbox.EbpfDnsModes
 import app.R
+import app.ConnectionTestConcurrentBounds
+import app.ConnectionTestTimeoutBounds
 import system.AndroidLauncherIcon
 import ui.components.IconAccent
 import ui.components.WarningConfirmDialog
@@ -146,6 +152,188 @@ private fun HideLauncherIconPreference(
             onHideLauncherIconChange(true)
         },
     )
+}
+
+@Composable
+internal fun SettingsConnectionTestSection(
+    connectionTestUrl: String,
+    connectionTestConcurrent: Int,
+    connectionTestTimeoutMillis: Int,
+    connectionTestUnifiedDelay: Boolean,
+    connectionTestIgnoreHandshakeTime: Boolean,
+    onConnectionTestUrlChange: (String) -> Unit,
+    onConnectionTestConcurrentChange: (Int) -> Unit,
+    onConnectionTestTimeoutChange: (Int) -> Unit,
+    onConnectionTestUnifiedDelayChange: (Boolean) -> Unit,
+    onConnectionTestIgnoreHandshakeTimeChange: (Boolean) -> Unit,
+    urlTestOptionsAvailable: Boolean,
+) {
+    SmallTitle(text = stringResource(R.string.connection_test_settings_title))
+    SettingsSectionCard {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Text(
+                text = stringResource(R.string.connection_test_settings_summary),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+
+        // ---- URL ----
+        var url by remember(connectionTestUrl) { mutableStateOf(connectionTestUrl) }
+        val urlError = if (url.isBlank() ||
+            !(url.startsWith("http://") || url.startsWith("https://"))
+        ) {
+            stringResource(R.string.connection_test_url_invalid)
+        } else {
+            null
+        }
+        OutlinedTextField(
+            value = url,
+            onValueChange = { url = it },
+            label = { Text(stringResource(R.string.connection_test_url)) },
+            singleLine = true,
+            isError = urlError != null,
+            supportingText = {
+                Text(
+                    if (urlError != null) urlError
+                    else stringResource(R.string.connection_test_url_summary, url),
+                )
+            },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Uri,
+                imeAction = ImeAction.Next,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        // Commit on blur; we can't observe focus here cheaply so the host
+        // filters empty strings and only writes when url is non-blank.
+        androidx.compose.runtime.LaunchedEffect(url) {
+            if (urlError == null && url != connectionTestUrl) {
+                onConnectionTestUrlChange(url)
+            }
+        }
+
+        // ---- Concurrent ----
+        val concurrentBounds = ConnectionTestConcurrentBounds
+        val concurrentDisplay = connectionTestConcurrent
+            .coerceIn(concurrentBounds.min, concurrentBounds.max)
+            .toString()
+        var concurrentText by remember(concurrentDisplay) {
+            mutableStateOf(concurrentDisplay)
+        }
+        val concurrentParsed = concurrentText.toIntOrNull()
+        val concurrentError = if (concurrentParsed == null ||
+            concurrentParsed !in concurrentBounds.min..concurrentBounds.max
+        ) {
+            stringResource(R.string.common_error_positive_number)
+        } else {
+            null
+        }
+        OutlinedTextField(
+            value = concurrentText,
+            onValueChange = { raw -> concurrentText = raw.filter(Char::isDigit).take(3) },
+            label = { Text(stringResource(R.string.connection_test_concurrent)) },
+            singleLine = true,
+            isError = concurrentError != null,
+            supportingText = {
+                Text(
+                    if (concurrentError != null) concurrentError
+                    else stringResource(
+                        R.string.connection_test_concurrent_summary,
+                        concurrentParsed ?: concurrentBounds.min,
+                    ),
+                )
+            },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Next,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        androidx.compose.runtime.LaunchedEffect(concurrentText) {
+            val parsed = concurrentParsed
+            if (parsed != null && parsed in concurrentBounds.min..concurrentBounds.max &&
+                parsed != connectionTestConcurrent
+            ) {
+                onConnectionTestConcurrentChange(parsed)
+            }
+        }
+
+        // ---- Timeout ----
+        val timeoutBounds = ConnectionTestTimeoutBounds
+        val timeoutDisplay = connectionTestTimeoutMillis
+            .coerceIn(timeoutBounds.min, timeoutBounds.max)
+            .toString()
+        var timeoutText by remember(timeoutDisplay) { mutableStateOf(timeoutDisplay) }
+        val timeoutParsed = timeoutText.toIntOrNull()
+        val timeoutError = if (timeoutParsed == null ||
+            timeoutParsed !in timeoutBounds.min..timeoutBounds.max
+        ) {
+            stringResource(R.string.common_error_positive_number)
+        } else {
+            null
+        }
+        OutlinedTextField(
+            value = timeoutText,
+            onValueChange = { raw -> timeoutText = raw.filter(Char::isDigit).take(5) },
+            label = { Text(stringResource(R.string.connection_test_timeout)) },
+            singleLine = true,
+            isError = timeoutError != null,
+            supportingText = {
+                Text(
+                    if (timeoutError != null) timeoutError
+                    else stringResource(
+                        R.string.connection_test_timeout_summary,
+                        timeoutParsed ?: timeoutBounds.min,
+                    ),
+                )
+            },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        androidx.compose.runtime.LaunchedEffect(timeoutText) {
+            val parsed = timeoutParsed
+            if (parsed != null && parsed in timeoutBounds.min..timeoutBounds.max &&
+                parsed != connectionTestTimeoutMillis
+            ) {
+                onConnectionTestTimeoutChange(parsed)
+            }
+        }
+
+        // ---- Switches ----
+        SwitchPreference(
+            title = stringResource(R.string.connection_test_unified_delay),
+            summary = stringResource(R.string.connection_test_unified_delay_summary),
+            checked = connectionTestUnifiedDelay,
+            onCheckedChange = onConnectionTestUnifiedDelayChange,
+        )
+        SwitchPreference(
+            title = stringResource(R.string.connection_test_ignore_handshake_time),
+            summary = stringResource(R.string.connection_test_ignore_handshake_time_summary),
+            checked = connectionTestIgnoreHandshakeTime,
+            onCheckedChange = onConnectionTestIgnoreHandshakeTimeChange,
+        )
+
+        if (!urlTestOptionsAvailable) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                Text(
+                    text = stringResource(R.string.connection_test_unavailable_warning),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
 }
 
 @Composable
