@@ -3,7 +3,10 @@
 
 package engine.singbox.runtime
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -11,24 +14,26 @@ import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
 internal data class SingBoxDelayTestPlan(
-    val commandGroupNames: List<String>,
+    // Outbound tags submitted to the daemon, one measurement each — the
+    // delay test walks the tree down to its leaf outbounds, husi style.
+    val leafTargetNames: List<String>,
+    // Every name the UI awaits, including nested groups; a nested group
+    // resolves through its selected leaf's URL test history.
     val targetNames: Set<String>,
-    val directTargetNamesByCommand: Map<String, Set<String>>,
-    val maxDirectTargetCount: Int,
     val baselineTimes: Map<String, Long>,
 )
 
 internal data class SingBoxDelayCommandSubmissions(
-    val successfulGroupNames: Set<String>,
-    val failedGroupNames: Set<String>,
+    val successfulNames: Set<String>,
+    val failedNames: Set<String>,
 )
 
 internal enum class SingBoxDelayAwaitCompletion {
@@ -91,7 +96,8 @@ internal fun buildSingBoxDelayTestPlan(
         "sing-box group is unavailable: $rootGroupName"
     }
 
-    val commandGroupNames = linkedSetOf<String>()
+    val visitedGroupNames = linkedSetOf<String>()
+    val leafTargetNames = linkedSetOf<String>()
     val targetNames = linkedSetOf<String>()
 
     fun isGroup(name: String): Boolean {
@@ -99,33 +105,23 @@ internal fun buildSingBoxDelayTestPlan(
     }
 
     fun visit(groupName: String) {
-        if (!commandGroupNames.add(groupName)) return
+        if (!visitedGroupNames.add(groupName)) return
         val group = groupsByName[groupName] ?: return
         group.all.forEach { memberName ->
             targetNames += memberName
             if (isGroup(memberName)) {
                 visit(memberName)
+            } else {
+                leafTargetNames += memberName
             }
         }
     }
 
     visit(rootGroupName)
 
-    val directTargetNamesByCommand = commandGroupNames.associateWith { groupName ->
-        buildSet {
-            if (groupName in targetNames) add(groupName)
-            groupsByName[groupName]?.all
-                ?.filterNot(::isGroup)
-                ?.let(::addAll)
-        }
-    }
     return SingBoxDelayTestPlan(
-        commandGroupNames = commandGroupNames.toList(),
+        leafTargetNames = leafTargetNames.toList(),
         targetNames = targetNames,
-        directTargetNamesByCommand = directTargetNamesByCommand,
-        maxDirectTargetCount = commandGroupNames.maxOfOrNull { groupName ->
-            groupsByName[groupName]?.all?.count { memberName -> !isGroup(memberName) } ?: 0
-        } ?: 0,
         baselineTimes = targetNames.associateWith { name ->
             proxies.nodeByName[name]?.delayUpdatedAtEpochSeconds ?: Long.MIN_VALUE
         },
@@ -143,10 +139,8 @@ internal fun buildSingBoxProxyDelayTestPlan(
         "sing-box proxy is unavailable: $proxyName"
     }
     return SingBoxDelayTestPlan(
-        commandGroupNames = listOf(proxyName),
+        leafTargetNames = listOf(proxyName),
         targetNames = setOf(proxyName),
-        directTargetNamesByCommand = mapOf(proxyName to setOf(proxyName)),
-        maxDirectTargetCount = 1,
         baselineTimes = mapOf(
             proxyName to (proxy.delayUpdatedAtEpochSeconds ?: Long.MIN_VALUE),
         ),
@@ -163,63 +157,59 @@ internal fun SingBoxDelayTestPlan.freshnessBaselines(
 }
 
 internal suspend fun submitSingBoxDelayCommandsAsync(
-    commandGroupNames: List<String>,
+    submissionNames: List<String>,
     concurrency: Int,
     submit: suspend (String) -> Unit,
 ): SingBoxDelayCommandSubmissions {
-    val distinctNames = commandGroupNames.distinct()
+    val distinctNames = submissionNames.distinct()
     if (distinctNames.isEmpty()) {
         return SingBoxDelayCommandSubmissions(
-            successfulGroupNames = emptySet(),
-            failedGroupNames = emptySet(),
+            successfulNames = emptySet(),
+            failedNames = emptySet(),
         )
     }
     val semaphore = Semaphore(concurrency.coerceAtLeast(1))
-    val successfulGroupNames = linkedSetOf<String>()
-    val failedGroupNames = linkedSetOf<String>()
-    coroutineScope {
-        distinctNames.forEach { groupName ->
-            launch {
+    val outcomes = coroutineScope {
+        distinctNames.map { name ->
+            async {
                 runCatching {
-                    semaphore.withPermit { submit(groupName) }
-                }.onSuccess { successfulGroupNames += groupName }
-                    .onFailure { failedGroupNames += groupName }
+                    // The callback blocks on the daemon-side measurement;
+                    // keep it off the caller's thread (UI/Default) and let
+                    // the semaphore bound how many measurements run at once.
+                    semaphore.withPermit { withContext(Dispatchers.IO) { submit(name) } }
+                }.onFailure { error ->
+                    if (error is CancellationException) throw error
+                }.isSuccess
             }
-        }
+        }.awaitAll()
+    }
+    val successfulNames = linkedSetOf<String>()
+    val failedNames = linkedSetOf<String>()
+    distinctNames.forEachIndexed { index, name ->
+        if (outcomes[index]) successfulNames += name else failedNames += name
     }
     return SingBoxDelayCommandSubmissions(
-        successfulGroupNames = successfulGroupNames,
-        failedGroupNames = failedGroupNames,
+        successfulNames = successfulNames,
+        failedNames = failedNames,
     )
 }
 
 internal fun SingBoxDelayTestPlan.knownSubmissionFailures(
     submissions: SingBoxDelayCommandSubmissions,
-): Set<String> {
-    val successfulCoverage = submissions.successfulGroupNames
-        .flatMapTo(linkedSetOf()) { groupName ->
-            directTargetNamesByCommand[groupName].orEmpty()
-        }
-    return submissions.failedGroupNames
-        .flatMapTo(linkedSetOf()) { groupName ->
-            directTargetNamesByCommand[groupName].orEmpty()
-        }
-        .minus(successfulCoverage)
-}
+): Set<String> = submissions.failedNames
 
 internal fun SingBoxDelayTestPlan.deadlineMillis(
     connectionTestTimeoutMillis: Int,
+    concurrency: Int,
 ): Long {
-    val perOutbound: Long = connectionTestTimeoutMillis.coerceAtLeast(1_000).toLong()
-    // Old behaviour was: per-batch timeout × batches + grace. We keep
-    // that as a floor so tiny test plans don't return instantly, but
-    // scale the hard cap with the configured per-outbound timeout.
-    val batches = (maxDirectTargetCount.coerceAtLeast(1) + SingBoxDelayBatchSize - 1) /
-        SingBoxDelayBatchSize
-    val batchBased = batches * SingBoxDelayBatchTimeoutMillis + SingBoxDelayDeadlineGraceMillis
-    val perTargetBased = maxDirectTargetCount.coerceAtLeast(1) * perOutbound +
-        SingBoxDelayDeadlineGraceMillis
-    return maxOf(batchBased, perTargetBased)
+    // Submissions block until each measurement completes; the await phase
+    // only has to catch the remaining stream pushes, so budget one pass
+    // over the leaves at the configured concurrency plus a grace margin.
+    val perTest = connectionTestTimeoutMillis.coerceAtLeast(1_000).toLong() +
+        SingBoxDelayPerTestOverheadMillis
+    val workers = concurrency.coerceAtLeast(1)
+    val rounds = (leafTargetNames.size.coerceAtLeast(1) + workers - 1) / workers
+    return rounds * perTest + SingBoxDelayDeadlineGraceMillis
 }
 
 internal fun SingBoxDelayTestPlan.freshDelays(
@@ -335,6 +325,5 @@ private val SingBoxDelayGroupTypes = setOf(
     "fallback",
 )
 
-private const val SingBoxDelayBatchSize = 10
-private const val SingBoxDelayBatchTimeoutMillis = 15_000L
+private const val SingBoxDelayPerTestOverheadMillis = 2_000L
 private const val SingBoxDelayDeadlineGraceMillis = 2_000L

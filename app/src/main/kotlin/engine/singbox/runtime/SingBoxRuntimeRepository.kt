@@ -478,19 +478,29 @@ internal class SingBoxRuntimeRepository(
             }
             try {
                 delay(DelayTestTimestampBoundaryWaitMillis.milliseconds)
+                // One measurement per leaf outbound with the user's custom
+                // URL test options (link/timeout/unified delay/handshake),
+                // husi style; the submission pool bounds concurrency and
+                // runs the blocking daemon calls on Dispatchers.IO.
                 val submissions = submitSingBoxDelayCommandsAsync(
-                    commandGroupNames = plan.commandGroupNames,
+                    submissionNames = plan.leafTargetNames,
                     concurrency = appState.connectionTestConcurrent,
-                    submit = { groupName ->
+                    submit = { leafName ->
                         synchronized(sessionLock) {
                             check(generation == runGeneration && session === active) {
                                 "sing-box API session changed during delay test"
                             }
-                            active.urlTest(groupName)
                         }
+                        active.urlTestWithOptions(
+                            outboundTag = leafName,
+                            link = appState.connectionTestUrl.trim(),
+                            timeoutMillis = appState.connectionTestTimeoutMillis,
+                            unifiedDelay = appState.connectionTestUnifiedDelay,
+                            ignoreHandshakeTime = appState.connectionTestIgnoreHandshakeTime,
+                        )
                     },
                 )
-                if (submissions.successfulGroupNames.isEmpty()) {
+                if (submissions.successfulNames.isEmpty()) {
                     val failure = SingBoxDelayResult(failedTargets = plan.targetNames)
                     updateDelayTestIfGenerationCurrent(runGeneration) { current ->
                         current.finishingDelayTest(target, failure)
@@ -505,7 +515,8 @@ internal class SingBoxRuntimeRepository(
                     knownFailures = knownFailures,
                     idleTimeoutMillis = DelayTestNoProgressTimeoutMillis,
                     hardTimeoutMillis = plan.deadlineMillis(
-                        appState.connectionTestTimeoutMillis,
+                        connectionTestTimeoutMillis = appState.connectionTestTimeoutMillis,
+                        concurrency = appState.connectionTestConcurrent,
                     ),
                 )
                 val result = plan.finish(

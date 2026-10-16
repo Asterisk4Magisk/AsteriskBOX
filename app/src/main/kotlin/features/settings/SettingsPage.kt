@@ -638,7 +638,6 @@ private fun SettingsContent(
                             state.copy(connectionTestIgnoreHandshakeTime = enabled)
                         }
                     },
-                    urlTestOptionsAvailable = false,
                 )
             }
             item(key = "settings_backup_restore") {

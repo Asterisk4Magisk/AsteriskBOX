@@ -166,7 +166,6 @@ internal fun SettingsConnectionTestSection(
     onConnectionTestTimeoutChange: (Int) -> Unit,
     onConnectionTestUnifiedDelayChange: (Boolean) -> Unit,
     onConnectionTestIgnoreHandshakeTimeChange: (Boolean) -> Unit,
-    urlTestOptionsAvailable: Boolean,
 ) {
     SmallTitle(text = stringResource(R.string.connection_test_settings_title))
     SettingsSectionCard {
@@ -323,16 +322,6 @@ internal fun SettingsConnectionTestSection(
             checked = connectionTestIgnoreHandshakeTime,
             onCheckedChange = onConnectionTestIgnoreHandshakeTimeChange,
         )
-
-        if (!urlTestOptionsAvailable) {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                Text(
-                    text = stringResource(R.string.connection_test_unavailable_warning),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
     }
 }
 
