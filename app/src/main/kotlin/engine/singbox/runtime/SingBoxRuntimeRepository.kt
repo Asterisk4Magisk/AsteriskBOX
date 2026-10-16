@@ -107,6 +107,8 @@ internal class SingBoxRuntimeRepository(
                     traffic = current.traffic.copy(connected = false),
                     proxiesRefreshing = false,
                     delayTestingTarget = null,
+                    delayTestingCompleted = 0,
+                    delayTestingTotal = 0,
                     delayTestingBaselines = emptyMap(),
                     lastError = "",
                 )
@@ -248,6 +250,8 @@ internal class SingBoxRuntimeRepository(
                     traffic = current.traffic.copy(connected = false),
                     proxiesRefreshing = true,
                     delayTestingTarget = null,
+                    delayTestingCompleted = 0,
+                    delayTestingTotal = 0,
                     delayTestingBaselines = emptyMap(),
                     lastError = "",
                 )
@@ -338,6 +342,8 @@ internal class SingBoxRuntimeRepository(
                         traffic = current.traffic.copy(connected = false),
                         proxiesRefreshing = false,
                         delayTestingTarget = null,
+                        delayTestingCompleted = 0,
+                        delayTestingTotal = 0,
                         delayTestingBaselines = emptyMap(),
                         lastError = message,
                     )
@@ -471,6 +477,7 @@ internal class SingBoxRuntimeRepository(
                         target = target,
                         baselines = baselineTimes,
                         targetNames = plan.targetNames,
+                        totalCount = plan.leafTargetNames.size,
                     )
                 },
             ) {
@@ -481,10 +488,23 @@ internal class SingBoxRuntimeRepository(
                 // One measurement per leaf outbound with the user's custom
                 // URL test options (link/timeout/unified delay/handshake),
                 // husi style; the submission pool bounds concurrency and
-                // runs the blocking daemon calls on Dispatchers.IO.
+                // runs the blocking daemon calls on Dispatchers.IO. Each
+                // completed submission bumps the visible progress counter
+                // (under the session lock, so concurrent workers can't race).
                 val submissions = submitSingBoxDelayCommandsAsync(
                     submissionNames = plan.leafTargetNames,
                     concurrency = appState.connectionTestConcurrent,
+                    onCompleted = {
+                        updateDelayTestIfGenerationCurrent(runGeneration) { current ->
+                            if (current.delayTestingTarget == target) {
+                                current.copy(
+                                    delayTestingCompleted = current.delayTestingCompleted + 1,
+                                )
+                            } else {
+                                current
+                            }
+                        }
+                    },
                     submit = { leafName ->
                         synchronized(sessionLock) {
                             check(generation == runGeneration && session === active) {
@@ -538,6 +558,8 @@ internal class SingBoxRuntimeRepository(
                     if (current.delayTestingTarget == target) {
                         current.copy(
                             delayTestingTarget = null,
+                            delayTestingCompleted = 0,
+                            delayTestingTotal = 0,
                             delayTestingBaselines = emptyMap(),
                         )
                     } else {
@@ -643,8 +665,11 @@ internal fun SingBoxRuntimeState.startingDelayTest(
     target: String,
     baselines: Map<String, Long>,
     targetNames: Set<String>,
+    totalCount: Int,
 ): SingBoxRuntimeState = copy(
     delayTestingTarget = target,
+    delayTestingCompleted = 0,
+    delayTestingTotal = totalCount.coerceAtLeast(0),
     delayTestingBaselines = baselines,
     delayFailureBaselines = delayFailureBaselines - targetNames,
 )
@@ -656,6 +681,8 @@ internal fun SingBoxRuntimeState.finishingDelayTest(
     if (delayTestingTarget != target) return this
     return copy(
         delayTestingTarget = null,
+        delayTestingCompleted = 0,
+        delayTestingTotal = 0,
         delayTestingBaselines = emptyMap(),
         delayFailureBaselines = mergeSingBoxDelayFailures(
             currentFailureBaselines = delayFailureBaselines,
