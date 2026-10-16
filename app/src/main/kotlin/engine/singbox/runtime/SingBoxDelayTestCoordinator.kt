@@ -159,6 +159,7 @@ internal fun SingBoxDelayTestPlan.freshnessBaselines(
 internal suspend fun submitSingBoxDelayCommandsAsync(
     submissionNames: List<String>,
     concurrency: Int,
+    onCompleted: suspend () -> Unit = {},
     submit: suspend (String) -> Unit,
 ): SingBoxDelayCommandSubmissions {
     val distinctNames = submissionNames.distinct()
@@ -172,7 +173,7 @@ internal suspend fun submitSingBoxDelayCommandsAsync(
     val outcomes = coroutineScope {
         distinctNames.map { name ->
             async {
-                runCatching {
+                val succeeded = runCatching {
                     // The callback blocks on the daemon-side measurement;
                     // keep it off the caller's thread (UI/Default) and let
                     // the semaphore bound how many measurements run at once.
@@ -180,6 +181,10 @@ internal suspend fun submitSingBoxDelayCommandsAsync(
                 }.onFailure { error ->
                     if (error is CancellationException) throw error
                 }.isSuccess
+                // Progress hook: fires once per finished name, success or
+                // failure; skipped when the run was cancelled.
+                onCompleted()
+                succeeded
             }
         }.awaitAll()
     }

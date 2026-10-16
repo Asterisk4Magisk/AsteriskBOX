@@ -35,6 +35,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -58,12 +59,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -117,6 +120,8 @@ private data class SingBoxProxyPageRuntimeState(
     val proxies: SingBoxProxiesState,
     val proxiesRefreshing: Boolean,
     val delayTestingTarget: String?,
+    val delayTestingCompleted: Int,
+    val delayTestingTotal: Int,
     val delayTestingBaselines: Map<String, Long>,
     val delayFailedNodes: Set<String>,
     val lastError: String,
@@ -126,6 +131,8 @@ private fun SingBoxRuntimeState.toProxyPageRuntimeState() = SingBoxProxyPageRunt
     proxies = proxies,
     proxiesRefreshing = proxiesRefreshing,
     delayTestingTarget = delayTestingTarget,
+    delayTestingCompleted = delayTestingCompleted,
+    delayTestingTotal = delayTestingTotal,
     delayTestingBaselines = delayTestingBaselines,
     delayFailedNodes = delayFailureBaselines.keys,
     lastError = lastError,
@@ -547,6 +554,8 @@ fun SingBoxProxyPage(
                         ProxyFloatingActions(
                             runtimeAvailable = runtimeAvailable,
                             testing = testingTarget == group.name,
+                            testingCompleted = runtimeState.delayTestingCompleted,
+                            testingTotal = runtimeState.delayTestingTotal,
                             canLocate = (pendingSelections[group.name] ?: group.now).isNotBlank(),
                             onLocate = { locateRequestTrigger++ },
                             onDelayTest = { testGroup(group) },
@@ -1029,6 +1038,8 @@ private fun String.visibleRuntimeName(unavailableLabel: String): String {
 private fun ProxyFloatingActions(
     runtimeAvailable: Boolean,
     testing: Boolean,
+    testingCompleted: Int,
+    testingTotal: Int,
     canLocate: Boolean,
     onLocate: () -> Unit,
     onDelayTest: () -> Unit,
@@ -1065,17 +1076,68 @@ private fun ProxyFloatingActions(
                 alpha = if (runtimeAvailable && !testing) 1f else 0.45f,
             ),
             icon = {
-                if (testing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.5.dp,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                } else {
-                    DelayToolbarGlyph()
+                // Fixed 24.dp slot: the spinner (20.dp) and the glyph (24.dp)
+                // must occupy the same footprint, or the button length
+                // changes when the test starts/stops.
+                Box(
+                    modifier = Modifier.size(24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (testing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.5.dp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    } else {
+                        DelayToolbarGlyph()
+                    }
                 }
             },
-            text = { Text(stringResource(R.string.sing_box_proxies_group_test)) },
+            text = {
+                // The text slot is pinned to a fixed width — the wider of
+                // "整组测试" and the widest progress value ("total/total") —
+                // and centered, so the button length is IDENTICAL whether
+                // it shows the label or the ticking progress. softWrap off:
+                // the numbers must never fold onto a second line.
+                val labelText = stringResource(R.string.sing_box_proxies_group_test)
+                val testingInProgress = testing && testingTotal > 0
+                val progressText = if (testingInProgress) {
+                    stringResource(
+                        R.string.sing_box_proxies_delay_testing_progress,
+                        testingCompleted.coerceAtMost(testingTotal),
+                        testingTotal,
+                    )
+                } else {
+                    null
+                }
+                val widestProgressText = if (testingInProgress) {
+                    stringResource(
+                        R.string.sing_box_proxies_delay_testing_progress,
+                        testingTotal,
+                        testingTotal,
+                    )
+                } else {
+                    null
+                }
+                val textMeasurer = rememberTextMeasurer()
+                val textStyle = LocalTextStyle.current
+                val slotWidthPx = remember(textMeasurer, labelText, widestProgressText, textStyle) {
+                    val labelWidth = textMeasurer.measure(labelText, textStyle).size.width
+                    val progressWidth = widestProgressText?.let { widest ->
+                        textMeasurer.measure(widest, textStyle).size.width
+                    } ?: 0
+                    maxOf(labelWidth, progressWidth)
+                }
+                val density = LocalDensity.current
+                Text(
+                    text = progressText ?: labelText,
+                    modifier = Modifier.width(with(density) { slotWidthPx.toDp() }),
+                    textAlign = TextAlign.Center,
+                    softWrap = false,
+                    maxLines = 1,
+                )
+            },
         )
     }
 }
