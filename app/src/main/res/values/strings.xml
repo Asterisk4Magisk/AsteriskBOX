@@ -279,18 +279,13 @@
     <string name="sing_box_proxies_group_test">Test group</string>
     <string name="sing_box_proxies_locate_selected">Locate current proxy</string>
 
-    <!-- Global connection-test settings. Mirrors the husi
-         `connection_test_*` strings in
-         composeApp/src/commonMain/composeResources/values/strings.xml. -->
+    <!-- Global connection-test settings, mirroring husi connection_test_* strings. -->
     <string name="connection_test_settings_title">Connection test</string>
     <string name="connection_test_settings_summary">Tune how the sing-box URL test measures delay</string>
     <string name="connection_test_url">Test URL</string>
-    <string name="connection_test_url_summary">%1$s</string>
     <string name="connection_test_url_invalid">Enter a valid HTTP or HTTPS URL</string>
     <string name="connection_test_concurrent">Test concurrency</string>
-    <string name="connection_test_concurrent_summary">Maximum number of outbound measurements running in parallel: %1$d</string>
     <string name="connection_test_timeout">Test timeout (ms)</string>
-    <string name="connection_test_timeout_summary">Max wait per outbound measurement: %1$d ms</string>
     <string name="connection_test_unified_delay">Unified delay</string>
     <string name="connection_test_unified_delay_summary">Measure the second request on a kept session, hiding the one-off handshake cost.</string>
     <string name="connection_test_ignore_handshake_time">Ignore handshake time</string>

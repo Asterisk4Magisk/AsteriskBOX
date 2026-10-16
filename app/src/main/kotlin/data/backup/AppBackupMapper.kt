@@ -7,6 +7,7 @@ import engine.singbox.config.DnsConfigurationMatchFields
 import engine.singbox.config.dnsConfigurationEntryTag
 
 import app.AppState
+import app.withNormalizedConnectionTestSettings
 import features.resources.withInitializedBundledRuleSets
 import app.ServiceControlSchedule
 import app.ServiceControlKeyguard
@@ -396,7 +397,9 @@ private fun AppBackupData.toAppState(): AppState {
         connectionTestUnifiedDelay = settings.connectionTestUnifiedDelay,
         connectionTestIgnoreHandshakeTime = settings.connectionTestIgnoreHandshakeTime,
         proxyAppListSelectedApps = proxyAppListSelectedApps,
-    ).withInitializedBundledRuleSets().withCanonicalManagedTagReferences()
+    ).withInitializedBundledRuleSets()
+        .withCanonicalManagedTagReferences()
+        .withNormalizedConnectionTestSettings()
 }
 
 private fun AppBackupOutboundGroup.toState(): OutboundGroupState =

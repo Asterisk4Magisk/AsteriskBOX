@@ -281,12 +281,9 @@
     <string name="connection_test_settings_title">连接测试</string>
     <string name="connection_test_settings_summary">调整 sing-box URL 测试的测量行为</string>
     <string name="connection_test_url">测试链接</string>
-    <string name="connection_test_url_summary">%1$s</string>
     <string name="connection_test_url_invalid">请输入合法的 HTTP 或 HTTPS 链接</string>
     <string name="connection_test_concurrent">测试并发</string>
-    <string name="connection_test_concurrent_summary">并行进行的出站测速数量:%1$d</string>
     <string name="connection_test_timeout">测试超时(毫秒)</string>
-    <string name="connection_test_timeout_summary">每个出站测量的最长等待时间:%1$d 毫秒</string>
     <string name="connection_test_unified_delay">统一延迟</string>
     <string name="connection_test_unified_delay_summary">在已建立会话上测第二次请求,剔除一次性握手成本。</string>
     <string name="connection_test_ignore_handshake_time">忽略握手时间</string>

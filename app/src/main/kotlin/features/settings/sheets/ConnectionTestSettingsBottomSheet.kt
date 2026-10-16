@@ -13,12 +13,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,8 +30,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.ConnectionTestConcurrentBounds
 import app.ConnectionTestTimeoutBounds
+import app.ConnectionTestTimeoutStepMillis
 import app.R
+import app.isValidConnectionTestUrl
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.delay
 import ui.components.AsteriskModalBottomSheet
 import ui.icons.AsteriskIcons as Icons
 
@@ -68,10 +74,18 @@ internal fun ConnectionTestSettingsBottomSheet(
         key(show) {
             SettingsSheetContent {
                 // Local text so partial / invalid input never reaches
-                // AppState (it is persisted only once it validates as an
-                // HTTP(S) URL, and only after the user stops typing).
+                // AppState: it is persisted only once it validates as an
+                // HTTP(S) URL, after a short typing pause or on dismiss.
                 var urlText by remember { mutableStateOf(connectionTestUrl) }
-                val urlError = if (!isConnectionTestUrlValid(urlText)) {
+                val latestUrlText by rememberUpdatedState(urlText)
+                val committedUrl by rememberUpdatedState(connectionTestUrl)
+                val commitUrl by rememberUpdatedState { text: String ->
+                    val trimmed = text.trim()
+                    if (isValidConnectionTestUrl(trimmed) && trimmed != committedUrl) {
+                        onConnectionTestUrlChange(trimmed)
+                    }
+                }
+                val urlError = if (!isValidConnectionTestUrl(urlText)) {
                     stringResource(R.string.connection_test_url_invalid)
                 } else {
                     null
@@ -87,9 +101,11 @@ internal fun ConnectionTestSettingsBottomSheet(
                     ),
                 )
                 LaunchedEffect(urlText) {
-                    if (isConnectionTestUrlValid(urlText) && urlText != connectionTestUrl) {
-                        onConnectionTestUrlChange(urlText)
-                    }
+                    delay(UrlCommitDebounceMillis.milliseconds)
+                    commitUrl(urlText)
+                }
+                DisposableEffect(Unit) {
+                    onDispose { commitUrl(latestUrlText) }
                 }
 
                 IntSliderPreference(
@@ -106,7 +122,8 @@ internal fun ConnectionTestSettingsBottomSheet(
                     value = connectionTestTimeoutMillis,
                     onValueChange = onConnectionTestTimeoutChange,
                     valueRange = ConnectionTestTimeoutBounds.min..ConnectionTestTimeoutBounds.max,
-                    steps = 20,
+                    steps = (ConnectionTestTimeoutBounds.max - ConnectionTestTimeoutBounds.min) /
+                        ConnectionTestTimeoutStepMillis - 1,
                 )
 
                 SwitchPreference(
@@ -133,6 +150,8 @@ internal fun ConnectionTestSettingsBottomSheet(
  * [Slider] underneath. Dragging only moves a local position; the config is
  * written once, when the gesture ends ([onValueChangeFinished]).
  */
+// Plain value/onValueChange Slider overload on purpose: the drag position
+// stays local and is committed once in onValueChangeFinished.
 @Suppress("DEPRECATION")
 @Composable
 private fun IntSliderPreference(
@@ -180,7 +199,4 @@ private fun IntSliderPreference(
     }
 }
 
-private fun isConnectionTestUrlValid(url: String): Boolean {
-    return url.isNotBlank() &&
-        (url.startsWith("http://") || url.startsWith("https://"))
-}
+private const val UrlCommitDebounceMillis = 500L

@@ -138,21 +138,38 @@ const val DefaultSingBoxUrlTestInterval = "3m"
 const val DefaultSingBoxUrlTestTolerance = 50
 const val DefaultSingBoxUrlTestIdleTimeout = "30m"
 
-// Global connection-test preferences, applied across all sing-box `urltest`
-// group selectors unless a per-group override is set. Mirrors the husi
-// `connectionTest*` settings (DataStore.kt:220-225).
+// Global connection-test preferences used by the delay test, and as the
+// url_test fallback when a group has no URL of its own. Mirrors the husi
+// `connectionTest*` settings.
 const val DefaultConnectionTestUrl = "http://cp.cloudflare.com/"
 const val DefaultConnectionTestConcurrent = 5
 const val DefaultConnectionTestTimeoutMillis = 5000
 const val DefaultConnectionTestUnifiedDelay = false
 const val DefaultConnectionTestIgnoreHandshakeTime = false
 
-// UI bounds for the connection-test settings. Concurrent mirrors the husi
-// `1f..32f, valueSteps=32` slider in MiscSettingsGroup.kt:78-79; timeout
-// mirrors `1024f..8192f, valueSteps=20`.
 data class ConnectionTestIntBounds(val min: Int, val max: Int)
 val ConnectionTestConcurrentBounds = ConnectionTestIntBounds(min = 1, max = 32)
-val ConnectionTestTimeoutBounds = ConnectionTestIntBounds(min = 1024, max = 8192)
+val ConnectionTestTimeoutBounds = ConnectionTestIntBounds(min = 1000, max = 8000)
+const val ConnectionTestTimeoutStepMillis = 500
+
+fun isValidConnectionTestUrl(url: String): Boolean {
+    val uri = runCatching { java.net.URI(url.trim()) }.getOrNull() ?: return false
+    return uri.scheme?.lowercase() in setOf("http", "https") && !uri.host.isNullOrBlank()
+}
+
+fun AppState.withNormalizedConnectionTestSettings(): AppState = copy(
+    connectionTestUrl = connectionTestUrl.trim()
+        .takeIf(::isValidConnectionTestUrl)
+        ?: DefaultConnectionTestUrl,
+    connectionTestConcurrent = connectionTestConcurrent.coerceIn(
+        ConnectionTestConcurrentBounds.min,
+        ConnectionTestConcurrentBounds.max,
+    ),
+    connectionTestTimeoutMillis = connectionTestTimeoutMillis.coerceIn(
+        ConnectionTestTimeoutBounds.min,
+        ConnectionTestTimeoutBounds.max,
+    ),
+)
 
 val SupportedSingBoxSelectorTypes = listOf(
     SingBoxSelectorTypeSelector,
