@@ -13,7 +13,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -23,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import app.ConnectionTestConcurrentBounds
 import app.ConnectionTestTimeoutBounds
 import app.R
+import kotlin.math.roundToInt
 import ui.components.AsteriskModalBottomSheet
 import ui.icons.AsteriskIcons as Icons
 
@@ -30,17 +35,13 @@ import ui.icons.AsteriskIcons as Icons
  * Bottom sheet for the five connection-test settings, opened from the
  * "连接测试" entry inside the regular (常规) settings section.
  *
- * Layout follows the husi pattern (xchacha20-poly1305/husi:
- * composeApp/.../MiscSettingsGroup.kt): the URL is a text field, the
- * two numeric settings (concurrency, timeout) are sliders, and the two
- * measurement toggles (unified delay, ignore handshake) are switches.
  * Field changes write through to AppState on the fly, so the sheet has
  * no 取消/保存 buttons — the user dismisses by tap-outside, back, or
  * drag, matching the "本地代理设置" sheet.
  *
  * Wrapped in [key] over [show] so re-opening the sheet resets the URL
- * text-field state to the latest AppState value, mirroring the keyboard
- * / ime reset behaviour the local proxy sheet uses.
+ * text-field state and both slider positions to the latest AppState
+ * values.
  */
 @Composable
 internal fun ConnectionTestSettingsBottomSheet(
@@ -83,27 +84,18 @@ internal fun ConnectionTestSettingsBottomSheet(
                     ),
                 )
 
-                // Concurrent slider: 1..32 with 30 intermediate stops, so the
-                // integer step equals 1 across the whole range (matching husi's
-                // SliderPreference(valueRange = 1f..32f, valueSteps = 32)).
                 IntSliderPreference(
                     title = stringResource(R.string.connection_test_concurrent),
-                    value = connectionTestConcurrent
-                        .coerceIn(ConnectionTestConcurrentBounds.min, ConnectionTestConcurrentBounds.max),
+                    value = connectionTestConcurrent,
                     onValueChange = onConnectionTestConcurrentChange,
                     valueRange = ConnectionTestConcurrentBounds.min..ConnectionTestConcurrentBounds.max,
-                    steps = ConnectionTestConcurrentBounds.max -
-                        ConnectionTestConcurrentBounds.min - 1,
+                    // One stop per integer across 1..32.
+                    steps = ConnectionTestConcurrentBounds.max - ConnectionTestConcurrentBounds.min - 1,
                 )
 
-                // Timeout slider: 1024..8192 with 20 intermediate stops, so the
-                // integer step equals ~358 ms across the whole range (matching
-                // husi's SliderPreference(valueRange = 1024f..8192f,
-                // valueSteps = 20)).
                 IntSliderPreference(
                     title = stringResource(R.string.connection_test_timeout),
-                    value = connectionTestTimeoutMillis
-                        .coerceIn(ConnectionTestTimeoutBounds.min, ConnectionTestTimeoutBounds.max),
+                    value = connectionTestTimeoutMillis,
                     onValueChange = onConnectionTestTimeoutChange,
                     valueRange = ConnectionTestTimeoutBounds.min..ConnectionTestTimeoutBounds.max,
                     steps = 20,
@@ -129,15 +121,11 @@ internal fun ConnectionTestSettingsBottomSheet(
 }
 
 /**
- * Compact label + integer slider + value row, in the same visual style as
- * the other sheets entries. The current value is right-aligned in the
- * primary tint, mirroring the readout in husi's SliderPreference.
- *
- * @param steps Number of intermediate stops between [valueRange.first]
- *   and [valueRange.last], exclusive of the endpoints. Pass 0 for
- *   continuous. For a per-integer slider over [min..max], pass
- *   `max - min - 1` (the slider still snaps to the exact range bounds).
+ * Plain slider row: title on the left, live value on the right, native MD3
+ * [Slider] underneath. Dragging only moves a local position; the config is
+ * written once, when the gesture ends ([onValueChangeFinished]).
  */
+@Suppress("DEPRECATION")
 @Composable
 private fun IntSliderPreference(
     title: String,
@@ -147,6 +135,7 @@ private fun IntSliderPreference(
     steps: Int,
     modifier: Modifier = Modifier,
 ) {
+    var position by remember { mutableFloatStateOf(value.toFloat()) }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -163,22 +152,20 @@ private fun IntSliderPreference(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = value.toString(),
+                text = position.roundToInt().toString(),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
         }
-        val sliderState = androidx.compose.material3.rememberSliderState(
-            value = value.toFloat(),
+        Slider(
+            value = position,
+            onValueChange = { position = it },
+            valueRange = valueRange.first.toFloat()..valueRange.last.toFloat(),
             steps = steps.coerceAtLeast(0),
-            trackRange = valueRange.first.toFloat()..valueRange.last.toFloat(),
-        )
-        androidx.compose.material3.Slider(
-            state = sliderState,
-            onValueChange = { newValue ->
-                val coerced = newValue.toInt()
-                    .coerceIn(valueRange.first, valueRange.last)
-                if (coerced != value) onValueChange(coerced)
+            onValueChangeFinished = {
+                onValueChange(
+                    position.roundToInt().coerceIn(valueRange.first, valueRange.last),
+                )
             },
             modifier = Modifier.fillMaxWidth(),
         )
