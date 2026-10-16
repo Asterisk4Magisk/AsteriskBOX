@@ -146,6 +146,11 @@ private fun AppState.toBackupSettings(): AppBackupSettings =
         serviceControl = serviceControl.toBackup(),
         privateAddressCidrs = privateAddressCidrs,
         proxyAppListMode = proxyAppListMode,
+        connectionTestUrl = connectionTestUrl,
+        connectionTestConcurrent = connectionTestConcurrent,
+        connectionTestTimeoutMillis = connectionTestTimeoutMillis,
+        connectionTestUnifiedDelay = connectionTestUnifiedDelay,
+        connectionTestIgnoreHandshakeTime = connectionTestIgnoreHandshakeTime,
     )
 
 private fun ServiceControlSettings.toBackup(): AppBackupServiceControl =
@@ -385,6 +390,11 @@ private fun AppBackupData.toAppState(): AppState {
         serviceControl = normalizeServiceControlSettings(settings.serviceControl.toState()),
         privateAddressCidrs = settings.privateAddressCidrs,
         proxyAppListMode = settings.proxyAppListMode,
+        connectionTestUrl = settings.connectionTestUrl,
+        connectionTestConcurrent = settings.connectionTestConcurrent,
+        connectionTestTimeoutMillis = settings.connectionTestTimeoutMillis,
+        connectionTestUnifiedDelay = settings.connectionTestUnifiedDelay,
+        connectionTestIgnoreHandshakeTime = settings.connectionTestIgnoreHandshakeTime,
         proxyAppListSelectedApps = proxyAppListSelectedApps,
     ).withInitializedBundledRuleSets().withCanonicalManagedTagReferences()
 }

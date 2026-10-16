@@ -13,9 +13,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -65,17 +67,18 @@ internal fun ConnectionTestSettingsBottomSheet(
     ) {
         key(show) {
             SettingsSheetContent {
-                val urlError = if (connectionTestUrl.isBlank() ||
-                    !(connectionTestUrl.startsWith("http://") ||
-                        connectionTestUrl.startsWith("https://"))
-                ) {
+                // Local text so partial / invalid input never reaches
+                // AppState (it is persisted only once it validates as an
+                // HTTP(S) URL, and only after the user stops typing).
+                var urlText by remember { mutableStateOf(connectionTestUrl) }
+                val urlError = if (!isConnectionTestUrlValid(urlText)) {
                     stringResource(R.string.connection_test_url_invalid)
                 } else {
                     null
                 }
                 SettingsTextField(
-                    value = connectionTestUrl,
-                    onValueChange = onConnectionTestUrlChange,
+                    value = urlText,
+                    onValueChange = { urlText = it },
                     label = stringResource(R.string.connection_test_url),
                     errorText = urlError,
                     keyboardOptions = KeyboardOptions(
@@ -83,6 +86,11 @@ internal fun ConnectionTestSettingsBottomSheet(
                         imeAction = ImeAction.Next,
                     ),
                 )
+                LaunchedEffect(urlText) {
+                    if (isConnectionTestUrlValid(urlText) && urlText != connectionTestUrl) {
+                        onConnectionTestUrlChange(urlText)
+                    }
+                }
 
                 IntSliderPreference(
                     title = stringResource(R.string.connection_test_concurrent),
@@ -170,4 +178,9 @@ private fun IntSliderPreference(
             modifier = Modifier.fillMaxWidth(),
         )
     }
+}
+
+private fun isConnectionTestUrlValid(url: String): Boolean {
+    return url.isNotBlank() &&
+        (url.startsWith("http://") || url.startsWith("https://"))
 }
