@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import app.R
+import system.AndroidLauncherIcon
 import ui.icons.AsteriskIcons as Icons
 
 internal data class SettingsSearchEntry(
@@ -68,11 +69,15 @@ internal fun settingsTopLevelSearchItems(
             stringResource(R.string.settings_allow_screenshots),
             stringResource(R.string.settings_allow_screenshots_summary),
         ),
-        SettingsSearchItem(
-            SettingsSectionId.Privacy,
-            stringResource(R.string.settings_hide_launcher_icon),
-            stringResource(R.string.settings_hide_launcher_icon_summary, system.AndroidLauncherIcon.DIAL_CODE),
-        ),
+        if (AndroidLauncherIcon.isSupported) {
+            SettingsSearchItem(
+                SettingsSectionId.Privacy,
+                stringResource(R.string.settings_hide_launcher_icon),
+                stringResource(R.string.settings_hide_launcher_icon_summary, AndroidLauncherIcon.DIAL_CODE),
+            )
+        } else {
+            null
+        },
         SettingsSearchItem(
             SettingsSectionId.Apps,
             stringResource(R.string.settings_color_mode),

@@ -19,11 +19,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,7 +35,9 @@ import engine.singbox.DefaultSingBoxLogLevel
 import engine.singbox.EbpfLocalDataPlanes
 import engine.singbox.EbpfDnsModes
 import app.R
+import system.AndroidLauncherIcon
 import ui.components.IconAccent
+import ui.components.WarningConfirmDialog
 import ui.icons.AsteriskIcons as Icons
 import ui.theme.AsteriskMotion
 
@@ -104,11 +104,7 @@ internal fun SettingsPrivacySection(
             onCheckedChange = onAllowScreenshotsChange,
             accent = IconAccent.MaskPurple,
         )
-        // API < 29 cannot reliably deliver the recovery broadcast to
-        // system.SecretCodeReceiver (legacy Telephony.SECRET_CODE requires
-        // CONTROL_INCALL_EXPERIENCE on the sender), so the launcher icon
-        // would be unrecoverable. Hide the switch below that threshold.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        if (AndroidLauncherIcon.isSupported) {
             HideLauncherIconPreference(
                 hideLauncherIcon = hideLauncherIcon,
                 onHideLauncherIconChange = onHideLauncherIconChange,
@@ -123,43 +119,33 @@ private fun HideLauncherIconPreference(
     onHideLauncherIconChange: (Boolean) -> Unit,
 ) {
     var showConfirm by remember { mutableStateOf(false) }
-    val dialCode = system.AndroidLauncherIcon.DIAL_CODE
+    val dialCode = AndroidLauncherIcon.DIAL_CODE
     SwitchPreference(
-                title = stringResource(R.string.settings_hide_launcher_icon),
-                icon = Icons.Rounded.Widgets,
-                summary = stringResource(R.string.settings_hide_launcher_icon_summary, dialCode),
-                checked = hideLauncherIcon,
-                onCheckedChange = { hide ->
-                    if (hide) {
-                        showConfirm = true
-                    } else {
-                        onHideLauncherIconChange(false)
-                    }
-                },
-                accent = IconAccent.MaskPink,
-            )
-            if (showConfirm) {
-            AlertDialog(
-                onDismissRequest = { showConfirm = false },
-                title = { Text(stringResource(R.string.settings_hide_launcher_icon)) },
-                text = {
-                    Text(stringResource(R.string.settings_hide_launcher_icon_confirm, dialCode))
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showConfirm = false
-                        onHideLauncherIconChange(true)
-                    }) {
-                        Text(stringResource(R.string.common_ok))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showConfirm = false }) {
-                        Text(stringResource(R.string.common_cancel))
-                    }
-                },
-            )
-        }
+        title = stringResource(R.string.settings_hide_launcher_icon),
+        icon = Icons.Rounded.Widgets,
+        summary = stringResource(R.string.settings_hide_launcher_icon_summary, dialCode),
+        checked = hideLauncherIcon,
+        onCheckedChange = { hide ->
+            if (hide) {
+                showConfirm = true
+            } else {
+                onHideLauncherIconChange(false)
+            }
+        },
+        accent = IconAccent.MaskPink,
+    )
+    WarningConfirmDialog(
+        show = showConfirm,
+        title = stringResource(R.string.settings_hide_launcher_icon),
+        summary = stringResource(R.string.settings_hide_launcher_icon_confirm, dialCode),
+        dismissText = stringResource(R.string.common_cancel),
+        confirmText = stringResource(R.string.common_ok),
+        onDismissRequest = { showConfirm = false },
+        onConfirm = {
+            showConfirm = false
+            onHideLauncherIconChange(true)
+        },
+    )
 }
 
 @Composable

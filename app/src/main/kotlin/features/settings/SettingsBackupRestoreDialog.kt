@@ -80,7 +80,7 @@ internal fun SettingsRestoreConfirmDialog(
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            if (preview.restoredState.hideLauncherIcon) {
+            if (preview.restoredState.hideLauncherIcon && AndroidLauncherIcon.isSupported) {
                 Text(
                     text = stringResource(
                         R.string.settings_hide_launcher_icon_confirm,

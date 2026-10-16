@@ -39,6 +39,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import system.AndroidLauncherIcon
 import system.applyScreenshotProtection
 import system.setRecentTasksHidden
 import ui.feedback.AndroidToastTipNotifier
@@ -180,12 +181,12 @@ class MainActivity : ComponentActivity() {
 
     private fun observeLauncherIconVisibility() {
         val state = (application as AsteriskApplication).stateStore.state
-        system.AndroidLauncherIcon.setHidden(applicationContext, state.value.hideLauncherIcon)
+        AndroidLauncherIcon.setHidden(applicationContext, state.value.hideLauncherIcon)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 state.map { it.hideLauncherIcon }
                     .distinctUntilChanged()
-                    .collect { system.AndroidLauncherIcon.setHidden(applicationContext, it) }
+                    .collect { AndroidLauncherIcon.setHidden(applicationContext, it) }
             }
         }
     }

@@ -7,7 +7,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import app.AsteriskApplication
+import app.R
 import kotlinx.coroutines.launch
+import ui.feedback.AndroidToastTipNotifier
 
 /**
  * Restores the launcher icon when the user dials `*#*#260728#*#*`.
@@ -22,11 +24,15 @@ import kotlinx.coroutines.launch
 class SecretCodeReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action !in SecretCodeActions) return
         if (intent.data?.host != AndroidLauncherIcon.SECRET_CODE) return
-        if (!AndroidLauncherIcon.isHidden(context)) return
+        val application = context.applicationContext as? AsteriskApplication
+        // The stored preference may still ask to hide the icon while the alias
+        // is enabled, e.g. right after a backup restore, so reset it too.
+        val hiddenInState = application?.stateStore?.state?.value?.hideLauncherIcon == true
+        if (!AndroidLauncherIcon.isHidden(context) && !hiddenInState) return
 
         val pendingResult = goAsync()
-        val application = context.applicationContext as? AsteriskApplication
         if (application == null) {
             try {
                 AndroidLauncherIcon.setHidden(context, false)
@@ -43,9 +49,16 @@ class SecretCodeReceiver : BroadcastReceiver() {
                     application.stateStore
                         .replaceAllAndAwaitPersistence(current.copy(hideLauncherIcon = false))
                 }
+                AndroidToastTipNotifier(context)
+                    .show(context.getString(R.string.settings_launcher_icon_restored))
             } finally {
                 pendingResult.finish()
             }
         }
     }
 }
+
+private val SecretCodeActions = setOf(
+    "android.provider.Telephony.SECRET_CODE",
+    "android.telephony.action.SECRET_CODE",
+)
