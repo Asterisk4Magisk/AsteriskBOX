@@ -147,6 +147,13 @@ const val DefaultConnectionTestTimeoutMillis = 5000
 const val DefaultConnectionTestUnifiedDelay = false
 const val DefaultConnectionTestIgnoreHandshakeTime = false
 
+// UI bounds for the connection-test settings. Concurrent mirrors the husi
+// `1f..32f, valueSteps=32` slider in MiscSettingsGroup.kt:78-79; timeout
+// mirrors `1024f..8192f, valueSteps=20`.
+data class ConnectionTestIntBounds(val min: Int, val max: Int)
+val ConnectionTestConcurrentBounds = ConnectionTestIntBounds(min = 1, max = 32)
+val ConnectionTestTimeoutBounds = ConnectionTestIntBounds(min = 1024, max = 8192)
+
 val SupportedSingBoxSelectorTypes = listOf(
     SingBoxSelectorTypeSelector,
     SingBoxSelectorTypeUrlTest,
