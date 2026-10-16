@@ -38,7 +38,7 @@ dependencyResolutionManagement {
             forRepository {
                 ivy {
                     name = "AndroidLibBoxLiteGitHubRelease"
-                    url = uri("https://github.com/Asterisk4Magisk/AndroidLibBoxLite/releases/download")
+                    url = uri("https://github.com/grill-glitch/AndroidLibBoxLite/releases/download")
                     patternLayout {
                         artifact("[revision]/[artifact].[ext]")
                     }

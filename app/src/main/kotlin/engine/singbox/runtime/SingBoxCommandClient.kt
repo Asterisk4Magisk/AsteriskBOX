@@ -119,6 +119,33 @@ internal class SingBoxCommandClient(
     }
 
     /**
+     * Measure one outbound with husi's custom URL test options.
+     *
+     * Forwards to [CommandClient.urlTestWithOptions], which the aar binds to
+     * the same `daemon.StartedService/URLTest` gRPC method the plain urlTest
+     * uses — the options travel as protobuf unknown fields, so both VPN
+     * (process-internal channel) and ROOT (127.0.0.1:9090 gRPC) targets
+     * honour them. The call blocks until the daemon stored the result in its
+     * URL test history; the group subscription pushes that to the UI. Throws
+     * when the measurement fails.
+     */
+    fun urlTestWithOptions(
+        outboundTag: String,
+        link: String,
+        timeoutMillis: Int,
+        unifiedDelay: Boolean,
+        ignoreHandshakeTime: Boolean,
+    ) {
+        requireClient().urlTestWithOptions(
+            outboundTag,
+            link,
+            timeoutMillis,
+            unifiedDelay,
+            ignoreHandshakeTime,
+        )
+    }
+
+    /**
      * Start an Apple networkQuality test through the running sing-box.
      *
      * Forwards to [CommandClient.startNetworkQualityTest], which the aar binds to
