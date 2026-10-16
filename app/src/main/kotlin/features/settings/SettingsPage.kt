@@ -575,10 +575,18 @@ private fun SettingsContent(
                     onOpenPrivateAddresses = { sheetState.openPrivateAddresses(appState) },
                 )
             }
-            item(key = "settings_app") {
-                SettingsAppSection(
+            item(key = "settings_privacy") {
+                SettingsPrivacySection(
                     hideRecentTasks = appState.hideRecentTasks,
                     onHideRecentTasksChange = { hidden -> updateAppState { it.copy(hideRecentTasks = hidden) } },
+                    allowScreenshots = appState.allowScreenshots,
+                    onAllowScreenshotsChange = { allowed -> updateAppState { it.copy(allowScreenshots = allowed) } },
+                    hideLauncherIcon = appState.hideLauncherIcon,
+                    onHideLauncherIconChange = { hidden -> updateAppState { it.copy(hideLauncherIcon = hidden) } },
+                )
+            }
+            item(key = "settings_app") {
+                SettingsAppSection(
                     languageOptions = languageOptions,
                     languageMode = appState.languageMode,
                     colorModeOptions = listOf(

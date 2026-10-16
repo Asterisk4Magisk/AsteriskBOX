@@ -59,9 +59,19 @@ internal fun settingsTopLevelSearchItems(
     val coreLogLevelLabels = settingsCoreLogLevelLabels()
     return listOfNotNull(
         SettingsSearchItem(
-            SettingsSectionId.Apps,
+            SettingsSectionId.Privacy,
             stringResource(R.string.settings_hide_recent_tasks),
             stringResource(R.string.settings_hide_recent_tasks_summary),
+        ),
+        SettingsSearchItem(
+            SettingsSectionId.Privacy,
+            stringResource(R.string.settings_allow_screenshots),
+            stringResource(R.string.settings_allow_screenshots_summary),
+        ),
+        SettingsSearchItem(
+            SettingsSectionId.Privacy,
+            stringResource(R.string.settings_hide_launcher_icon),
+            stringResource(R.string.settings_hide_launcher_icon_summary, system.AndroidLauncherIcon.DIAL_CODE),
         ),
         SettingsSearchItem(
             SettingsSectionId.Apps,

@@ -19,10 +19,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -40,8 +46,6 @@ internal fun settingsCoreLogLevelLabels(): List<String> =
 
 @Composable
 internal fun SettingsAppSection(
-    hideRecentTasks: Boolean,
-    onHideRecentTasksChange: (Boolean) -> Unit,
     languageOptions: List<String>,
     languageMode: Int,
     colorModeOptions: List<String>,
@@ -71,6 +75,18 @@ internal fun SettingsAppSection(
         onColorModeChange = onColorModeChange,
         onSeedIndexChange = onSeedIndexChange,
     )
+}
+
+@Composable
+internal fun SettingsPrivacySection(
+    hideRecentTasks: Boolean,
+    onHideRecentTasksChange: (Boolean) -> Unit,
+    allowScreenshots: Boolean,
+    onAllowScreenshotsChange: (Boolean) -> Unit,
+    hideLauncherIcon: Boolean,
+    onHideLauncherIconChange: (Boolean) -> Unit,
+) {
+    SmallTitle(text = stringResource(R.string.settings_privacy))
     SettingsSectionCard {
         SwitchPreference(
             title = stringResource(R.string.settings_hide_recent_tasks),
@@ -80,7 +96,70 @@ internal fun SettingsAppSection(
             onCheckedChange = onHideRecentTasksChange,
             accent = IconAccent.MaskGrey,
         )
+        SwitchPreference(
+            title = stringResource(R.string.settings_allow_screenshots),
+            icon = Icons.Rounded.Lock,
+            summary = stringResource(R.string.settings_allow_screenshots_summary),
+            checked = allowScreenshots,
+            onCheckedChange = onAllowScreenshotsChange,
+            accent = IconAccent.MaskPurple,
+        )
+        // API < 29 cannot reliably deliver the recovery broadcast to
+        // system.SecretCodeReceiver (legacy Telephony.SECRET_CODE requires
+        // CONTROL_INCALL_EXPERIENCE on the sender), so the launcher icon
+        // would be unrecoverable. Hide the switch below that threshold.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            HideLauncherIconPreference(
+                hideLauncherIcon = hideLauncherIcon,
+                onHideLauncherIconChange = onHideLauncherIconChange,
+            )
+        }
     }
+}
+
+@Composable
+private fun HideLauncherIconPreference(
+    hideLauncherIcon: Boolean,
+    onHideLauncherIconChange: (Boolean) -> Unit,
+) {
+    var showConfirm by remember { mutableStateOf(false) }
+    val dialCode = system.AndroidLauncherIcon.DIAL_CODE
+    SwitchPreference(
+                title = stringResource(R.string.settings_hide_launcher_icon),
+                icon = Icons.Rounded.Widgets,
+                summary = stringResource(R.string.settings_hide_launcher_icon_summary, dialCode),
+                checked = hideLauncherIcon,
+                onCheckedChange = { hide ->
+                    if (hide) {
+                        showConfirm = true
+                    } else {
+                        onHideLauncherIconChange(false)
+                    }
+                },
+                accent = IconAccent.MaskPink,
+            )
+            if (showConfirm) {
+            AlertDialog(
+                onDismissRequest = { showConfirm = false },
+                title = { Text(stringResource(R.string.settings_hide_launcher_icon)) },
+                text = {
+                    Text(stringResource(R.string.settings_hide_launcher_icon_confirm, dialCode))
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showConfirm = false
+                        onHideLauncherIconChange(true)
+                    }) {
+                        Text(stringResource(R.string.common_ok))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showConfirm = false }) {
+                        Text(stringResource(R.string.common_cancel))
+                    }
+                },
+            )
+        }
 }
 
 @Composable

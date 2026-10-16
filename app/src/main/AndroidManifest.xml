@@ -44,10 +44,6 @@
             android:theme="@style/AppTheme.Starting"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -71,6 +67,23 @@
                 <data android:host="import-remote-profile" />
             </intent-filter>
         </activity>
+
+        <!--
+            The launcher entry lives on an alias so it can be disabled to
+            hide the app from the launcher without breaking deep links,
+            shortcuts or the quick settings tile. See system.AndroidLauncherIcon
+            and the "Hide launcher icon" privacy setting.
+        -->
+        <activity-alias
+            android:name="app.ui.LauncherActivityAlias"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:targetActivity="app.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <activity
             android:name="features.singbox.qr.PortraitQrCaptureActivity"
@@ -104,6 +117,24 @@
             android:name="features.automation.BroadcastControlReceiver"
             android:exported="true"
             tools:ignore="ExportedReceiver" />
+
+        <!--
+            Restores the launcher icon when the user dials *#*#260728#*#*
+            from the system dialer. The broadcast is dispatched system-wide
+            by the dialer, so it works even when the launcher entry is
+            hidden. See system.SecretCodeReceiver.
+        -->
+        <receiver
+            android:name="system.SecretCodeReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.provider.Telephony.SECRET_CODE" />
+                <action android:name="android.telephony.action.SECRET_CODE" />
+                <data
+                    android:host="260728"
+                    android:scheme="android_secret_code" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name="features.quicksettings.ProxyQuickSettingsTileService"
