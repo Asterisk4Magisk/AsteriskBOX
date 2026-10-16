@@ -290,6 +290,26 @@ internal class AppSettingsPreferences(
                 KeyProxyAppListMode,
                 defaults.proxyAppListMode,
             ),
+            connectionTestUrl = preferences.getString(
+                KeyConnectionTestUrl,
+                defaults.connectionTestUrl,
+            ) ?: defaults.connectionTestUrl,
+            connectionTestConcurrent = preferences.getInt(
+                KeyConnectionTestConcurrent,
+                defaults.connectionTestConcurrent,
+            ),
+            connectionTestTimeoutMillis = preferences.getInt(
+                KeyConnectionTestTimeoutMillis,
+                defaults.connectionTestTimeoutMillis,
+            ),
+            connectionTestUnifiedDelay = preferences.getBoolean(
+                KeyConnectionTestUnifiedDelay,
+                defaults.connectionTestUnifiedDelay,
+            ),
+            connectionTestIgnoreHandshakeTime = preferences.getBoolean(
+                KeyConnectionTestIgnoreHandshakeTime,
+                defaults.connectionTestIgnoreHandshakeTime,
+            ),
         )
     }
 
@@ -512,6 +532,14 @@ private const val LegacyKeyEbpfSharedNetworkInterfaces = "ebpf_shared_network_in
 internal const val KeyIgnoredInterfaces = "ignored_interfaces"
 internal const val KeyPrivateAddressCidrs = "private_address_cidrs"
 internal const val KeyProxyAppListMode = "proxy_app_list_mode"
+
+// Global connection-test preference keys. Values shared with the husi
+// `connectionTest*` settings (DataStore.kt:220-225).
+internal const val KeyConnectionTestUrl = "connection_test_url"
+internal const val KeyConnectionTestConcurrent = "connection_test_concurrent"
+internal const val KeyConnectionTestTimeoutMillis = "connection_test_timeout_millis"
+internal const val KeyConnectionTestUnifiedDelay = "connection_test_unified_delay"
+internal const val KeyConnectionTestIgnoreHandshakeTime = "connection_test_ignore_handshake_time"
 
 private val SubscriptionHwidLock = Any()
 

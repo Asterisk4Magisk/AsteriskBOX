@@ -133,6 +133,13 @@ internal data class AppBackupSettings(
     val serviceControl: AppBackupServiceControl = AppBackupServiceControl(),
     val privateAddressCidrs: List<String> = BackupDefaults.privateAddressCidrs,
     val proxyAppListMode: Int = BackupDefaults.proxyAppListMode,
+
+    // Global connection-test settings — back up so a restore carries them.
+    val connectionTestUrl: String = BackupDefaults.connectionTestUrl,
+    val connectionTestConcurrent: Int = BackupDefaults.connectionTestConcurrent,
+    val connectionTestTimeoutMillis: Int = BackupDefaults.connectionTestTimeoutMillis,
+    val connectionTestUnifiedDelay: Boolean = BackupDefaults.connectionTestUnifiedDelay,
+    val connectionTestIgnoreHandshakeTime: Boolean = BackupDefaults.connectionTestIgnoreHandshakeTime,
 )
 
 @Serializable
