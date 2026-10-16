@@ -151,4 +151,11 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
     stringList(KeyIgnoredInterfaces, ignoredInterfaces)
     stringList(KeyPrivateAddressCidrs, privateAddressCidrs)
     int(KeyProxyAppListMode, proxyAppListMode)
+
+    // Global connection-test settings — keyed for SharedPreferences.
+    string(KeyConnectionTestUrl, connectionTestUrl)
+    int(KeyConnectionTestConcurrent, connectionTestConcurrent)
+    int(KeyConnectionTestTimeoutMillis, connectionTestTimeoutMillis)
+    boolean(KeyConnectionTestUnifiedDelay, connectionTestUnifiedDelay)
+    boolean(KeyConnectionTestIgnoreHandshakeTime, connectionTestIgnoreHandshakeTime)
 }

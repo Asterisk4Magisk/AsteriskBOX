@@ -144,6 +144,14 @@ data class AppState(
     val ignoredInterfaces: List<String> = emptyList(),
     val privateAddressCidrs: List<String> = emptyList(),
 
+    // Global connection-test settings (apply across all urltest group
+    // selectors; per-group `SingBoxSelectorState.url`/`idleTimeout` override).
+    val connectionTestUrl: String = DefaultConnectionTestUrl,
+    val connectionTestConcurrent: Int = DefaultConnectionTestConcurrent,
+    val connectionTestTimeoutMillis: Int = DefaultConnectionTestTimeoutMillis,
+    val connectionTestUnifiedDelay: Boolean = DefaultConnectionTestUnifiedDelay,
+    val connectionTestIgnoreHandshakeTime: Boolean = DefaultConnectionTestIgnoreHandshakeTime,
+
     val proxyAppListMode: Int = ProxyAppListModeGlobal,
     val proxyAppListSelectedApps: List<String> = emptyList(),
 )

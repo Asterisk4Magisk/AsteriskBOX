@@ -275,6 +275,22 @@
     <string name="sing_box_proxies_delay_testing">测试中</string>
     <string name="sing_box_proxies_group_test">整组测试</string>
     <string name="sing_box_proxies_locate_selected">定位当前选中节点</string>
+
+    <!-- 连接测试设置 — 对应 husi 的 connection_test_* 字符串 -->
+    <string name="connection_test_settings_title">连接测试</string>
+    <string name="connection_test_settings_summary">调整 sing-box URL 测试的测量行为</string>
+    <string name="connection_test_url">测试链接</string>
+    <string name="connection_test_url_summary">%1$s</string>
+    <string name="connection_test_url_invalid">请输入合法的 HTTP 或 HTTPS 链接</string>
+    <string name="connection_test_concurrent">测试并发</string>
+    <string name="connection_test_concurrent_summary">同时提交的 urltest 分组数:%1$d</string>
+    <string name="connection_test_timeout">测试超时(毫秒)</string>
+    <string name="connection_test_timeout_summary">每个出站测量的最长等待时间:%1$d 毫秒</string>
+    <string name="connection_test_unified_delay">统一延迟</string>
+    <string name="connection_test_unified_delay_summary">在已建立会话上测第二次请求,剔除一次性握手成本。需要 libbox 提供 URLTest RPC,否则忽略。</string>
+    <string name="connection_test_ignore_handshake_time">忽略握手时间</string>
+    <string name="connection_test_ignore_handshake_time_summary">在 TCP/TLS 握手完成后再开始计时。需要 libbox 提供 URLTest RPC,否则忽略。</string>
+    <string name="connection_test_unavailable_warning">\"统一延迟\"和\"忽略握手时间\"需要 libbox 的 URLTest RPC。当前版本仅支持 group tag,这两个开关会被保存但不会生效。</string>
     <string name="sing_box_proxies_loading">正在加载代理…</string>
     <string name="sing_box_proxies_option_layout">布局</string>
     <string name="sing_box_proxies_option_layout_auto">自动</string>

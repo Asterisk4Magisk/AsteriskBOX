@@ -138,6 +138,15 @@ const val DefaultSingBoxUrlTestInterval = "3m"
 const val DefaultSingBoxUrlTestTolerance = 50
 const val DefaultSingBoxUrlTestIdleTimeout = "30m"
 
+// Global connection-test preferences, applied across all sing-box `urltest`
+// group selectors unless a per-group override is set. Mirrors the husi
+// `connectionTest*` settings (DataStore.kt:220-225).
+const val DefaultConnectionTestUrl = "http://cp.cloudflare.com/"
+const val DefaultConnectionTestConcurrent = 5
+const val DefaultConnectionTestTimeoutMillis = 5000
+const val DefaultConnectionTestUnifiedDelay = false
+const val DefaultConnectionTestIgnoreHandshakeTime = false
+
 val SupportedSingBoxSelectorTypes = listOf(
     SingBoxSelectorTypeSelector,
     SingBoxSelectorTypeUrlTest,
