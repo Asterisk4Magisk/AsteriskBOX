@@ -52,6 +52,8 @@ internal class AppSettingsPreferences(
             languageMode = preferences.getInt(KeyLanguageMode, defaults.languageMode),
             seedIndex = preferences.getInt(KeySeedIndex, defaults.seedIndex),
             hideRecentTasks = preferences.getBoolean(KeyHideRecentTasks, defaults.hideRecentTasks),
+            allowScreenshots = preferences.getBoolean(KeyAllowScreenshots, defaults.allowScreenshots),
+            hideLauncherIcon = preferences.getBoolean(KeyHideLauncherIcon, defaults.hideLauncherIcon),
             outboundListLayout = preferences.getInt(
                 KeyOutboundListLayout,
                 defaults.outboundListLayout,
@@ -408,6 +410,8 @@ internal const val KeyColorMode = "color_mode"
 internal const val KeyLanguageMode = "language_mode"
 internal const val KeySeedIndex = "seed_index"
 internal const val KeyHideRecentTasks = "hide_recent_tasks"
+internal const val KeyAllowScreenshots = "allow_screenshots"
+internal const val KeyHideLauncherIcon = "hide_launcher_icon"
 private const val KeySubscriptionHwid = "subscription_hwid"
 internal const val KeyOutboundListLayout = "outbound_list_layout"
 internal const val KeyOutboundListSort = "outbound_list_sort"

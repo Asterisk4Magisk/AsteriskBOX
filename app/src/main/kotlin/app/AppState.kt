@@ -35,6 +35,8 @@ data class AppState(
     val languageMode: Int = LanguageModeSystem,
     val seedIndex: Int = 0,
     val hideRecentTasks: Boolean = false,
+    val allowScreenshots: Boolean = true,
+    val hideLauncherIcon: Boolean = false,
 
     val outboundGroups: List<OutboundGroupState> = emptyList(),
     val nextOutboundGroupId: Int = 1,

@@ -39,6 +39,8 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
     int(KeyLanguageMode, languageMode)
     int(KeySeedIndex, seedIndex)
     boolean(KeyHideRecentTasks, hideRecentTasks)
+    boolean(KeyAllowScreenshots, allowScreenshots)
+    boolean(KeyHideLauncherIcon, hideLauncherIcon)
     int(KeyOutboundListLayout, outboundListLayout)
     int(KeyOutboundListSort, outboundListSort)
     string(KeySelectorSelections, StringMapJson.encode(selectorSelections))
