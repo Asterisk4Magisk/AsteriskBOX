@@ -6,6 +6,7 @@ package engine.singbox.config
 import android.content.Context
 import app.AppState
 import app.DefaultSingBoxUrlTestUrl
+import app.isValidConnectionTestUrl
 import app.ManagedApiServiceTag
 import app.ManagedDirectOutboundTag
 import app.ManagedGlobalSelectorTag
@@ -697,17 +698,11 @@ private fun buildUrlTestOutbound(
     putJsonArray("outbounds") {
         members.forEach(::add)
     }
-    // URL priority: per-group URL wins when non-blank, else the global
-    // `connectionTestUrl` preference (mirrors husi behavior where the
-    // global `connectionTestURL` is used for all URL tests, but keeps
-    // existing per-group customizations intact). The global fallback is
-    // only used when it is a valid HTTP(S) URL; a blank or malformed
-    // preference would otherwise emit an invalid `url` and fail the
-    // config checker, so it falls back to the built-in default.
+    // A blank per-group URL falls back to the global connection-test URL
+    // when that one is a valid HTTP(S) URL, else to the built-in default.
     val effectiveUrl = selector.url.trim()
         .takeIf(String::isNotEmpty)
-        ?: appState.connectionTestUrl.trim()
-            .takeIf { it.startsWith("http://") || it.startsWith("https://") }
+        ?: appState.connectionTestUrl.trim().takeIf(::isValidConnectionTestUrl)
         ?: DefaultSingBoxUrlTestUrl
     put("url", effectiveUrl)
     put("interval", selector.interval.trim())

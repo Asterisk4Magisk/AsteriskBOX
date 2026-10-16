@@ -144,8 +144,7 @@ data class AppState(
     val ignoredInterfaces: List<String> = emptyList(),
     val privateAddressCidrs: List<String> = emptyList(),
 
-    // Global connection-test settings (apply across all urltest group
-    // selectors; per-group `SingBoxSelectorState.url`/`idleTimeout` override).
+    // Global connection-test settings used by the delay test.
     val connectionTestUrl: String = DefaultConnectionTestUrl,
     val connectionTestConcurrent: Int = DefaultConnectionTestConcurrent,
     val connectionTestTimeoutMillis: Int = DefaultConnectionTestTimeoutMillis,

@@ -8,8 +8,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import app.AppState
-import app.ConnectionTestConcurrentBounds
-import app.ConnectionTestTimeoutBounds
+import app.withNormalizedConnectionTestSettings
 import app.ServiceControlSchedule
 import app.ServiceControlKeyguard
 import app.ServiceControlSettings
@@ -299,16 +298,10 @@ internal class AppSettingsPreferences(
             connectionTestConcurrent = preferences.getInt(
                 KeyConnectionTestConcurrent,
                 defaults.connectionTestConcurrent,
-            ).coerceIn(
-                ConnectionTestConcurrentBounds.min,
-                ConnectionTestConcurrentBounds.max,
             ),
             connectionTestTimeoutMillis = preferences.getInt(
                 KeyConnectionTestTimeoutMillis,
                 defaults.connectionTestTimeoutMillis,
-            ).coerceIn(
-                ConnectionTestTimeoutBounds.min,
-                ConnectionTestTimeoutBounds.max,
             ),
             connectionTestUnifiedDelay = preferences.getBoolean(
                 KeyConnectionTestUnifiedDelay,
@@ -318,7 +311,7 @@ internal class AppSettingsPreferences(
                 KeyConnectionTestIgnoreHandshakeTime,
                 defaults.connectionTestIgnoreHandshakeTime,
             ),
-        )
+        ).withNormalizedConnectionTestSettings()
     }
 
     fun save(state: AppState) {

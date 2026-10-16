@@ -6,6 +6,8 @@ package engine.singbox.runtime
 import engine.root.dns.withRootDnsMutation
 import android.content.Context
 import app.AppState
+import app.DefaultConnectionTestUrl
+import app.isValidConnectionTestUrl
 import app.modes.RunModeVpnService
 import engine.proxy.ProxyEngineStartRequest
 import engine.singbox.singBoxControlConfig
@@ -513,7 +515,9 @@ internal class SingBoxRuntimeRepository(
                         }
                         active.urlTestWithOptions(
                             outboundTag = leafName,
-                            link = appState.connectionTestUrl.trim(),
+                            link = appState.connectionTestUrl.trim()
+                                .takeIf(::isValidConnectionTestUrl)
+                                ?: DefaultConnectionTestUrl,
                             timeoutMillis = appState.connectionTestTimeoutMillis,
                             unifiedDelay = appState.connectionTestUnifiedDelay,
                             ignoreHandshakeTime = appState.connectionTestIgnoreHandshakeTime,
