@@ -137,6 +137,7 @@ private fun SettingsContent(
     val scope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
     var showConfigPreview by remember { mutableStateOf(false) }
+    var showConnectionTestDialog by remember { mutableStateOf(false) }
     var runModeSwitchInProgress by rememberSaveable { mutableStateOf(false) }
     var rootBootScriptSwitchInProgress by rememberSaveable { mutableStateOf(false) }
     var rootEbpfSwitchInProgress by rememberSaveable { mutableStateOf(false) }
@@ -377,6 +378,7 @@ private fun SettingsContent(
                     onOpenSelectors = { navigator.push(Route.SelectorManagement) },
                     onOpenEndpoints = { navigator.push(Route.EndpointList) },
                     onOpenRouting = { navigator.push(Route.RoutingManagement) },
+                    onOpenConnectionTest = { showConnectionTestDialog = true },
                     onCoreLogLevelChange = { level ->
                         if (level != appState.coreLogLevel) {
                             val nextState = appState.copy(coreLogLevel = level)
@@ -608,38 +610,6 @@ private fun SettingsContent(
                     onOpenNetworkQualityTest = { sheetState.openNetworkQualityTest() },
                 )
             }
-            item(key = "settings_connection_test") {
-                SettingsConnectionTestSection(
-                    connectionTestUrl = appState.connectionTestUrl,
-                    connectionTestConcurrent = appState.connectionTestConcurrent,
-                    connectionTestTimeoutMillis = appState.connectionTestTimeoutMillis,
-                    connectionTestUnifiedDelay = appState.connectionTestUnifiedDelay,
-                    connectionTestIgnoreHandshakeTime = appState.connectionTestIgnoreHandshakeTime,
-                    onConnectionTestUrlChange = { url ->
-                        updateAppState { state -> state.copy(connectionTestUrl = url) }
-                    },
-                    onConnectionTestConcurrentChange = { value ->
-                        updateAppState { state ->
-                            state.copy(connectionTestConcurrent = value)
-                        }
-                    },
-                    onConnectionTestTimeoutChange = { value ->
-                        updateAppState { state ->
-                            state.copy(connectionTestTimeoutMillis = value)
-                        }
-                    },
-                    onConnectionTestUnifiedDelayChange = { enabled ->
-                        updateAppState { state ->
-                            state.copy(connectionTestUnifiedDelay = enabled)
-                        }
-                    },
-                    onConnectionTestIgnoreHandshakeTimeChange = { enabled ->
-                        updateAppState { state ->
-                            state.copy(connectionTestIgnoreHandshakeTime = enabled)
-                        }
-                    },
-                )
-            }
             item(key = "settings_backup_restore") {
                 SettingsBackupRestoreSection(
                     progressText = backupRestoreProgressText,
@@ -749,6 +719,39 @@ private fun SettingsContent(
                 }
             },
         )
+        if (showConnectionTestDialog) {
+            SettingsConnectionTestDialog(
+                connectionTestUrl = appState.connectionTestUrl,
+                connectionTestConcurrent = appState.connectionTestConcurrent,
+                connectionTestTimeoutMillis = appState.connectionTestTimeoutMillis,
+                connectionTestUnifiedDelay = appState.connectionTestUnifiedDelay,
+                connectionTestIgnoreHandshakeTime = appState.connectionTestIgnoreHandshakeTime,
+                onConnectionTestUrlChange = { url ->
+                    updateAppState { state -> state.copy(connectionTestUrl = url) }
+                },
+                onConnectionTestConcurrentChange = { value ->
+                    updateAppState { state ->
+                        state.copy(connectionTestConcurrent = value)
+                    }
+                },
+                onConnectionTestTimeoutChange = { value ->
+                    updateAppState { state ->
+                        state.copy(connectionTestTimeoutMillis = value)
+                    }
+                },
+                onConnectionTestUnifiedDelayChange = { enabled ->
+                    updateAppState { state ->
+                        state.copy(connectionTestUnifiedDelay = enabled)
+                    }
+                },
+                onConnectionTestIgnoreHandshakeTimeChange = { enabled ->
+                    updateAppState { state ->
+                        state.copy(connectionTestIgnoreHandshakeTime = enabled)
+                    }
+                },
+                onDismiss = { showConnectionTestDialog = false },
+            )
+        }
     }
     }
 }

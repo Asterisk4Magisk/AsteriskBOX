@@ -24,6 +24,7 @@ internal enum class SettingsCoreItem {
     Selectors,
     Endpoints,
     Routing,
+    ConnectionTest,
     LogLevel,
 }
 
@@ -36,6 +37,7 @@ internal val SettingsCoreItems = listOf(
     SettingsCoreItem.Selectors,
     SettingsCoreItem.Routing,
     SettingsCoreItem.AppManagement,
+    SettingsCoreItem.ConnectionTest,
     SettingsCoreItem.LogLevel,
 )
 
