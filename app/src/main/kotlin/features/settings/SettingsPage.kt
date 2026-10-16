@@ -48,6 +48,7 @@ import data.backup.AppBackupRestorePreview
 import engine.proxy.ProxyServiceResult
 import engine.proxy.withResolvedDynamicLocalProxyPort
 import features.resources.runtime.singBoxRuleSetFiles
+import features.settings.sheets.ConnectionTestSettingsBottomSheet
 import features.settings.sheets.externalInterfacesSummary
 import features.settings.sheets.ignoredInterfacesSummary
 import features.settings.sheets.privateAddressCidrsSummary
@@ -719,39 +720,38 @@ private fun SettingsContent(
                 }
             },
         )
-        if (showConnectionTestDialog) {
-            SettingsConnectionTestDialog(
-                connectionTestUrl = appState.connectionTestUrl,
-                connectionTestConcurrent = appState.connectionTestConcurrent,
-                connectionTestTimeoutMillis = appState.connectionTestTimeoutMillis,
-                connectionTestUnifiedDelay = appState.connectionTestUnifiedDelay,
-                connectionTestIgnoreHandshakeTime = appState.connectionTestIgnoreHandshakeTime,
-                onConnectionTestUrlChange = { url ->
-                    updateAppState { state -> state.copy(connectionTestUrl = url) }
-                },
-                onConnectionTestConcurrentChange = { value ->
-                    updateAppState { state ->
-                        state.copy(connectionTestConcurrent = value)
-                    }
-                },
-                onConnectionTestTimeoutChange = { value ->
-                    updateAppState { state ->
-                        state.copy(connectionTestTimeoutMillis = value)
-                    }
-                },
-                onConnectionTestUnifiedDelayChange = { enabled ->
-                    updateAppState { state ->
-                        state.copy(connectionTestUnifiedDelay = enabled)
-                    }
-                },
-                onConnectionTestIgnoreHandshakeTimeChange = { enabled ->
-                    updateAppState { state ->
-                        state.copy(connectionTestIgnoreHandshakeTime = enabled)
-                    }
-                },
-                onDismiss = { showConnectionTestDialog = false },
-            )
-        }
+        ConnectionTestSettingsBottomSheet(
+            show = showConnectionTestDialog,
+            connectionTestUrl = appState.connectionTestUrl,
+            connectionTestConcurrent = appState.connectionTestConcurrent,
+            connectionTestTimeoutMillis = appState.connectionTestTimeoutMillis,
+            connectionTestUnifiedDelay = appState.connectionTestUnifiedDelay,
+            connectionTestIgnoreHandshakeTime = appState.connectionTestIgnoreHandshakeTime,
+            onConnectionTestUrlChange = { url ->
+                updateAppState { state -> state.copy(connectionTestUrl = url) }
+            },
+            onConnectionTestConcurrentChange = { value ->
+                updateAppState { state ->
+                    state.copy(connectionTestConcurrent = value)
+                }
+            },
+            onConnectionTestTimeoutChange = { value ->
+                updateAppState { state ->
+                    state.copy(connectionTestTimeoutMillis = value)
+                }
+            },
+            onConnectionTestUnifiedDelayChange = { enabled ->
+                updateAppState { state ->
+                    state.copy(connectionTestUnifiedDelay = enabled)
+                }
+            },
+            onConnectionTestIgnoreHandshakeTimeChange = { enabled ->
+                updateAppState { state ->
+                    state.copy(connectionTestIgnoreHandshakeTime = enabled)
+                }
+            },
+            onDismissRequest = { showConnectionTestDialog = false },
+        )
     }
     }
 }
