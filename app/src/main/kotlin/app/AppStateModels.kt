@@ -144,7 +144,7 @@ const val DefaultSingBoxUrlTestIdleTimeout = "30m"
 const val DefaultConnectionTestUrl = "http://cp.cloudflare.com/"
 const val DefaultConnectionTestConcurrent = 5
 const val DefaultConnectionTestTimeoutMillis = 5000
-const val DefaultConnectionTestUnifiedDelay = false
+const val DefaultConnectionTestUnifiedDelay = true
 const val DefaultConnectionTestIgnoreHandshakeTime = false
 
 data class ConnectionTestIntBounds(val min: Int, val max: Int)
@@ -574,25 +574,24 @@ fun AppState.withRemovedManagedOutboundTags(
         if (newlyUnavailableTags.isEmpty()) break
         unavailableWithDependencies += newlyUnavailableTags
     }
-    val transitivelyUnavailableTags = unavailableWithDependencies
     val dependentDnsServerTags = dnsServers
         .filter { server ->
             server.type in EndpointBackedDnsServerTypes &&
-                server.endpoint in transitivelyUnavailableTags
+                server.endpoint in unavailableWithDependencies
         }
         .mapTo(mutableSetOf(), SingBoxDnsServerState::tag)
     return copy(
         outboundGroups = outboundGroups.map { group ->
-            group.copy(detour = group.detour.takeUnless(transitivelyUnavailableTags::contains).orEmpty())
+            group.copy(detour = group.detour.takeUnless(unavailableWithDependencies::contains).orEmpty())
         },
-        outbounds = transitivelyUnavailableTags.fold(updatedOutbounds) { currentOutbounds, tag ->
+        outbounds = unavailableWithDependencies.fold(updatedOutbounds) { currentOutbounds, tag ->
             currentOutbounds.replaceManagedReference(
                 field = "detour",
                 previousTag = tag,
                 replacementTag = "",
             )
         },
-        endpoints = transitivelyUnavailableTags.fold(endpoints) { updatedEndpoints, tag ->
+        endpoints = unavailableWithDependencies.fold(endpoints) { updatedEndpoints, tag ->
             updatedEndpoints.replaceEndpointManagedReference(
                 field = "detour",
                 previousTag = tag,
@@ -601,20 +600,20 @@ fun AppState.withRemovedManagedOutboundTags(
         },
         selectors = updatedSelectors,
         selectorSelections = selectorSelections
-            .filterKeys { selectorTag -> selectorTag !in transitivelyUnavailableTags }
-            .filterValues { outboundTag -> outboundTag !in transitivelyUnavailableTags },
+            .filterKeys { selectorTag -> selectorTag !in unavailableWithDependencies }
+            .filterValues { outboundTag -> outboundTag !in unavailableWithDependencies },
         routeFinal = routeFinal
-            .takeUnless(transitivelyUnavailableTags::contains)
+            .takeUnless(unavailableWithDependencies::contains)
             .orEmpty(),
         routeRules = routeRules.map { rule ->
             rule.updateManagedPreferredByReferences { tag ->
-                tag.takeUnless(transitivelyUnavailableTags::contains)
-            }.copy(outbound = rule.outbound.takeUnless(transitivelyUnavailableTags::contains).orEmpty())
+                tag.takeUnless(unavailableWithDependencies::contains)
+            }.copy(outbound = rule.outbound.takeUnless(unavailableWithDependencies::contains).orEmpty())
         },
         dnsServers = dnsServers.map { server ->
             server.copy(
                 detour = server.detour
-                    .takeUnless(transitivelyUnavailableTags::contains)
+                    .takeUnless(unavailableWithDependencies::contains)
                     .orEmpty(),
             )
         },

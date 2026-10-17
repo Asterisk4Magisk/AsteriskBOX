@@ -48,7 +48,6 @@ import data.backup.AppBackupRestorePreview
 import engine.proxy.ProxyServiceResult
 import engine.proxy.withResolvedDynamicLocalProxyPort
 import features.resources.runtime.singBoxRuleSetFiles
-import features.settings.sheets.ConnectionTestSettingsBottomSheet
 import features.settings.sheets.externalInterfacesSummary
 import features.settings.sheets.ignoredInterfacesSummary
 import features.settings.sheets.privateAddressCidrsSummary
@@ -138,7 +137,6 @@ private fun SettingsContent(
     val scope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
     var showConfigPreview by remember { mutableStateOf(false) }
-    var showConnectionTestDialog by remember { mutableStateOf(false) }
     var runModeSwitchInProgress by rememberSaveable { mutableStateOf(false) }
     var rootBootScriptSwitchInProgress by rememberSaveable { mutableStateOf(false) }
     var rootEbpfSwitchInProgress by rememberSaveable { mutableStateOf(false) }
@@ -379,7 +377,7 @@ private fun SettingsContent(
                     onOpenSelectors = { navigator.push(Route.SelectorManagement) },
                     onOpenEndpoints = { navigator.push(Route.EndpointList) },
                     onOpenRouting = { navigator.push(Route.RoutingManagement) },
-                    onOpenConnectionTest = { showConnectionTestDialog = true },
+                    onOpenConnectionTest = { sheetState.openConnectionTestSettings(appState) },
                     onCoreLogLevelChange = { level ->
                         if (level != appState.coreLogLevel) {
                             val nextState = appState.copy(coreLogLevel = level)
@@ -719,38 +717,6 @@ private fun SettingsContent(
                     }
                 }
             },
-        )
-        ConnectionTestSettingsBottomSheet(
-            show = showConnectionTestDialog,
-            connectionTestUrl = appState.connectionTestUrl,
-            connectionTestConcurrent = appState.connectionTestConcurrent,
-            connectionTestTimeoutMillis = appState.connectionTestTimeoutMillis,
-            connectionTestUnifiedDelay = appState.connectionTestUnifiedDelay,
-            connectionTestIgnoreHandshakeTime = appState.connectionTestIgnoreHandshakeTime,
-            onConnectionTestUrlChange = { url ->
-                updateAppState { state -> state.copy(connectionTestUrl = url) }
-            },
-            onConnectionTestConcurrentChange = { value ->
-                updateAppState { state ->
-                    state.copy(connectionTestConcurrent = value)
-                }
-            },
-            onConnectionTestTimeoutChange = { value ->
-                updateAppState { state ->
-                    state.copy(connectionTestTimeoutMillis = value)
-                }
-            },
-            onConnectionTestUnifiedDelayChange = { enabled ->
-                updateAppState { state ->
-                    state.copy(connectionTestUnifiedDelay = enabled)
-                }
-            },
-            onConnectionTestIgnoreHandshakeTimeChange = { enabled ->
-                updateAppState { state ->
-                    state.copy(connectionTestIgnoreHandshakeTime = enabled)
-                }
-            },
-            onDismissRequest = { showConnectionTestDialog = false },
         )
     }
     }
