@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -533,7 +535,10 @@ private fun MetricExplanationDialog(onDismissRequest: () -> Unit) {
         },
         title = { Text(stringResource(R.string.monitor_network_quality_explanation_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 ExplanationBlock(
                     titleRes = R.string.monitor_network_quality_idle_latency,
                     bodyRes = R.string.monitor_network_quality_idle_latency_explanation,
@@ -565,7 +570,7 @@ private fun MetricExplanationDialog(onDismissRequest: () -> Unit) {
 
 @Composable
 private fun ExplanationBlock(titleRes: Int, bodyRes: Int) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             text = stringResource(titleRes),
             style = MaterialTheme.typography.titleSmall,
