@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import app.ManagedOutboundChoice
 import app.LocalAppStateStore
 import app.collectAppState
+import features.proxy.app.AppPackagePickerAction
 import features.resources.runtime.singBoxHostsFiles
 import app.ManagedReferenceChoice
 import app.SingBoxDnsRuleActions
@@ -1741,6 +1742,16 @@ private fun DnsRuleMatchFieldEditor(
                 },
                 onPendingChange = onPendingChange,
                 horizontalPadding = 0.dp,
+                headerActions = {
+                    if (matcher == "package_name") {
+                        AppPackagePickerAction(
+                            values = values,
+                            onValuesChange = { nextValues ->
+                                onRuleChange(rule.withDnsRuleMatchValues(matcher, nextValues))
+                            },
+                        )
+                    }
+                },
             )
         }
     }

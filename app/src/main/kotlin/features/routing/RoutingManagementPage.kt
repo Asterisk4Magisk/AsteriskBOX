@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -88,6 +89,7 @@ import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import engine.singbox.config.withoutInactiveFields
 import features.logs.FailureLogContext
 import features.logs.reportFailure
+import features.proxy.app.AppPackagePickerAction
 import features.resources.runtime.singBoxRuleSetFiles
 import features.settings.SettingsDropdownRow
 import kotlinx.coroutines.CancellationException
@@ -1268,6 +1270,12 @@ internal fun RouteRuleEditorScaffold(
                         title = routeRuleMatcherLabel("package_name"),
                         values = current.packageName,
                         onChange = { draft = current.copy(packageName = it) },
+                        headerActions = {
+                            AppPackagePickerAction(
+                                values = current.packageName,
+                                onValuesChange = { draft = current.copy(packageName = it) },
+                            )
+                        },
                     )
                 }
                 item(key = "package_name_regex") {
@@ -1563,6 +1571,7 @@ private fun RouteStringList(
     validate: (String) -> String? = { null },
     onPendingChange: ((Boolean) -> Unit)? = null,
     description: String? = null,
+    headerActions: @Composable RowScope.() -> Unit = {},
 ) {
     StringListEditor(
         editorKey = key,
@@ -1574,6 +1583,7 @@ private fun RouteStringList(
         validateInput = validate,
         onPendingChange = onPendingChange,
         horizontalPadding = 0.dp,
+        headerActions = headerActions,
     )
 }
 

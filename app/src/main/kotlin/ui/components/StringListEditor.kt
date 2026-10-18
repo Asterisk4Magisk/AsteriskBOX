@@ -70,6 +70,7 @@ internal fun StringListEditor(
     normalizeInput: (String) -> String = String::trim,
     onPendingChange: ((Boolean) -> Unit)? = null,
     horizontalPadding: Dp = 16.dp,
+    headerActions: @Composable RowScope.() -> Unit = {},
 ) {
     var input by rememberSaveable(editorKey, title) { mutableStateOf("") }
     var editingIndex by rememberSaveable(editorKey, title) { mutableIntStateOf(-1) }
@@ -102,11 +103,18 @@ internal fun StringListEditor(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 AsteriskInfoChip(text = sanitizedValues.size.toString())
+                // Header buttons carry 9dp of inner padding; this keeps every header gap at 18dp.
+                Spacer(Modifier.width(9.dp))
+                headerActions()
                 IconButton(
                     onClick = {
                         bulkInput = sanitizedValues.joinToString("\n")
                         showBulkEditor = true
                     },
+                    // The end inset keeps this icon centred over the 48dp add button below.
+                    modifier = Modifier
+                        .padding(end = 3.dp)
+                        .size(StringListHeaderActionSize),
                 ) {
                     Icon(Icons.Rounded.EditNote, stringResource(R.string.common_edit_all))
                 }
@@ -350,6 +358,9 @@ private fun Modifier.expandHorizontallyBy(extra: Dp): Modifier = layout { measur
 }
 
 private val StringListItemEditorBorderExtension = 8.dp
+
+/** Size for header icon buttons, including those passed through `headerActions`. */
+internal val StringListHeaderActionSize = 42.dp
 
 @Composable
 private fun RowScope.StringListEditableField(
