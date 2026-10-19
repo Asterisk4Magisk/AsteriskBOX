@@ -37,6 +37,7 @@ data class AppState(
     val hideRecentTasks: Boolean = false,
     val allowScreenshots: Boolean = false,
     val hideLauncherIcon: Boolean = false,
+    val autoHideNavigationBar: Boolean = false,
 
     val outboundGroups: List<OutboundGroupState> = emptyList(),
     val nextOutboundGroupId: Int = 1,

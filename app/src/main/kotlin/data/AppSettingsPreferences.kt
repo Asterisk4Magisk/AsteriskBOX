@@ -55,6 +55,10 @@ internal class AppSettingsPreferences(
             hideRecentTasks = preferences.getBoolean(KeyHideRecentTasks, defaults.hideRecentTasks),
             allowScreenshots = preferences.getBoolean(KeyAllowScreenshots, defaults.allowScreenshots),
             hideLauncherIcon = preferences.getBoolean(KeyHideLauncherIcon, defaults.hideLauncherIcon),
+            autoHideNavigationBar = preferences.getBoolean(
+                KeyAutoHideNavigationBar,
+                defaults.autoHideNavigationBar,
+            ),
             outboundListLayout = preferences.getInt(
                 KeyOutboundListLayout,
                 defaults.outboundListLayout,
@@ -433,6 +437,7 @@ internal const val KeySeedIndex = "seed_index"
 internal const val KeyHideRecentTasks = "hide_recent_tasks"
 internal const val KeyAllowScreenshots = "allow_screenshots"
 internal const val KeyHideLauncherIcon = "hide_launcher_icon"
+internal const val KeyAutoHideNavigationBar = "auto_hide_navigation_bar"
 private const val KeySubscriptionHwid = "subscription_hwid"
 internal const val KeyOutboundListLayout = "outbound_list_layout"
 internal const val KeyOutboundListSort = "outbound_list_sort"

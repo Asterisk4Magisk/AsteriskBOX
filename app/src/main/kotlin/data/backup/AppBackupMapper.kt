@@ -76,6 +76,7 @@ private fun AppState.toBackupSettings(): AppBackupSettings =
         hideRecentTasks = hideRecentTasks,
         allowScreenshots = allowScreenshots,
         hideLauncherIcon = hideLauncherIcon,
+        autoHideNavigationBar = autoHideNavigationBar,
         outboundListLayout = outboundListLayout,
         outboundListSort = outboundListSort,
         selectorSelections = selectorSelections,
@@ -290,6 +291,7 @@ private fun AppBackupData.toAppState(): AppState {
         hideRecentTasks = settings.hideRecentTasks,
         allowScreenshots = settings.allowScreenshots,
         hideLauncherIcon = settings.hideLauncherIcon,
+        autoHideNavigationBar = settings.autoHideNavigationBar,
         outboundGroups = restoredOutboundGroups,
         nextOutboundGroupId = nextId(
             defaults.nextOutboundGroupId,
