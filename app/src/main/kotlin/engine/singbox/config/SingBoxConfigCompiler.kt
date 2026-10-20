@@ -6,6 +6,7 @@ package engine.singbox.config
 import android.content.Context
 import app.AppState
 import app.DefaultSingBoxUrlTestUrl
+import app.effectiveFakeIpEnabled
 import app.isValidConnectionTestUrl
 import app.ManagedApiServiceTag
 import app.ManagedDirectOutboundTag
@@ -691,7 +692,7 @@ private fun buildSelectorOutbound(
 private fun buildUrlTestOutbound(
     selector: app.SingBoxSelectorState,
     members: List<String>,
-    appState: app.AppState,
+    appState: AppState,
 ): JsonObject = buildJsonObject {
     put("type", SingBoxSelectorTypeUrlTest)
     put("tag", selector.tag)
@@ -1020,12 +1021,14 @@ private fun JsonObject.hasAppTag(): Boolean =
     isManagedSingBoxTag((this["tag"] as? JsonPrimitive)?.contentOrNull.orEmpty())
 
 private fun compileExperimental(appState: AppState): JsonObject? {
+    // The FakeIP store only matters while the managed FakeIP server is compiled.
+    val storeFakeIp = appState.storeFakeIp && appState.effectiveFakeIpEnabled
     // ROOT can restart independently of the UI; retain the last API-selected mode.
-    if (!appState.runMode.isRootRunMode() && !appState.storeFakeIp && !appState.storeDns) return null
+    if (!appState.runMode.isRootRunMode() && !storeFakeIp && !appState.storeDns) return null
     return buildJsonObject {
         putJsonObject("cache_file") {
             put("enabled", true)
-            if (appState.storeFakeIp) put("store_fakeip", true)
+            if (storeFakeIp) put("store_fakeip", true)
             if (appState.storeDns) put("store_dns", true)
         }
     }
