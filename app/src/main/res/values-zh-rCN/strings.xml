@@ -839,7 +839,7 @@
     <string name="settings_dns_endpoint_fallback">未命名端点</string>
     <string name="settings_dns_endpoint_unavailable">所选端点不可用</string>
     <string name="settings_dns_extra_records">附加记录</string>
-    <string name="settings_dns_fake_ip_v4_range">FakeIP IPv4 地址池</string>
+    <string name="settings_dns_fake_ip_range">FakeIP 地址池</string>
     <string name="settings_dns_field_required">此字段不能为空</string>
     <string name="settings_dns_final">默认 DNS 服务器</string>
     <string name="settings_dns_final_required">请选择默认 DNS 服务器</string>
@@ -941,7 +941,7 @@
     <string name="settings_dns_tls_server_name">TLS 服务器名称（可选）</string>
     <string name="settings_dns_ttl_invalid">TTL 必须是 0 到 4294967295 之间的整数</string>
     <string name="settings_fake_ip_pool_invalid">请输入前缀长度为 /1 至 /30 的 IPv4 CIDR</string>
-    <string name="settings_fake_ip_summary">使用 IPv4 FakeIP 地址池处理 DNS 地址查询</string>
+    <string name="settings_fake_ip_summary">启用 FakeIP</string>
 
     <!-- Routing -->
     <string name="routing_action">动作</string>

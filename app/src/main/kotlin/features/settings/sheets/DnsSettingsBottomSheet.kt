@@ -265,7 +265,7 @@ internal fun DnsSettingsBottomSheet(
                                     SettingsTextField(
                                         value = draft.dnsFakeIpRange,
                                         onValueChange = { onDraftChange(draft.copy(dnsFakeIpRange = it)) },
-                                        label = stringResource(R.string.settings_dns_fake_ip_v4_range),
+                                        label = stringResource(R.string.settings_dns_fake_ip_range),
                                         errorText = fakeIpPoolError,
                                     )
                                 }
