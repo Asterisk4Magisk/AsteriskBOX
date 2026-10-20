@@ -100,7 +100,10 @@ internal object SingBoxDnsCompiler {
                     appState.effectiveFakeIpEnabled || rule.server != ManagedFakeIpDnsTag
                 }) + if (appState.effectiveFakeIpEnabled) listOf(
                     buildJsonObject {
-                        putJsonArray("query_type") { add("A") }
+                        putJsonArray("query_type") {
+                            add("A")
+                            add("AAAA")
+                        }
                         put("action", "route")
                         put("server", ManagedFakeIpDnsTag)
                     },
@@ -337,22 +340,30 @@ private fun kotlinx.serialization.json.JsonObjectBuilder.putNetworkServerFields(
 
 private fun SingBoxDnsRuleState.toJson(): JsonObject {
     val match = compileDnsRuleMatch(this)
-    // Legacy A/AAAA rules retain their conditions, but IPv6 never reaches FakeIP.
-    val ipv4Match = if (server == ManagedFakeIpDnsTag && action in setOf("route", "evaluate")) {
+    // Keep user conditions; FakeIP answers AAAA with no records when no IPv6 pool is configured.
+    val ipQueryMatch = if (server == ManagedFakeIpDnsTag && action in setOf("route", "evaluate")) {
         buildJsonObject {
             if (match.isEmpty()) {
-                putJsonArray("query_type") { add("A") }
+                putJsonArray("query_type") {
+                    add("A")
+                    add("AAAA")
+                }
             } else {
                 put("type", "logical")
                 put("mode", "and")
                 putJsonArray("rules") {
                     add(match)
-                    add(buildJsonObject { putJsonArray("query_type") { add("A") } })
+                    add(buildJsonObject {
+                        putJsonArray("query_type") {
+                            add("A")
+                            add("AAAA")
+                        }
+                    })
                 }
             }
         }
     } else match
-    return JsonObject(ipv4Match + compileDnsRuleAction(this))
+    return JsonObject(ipQueryMatch + compileDnsRuleAction(this))
 }
 
 private fun compileDnsRuleMatch(rule: SingBoxDnsRuleState): JsonObject = buildJsonObject {
