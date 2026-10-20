@@ -59,7 +59,7 @@ internal data class DnsSettingsDraft(
     val dnsTimeout: String = "",
     val enableFakeIp: Boolean = false,
     val dnsFakeIpRange: String = engine.network.DefaultFakeIpIpv4Pool,
-    val storeFakeIp: Boolean = false,
+    val storeFakeIp: Boolean = true,
     val storeDns: Boolean = false,
     val dnsServers: List<SingBoxDnsServerState> = emptyList(),
     val nextDnsServerId: Int = 1,
