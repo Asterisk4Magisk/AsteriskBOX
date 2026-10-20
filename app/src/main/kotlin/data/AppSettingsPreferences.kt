@@ -225,6 +225,9 @@ internal class AppSettingsPreferences(
             ),
             dnsTimeout = preferences.getString(KeyDnsTimeout, defaults.dnsTimeout)
                 ?: defaults.dnsTimeout,
+            enableFakeIp = preferences.getBoolean(KeyEnableFakeIp, defaults.enableFakeIp),
+            dnsFakeIpRange = preferences.getString(KeyDnsFakeIpRange, defaults.dnsFakeIpRange)
+                ?: defaults.dnsFakeIpRange,
             storeFakeIp = preferences.getBoolean(KeyStoreFakeIp, defaults.storeFakeIp),
             storeDns = preferences.getBoolean(KeyStoreDns, defaults.storeDns),
             transparentProxyPort = preferences.getString(
@@ -498,6 +501,8 @@ internal const val KeyDnsOptimisticCache = "dns_optimistic_cache"
 internal const val KeyDnsDisableCache = "dns_disable_cache"
 internal const val KeyDnsDisableExpire = "dns_disable_expire"
 internal const val KeyDnsTimeout = "dns_timeout"
+internal const val KeyEnableFakeIp = "enable_fake_ip"
+internal const val KeyDnsFakeIpRange = "dns_fake_ip_range"
 internal const val KeyStoreFakeIp = "store_fake_ip"
 internal const val KeyStoreDns = "store_dns"
 internal const val KeyTransparentProxyPort = "transparent_proxy_port"

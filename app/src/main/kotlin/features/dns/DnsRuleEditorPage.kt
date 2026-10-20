@@ -63,7 +63,7 @@ internal fun DnsRuleEditorPage(
     val stored = appState.dnsRules.firstOrNull { rule -> rule.id == ruleId }
     val serverChoices = appState.dnsServers.map { server ->
         server.tag to server.remarks.ifBlank { dnsServerTypeLabel(server.type) }
-    }
+    } + if (appState.enableFakeIp) listOf(app.ManagedFakeIpDnsTag to "FakeIP") else emptyList()
     val serverTags = serverChoices.map { choice -> choice.first }
     val initial = initialDraft ?: stored ?: SingBoxDnsRuleState(
         id = appState.nextAvailableDnsRuleId(),

@@ -6,6 +6,7 @@ package engine.singbox.config
 import android.content.Context
 import android.os.Process
 import app.AppState
+import app.withCompatibleProxyAppListMode
 import app.modes.ProxyAppListModeBlacklist
 import app.modes.ProxyAppListModeGlobal
 import app.modes.ProxyAppListModeWhitelist
@@ -41,7 +42,7 @@ internal fun buildRootInboundUidPolicy(
 
 internal fun Context.resolveRootInboundUidPolicy(appState: AppState): RootInboundUidPolicy {
     val selectedAppKeys = appState.proxyAppListSelectedApps.toTrimmedNonEmptyDistinctList()
-    val mode = appState.proxyAppListMode.toSupportedProxyAppListMode()
+    val mode = appState.withCompatibleProxyAppListMode().proxyAppListMode.toSupportedProxyAppListMode()
     val resolvedUids = if (mode == ProxyAppListModeGlobal) {
         emptyList()
     } else {

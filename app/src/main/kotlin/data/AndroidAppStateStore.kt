@@ -7,6 +7,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import features.resources.runtime.synchronizeResourceAssets
+import app.withCompatibleProxyAppListMode
 import app.AppState
 import app.requiresManagedTagCanonicalization
 import app.withCanonicalManagedTagReferences
@@ -63,7 +64,7 @@ class AndroidAppStateStore private constructor(
     }
 
     suspend fun replaceAllAndAwaitPersistence(nextState: AppState) {
-        val canonicalNextState = nextState.withCanonicalManagedTagReferences()
+        val canonicalNextState = nextState.withCanonicalManagedTagReferences().withCompatibleProxyAppListMode()
         lateinit var previousState: AppState
         val replacementRevision = synchronized(updateLock) {
             previousState = mutableState.value
@@ -205,11 +206,11 @@ class AndroidAppStateStore private constructor(
             val settings = settingsPreferences.load()
             val hasRoomContent = persistedState?.hasRoomContent() == true
             val previous = if (hasRoomContent) {
-                requireNotNull(persistedState).toAppState(settings)
+                persistedState.toAppState(settings)
             } else {
                 settings.withCanonicalManagedTagReferences()
             }
-            val initialized = previous.withInitializedBundledRuleSets()
+            val initialized = previous.withInitializedBundledRuleSets().withCompatibleProxyAppListMode()
             // Persist the records, references and marker in one Room transaction before exposing them.
             // Otherwise a process death after deletion could cause defaults to be seeded again.
             if (initialized !== previous) {
@@ -329,7 +330,7 @@ class AndroidAppStateStore private constructor(
 internal fun canonicalAppStateUpdate(
     transform: (AppState) -> AppState,
 ): (AppState) -> AppState = { state ->
-    val nextState = transform(state)
+    val nextState = transform(state).withCompatibleProxyAppListMode()
     if (requiresManagedTagCanonicalization(state, nextState)) {
         nextState.withCanonicalManagedTagReferences()
     } else {

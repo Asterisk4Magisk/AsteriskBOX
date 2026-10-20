@@ -124,7 +124,7 @@ internal fun DnsManagementPage(
     val validationFailedMessage = stringResource(R.string.settings_sing_box_validation_failed)
     val serverChoices = appState.dnsServers.map { server ->
         server.tag to server.remarks.ifBlank { dnsServerTypeLabel(server.type) }
-    }
+    } + if (appState.enableFakeIp) listOf(app.ManagedFakeIpDnsTag to "FakeIP") else emptyList()
     val ruleSetChoices = remember(appState.customResourceFiles) {
         appState.managedRuleSetChoices(
             context.singBoxRuleSetFiles(appState.customResourceFiles).map { file -> file.name },

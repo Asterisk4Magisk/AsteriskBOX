@@ -40,13 +40,6 @@ data class SubscriptionInfo(
         }
 
     /**
-     * True when the server reported enough information for the UI to draw a meaningful
-     * traffic summary: either a positive total quota (metered) or a positive expire time.
-     */
-    val hasTraffic: Boolean
-        get() = totalBytes > 0L || expireAtSeconds > 0L
-
-    /**
      * True when the server reported a positive total quota so a progress bar makes sense.
      */
     val hasMeteredQuota: Boolean
@@ -307,6 +300,7 @@ data class SingBoxDnsServerState(
     val predefinedHosts: List<String> = emptyList(),
     val interfaceName: String = "",
     val interfaceNames: List<String> = emptyList(),
+    // Read old FakeIP server records/backups before moving them to the dedicated settings.
     val inet4Range: String = "",
     val inet6Range: String = "",
     val endpoint: String = "",
@@ -393,7 +387,6 @@ val SingBoxDnsServerTypes = listOf(
     "h3",
     "dhcp",
     "mdns",
-    "fakeip",
     "tailscale",
     "openconnect",
     "openvpn",

@@ -30,6 +30,7 @@ internal enum class ManagedTagKind {
     TUN_INBOUND,
     ROOT_INBOUND,
     API_SERVICE,
+    FAKE_IP_DNS,
 }
 
 internal data class ManagedTagIdentity(
@@ -115,6 +116,7 @@ private data class DynamicManagedTagPattern(
 )
 
 private val FixedManagedTagIdentities = mapOf(
+    ManagedFakeIpDnsTag to ManagedTagIdentity(ManagedTagKind.FAKE_IP_DNS),
     ManagedDirectOutboundTag to ManagedTagIdentity(ManagedTagKind.DIRECT_OUTBOUND),
     ManagedGlobalSelectorTag to ManagedTagIdentity(ManagedTagKind.GLOBAL_SELECTOR),
     ManagedLocalInboundTag to ManagedTagIdentity(ManagedTagKind.LOCAL_INBOUND),

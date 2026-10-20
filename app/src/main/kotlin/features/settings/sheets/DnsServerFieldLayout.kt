@@ -11,7 +11,6 @@ internal enum class DnsServerFieldKind {
     Network,
     Dhcp,
     Mdns,
-    FakeIp,
     Endpoint,
     Resolved,
 }
@@ -39,7 +38,6 @@ internal fun dnsServerFieldLayout(serverType: String): DnsServerFieldLayout =
         )
         "dhcp" -> DnsServerFieldLayout(DnsServerFieldKind.Dhcp)
         "mdns" -> DnsServerFieldLayout(DnsServerFieldKind.Mdns)
-        "fakeip" -> DnsServerFieldLayout(DnsServerFieldKind.FakeIp)
         "tailscale", "openconnect", "openvpn" ->
             DnsServerFieldLayout(DnsServerFieldKind.Endpoint)
         "resolved" -> DnsServerFieldLayout(DnsServerFieldKind.Resolved)

@@ -14,7 +14,6 @@ import app.managedDnsServerTag
 import engine.singbox.config.APP_DIRECT_OUTBOUND
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 
-const val DefaultSingBoxDnsFakeIpRange = "198.18.0.1/16"
 val DefaultSingBoxDnsFinal = managedDnsServerTag(2, "proxy")
 val DefaultSingBoxRouteDefaultDomainResolver = managedDnsServerTag(1, "direct")
 const val DefaultSingBoxDnsCacheCapacity = ""

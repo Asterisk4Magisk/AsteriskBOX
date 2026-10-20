@@ -97,6 +97,8 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
     boolean(KeyDnsDisableCache, dnsDisableCache)
     boolean(KeyDnsDisableExpire, dnsDisableExpire)
     string(KeyDnsTimeout, dnsTimeout)
+    boolean(KeyEnableFakeIp, enableFakeIp)
+    string(KeyDnsFakeIpRange, dnsFakeIpRange)
     boolean(KeyStoreFakeIp, storeFakeIp)
     boolean(KeyStoreDns, storeDns)
     string(KeyTransparentProxyPort, transparentProxyPort)

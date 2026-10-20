@@ -66,6 +66,7 @@ internal fun AppState.managedReferenceRemarks(): Map<String, String> = buildMap 
     dnsServers.forEach { server ->
         putVisibleRemarks(server.tag, server.remarks)
     }
+    putVisibleRemarks(ManagedFakeIpDnsTag, "FakeIP")
     dnsRules
         .filter { rule -> rule.action == SingBoxDnsEvaluateAction }
         .forEach { rule ->
@@ -252,6 +253,7 @@ internal fun AppState.currentManagedTagsByIdentity(): Map<ManagedTagIdentity, St
     add(APP_TUN_INBOUND)
     add(APP_ROOT_INBOUND)
     add(ManagedApiServiceTag)
+    add(ManagedFakeIpDnsTag)
     outboundGroups.forEach { group ->
         add(managedOutboundGroupSelectorTag(group.id, group.name))
     }
@@ -285,12 +287,16 @@ internal fun SingBoxDnsRuleState.withCanonicalManagedReferences(
     logicalRules = logicalRules.map { rule -> rule.withCanonicalManagedReferences(resolve) },
     server = resolve(server),
     matches = matches.map { match ->
-        if (match.field in DnsConfigurationMatchFields) {
-            match.copy(values = mapDnsConfigurationTags(match.values, resolve))
-        } else if (match.field in CanonicalDnsReferenceFields) {
-            match.copy(values = match.values.map(resolve))
-        } else {
-            match
+        when (match.field) {
+            in DnsConfigurationMatchFields -> {
+                match.copy(values = mapDnsConfigurationTags(match.values, resolve))
+            }
+            in CanonicalDnsReferenceFields -> {
+                match.copy(values = match.values.map(resolve))
+            }
+            else -> {
+                match
+            }
         }
     },
 )
@@ -625,6 +631,7 @@ internal fun AppState.withPrunedDnsServerReferences(): AppState {
     val availableTags = dnsServers.mapNotNullTo(mutableSetOf()) { server ->
         server.tag.trim().takeIf(String::isNotEmpty)
     }
+    availableTags.add(ManagedFakeIpDnsTag)
     val preferredByTags = selectablePreferredByDnsServerTags(this).toSet()
     val configurationTags = dnsServers.filter { it.type in DnsConfigurationServerTypes }
         .mapTo(mutableSetOf(), SingBoxDnsServerState::tag)

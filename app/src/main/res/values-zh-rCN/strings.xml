@@ -840,7 +840,6 @@
     <string name="settings_dns_endpoint_unavailable">所选端点不可用</string>
     <string name="settings_dns_extra_records">附加记录</string>
     <string name="settings_dns_fake_ip_v4_range">FakeIP IPv4 地址池</string>
-    <string name="settings_dns_fake_ip_v6_range">FakeIP IPv6 地址池（可选）</string>
     <string name="settings_dns_field_required">此字段不能为空</string>
     <string name="settings_dns_final">默认 DNS 服务器</string>
     <string name="settings_dns_final_required">请选择默认 DNS 服务器</string>
@@ -915,7 +914,6 @@
     <string name="settings_dns_server_required">至少需要一个有效的 DNS 服务器</string>
     <string name="settings_dns_server_type">服务器类型</string>
     <string name="settings_dns_server_type_dhcp">DHCP</string>
-    <string name="settings_dns_server_type_fakeip">FakeIP</string>
     <string name="settings_dns_server_type_group">分组</string>
     <string name="settings_dns_server_type_h3">HTTP/3</string>
     <string name="settings_dns_server_type_hosts">Hosts</string>
@@ -942,6 +940,8 @@
     <string name="settings_dns_tls_insecure">允许不安全的 TLS</string>
     <string name="settings_dns_tls_server_name">TLS 服务器名称（可选）</string>
     <string name="settings_dns_ttl_invalid">TTL 必须是 0 到 4294967295 之间的整数</string>
+    <string name="settings_fake_ip_pool_invalid">请输入前缀长度为 /1 至 /30 的 IPv4 CIDR</string>
+    <string name="settings_fake_ip_summary">使用 IPv4 FakeIP 地址池处理 DNS 地址查询</string>
 
     <!-- Routing -->
     <string name="routing_action">动作</string>
@@ -1317,6 +1317,7 @@
     <string name="proxy_app_list_clear_done">已清空</string>
     <string name="proxy_app_list_clear_selection">清空</string>
     <string name="proxy_app_list_entry_summary">{package}</string>
+    <string name="proxy_app_list_fake_dns_requires_global">ROOT 模式开启 FakeIP 时仅支持全应用模式</string>
     <string name="proxy_app_list_help">帮助</string>
     <string name="proxy_app_list_help_blacklist">黑名单模式：仅名单中的应用不使用代理，其他应用均使用代理。</string>
     <string name="proxy_app_list_help_global">全应用模式：所有应用均使用代理。</string>

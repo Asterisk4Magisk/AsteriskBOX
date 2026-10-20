@@ -4,6 +4,7 @@
 package features.dns
 
 import app.AppState
+import app.withCompatibleProxyAppListMode
 import app.withPrunedDnsServerReferences
 import app.withCanonicalManagedTagReferences
 import features.settings.DnsSettingsDraft
@@ -20,6 +21,8 @@ internal fun AppState.withDnsSettings(draft: DnsSettingsDraft): AppState {
         dnsDisableCache = draft.dnsDisableCache,
         dnsDisableExpire = draft.dnsDisableExpire,
         dnsTimeout = draft.dnsTimeout,
+        enableFakeIp = draft.enableFakeIp,
+        dnsFakeIpRange = draft.dnsFakeIpRange,
         storeFakeIp = draft.storeFakeIp,
         storeDns = draft.storeDns,
         dnsServers = draft.dnsServers,
@@ -27,5 +30,5 @@ internal fun AppState.withDnsSettings(draft: DnsSettingsDraft): AppState {
         dnsRules = dnsRules
             .replaceDnsServerTagReferences(draft.dnsServerTagReplacements)
             .replaceDnsPreferredByTagReferences(draft.dnsPreferredByTagReplacements),
-    ).withCanonicalManagedTagReferences().withPrunedDnsServerReferences()
+    ).withCanonicalManagedTagReferences().withPrunedDnsServerReferences().withCompatibleProxyAppListMode()
 }

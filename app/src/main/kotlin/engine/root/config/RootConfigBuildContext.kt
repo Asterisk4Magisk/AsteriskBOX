@@ -7,10 +7,9 @@ import android.content.Context
 import app.AppState
 import app.effectiveFakeIpEnabled
 import app.effectiveLocalDnsEnabled
-import engine.network.parseCidrAddressOrNull
 import engine.network.toPortOrNull
 import engine.proxy.ProxyEngineStartRequest
-import engine.singbox.DefaultSingBoxDnsFakeIpRange
+import engine.network.normalizedFakeIpIpv4Pool
 import engine.singbox.SingBoxConfigFactory
 import engine.singbox.prepareSingBoxCoreLogPaths
 import features.resources.runtime.SingBoxResourceFilePaths
@@ -81,32 +80,4 @@ internal fun AppState.bpf2SocksBridgePortValue(): Int {
     return bpf2SocksBridgePort.toPortOrNull() ?: RootBpf2SocksDefaultBridgePort
 }
 
-private fun AppState.rootFakeIpIpv4Pool(): String {
-    return dnsServers
-        .firstOrNull { server -> server.type == "fakeip" }
-        ?.inet4Range
-        ?.normalizedIpv4CidrOrNull()
-        ?: DefaultSingBoxDnsFakeIpRange.normalizedIpv4CidrOrNull()
-        ?: "198.18.0.0/16"
-}
-
-private fun String.normalizedIpv4CidrOrNull(): String? {
-    val cidr = parseCidrAddressOrNull(this) ?: return null
-    if (":" in cidr.address) return null
-    val octets = cidr.address.split(".")
-    if (octets.size != 4) return null
-    var addressValue = 0L
-    octets.forEach { octet ->
-        val value = octet.toIntOrNull() ?: return null
-        addressValue = (addressValue shl 8) or value.toLong()
-    }
-    val mask = if (cidr.prefixLength == 0) 0L else (0xffffffffL shl (32 - cidr.prefixLength)) and 0xffffffffL
-    val network = addressValue and mask
-    val address = listOf(
-        (network shr 24) and 0xff,
-        (network shr 16) and 0xff,
-        (network shr 8) and 0xff,
-        network and 0xff,
-    ).joinToString(".")
-    return "$address/${cidr.prefixLength}"
-}
+private fun AppState.rootFakeIpIpv4Pool(): String = dnsFakeIpRange.normalizedFakeIpIpv4Pool()

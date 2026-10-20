@@ -67,8 +67,7 @@ import app.SingBoxDnsServerTypes
 import app.visibleManagedReference
 import engine.network.isCidrAddress
 import engine.network.isIpAddress
-import engine.network.isIpv4CidrAddress
-import engine.singbox.DefaultSingBoxDnsFakeIpRange
+import engine.network.isValidFakeIpIpv4Pool
 import engine.singbox.DefaultSingBoxDnsTimeout
 import engine.singbox.config.hasValidDnsRuleStructure
 import engine.singbox.config.DnsRuleBooleanMatchers
@@ -205,7 +204,9 @@ internal fun DnsSettingsBottomSheet(
             stringResource(R.string.settings_dns_server_identity_invalid)
         else -> null
     }
-    val canSave = timeoutError == null &&
+    val fakeIpPoolError = stringResource(R.string.settings_fake_ip_pool_invalid)
+        .takeIf { draft.enableLocalDns && draft.enableFakeIp && !isValidFakeIpIpv4Pool(draft.dnsFakeIpRange) }
+    val canSave = fakeIpPoolError == null && timeoutError == null &&
         cacheCapacityError == null &&
         defaultServerError == null &&
         defaultDomainResolverError == null &&
@@ -242,6 +243,35 @@ internal fun DnsSettingsBottomSheet(
                         checked = draft.enableLocalDns,
                         onCheckedChange = { onDraftChange(draft.copy(enableLocalDns = it)) },
                     )
+                    AnimatedVisibility(
+                        visible = draft.enableLocalDns,
+                        enter = AsteriskMotion.contentEnter(),
+                        exit = AsteriskMotion.contentExit(),
+                    ) {
+                        Column {
+                            SwitchPreference(
+                                title = "FakeIP",
+                                icon = Icons.Rounded.Dns,
+                                summary = stringResource(R.string.settings_fake_ip_summary),
+                                checked = draft.enableFakeIp,
+                                onCheckedChange = { onDraftChange(draft.copy(enableFakeIp = it)) },
+                            )
+                            AnimatedVisibility(
+                                visible = draft.enableFakeIp,
+                                enter = AsteriskMotion.contentEnter(),
+                                exit = AsteriskMotion.contentExit(),
+                            ) {
+                                Column {
+                                    SettingsTextField(
+                                        value = draft.dnsFakeIpRange,
+                                        onValueChange = { onDraftChange(draft.copy(dnsFakeIpRange = it)) },
+                                        label = stringResource(R.string.settings_dns_fake_ip_v4_range),
+                                        errorText = fakeIpPoolError,
+                                    )
+                                }
+                            }
+                        }
+                    }
                     WindowDropdownPreference(
                         title = stringResource(R.string.settings_dns_final),
                         icon = Icons.AutoMirrored.Rounded.AltRoute,
@@ -344,9 +374,8 @@ internal fun DnsSettingsBottomSheet(
                         label = stringResource(R.string.settings_dns_timeout),
                         errorText = timeoutError,
                     )
-                    val hasFakeIpServer = draft.dnsServers.any { it.type == "fakeip" }
                     AnimatedVisibility(
-                        visible = hasFakeIpServer,
+                        visible = draft.enableLocalDns && draft.enableFakeIp,
                         enter = AsteriskMotion.contentEnter(),
                         exit = AsteriskMotion.contentExit(),
                     ) {
@@ -548,14 +577,6 @@ private fun DnsServerEditorSheet(
     }
     val serviceError = requiredError.takeIf { server.type == "resolved" && server.service.isBlank() }
     val hostsInvalidMessage = stringResource(R.string.settings_dns_hosts_invalid)
-    val fakeIpError = if (
-        server.type == "fakeip" &&
-        !isIpv4CidrAddress(server.inet4Range.ifBlank { DefaultSingBoxDnsFakeIpRange })
-    ) {
-        stringResource(R.string.settings_dns_cidr_invalid)
-    } else {
-        null
-    }
     val existingServerTags = existingServers
         .filter { it.type != "group" && it.type != "fakeip" }
         .map { it.tag.trim() }
@@ -581,7 +602,6 @@ private fun DnsServerEditorSheet(
         detourError,
         endpointError,
         serviceError,
-        fakeIpError,
         groupServerError,
         portError,
     ).all { it == null }
@@ -784,23 +804,6 @@ private fun DnsServerEditorSheet(
                         onServerChange = onEditorChange,
                         domainResolverError = domainResolverError,
                         detourError = detourError,
-                    )
-                    }
-                    DnsServerFieldKind.FakeIp -> {
-                    SettingsTextField(
-                        value = server.inet4Range,
-                        onValueChange = { onEditorChange(server.copy(inet4Range = it)) },
-                        label = stringResource(R.string.settings_dns_fake_ip_v4_range),
-                        errorText = fakeIpError,
-                    )
-                    SettingsTextField(
-                        value = server.inet6Range,
-                        onValueChange = { onEditorChange(server.copy(inet6Range = it)) },
-                        label = stringResource(R.string.settings_dns_fake_ip_v6_range),
-                        errorText = server.inet6Range.takeIf(String::isNotBlank)?.let { range ->
-                            if (isCidrAddress(range) && ":" in range) null
-                            else stringResource(R.string.settings_dns_cidr_invalid)
-                        },
                     )
                     }
                     DnsServerFieldKind.Endpoint -> {
@@ -1940,6 +1943,7 @@ private fun DnsObjectRow(
 
 internal fun DnsSettingsDraft.sanitized(): DnsSettingsDraft =
     copy(
+        dnsFakeIpRange = dnsFakeIpRange.trim(),
         dnsFinal = dnsFinal.trim(),
         routeDefaultDomainResolver = routeDefaultDomainResolver.trim(),
         dnsCacheCapacity = dnsCacheCapacity.trim(),
@@ -1965,7 +1969,6 @@ private fun dnsServerSummary(
         "group" -> server.servers.takeIf(List<String>::isNotEmpty)
             ?.joinToString(", ")
             ?: stringResource(R.string.settings_dns_group_servers_empty)
-        "fakeip" -> server.inet4Range.ifBlank { DefaultSingBoxDnsFakeIpRange }
         in EndpointDnsServerTypes ->
             visibleManagedReference(server.endpoint, endpointLabels, unavailableLabel)
         "resolved" -> server.service
@@ -2017,7 +2020,6 @@ private fun dnsServerTypeLabelResource(type: String): Int = when (type) {
     "h3" -> R.string.settings_dns_server_type_h3
     "dhcp" -> R.string.settings_dns_server_type_dhcp
     "mdns" -> R.string.settings_dns_server_type_mdns
-    "fakeip" -> R.string.settings_dns_server_type_fakeip
     "tailscale" -> R.string.settings_dns_server_type_tailscale
     "openconnect" -> R.string.settings_dns_server_type_openconnect
     "openvpn" -> R.string.settings_dns_server_type_openvpn

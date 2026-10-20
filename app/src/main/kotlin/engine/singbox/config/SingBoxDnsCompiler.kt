@@ -3,6 +3,10 @@
 
 package engine.singbox.config
 
+import app.ManagedFakeIpDnsTag
+import app.effectiveFakeIpEnabled
+import app.withIpv4FakeIpSettings
+import engine.network.normalizedFakeIpIpv4Pool
 import app.withPrunedDnsEvaluationReferences
 
 import app.AppState
@@ -16,7 +20,6 @@ import app.SingBoxDnsRuleTypeLogical
 import app.SingBoxDnsServerState
 import app.SingBoxDnsServerTypes
 import app.effectiveLocalDnsEnabled
-import engine.singbox.DefaultSingBoxDnsFakeIpRange
 import engine.singbox.DefaultSingBoxDnsServers
 import engine.singbox.SingBoxUnsigned32Max
 import engine.singbox.singBoxRuleMatcherValueError
@@ -49,6 +52,8 @@ internal object SingBoxDnsCompiler {
         hostsResourcePaths: Map<Int, String> = emptyMap(),
     ): SingBoxDnsCompileResult? {
         if (!appState.effectiveLocalDnsEnabled) return null
+        val normalized = appState.withIpv4FakeIpSettings()
+        if (normalized !== appState) return compile(normalized, hostsResourcePaths)
 
         val sourceServers = appState.dnsServers.ifEmpty { DefaultSingBoxDnsServers }
         require(sourceServers.map(SingBoxDnsServerState::id).distinct().size == sourceServers.size) {
@@ -81,8 +86,25 @@ internal object SingBoxDnsCompiler {
 
         return SingBoxDnsCompileResult(
             dns = buildJsonObject {
-                put("servers", JsonArray(servers))
-                val rules = compileManagedDnsRules(appState.dnsRules)
+                val fakeIpServers = if (appState.effectiveFakeIpEnabled) listOf(
+                    buildJsonObject {
+                        put("type", "fakeip")
+                        put("tag", ManagedFakeIpDnsTag)
+                        put("inet4_range", appState.dnsFakeIpRange.normalizedFakeIpIpv4Pool())
+                    },
+                ) else emptyList()
+                put("servers", JsonArray(servers + fakeIpServers))
+                // Keep explicit user rules ahead of the fallback, including exclusions/rejections.
+                // The default resolver/final remain real DNS servers for internal resolution.
+                val rules = compileManagedDnsRules(appState.dnsRules.filter { rule ->
+                    appState.effectiveFakeIpEnabled || rule.server != ManagedFakeIpDnsTag
+                }) + if (appState.effectiveFakeIpEnabled) listOf(
+                    buildJsonObject {
+                        putJsonArray("query_type") { add("A") }
+                        put("action", "route")
+                        put("server", ManagedFakeIpDnsTag)
+                    },
+                ) else emptyList()
                 if (rules.isNotEmpty()) put("rules", JsonArray(rules))
                 put("final", defaultServer)
                 put(
@@ -277,10 +299,6 @@ private fun SingBoxDnsServerState.toJson(hostsPaths: List<String>): JsonObject =
         "https", "h3" -> putNetworkServerFields(this@toJson, includeTls = true, includePath = true)
         "dhcp" -> putIfNotBlank("interface", interfaceName)
         "mdns" -> putStringArrayIfNotEmpty("interface", interfaceNames)
-        "fakeip" -> {
-            put("inet4_range", inet4Range.ifBlank { DefaultSingBoxDnsFakeIpRange })
-            putIfNotBlank("inet6_range", inet6Range)
-        }
         "tailscale", "openconnect", "openvpn" -> {
             putIfNotBlank("endpoint", endpoint)
             if (acceptDefaultResolvers) put("accept_default_resolvers", true)
@@ -317,8 +335,25 @@ private fun kotlinx.serialization.json.JsonObjectBuilder.putNetworkServerFields(
     }
 }
 
-private fun SingBoxDnsRuleState.toJson(): JsonObject =
-    JsonObject(compileDnsRuleMatch(this) + compileDnsRuleAction(this))
+private fun SingBoxDnsRuleState.toJson(): JsonObject {
+    val match = compileDnsRuleMatch(this)
+    // Legacy A/AAAA rules retain their conditions, but IPv6 never reaches FakeIP.
+    val ipv4Match = if (server == ManagedFakeIpDnsTag && action in setOf("route", "evaluate")) {
+        buildJsonObject {
+            if (match.isEmpty()) {
+                putJsonArray("query_type") { add("A") }
+            } else {
+                put("type", "logical")
+                put("mode", "and")
+                putJsonArray("rules") {
+                    add(match)
+                    add(buildJsonObject { putJsonArray("query_type") { add("A") } })
+                }
+            }
+        }
+    } else match
+    return JsonObject(ipv4Match + compileDnsRuleAction(this))
+}
 
 private fun compileDnsRuleMatch(rule: SingBoxDnsRuleState): JsonObject = buildJsonObject {
     if (rule.type == SingBoxDnsRuleTypeLogical) {

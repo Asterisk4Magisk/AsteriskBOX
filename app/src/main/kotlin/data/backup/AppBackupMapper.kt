@@ -6,6 +6,7 @@ package data.backup
 import engine.singbox.config.DnsConfigurationMatchFields
 import engine.singbox.config.dnsConfigurationEntryTag
 
+import app.withCompatibleProxyAppListMode
 import app.AppState
 import app.withNormalizedConnectionTestSettings
 import features.resources.withInitializedBundledRuleSets
@@ -124,6 +125,9 @@ private fun AppState.toBackupSettings(): AppBackupSettings =
         snifferTimeout = snifferTimeout,
         enableIpv6 = enableIpv6,
         enableIpv6Prefer = enableIpv6Prefer,
+        enableFakeIp = enableFakeIp,
+        dnsFakeIpRange = dnsFakeIpRange,
+        storeFakeIp = storeFakeIp,
         dnsFinal = dnsFinal,
         routeDefaultDomainResolver = routeDefaultDomainResolver,
         dnsCacheCapacity = dnsCacheCapacity,
@@ -361,6 +365,9 @@ private fun AppBackupData.toAppState(): AppState {
         snifferTimeout = settings.snifferTimeout,
         enableIpv6 = settings.enableIpv6,
         enableIpv6Prefer = settings.enableIpv6Prefer,
+        enableFakeIp = settings.enableFakeIp,
+        dnsFakeIpRange = settings.dnsFakeIpRange,
+        storeFakeIp = settings.storeFakeIp,
         dnsFinal = settings.dnsFinal,
         routeDefaultDomainResolver = settings.routeDefaultDomainResolver,
         dnsCacheCapacity = settings.dnsCacheCapacity,
@@ -401,6 +408,7 @@ private fun AppBackupData.toAppState(): AppState {
         proxyAppListSelectedApps = proxyAppListSelectedApps,
     ).withInitializedBundledRuleSets()
         .withCanonicalManagedTagReferences()
+        .withCompatibleProxyAppListMode()
         .withNormalizedConnectionTestSettings()
 }
 
@@ -492,6 +500,7 @@ private fun AppState.restoreWarnings(): List<AppBackupWarning> {
     val missingOutboundCount = outboundReferences.countMissingManagedReferences(availableOutbounds)
 
     val availableDnsServers = dnsServers.mapTo(mutableSetOf()) { server -> server.tag }
+        .apply { if (enableFakeIp) add(app.ManagedFakeIpDnsTag) }
     val dnsReferences = buildList {
         add(dnsFinal)
         add(routeDefaultDomainResolver)

@@ -53,6 +53,7 @@ import app.LocalAppStateStore
 import app.LocalIsWideScreen
 import app.LocalUpdateAppState
 import app.R
+import app.requiresGlobalProxyAppMode
 import app.collectAppState
 import app.modes.ProxyAppListModeBlacklist
 import app.modes.ProxyAppListModeGlobal
@@ -137,6 +138,8 @@ fun ProxyAppListPage(
 
     val proxyAppListModes = proxyAppListModeLabels()
     val modeIndex = appState.proxyAppListMode.coerceIn(proxyAppListModes.indices)
+    val requiresGlobalProxyAppMode = appState.requiresGlobalProxyAppMode
+    val fakeDnsGlobalModeMessage = stringResource(R.string.proxy_app_list_fake_dns_requires_global)
     val isVpnServiceMode = appState.runMode == RunModeVpnService
     val selectedAppKeys = remember(appState.proxyAppListSelectedApps) {
         appState.proxyAppListSelectedApps.toSet()
@@ -358,8 +361,13 @@ fun ProxyAppListPage(
                 ProxyAppListModeSegmentedRow(
                     modes = proxyAppListModes,
                     selectedIndex = modeIndex,
+                    requiresGlobalProxyAppMode = requiresGlobalProxyAppMode,
                     onSelectedIndexChange = { index ->
-                        updateAppState { state -> state.copy(proxyAppListMode = index) }
+                        if (requiresGlobalProxyAppMode && index != ProxyAppListModeGlobal) {
+                            scope.launch { tipNotifier.show(fakeDnsGlobalModeMessage) }
+                        } else {
+                            updateAppState { state -> state.copy(proxyAppListMode = index) }
+                        }
                     },
                     modifier = Modifier
                         .cutoutHorizontalPadding()
@@ -419,6 +427,7 @@ fun ProxyAppListPage(
         onModeSelected = { importMode ->
             val imported = pendingAppListImport ?: return@ImportModeDialog
             var importedCount = 0
+            var importedModeRestricted = false
             updateAppState { state ->
                 val result = applyProxyAppListClipboardImport(
                     currentMode = state.proxyAppListMode,
@@ -431,6 +440,7 @@ fun ProxyAppListPage(
                     ClipboardImportMode.Merge ->
                         (result.selectedApps.size - state.proxyAppListSelectedApps.size).coerceAtLeast(0)
                 }
+                importedModeRestricted = state.requiresGlobalProxyAppMode && result.mode != ProxyAppListModeGlobal
                 state.copy(
                     proxyAppListMode = result.mode,
                     proxyAppListSelectedApps = result.selectedApps,
@@ -438,7 +448,10 @@ fun ProxyAppListPage(
             }
             pendingAppListImport = null
             scope.launch {
-                tipNotifier.show(importedTemplate.formatTemplate("count" to importedCount))
+                tipNotifier.show(
+                    if (importedModeRestricted) fakeDnsGlobalModeMessage
+                    else importedTemplate.formatTemplate("count" to importedCount),
+                )
             }
         },
     )

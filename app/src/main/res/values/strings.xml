@@ -853,7 +853,6 @@
     <string name="settings_dns_endpoint_unavailable">The selected endpoint is unavailable</string>
     <string name="settings_dns_extra_records">Extra records</string>
     <string name="settings_dns_fake_ip_v4_range">FakeIP IPv4 range</string>
-    <string name="settings_dns_fake_ip_v6_range">FakeIP IPv6 range (optional)</string>
     <string name="settings_dns_field_required">This field is required</string>
     <string name="settings_dns_final">Default DNS server</string>
     <string name="settings_dns_final_required">Select a default DNS server</string>
@@ -928,7 +927,6 @@
     <string name="settings_dns_server_required">At least one valid DNS server is required</string>
     <string name="settings_dns_server_type">Server type</string>
     <string name="settings_dns_server_type_dhcp">DHCP</string>
-    <string name="settings_dns_server_type_fakeip">FakeIP</string>
     <string name="settings_dns_server_type_group">Group</string>
     <string name="settings_dns_server_type_h3">HTTP/3</string>
     <string name="settings_dns_server_type_hosts">Hosts</string>
@@ -955,6 +953,8 @@
     <string name="settings_dns_tls_insecure">Allow insecure TLS</string>
     <string name="settings_dns_tls_server_name">TLS server name (optional)</string>
     <string name="settings_dns_ttl_invalid">TTL must be an integer from 0 to 4294967295</string>
+    <string name="settings_fake_ip_pool_invalid">Enter an IPv4 CIDR with a prefix from /1 to /30</string>
+    <string name="settings_fake_ip_summary">Use an IPv4 FakeIP pool for DNS address queries</string>
 
     <!-- Routing -->
     <string name="routing_action">Action</string>
@@ -1334,6 +1334,7 @@
     <string name="proxy_app_list_clear_done">Selection cleared</string>
     <string name="proxy_app_list_clear_selection">Clear selection</string>
     <string name="proxy_app_list_entry_summary">{package}</string>
+    <string name="proxy_app_list_fake_dns_requires_global">FakeIP in ROOT mode requires all-app mode</string>
     <string name="proxy_app_list_help">Help</string>
     <string name="proxy_app_list_help_blacklist">Blacklist mode: apps on the blacklist bypass the proxy; everything else uses it.</string>
     <string name="proxy_app_list_help_global">All-app mode: every app uses the proxy.</string>
