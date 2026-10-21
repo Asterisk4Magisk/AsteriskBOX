@@ -22,8 +22,7 @@ val DefaultSingBoxDnsServers = listOf(
     SingBoxDnsServerState(
         id = 1,
         remarks = "direct",
-        type = "udp",
-        server = "223.5.5.5",
+        type = "local",
     ),
     SingBoxDnsServerState(
         id = 2,
