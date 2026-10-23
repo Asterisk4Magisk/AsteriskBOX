@@ -1279,13 +1279,6 @@ internal fun OutboundGroupCard(
                                             stringResource(R.string.outbound_group_update_interval_value, group.updateInterval),
                                             style = MaterialTheme.typography.bodySmall,
                                         )
-                                        if (group.subscriptionInfo.expireAtSeconds > 0L) Text(
-                                            text = stringResource(
-                                                R.string.outbound_group_subscription_expire,
-                                                (group.subscriptionInfo.expireAtSeconds * 1000L).toReadableDateOrDash(),
-                                            ),
-                                            style = MaterialTheme.typography.bodySmall,
-                                        )
                                         if (status.summary.isNotBlank()) Text(
                                             status.summary, style = MaterialTheme.typography.bodySmall, color = statusColor,
                                         )
@@ -1356,8 +1349,42 @@ internal fun OutboundGroupCard(
                 }
             }
             OutboundGroupSubscriptionInfo(info = group.subscriptionInfo)
+            OutboundGroupCardMeta(group = group)
         }
     }
+}
+
+/**
+ * Last-update time and expiry, the two facts worth seeing without opening the status
+ * popup. Each half is omitted when the group does not carry it, so local groups and
+ * subscriptions without a quota stay one line shorter.
+ */
+@Composable
+private fun OutboundGroupCardMeta(group: OutboundGroupState) {
+    val updatedText = group.lastUpdatedAtMillis
+        .takeIf { it > 0L && group.url.isNotBlank() }
+        ?.let {
+            stringResource(
+                R.string.outbound_group_status_updated,
+                it.toReadableDateTimeOrDash(),
+            )
+        }
+    val expireText = group.subscriptionInfo.expireAtSeconds
+        .takeIf { it > 0L }
+        ?.let {
+            stringResource(
+                R.string.outbound_group_subscription_expire,
+                (it * 1000L).toReadableDateOrDash(),
+            )
+        }
+    val meta = listOfNotNull(updatedText, expireText).joinToString(" · ")
+    if (meta.isEmpty()) return
+    Text(
+        text = meta,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 6.dp, end = 8.dp),
+    )
 }
 
 @Composable
