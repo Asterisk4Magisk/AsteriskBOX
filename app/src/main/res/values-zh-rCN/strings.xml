@@ -323,6 +323,12 @@
     <string name="outbound_group_hwid">HWID</string>
     <string name="outbound_group_local">本地分组</string>
     <string name="outbound_group_management">分组管理</string>
+    <string name="outbound_group_config_restart_required">需要重启生效</string>
+    <string name="outbound_group_config_restart_summary">配置已变更，运行中的服务仍在使用变更前的配置，重启后生效。</string>
+    <string name="outbound_group_config_restart_action">立即重启</string>
+    <string name="outbound_group_config_restart_message">分组与代理的修改已保存。运行中的 sing-box 内核仍保持启动时的配置，重启服务后新配置才会生效。</string>
+    <string name="outbound_group_config_restart_later">稍后</string>
+    <string name="outbound_group_config_restart_failed">重启服务失败</string>
     <string name="outbound_group_name">名称</string>
     <string name="outbound_group_name_duplicate">%1$s(%2$d)</string>
     <string name="outbound_group_name_placeholder">留空则首次同步后自动命名</string>

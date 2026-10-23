@@ -85,6 +85,18 @@ data class AppState(
 
     val proxyRunning: Boolean = false,
 
+    /**
+     * The running core was started from a configuration that no longer matches the
+     * persisted outbound data, so the service must be restarted to apply it.
+     *
+     * This models the same gap META closes with its pending-restart profile: group,
+     * outbound and subscription edits are committed to the store immediately, but a
+     * live sing-box instance keeps the configuration it was launched with. It is
+     * intentionally runtime-only (like [proxyRunning]) because a freshly launched core
+     * always compiles the current state, which settles the marker on its own.
+     */
+    val pendingConfigRestart: Boolean = false,
+
     val enableConfigOverrideScript: Boolean = false,
     val configOverrideScript: String = "const main = (config) => {\n  return config\n}",
     val coreLogLevel: String = DefaultSingBoxLogLevel,
@@ -162,6 +174,46 @@ data class AppState(
 
 val AppState.effectiveLocalDnsEnabled: Boolean
     get() = enableLocalDns
+
+/**
+ * Whether [previous] and this state disagree on any field that feeds the compiled
+ * outbound section of the sing-box configuration: the outbound list itself, and each
+ * group's identity, name, enablement and detour.
+ *
+ * Subscription bookkeeping (URL, HWID, user agent, update interval, last-update
+ * counters) is deliberately excluded: editing it never changes the running core.
+ */
+internal fun AppState.outboundConfigChangedFrom(previous: AppState): Boolean {
+    if (outbounds != previous.outbounds) return true
+    if (outboundGroups.size != previous.outboundGroups.size) return true
+    return outboundGroups.zip(previous.outboundGroups).any { (current, prior) ->
+        current.id != prior.id ||
+            current.name != prior.name ||
+            current.enabled != prior.enabled ||
+            current.detour != prior.detour
+    }
+}
+
+/** Marks the running core as stale after an outbound-side edit. */
+internal fun AppState.withConfigRestartPendingFrom(previous: AppState): AppState {
+    if (pendingConfigRestart || !proxyRunning) return this
+    if (!outboundConfigChangedFrom(previous)) return this
+    return copy(pendingConfigRestart = true)
+}
+
+/**
+ * Clears the marker once it cannot describe a live core any more: the service is
+ * stopped, or it just (re)started — a launch always compiles the current state.
+ *
+ * Mirrors META, which drops its pending-restart id when the proxy is observed as not
+ * running; the extra `proxyRunning` transition covers starts from the tile, the
+ * broadcast receiver and the home screen, none of which go through our restart button.
+ */
+internal fun AppState.withSettledConfigRestart(previous: AppState): AppState {
+    if (!pendingConfigRestart) return this
+    if (!proxyRunning || proxyRunning != previous.proxyRunning) return copy(pendingConfigRestart = false)
+    return this
+}
 
 val AppState.rootIpv6DataPathEnabled: Boolean
     get() = enableIpv6 || (effectiveLocalDnsEnabled && !enableRootIpv6Disabler)

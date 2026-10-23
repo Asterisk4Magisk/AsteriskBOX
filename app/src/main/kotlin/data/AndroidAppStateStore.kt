@@ -11,6 +11,7 @@ import app.withCompatibleProxyAppListMode
 import app.AppState
 import app.requiresManagedTagCanonicalization
 import app.withCanonicalManagedTagReferences
+import app.withSettledConfigRestart
 import features.logs.AndroidAppLogger
 import features.resources.withInitializedBundledRuleSets
 import kotlinx.coroutines.CompletableDeferred
@@ -331,11 +332,14 @@ internal fun canonicalAppStateUpdate(
     transform: (AppState) -> AppState,
 ): (AppState) -> AppState = { state ->
     val nextState = transform(state).withCompatibleProxyAppListMode()
-    if (requiresManagedTagCanonicalization(state, nextState)) {
+    val canonicalState = if (requiresManagedTagCanonicalization(state, nextState)) {
         nextState.withCanonicalManagedTagReferences()
     } else {
         nextState
     }
+    // Single funnel for the pending-restart marker: any write that starts or stops the
+    // core settles it, so no mutation path has to remember to clear it.
+    canonicalState.withSettledConfigRestart(state)
 }
 
 private class StatePersistenceSupersededException : IllegalStateException(
