@@ -11,6 +11,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -60,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -667,6 +670,27 @@ internal fun OutboundGroupListPage(
             isWideScreen = isWideScreen,
         )
         val listContentPadding = pageListPadding(contentPadding)
+        val layoutDirection = LocalLayoutDirection.current
+        /*
+         * The restart banner is pinned above the list rather than added as list item 0: as an item
+         * it inherited the list's scroll anchor, so when it appeared while the list was scrolled it
+         * was laid out above the viewport and hidden behind the top bar. Pinning it also keeps the
+         * groups at index 0, which the reorder drag mapping below relies on.
+         */
+        val pinnedRestartBanner = appState.pendingConfigRestart
+        val groupListPadding = if (pinnedRestartBanner) {
+            // The banner carries the top bar inset, so the list only keeps the inter-card gap.
+            pageListPadding(
+                PaddingValues(
+                    top = 0.dp,
+                    start = contentPadding.calculateStartPadding(layoutDirection),
+                    end = contentPadding.calculateEndPadding(layoutDirection),
+                    bottom = contentPadding.calculateBottomPadding(),
+                ),
+            )
+        } else {
+            listContentPadding
+        }
         val listState = rememberLazyListState()
         val preview = rememberReorderPreview(
             appState.outboundGroups,
@@ -698,106 +722,111 @@ internal fun OutboundGroupListPage(
         val reorderableState = rememberAsteriskReorderableLazyListState(
             lazyListState = listState,
             itemCount = displayedGroups.size,
-            scrollThresholdPadding = verticalReorderScrollThresholdPadding(listContentPadding),
+            scrollThresholdPadding = verticalReorderScrollThresholdPadding(groupListPadding),
             onMove = preview.onMove,
         )
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            state = listState,
-            contentPadding = listContentPadding,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (appState.pendingConfigRestart) {
-                item(key = "config_restart_pending") {
-                    OutboundGroupConfigRestartBanner(
-                        busy = restartInProgress,
-                        onRestart = { restartService() },
-                    )
-                }
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (pinnedRestartBanner) {
+                OutboundGroupConfigRestartBanner(
+                    busy = restartInProgress,
+                    onRestart = { restartService() },
+                    modifier = Modifier.padding(
+                        start = listContentPadding.calculateStartPadding(layoutDirection),
+                        end = listContentPadding.calculateEndPadding(layoutDirection),
+                        top = contentPadding.calculateTopPadding() + 8.dp,
+                    ),
+                )
             }
-            if (displayedGroups.isEmpty()) {
-                item(key = "empty") {
-                    OutboundGroupEmptyState(
-                        onAdd = { showAddMethodSheet = true },
-                    )
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                state = listState,
+                contentPadding = groupListPadding,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (displayedGroups.isEmpty()) {
+                    item(key = "empty") {
+                        OutboundGroupEmptyState(
+                            onAdd = { showAddMethodSheet = true },
+                        )
+                    }
                 }
-            }
-            items(
-                items = displayedGroups,
-                key = OutboundGroupState::id,
-                contentType = { "outbound-group" },
-            ) { group ->
-                ReorderableItem(
-                    state = reorderableState.reorderableState,
-                    key = group.id,
-                    modifier = Modifier.fillMaxWidth(),
-                    animateItemModifier = Modifier.animateItem(),
-                ) { isDragging ->
-                    OutboundGroupCard(
-                        group = group,
-                        outboundCount = appState.outbounds.count { outbound ->
-                            outbound.groupId == group.id
-                        },
-                        syncing = group.id in syncingGroupIds,
-                        isDragging = isDragging,
-                        enabledChangeBusy = group.id in enabledChangingGroupIds,
-                        onEnabledChange = { enabled ->
-                            val groupId = group.id
-                            if (groupId in enabledChangingGroupIds) return@OutboundGroupCard
-                            enabledChangingGroupIds += groupId
-                            scope.launch {
-                                try {
-                                    when (
-                                        val result = services.outboundRepository.setGroupEnabled(
-                                            groupId,
-                                            enabled,
-                                        )
-                                    ) {
-                                        OutboundCommandResult.GroupEnabledChanged -> Unit
-                                        OutboundCommandResult.Conflict ->
-                                            services.tipNotifier.show(stateChangedMessage)
-                                        is OutboundCommandResult.PersistenceFailed ->
-                                            services.tipNotifier.showError(
-                                                result.error,
-                                                importFailedMessage,
-                                                FailureLogContext(
-                                                    operation = "outbound_group_enabled",
-                                                    stage = "persist",
-                                                ),
+                items(
+                    items = displayedGroups,
+                    key = OutboundGroupState::id,
+                    contentType = { "outbound-group" },
+                ) { group ->
+                    ReorderableItem(
+                        state = reorderableState.reorderableState,
+                        key = group.id,
+                        modifier = Modifier.fillMaxWidth(),
+                        animateItemModifier = Modifier.animateItem(),
+                    ) { isDragging ->
+                        OutboundGroupCard(
+                            group = group,
+                            outboundCount = appState.outbounds.count { outbound ->
+                                outbound.groupId == group.id
+                            },
+                            syncing = group.id in syncingGroupIds,
+                            isDragging = isDragging,
+                            enabledChangeBusy = group.id in enabledChangingGroupIds,
+                            onEnabledChange = { enabled ->
+                                val groupId = group.id
+                                if (groupId in enabledChangingGroupIds) return@OutboundGroupCard
+                                enabledChangingGroupIds += groupId
+                                scope.launch {
+                                    try {
+                                        when (
+                                            val result = services.outboundRepository.setGroupEnabled(
+                                                groupId,
+                                                enabled,
                                             )
-                                        is OutboundCommandResult.Invalid ->
-                                            services.tipNotifier.show(importFailedMessage)
-                                        OutboundCommandResult.Deleted,
-                                        OutboundCommandResult.GroupDeleted,
-                                        OutboundCommandResult.GroupsReordered,
-                                        OutboundCommandResult.ImportPersisted,
-                                        OutboundCommandResult.Reordered,
-                                        is OutboundCommandResult.Saved,
-                                        is OutboundCommandResult.GroupSaved,
-                                        -> error("Unexpected outbound group enable result: $result")
+                                        ) {
+                                            OutboundCommandResult.GroupEnabledChanged -> Unit
+                                            OutboundCommandResult.Conflict ->
+                                                services.tipNotifier.show(stateChangedMessage)
+                                            is OutboundCommandResult.PersistenceFailed ->
+                                                services.tipNotifier.showError(
+                                                    result.error,
+                                                    importFailedMessage,
+                                                    FailureLogContext(
+                                                        operation = "outbound_group_enabled",
+                                                        stage = "persist",
+                                                    ),
+                                                )
+                                            is OutboundCommandResult.Invalid ->
+                                                services.tipNotifier.show(importFailedMessage)
+                                            OutboundCommandResult.Deleted,
+                                            OutboundCommandResult.GroupDeleted,
+                                            OutboundCommandResult.GroupsReordered,
+                                            OutboundCommandResult.ImportPersisted,
+                                            OutboundCommandResult.Reordered,
+                                            is OutboundCommandResult.Saved,
+                                            is OutboundCommandResult.GroupSaved,
+                                            -> error("Unexpected outbound group enable result: $result")
+                                        }
+                                    } finally {
+                                        enabledChangingGroupIds -= groupId
                                     }
-                                } finally {
-                                    enabledChangingGroupIds -= groupId
                                 }
-                            }
-                        },
-                        onSync = { syncGroup(group) },
-                        onEdit = {
-                            editorGroup = group
-                            groupEditorSession += 1
-                            showGroupEditor = true
-                        },
-                        onDelete = { pendingDelete = group },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .longPressReorderDragHandle(
-                                scope = this,
-                                enabled = displayedGroups.size > 1,
-                                state = reorderableState,
-                                onDragStarted = preview.onDragStarted,
-                                onDragStopped = preview.onDragStopped,
-                            ),
-                    )
+                            },
+                            onSync = { syncGroup(group) },
+                            onEdit = {
+                                editorGroup = group
+                                groupEditorSession += 1
+                                showGroupEditor = true
+                            },
+                            onDelete = { pendingDelete = group },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .longPressReorderDragHandle(
+                                    scope = this,
+                                    enabled = displayedGroups.size > 1,
+                                    state = reorderableState,
+                                    onDragStarted = preview.onDragStarted,
+                                    onDragStopped = preview.onDragStopped,
+                                ),
+                        )
+                    }
                 }
             }
         }
@@ -1213,9 +1242,10 @@ private fun OutboundGroupAddMethodSheet(
 private fun OutboundGroupConfigRestartBanner(
     busy: Boolean,
     onRestart: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = AsteriskShapeTokens.ListCard,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
