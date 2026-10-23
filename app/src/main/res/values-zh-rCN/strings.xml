@@ -334,6 +334,9 @@
     <string name="outbound_group_add_from_qr_summary">扫描订阅链接二维码，自动创建分组并同步</string>
     <string name="outbound_group_add_manually">手动填写</string>
     <string name="outbound_group_add_manually_summary">填写订阅地址，或新建本地分组</string>
+    <string name="outbound_group_add_from_file">从文件导入</string>
+    <string name="outbound_group_add_from_file_summary">用 sing-box JSON、Mihomo YAML 或节点链接文件新建分组</string>
+    <string name="outbound_group_add_file_failed">导入文件失败</string>
     <string name="outbound_group_add_qr_invalid">二维码内容不是订阅链接</string>
     <string name="outbound_group_add_installed">已添加分组</string>
     <string name="outbound_group_add_failed">添加分组失败</string>
