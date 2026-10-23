@@ -378,45 +378,6 @@ internal fun OutboundGroupListPage(
         }
     }
 
-    fun saveGroup(group: OutboundGroupState) {
-        val session = groupEditorSession
-        if (savingGroupEditorSession != null) return
-        val expected = editorGroup
-        savingGroupEditorSession = session
-        scope.launch {
-            try {
-                when (val result = services.outboundRepository.saveGroup(expected, group)) {
-                    is OutboundCommandResult.GroupSaved -> {
-                        if (groupEditorSession == session) {
-                            showGroupEditor = false
-                            if (createOnOpen) navigator.pop()
-                        }
-                    }
-                    OutboundCommandResult.Conflict ->
-                        services.tipNotifier.show(stateChangedMessage)
-                    is OutboundCommandResult.Invalid ->
-                        services.tipNotifier.show(importFailedMessage)
-                    is OutboundCommandResult.PersistenceFailed ->
-                        services.tipNotifier.showError(
-                            result.error,
-                            importFailedMessage,
-                            FailureLogContext(operation = "outbound_group_save", stage = "persist"),
-                        )
-                    OutboundCommandResult.Deleted,
-                    OutboundCommandResult.GroupDeleted,
-                    OutboundCommandResult.GroupEnabledChanged,
-                    OutboundCommandResult.GroupsReordered,
-                    OutboundCommandResult.ImportPersisted,
-                    OutboundCommandResult.Reordered,
-                    is OutboundCommandResult.Saved,
-                    -> error("Unexpected outbound group save result: $result")
-                }
-            } finally {
-                if (savingGroupEditorSession == session) savingGroupEditorSession = null
-            }
-        }
-    }
-
     suspend fun updateGroupSubscription(
         requestedGroup: OutboundGroupState,
         trigger: SubscriptionUpdateTrigger = SubscriptionUpdateTrigger.MANUAL,
@@ -507,6 +468,56 @@ internal fun OutboundGroupListPage(
                 }
             } finally {
                 syncingGroupIds -= group.id
+            }
+        }
+    }
+
+    /**
+     * Saves the editor's group and, when it points at a new or changed subscription URL,
+     * fetches it straight away. META does the same on save: without it a freshly added
+     * subscription stays empty until the user reopens the card menu and runs 更新.
+     *
+     * Declared after [syncGroup] because local functions must be declared before use.
+     */
+    fun saveGroup(group: OutboundGroupState) {
+        val session = groupEditorSession
+        if (savingGroupEditorSession != null) return
+        val expected = editorGroup
+        savingGroupEditorSession = session
+        scope.launch {
+            try {
+                when (val result = services.outboundRepository.saveGroup(expected, group)) {
+                    is OutboundCommandResult.GroupSaved -> {
+                        if (groupEditorSession == session) {
+                            showGroupEditor = false
+                            if (createOnOpen) navigator.pop()
+                        }
+                        val saved = result.group
+                        if (saved.url.isNotBlank() && expected?.url != saved.url) {
+                            syncGroup(saved)
+                        }
+                    }
+                    OutboundCommandResult.Conflict ->
+                        services.tipNotifier.show(stateChangedMessage)
+                    is OutboundCommandResult.Invalid ->
+                        services.tipNotifier.show(importFailedMessage)
+                    is OutboundCommandResult.PersistenceFailed ->
+                        services.tipNotifier.showError(
+                            result.error,
+                            importFailedMessage,
+                            FailureLogContext(operation = "outbound_group_save", stage = "persist"),
+                        )
+                    OutboundCommandResult.Deleted,
+                    OutboundCommandResult.GroupDeleted,
+                    OutboundCommandResult.GroupEnabledChanged,
+                    OutboundCommandResult.GroupsReordered,
+                    OutboundCommandResult.ImportPersisted,
+                    OutboundCommandResult.Reordered,
+                    is OutboundCommandResult.Saved,
+                    -> error("Unexpected outbound group save result: $result")
+                }
+            } finally {
+                if (savingGroupEditorSession == session) savingGroupEditorSession = null
             }
         }
     }
