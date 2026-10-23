@@ -11,9 +11,9 @@ import org.gradle.api.tasks.TaskAction
 object ProjectConfig {
     const val JVM_VERSION = 26
     const val PROJECT_NAME = "AsteriskBOX"
-    const val VERSION_NAME = "1.1.21"
+    const val VERSION_NAME = "1.1.22-dev"
     const val PACKAGE_NAME = "org.asterisk.zcc.abox"
-    const val ASTERISKD_VERSION = "v2.1.12"
+    const val ASTERISKD_VERSION = "v2.1.13"
     const val BPF2SOCKS_VERSION = "v1.1.7"
     const val BPF_MATCHER_VERSION = "v1.0.2"
     const val ENHANCE_VERSION = "v1.0.7"
