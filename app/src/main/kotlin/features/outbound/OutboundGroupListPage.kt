@@ -16,7 +16,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -38,6 +37,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -1013,6 +1013,7 @@ internal fun OutboundGroupCard(
         label = "outbound-group-card-shadow",
     )
     var showUpdateInfo by remember(group.id) { mutableStateOf(false) }
+    var menuExpanded by remember(group.id) { mutableStateOf(false) }
     var infoAnchorPosition by remember(group.id) { mutableStateOf<Offset?>(null) }
     LaunchedEffect(syncing, isDragging, enabledChangeBusy, group) {
         showUpdateInfo = false
@@ -1164,34 +1165,57 @@ internal fun OutboundGroupCard(
                     onCheckedChange = { showUpdateInfo = false; onEnabledChange(it) },
                     enabled = !enabledChangeBusy,
                 )
-            }
-            OutboundGroupSubscriptionInfo(info = group.subscriptionInfo)
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                if (group.url.isNotBlank()) {
-                    TextButton(onClick = { showUpdateInfo = false; onSync() }, enabled = !syncing) {
-                        if (syncing) {
-                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Rounded.Refresh, contentDescription = null)
+                Box {
+                    IconButton(
+                        onClick = { showUpdateInfo = false; menuExpanded = true },
+                        enabled = !enabledChangeBusy,
+                    ) {
+                        Icon(Icons.Rounded.MoreVert, stringResource(R.string.common_more))
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        if (group.url.isNotBlank()) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.common_update)) },
+                                leadingIcon = {
+                                    if (syncing) {
+                                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    } else {
+                                        Icon(Icons.Rounded.Refresh, contentDescription = null)
+                                    }
+                                },
+                                enabled = !syncing,
+                                onClick = {
+                                    menuExpanded = false
+                                    showUpdateInfo = false
+                                    onSync()
+                                },
+                            )
                         }
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(R.string.common_update))
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.common_edit)) },
+                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                showUpdateInfo = false
+                                onEdit()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.common_delete)) },
+                            leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                            onClick = {
+                                menuExpanded = false
+                                showUpdateInfo = false
+                                onDelete()
+                            },
+                        )
                     }
                 }
-                TextButton(onClick = { showUpdateInfo = false; onEdit() }, enabled = !enabledChangeBusy) {
-                    Icon(Icons.Rounded.Edit, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.common_edit))
-                }
-                TextButton(onClick = { showUpdateInfo = false; onDelete() }, enabled = !enabledChangeBusy) {
-                    Icon(Icons.Rounded.Delete, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.common_delete))
-                }
             }
+            OutboundGroupSubscriptionInfo(info = group.subscriptionInfo)
         }
     }
 }
