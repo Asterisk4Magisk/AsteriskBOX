@@ -337,6 +337,9 @@
     <string name="outbound_group_add_from_qr_summary">Create a group from a subscription link and sync it</string>
     <string name="outbound_group_add_manually">Enter manually</string>
     <string name="outbound_group_add_manually_summary">Type a subscription URL or create a local group</string>
+    <string name="outbound_group_add_from_file">Import from file</string>
+    <string name="outbound_group_add_from_file_summary">Create a group from a sing-box JSON, Mihomo YAML or link list file</string>
+    <string name="outbound_group_add_file_failed">Unable to import the file</string>
     <string name="outbound_group_add_qr_invalid">The QR code does not contain a subscription link</string>
     <string name="outbound_group_add_installed">Group added</string>
     <string name="outbound_group_add_failed">Unable to add the group</string>

@@ -59,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -88,10 +89,12 @@ import features.importing.ImportSource
 import features.importing.ImportStage
 import features.importing.importFailureResultPresentation
 import features.importing.reportImportFailure
+import features.importing.readImportUtf8WithinLimit
 import features.importing.sanitizeImportMessage
 import features.importing.toImportResultPresentation
 import features.logs.FailureLogContext
 import engine.proxy.ProxyServiceResult
+import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.settings.SettingsDropdownRow
 import features.settings.SettingsSwitchRow
 import features.subscription.SubscriptionSchedule
@@ -106,6 +109,7 @@ import features.subscription.usecase.OutboundSubscriptionUpdateResult
 import features.subscription.usecase.SubscriptionUpdateTrigger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
@@ -130,6 +134,9 @@ import utils.toReadableBytes
 import utils.toReadableDateOrDash
 import utils.toReadableDateTimeOrDash
 import java.net.URI
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import ui.icons.AsteriskIcons as Icons
 
 @Composable
@@ -144,6 +151,7 @@ internal fun OutboundGroupListPage(
     val navigator = LocalNavigator.current
     val services = LocalAppServices.current
     val resources = LocalResources.current
+    val context = LocalContext.current
     val isWideScreen = LocalIsWideScreen.current
     val scope = rememberCoroutineScope()
     var editorGroup by remember { mutableStateOf<OutboundGroupState?>(null) }
@@ -169,10 +177,12 @@ internal fun OutboundGroupListPage(
     var restartInProgress by remember { mutableStateOf(false) }
     var showAddMethodSheet by remember { mutableStateOf(false) }
     var addingFromQrCode by remember { mutableStateOf(false) }
+    var addingFromFile by remember { mutableStateOf(false) }
     val restartFailedMessage = stringResource(R.string.outbound_group_config_restart_failed)
     val qrInvalidMessage = stringResource(R.string.outbound_group_add_qr_invalid)
     val addInstalledMessage = stringResource(R.string.outbound_group_add_installed)
     val addFailedMessage = stringResource(R.string.outbound_group_add_failed)
+    val addFileFailedMessage = stringResource(R.string.outbound_group_add_file_failed)
     val importFailedMessage = stringResource(R.string.outbound_group_sync_failed)
     val stateChangedMessage = stringResource(R.string.outbound_group_sync_failed)
     val subscriptionGroups = appState.outboundGroups.outboundSubscriptionGroups()
@@ -224,6 +234,115 @@ internal fun OutboundGroupListPage(
                 services.tipNotifier.showError(error, addFailedMessage)
             } finally {
                 addingFromQrCode = false
+            }
+        }
+    }
+
+    /**
+     * Imports a local sing-box JSON (or Mihomo YAML, or a list of proxy links) as a new
+     * local group. The group and its outbounds are planned into one state and committed
+     * once, so a file that parses badly cannot leave an empty group behind.
+     */
+    fun addFromFile() {
+        if (addingFromFile) return
+        addingFromFile = true
+        scope.launch {
+            var stage = ImportStage.READ
+            try {
+                val uri = services.importFilePicker() ?: return@launch
+                val file = withContext(Dispatchers.IO) { context.readGroupImportFile(uri) }
+                stage = ImportStage.PARSE
+                val parsed = withContext(Dispatchers.Default) {
+                    parseOutboundImportContent(file.content)
+                }
+                if (parsed.accepted.isEmpty()) {
+                    importResultPresentation = parsed.toImportResultPresentation(committed = false)
+                    return@launch
+                }
+                val snapshot = stateStore.state.value
+                val withGroup = snapshot.withSavedOutboundGroup(
+                    OutboundGroupState(id = 0, name = file.groupName),
+                )
+                val group = withGroup.outboundGroups.last()
+                val plan = withGroup.planOutboundImport(
+                    groupId = group.id,
+                    parsed = parsed,
+                    replaceGroup = false,
+                    strict = false,
+                )
+                if (!plan.committed) {
+                    importResultPresentation = plan.outcome.toImportResultPresentation(
+                        committed = false,
+                    )
+                    return@launch
+                }
+                stage = ImportStage.VALIDATE
+                withContext(Dispatchers.IO) {
+                    validateSingBoxRuntimeConfiguration(context, plan.state)
+                }
+                stage = ImportStage.COMMIT
+                when (
+                    val persist = services.outboundRepository.persistImport(snapshot, plan.state)
+                ) {
+                    OutboundCommandResult.ImportPersisted -> {
+                        val presentation = plan.outcome.toImportResultPresentation(committed = true)
+                        if (presentation.showDialog) {
+                            importResultPresentation = presentation
+                        } else {
+                            services.tipNotifier.show(
+                                resources.getQuantityString(
+                                    R.plurals.outbound_import_success,
+                                    plan.outcome.accepted.size,
+                                    plan.outcome.accepted.size,
+                                ),
+                            )
+                        }
+                    }
+
+                    OutboundCommandResult.Conflict -> reportImportFailure(
+                        operation = ImportOperation.OUTBOUND,
+                        source = ImportSource.FILE,
+                        stage = ImportStage.COMMIT,
+                    ).also {
+                        importResultPresentation = importFailureResultPresentation(stateChangedMessage)
+                    }
+
+                    is OutboundCommandResult.Invalid -> reportImportFailure(
+                        operation = ImportOperation.OUTBOUND,
+                        source = ImportSource.FILE,
+                        stage = ImportStage.VALIDATE,
+                        error = persist.error,
+                    ).also {
+                        importResultPresentation = importFailureResultPresentation(
+                            persist.error.message ?: addFileFailedMessage,
+                        )
+                    }
+
+                    is OutboundCommandResult.PersistenceFailed -> reportImportFailure(
+                        operation = ImportOperation.OUTBOUND,
+                        source = ImportSource.FILE,
+                        stage = ImportStage.COMMIT,
+                        error = persist.error,
+                    ).also {
+                        importResultPresentation = importFailureResultPresentation(
+                            persist.error.message ?: addFileFailedMessage,
+                        )
+                    }
+
+                    else -> error("Unexpected outbound import result: $persist")
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                reportImportFailure(
+                    operation = ImportOperation.OUTBOUND,
+                    source = ImportSource.FILE,
+                    stage = stage,
+                    error = error,
+                )
+                services.tipNotifier.showError(error, addFileFailedMessage)
+            } finally {
+                addingFromFile = false
             }
         }
     }
@@ -682,6 +801,10 @@ internal fun OutboundGroupListPage(
                 showAddMethodSheet = false
                 openGroupEditor()
             },
+            onImportFile = {
+                showAddMethodSheet = false
+                addFromFile()
+            },
         )
         OutboundGroupEditorSheet(
             show = showGroupEditor,
@@ -974,6 +1097,43 @@ private fun OutboundGroupBatchProgressDialog(
 }
 
 /**
+ * Reads a picked file and derives a group name from it: the display name without its
+ * extension, falling back to the URI's last segment so a file provider that publishes no
+ * name still yields a usable group.
+ */
+private data class GroupImportFile(
+    val content: String,
+    val groupName: String,
+)
+
+private fun Context.readGroupImportFile(uri: Uri): GroupImportFile {
+    val displayName = runCatching {
+        contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            val column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (column >= 0 && cursor.moveToFirst()) cursor.getString(column) else null
+        }
+    }.getOrNull()
+        ?.takeIf(String::isNotBlank)
+        ?: uri.lastPathSegment
+    val content = contentResolver.openInputStream(uri)?.use { input ->
+        input.readImportUtf8WithinLimit()
+    } ?: throw IllegalArgumentException("Unable to open the import file")
+    require(content.isNotBlank()) { "The import file is empty" }
+    val groupName = displayName
+        ?.substringBeforeLast('.', missingDelimiterValue = displayName)
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
+        ?: "Imported"
+    return GroupImportFile(content = content, groupName = groupName)
+}
+
+/**
  * Turns scanned QR content into an install request. Hosted deep links are accepted as
  * they are; a bare http(s) link is treated as a plain sing-box subscription.
  * Anything else (a single node link, free text) is rejected.
@@ -997,6 +1157,7 @@ private fun OutboundGroupAddMethodSheet(
     onDismissRequest: () -> Unit,
     onScanQrCode: () -> Unit,
     onEnterManually: () -> Unit,
+    onImportFile: () -> Unit,
 ) {
     AsteriskModalBottomSheet(
         show = show,
@@ -1020,6 +1181,12 @@ private fun OutboundGroupAddMethodSheet(
                 summary = stringResource(R.string.outbound_group_add_from_qr_summary),
                 leadingIcon = Icons.Rounded.QrCodeScanner,
                 onClick = onScanQrCode,
+            )
+            AsteriskListRow(
+                title = stringResource(R.string.outbound_group_add_from_file),
+                summary = stringResource(R.string.outbound_group_add_from_file_summary),
+                leadingIcon = Icons.Rounded.FileUpload,
+                onClick = onImportFile,
             )
             AsteriskListRow(
                 title = stringResource(R.string.outbound_group_add_manually),
