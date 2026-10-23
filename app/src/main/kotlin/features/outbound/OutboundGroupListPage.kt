@@ -74,6 +74,7 @@ import app.LocalAppServices
 import app.LocalAppStateStore
 import app.LocalIsWideScreen
 import app.LocalNavigator
+import app.LocalUpdateAppState
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
 import app.SubscriptionInfo
@@ -89,6 +90,7 @@ import features.importing.reportImportFailure
 import features.importing.sanitizeImportMessage
 import features.importing.toImportResultPresentation
 import features.logs.FailureLogContext
+import engine.proxy.ProxyServiceResult
 import features.settings.SettingsDropdownRow
 import features.settings.SettingsSwitchRow
 import features.subscription.SubscriptionSchedule
@@ -134,6 +136,7 @@ internal fun OutboundGroupListPage(
 ) {
     val stateStore = LocalAppStateStore.current
     val appState by stateStore.collectAppState()
+    val updateAppState = LocalUpdateAppState.current
     val navigator = LocalNavigator.current
     val services = LocalAppServices.current
     val resources = LocalResources.current
@@ -156,9 +159,42 @@ internal fun OutboundGroupListPage(
     var importResultPresentation by remember {
         mutableStateOf<ImportResultPresentation?>(null)
     }
+    var restartInProgress by remember { mutableStateOf(false) }
+    val restartFailedMessage = stringResource(R.string.outbound_group_config_restart_failed)
     val importFailedMessage = stringResource(R.string.outbound_group_sync_failed)
     val stateChangedMessage = stringResource(R.string.outbound_group_sync_failed)
     val subscriptionGroups = appState.outboundGroups.outboundSubscriptionGroups()
+
+    fun restartService() {
+        if (restartInProgress) return
+        restartInProgress = true
+        scope.launch {
+            try {
+                when (val result = services.proxyServiceUseCase.restart(stateStore.state.value)) {
+                    is ProxyServiceResult.Success -> {
+                        updateAppState { state ->
+                            state.copy(
+                                proxyRunning = result.proxyRunning,
+                                localProxyPort = result.appState?.localProxyPort
+                                    ?: state.localProxyPort,
+                                singBoxControlPort = result.appState?.singBoxControlPort
+                                    ?: state.singBoxControlPort,
+                                // A successful restart relaunches the core from this state.
+                                pendingConfigRestart = false,
+                            )
+                        }
+                    }
+
+                    is ProxyServiceResult.Failed -> services.tipNotifier.showError(
+                        result.error,
+                        restartFailedMessage,
+                    )
+                }
+            } finally {
+                restartInProgress = false
+            }
+        }
+    }
 
     fun saveGroup(group: OutboundGroupState) {
         val session = groupEditorSession
@@ -479,6 +515,14 @@ internal fun OutboundGroupListPage(
             contentPadding = listContentPadding,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (appState.pendingConfigRestart) {
+                item(key = "config_restart_pending") {
+                    OutboundGroupConfigRestartBanner(
+                        busy = restartInProgress,
+                        onRestart = { restartService() },
+                    )
+                }
+            }
             if (displayedGroups.isEmpty()) {
                 item(key = "empty") {
                     OutboundGroupEmptyState(
@@ -845,6 +889,58 @@ private fun OutboundGroupBatchProgressDialog(
             )
         },
     )
+}
+
+@Composable
+private fun OutboundGroupConfigRestartBanner(
+    busy: Boolean,
+    onRestart: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = AsteriskShapeTokens.ListCard,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        ),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 14.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.Sync,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    text = stringResource(R.string.outbound_group_config_restart_required),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+            }
+            Text(
+                text = stringResource(R.string.outbound_group_config_restart_summary),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                AsteriskActionButton(
+                    text = stringResource(R.string.outbound_group_config_restart_action),
+                    icon = Icons.Rounded.Refresh,
+                    enabled = !busy,
+                    loading = busy,
+                    onClick = onRestart,
+                )
+            }
+        }
+    }
 }
 
 @Composable

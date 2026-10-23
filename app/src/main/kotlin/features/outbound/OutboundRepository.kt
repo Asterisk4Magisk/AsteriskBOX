@@ -10,6 +10,7 @@ import app.managedOutboundGroupSelectorTag
 import app.withRemovedManagedOutbound
 import app.withRemovedManagedOutbounds
 import app.withRemovedManagedOutboundTags
+import app.withConfigRestartPendingFrom
 import app.withReplacedManagedTag
 import features.importing.importFingerprint
 import kotlinx.coroutines.CancellationException
@@ -347,9 +348,13 @@ internal class OutboundRepository(
         success: () -> OutboundCommandResult,
     ): OutboundCommandResult {
         currentCoroutineContext().ensureActive()
+        // Every outbound-side mutation funnels through here, so this is the one place
+        // that has to notice a running core going stale. The marker rides along with
+        // the same commit, so it can never describe a write that failed to persist.
+        val committed = updated.withConfigRestartPendingFrom(expected)
         return withContext(NonCancellable) {
             mapPersistence(
-                gateway.commitPreparedAndAwaitPersistence(expected, updated),
+                gateway.commitPreparedAndAwaitPersistence(expected, committed),
                 success,
             )
         }

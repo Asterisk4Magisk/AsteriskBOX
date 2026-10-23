@@ -326,6 +326,12 @@
     <string name="outbound_group_hwid">HWID</string>
     <string name="outbound_group_local">Local group</string>
     <string name="outbound_group_management">Group management</string>
+    <string name="outbound_group_config_restart_required">Restart required</string>
+    <string name="outbound_group_config_restart_summary">Configuration changed. The running service still uses the previous configuration until it restarts.</string>
+    <string name="outbound_group_config_restart_action">Restart now</string>
+    <string name="outbound_group_config_restart_message">Group and proxy changes are saved. The running sing-box core keeps its launch configuration, so the change only takes effect after a restart.</string>
+    <string name="outbound_group_config_restart_later">Later</string>
+    <string name="outbound_group_config_restart_failed">Unable to restart the service</string>
     <string name="outbound_group_name">Name</string>
     <string name="outbound_group_name_duplicate">%1$s(%2$d)</string>
     <string name="outbound_group_name_placeholder">Leave blank to auto-assign on first sync</string>
