@@ -171,6 +171,7 @@ fun App(
             resourceFileUpdateCoordinator = resourceFileUpdateCoordinator,
             appBackupUseCase = appBackupUseCase,
             outboundSubscriptionUpdater = outboundSubscriptionUpdater,
+            subscriptionInstallConfig = application.subscriptionInstallConfig,
             qrCodeScanner = qrCodeScanner,
             importFilePicker = resourceFilePicker,
             singBoxRuntime = singBoxRuntime,

@@ -94,6 +94,8 @@ import engine.proxy.ProxyServiceResult
 import features.settings.SettingsDropdownRow
 import features.settings.SettingsSwitchRow
 import features.subscription.SubscriptionSchedule
+import features.subscription.SubscriptionInstallConfig
+import features.subscription.parseSubscriptionDeepLink
 import features.subscription.SubscriptionUserAgentOption
 import features.subscription.SubscriptionUserAgentOptions
 import features.subscription.parseSubscriptionSchedule
@@ -110,6 +112,7 @@ import kotlinx.coroutines.withContext
 import app.R
 import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskActionButton
+import ui.components.AsteriskListRow
 import ui.components.AsteriskModalBottomSheet
 import ui.components.WarningConfirmDialog
 import ui.components.localizedLabel
@@ -160,10 +163,66 @@ internal fun OutboundGroupListPage(
         mutableStateOf<ImportResultPresentation?>(null)
     }
     var restartInProgress by remember { mutableStateOf(false) }
+    var showAddMethodSheet by remember { mutableStateOf(false) }
+    var addingFromQrCode by remember { mutableStateOf(false) }
     val restartFailedMessage = stringResource(R.string.outbound_group_config_restart_failed)
+    val qrInvalidMessage = stringResource(R.string.outbound_group_add_qr_invalid)
+    val addInstalledMessage = stringResource(R.string.outbound_group_add_installed)
+    val addFailedMessage = stringResource(R.string.outbound_group_add_failed)
     val importFailedMessage = stringResource(R.string.outbound_group_sync_failed)
     val stateChangedMessage = stringResource(R.string.outbound_group_sync_failed)
     val subscriptionGroups = appState.outboundGroups.outboundSubscriptionGroups()
+
+    fun openGroupEditor() {
+        editorGroup = null
+        groupEditorSession += 1
+        showGroupEditor = true
+    }
+
+    /**
+     * Scans a subscription QR code and installs it through the same use case the
+     * clash://, v2rayng:// and sing-box:// deep links use, so a scanned link and a
+     * tapped link produce identical groups.
+     */
+    fun addFromQrCode() {
+        if (addingFromQrCode) return
+        addingFromQrCode = true
+        scope.launch {
+            try {
+                val scanned = services.qrCodeScanner()?.trim().orEmpty()
+                if (scanned.isBlank()) return@launch
+                val config = subscriptionInstallConfigFromScan(scanned)
+                if (config == null) {
+                    services.tipNotifier.show(qrInvalidMessage)
+                    return@launch
+                }
+                when (val result = services.subscriptionInstallConfig.install(config)) {
+                    is OutboundSubscriptionUpdateResult.Success,
+                    is OutboundSubscriptionUpdateResult.Partial,
+                    OutboundSubscriptionUpdateResult.NotModified,
+                    -> services.tipNotifier.show(addInstalledMessage)
+
+                    is OutboundSubscriptionUpdateResult.Failed -> services.tipNotifier.showError(
+                        result.error,
+                        addFailedMessage,
+                        FailureLogContext(
+                            operation = "outbound_group_add_qr",
+                            source = ImportSource.QR_CODE.logValue,
+                            stage = result.stage.logValue,
+                        ),
+                    )
+
+                    is OutboundSubscriptionUpdateResult.Cancelled -> Unit
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                services.tipNotifier.showError(error, addFailedMessage)
+            } finally {
+                addingFromQrCode = false
+            }
+        }
+    }
 
     fun restartService() {
         if (restartInProgress) return
@@ -457,11 +516,7 @@ internal fun OutboundGroupListPage(
                         )
                     }
                     IconButton(
-                        onClick = {
-                            editorGroup = null
-                            groupEditorSession += 1
-                            showGroupEditor = true
-                        },
+                        onClick = { showAddMethodSheet = true },
                     ) {
                         Icon(Icons.Rounded.Add, stringResource(R.string.common_add))
                     }
@@ -526,11 +581,7 @@ internal fun OutboundGroupListPage(
             if (displayedGroups.isEmpty()) {
                 item(key = "empty") {
                     OutboundGroupEmptyState(
-                        onAdd = {
-                            editorGroup = null
-                            groupEditorSession += 1
-                            showGroupEditor = true
-                        },
+                        onAdd = { showAddMethodSheet = true },
                     )
                 }
             }
@@ -613,6 +664,18 @@ internal fun OutboundGroupListPage(
                 }
             }
         }
+        OutboundGroupAddMethodSheet(
+            show = showAddMethodSheet,
+            onDismissRequest = { showAddMethodSheet = false },
+            onScanQrCode = {
+                showAddMethodSheet = false
+                addFromQrCode()
+            },
+            onEnterManually = {
+                showAddMethodSheet = false
+                openGroupEditor()
+            },
+        )
         OutboundGroupEditorSheet(
             show = showGroupEditor,
             appState = appState,
@@ -889,6 +952,64 @@ private fun OutboundGroupBatchProgressDialog(
             )
         },
     )
+}
+
+/**
+ * Turns scanned QR content into an install request. Hosted deep links are accepted as
+ * they are; a bare http(s) link is treated as a plain sing-box subscription.
+ * Anything else (a single node link, free text) is rejected.
+ */
+internal fun subscriptionInstallConfigFromScan(raw: String): SubscriptionInstallConfig? {
+    parseSubscriptionDeepLink(raw)?.let { return it }
+    val trimmed = raw.trim()
+    if (trimmed.isBlank() || trimmed.any(Char::isWhitespace)) return null
+    val uri = runCatching { URI(trimmed) }.getOrNull() ?: return null
+    if (uri.scheme?.lowercase() !in setOf("http", "https") || uri.host.isNullOrBlank()) return null
+    return SubscriptionInstallConfig(
+        name = "",
+        url = trimmed,
+        userAgent = DefaultOutboundSubscriptionUserAgent,
+    )
+}
+
+@Composable
+private fun OutboundGroupAddMethodSheet(
+    show: Boolean,
+    onDismissRequest: () -> Unit,
+    onScanQrCode: () -> Unit,
+    onEnterManually: () -> Unit,
+) {
+    AsteriskModalBottomSheet(
+        show = show,
+        title = stringResource(R.string.outbound_group_add_method_title),
+        onDismissRequest = onDismissRequest,
+        startAction = {
+            AsteriskActionButton(
+                text = stringResource(R.string.common_cancel),
+                icon = Icons.Rounded.Close,
+                onClick = onDismissRequest,
+            )
+        },
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+        ) {
+            AsteriskListRow(
+                title = stringResource(R.string.outbound_group_add_from_qr),
+                summary = stringResource(R.string.outbound_group_add_from_qr_summary),
+                leadingIcon = Icons.Rounded.QrCodeScanner,
+                onClick = onScanQrCode,
+            )
+            AsteriskListRow(
+                title = stringResource(R.string.outbound_group_add_manually),
+                summary = stringResource(R.string.outbound_group_add_manually_summary),
+                leadingIcon = Icons.Rounded.Edit,
+                onClick = onEnterManually,
+            )
+        }
+    }
 }
 
 @Composable
