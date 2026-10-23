@@ -83,6 +83,7 @@ import features.importing.ImportOperation
 import features.importing.ImportResultDetail
 import features.importing.ImportResultDialog
 import features.importing.ImportResultPresentation
+import features.importing.ImportResultStatus
 import features.importing.ImportSource
 import features.importing.ImportStage
 import features.importing.importFailureResultPresentation
@@ -162,6 +163,9 @@ internal fun OutboundGroupListPage(
     var importResultPresentation by remember {
         mutableStateOf<ImportResultPresentation?>(null)
     }
+    // Set only when the dialog reports a failure for a single-group sync, so 重试
+    // re-runs exactly the update that failed.
+    var retrySyncGroupId by remember { mutableStateOf<Int?>(null) }
     var restartInProgress by remember { mutableStateOf(false) }
     var showAddMethodSheet by remember { mutableStateOf(false) }
     var addingFromQrCode by remember { mutableStateOf(false) }
@@ -350,6 +354,8 @@ internal fun OutboundGroupListPage(
                     is OutboundGroupUpdateResult.Success -> {
                         if (result.presentation?.showDialog == true) {
                             importResultPresentation = result.presentation
+                            retrySyncGroupId = group.id
+                                .takeIf { result.presentation.status == ImportResultStatus.FAILURE }
                         } else if (result.notModified) {
                             services.tipNotifier.show(
                                 resources.getString(
@@ -377,6 +383,7 @@ internal fun OutboundGroupListPage(
                             ?: importFailureResultPresentation(
                                 result.error.message ?: importFailedMessage,
                             )
+                        retrySyncGroupId = group.id
                     }
                 }
             } finally {
@@ -755,7 +762,19 @@ internal fun OutboundGroupListPage(
     importResultPresentation?.let { presentation ->
         ImportResultDialog(
             presentation = presentation,
-            onDismissRequest = { importResultPresentation = null },
+            onDismissRequest = {
+                importResultPresentation = null
+                retrySyncGroupId = null
+            },
+            onRetry = retrySyncGroupId?.let { groupId ->
+                {
+                    importResultPresentation = null
+                    retrySyncGroupId = null
+                    appState.outboundGroups
+                        .firstOrNull { group -> group.id == groupId }
+                        ?.let(::syncGroup)
+                }
+            },
         )
     }
     batchSyncResults?.let { results ->

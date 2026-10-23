@@ -104,6 +104,7 @@ internal fun importFailureResultPresentation(
 internal fun ImportResultDialog(
     presentation: ImportResultPresentation,
     onDismissRequest: () -> Unit,
+    onRetry: (() -> Unit)? = null,
 ) {
     val title = stringResource(
         when (presentation.status) {
@@ -151,5 +152,14 @@ internal fun ImportResultDialog(
                 Text(stringResource(R.string.common_close))
             }
         },
+        dismissButton = onRetry
+            ?.takeIf { presentation.status == ImportResultStatus.FAILURE }
+            ?.let { retry ->
+                {
+                    TextButton(onClick = retry) {
+                        Text(stringResource(R.string.common_retry))
+                    }
+                }
+            },
     )
 }
