@@ -329,6 +329,14 @@
     <string name="outbound_group_config_restart_message">分组与代理的修改已保存。运行中的 sing-box 内核仍保持启动时的配置，重启服务后新配置才会生效。</string>
     <string name="outbound_group_config_restart_later">稍后</string>
     <string name="outbound_group_config_restart_failed">重启服务失败</string>
+    <string name="outbound_group_add_method_title">添加分组</string>
+    <string name="outbound_group_add_from_qr">扫码添加订阅</string>
+    <string name="outbound_group_add_from_qr_summary">扫描订阅链接二维码，自动创建分组并同步</string>
+    <string name="outbound_group_add_manually">手动填写</string>
+    <string name="outbound_group_add_manually_summary">填写订阅地址，或新建本地分组</string>
+    <string name="outbound_group_add_qr_invalid">二维码内容不是订阅链接</string>
+    <string name="outbound_group_add_installed">已添加分组</string>
+    <string name="outbound_group_add_failed">添加分组失败</string>
     <string name="outbound_group_name">名称</string>
     <string name="outbound_group_name_duplicate">%1$s(%2$d)</string>
     <string name="outbound_group_name_placeholder">留空则首次同步后自动命名</string>
