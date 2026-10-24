@@ -333,12 +333,12 @@
     <string name="outbound_group_config_apply_failed">Unable to apply the configuration</string>
     <string name="outbound_group_config_applied">Configuration applied</string>
     <string name="outbound_group_add_method_title">Add group</string>
-    <string name="outbound_group_add_from_qr">Scan subscription QR code</string>
-    <string name="outbound_group_add_from_qr_summary">Create a group from a subscription link and sync it</string>
+    <string name="outbound_group_add_from_qr">QR code</string>
+    <string name="outbound_group_add_from_qr_summary">Scan a subscription link QR code and sync it now</string>
     <string name="outbound_group_add_manually">Enter manually</string>
-    <string name="outbound_group_add_manually_summary">Type a subscription URL or create a local group</string>
-    <string name="outbound_group_add_from_file">Import from file</string>
-    <string name="outbound_group_add_from_file_summary">Create a group from a sing-box JSON, Mihomo YAML or link list file</string>
+    <string name="outbound_group_add_manually_summary">Add a remote subscription URL or create a local group</string>
+    <string name="outbound_group_add_from_file">File</string>
+    <string name="outbound_group_add_from_file_summary">Import a local sing-box JSON, Mihomo YAML or link list file</string>
     <string name="outbound_group_add_file_failed">Unable to import the file</string>
     <string name="outbound_group_add_qr_invalid">The QR code does not contain a subscription link</string>
     <string name="outbound_group_add_installed">Group added</string>

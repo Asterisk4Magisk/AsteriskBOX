@@ -46,6 +46,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import ui.components.AsteriskScaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -61,6 +62,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -69,6 +71,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -122,7 +125,6 @@ import kotlinx.coroutines.withContext
 import app.R
 import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskActionButton
-import ui.components.AsteriskListRow
 import ui.components.AsteriskModalBottomSheet
 import ui.components.WarningConfirmDialog
 import ui.components.localizedLabel
@@ -1288,39 +1290,89 @@ private fun OutboundGroupAddMethodSheet(
 ) {
     AsteriskModalBottomSheet(
         show = show,
-        title = stringResource(R.string.outbound_group_add_method_title),
         onDismissRequest = onDismissRequest,
-        startAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
-                onClick = onDismissRequest,
-            )
-        },
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth()
-                .padding(horizontal = 16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            AsteriskListRow(
+            Text(
+                text = stringResource(R.string.outbound_group_add_method_title),
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+            )
+            OutboundGroupAddMethodOption(
                 title = stringResource(R.string.outbound_group_add_from_qr),
                 summary = stringResource(R.string.outbound_group_add_from_qr_summary),
-                leadingIcon = Icons.Rounded.QrCodeScanner,
+                icon = Icons.Rounded.QrCodeScanner,
                 onClick = onScanQrCode,
             )
-            AsteriskListRow(
+            OutboundGroupAddMethodOption(
                 title = stringResource(R.string.outbound_group_add_from_file),
                 summary = stringResource(R.string.outbound_group_add_from_file_summary),
-                leadingIcon = Icons.Rounded.FileUpload,
+                icon = Icons.Rounded.FileDownload,
                 onClick = onImportFile,
             )
-            AsteriskListRow(
+            OutboundGroupAddMethodOption(
                 title = stringResource(R.string.outbound_group_add_manually),
                 summary = stringResource(R.string.outbound_group_add_manually_summary),
-                leadingIcon = Icons.Rounded.Edit,
+                icon = Icons.Rounded.Edit,
                 onClick = onEnterManually,
             )
+        }
+    }
+}
+
+@Composable
+private fun OutboundGroupAddMethodOption(
+    title: String,
+    summary: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 76.dp),
+        shape = AsteriskShapeTokens.InnerContainer,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                shape = AsteriskShapeTokens.SmallContainer,
+                color = MaterialTheme.colorScheme.secondaryContainer,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.padding(10.dp),
+                )
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+            }
         }
     }
 }
@@ -1474,9 +1526,9 @@ internal fun OutboundGroupCard(
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         val status = group.subscriptionStatusPresentation()
-        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 8.dp)) {
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, top = 14.dp, end = 8.dp, bottom = 16.dp)) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -1679,7 +1731,11 @@ private fun OutboundGroupCardMeta(group: OutboundGroupState) {
         text = meta,
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 6.dp, end = 8.dp),
+        // Directly under the quota it continues that block; otherwise it starts a new one.
+        modifier = Modifier.padding(
+            top = if (group.subscriptionInfo.hasMeteredQuota) 4.dp else 8.dp,
+            end = 8.dp,
+        ),
     )
 }
 
@@ -2102,8 +2158,8 @@ private fun OutboundGroupSubscriptionInfo(
 ) {
     if (!info.hasMeteredQuota) return
     Column(
-        modifier = modifier.fillMaxWidth().padding(top = 8.dp, end = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = modifier.fillMaxWidth().padding(top = 12.dp, end = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         LinearProgressIndicator(
             progress = { info.usageProgress },
