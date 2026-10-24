@@ -51,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import ui.components.AsteriskTopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -81,6 +82,8 @@ import app.LocalNavigator
 import app.LocalUpdateAppState
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
+import app.OutboundState
+import app.outboundConfigChangedFrom
 import app.SubscriptionInfo
 import app.collectAppState
 import features.importing.ImportOperation
@@ -97,7 +100,6 @@ import features.importing.sanitizeImportMessage
 import features.importing.toImportResultPresentation
 import features.logs.FailureLogContext
 import engine.proxy.ProxyServiceResult
-import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.settings.SettingsDropdownRow
 import features.settings.SettingsSwitchRow
 import features.subscription.SubscriptionSchedule
@@ -137,6 +139,9 @@ import utils.toReadableBytes
 import utils.toReadableDateOrDash
 import utils.toReadableDateTimeOrDash
 import java.net.URI
+import java.util.concurrent.atomic.AtomicBoolean
+import features.home.HomeServiceOperation
+import utils.disambiguateName
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -177,13 +182,25 @@ internal fun OutboundGroupListPage(
     // Set only when the dialog reports a failure for a single-group sync, so 重试
     // re-runs exactly the update that failed.
     var retrySyncGroupId by remember { mutableStateOf<Int?>(null) }
-    var restartInProgress by remember { mutableStateOf(false) }
+    // The apply shares the home screen's service operation state, so the power button and this
+    // banner exclude each other and the spinner survives leaving and reopening the page.
+    val serviceOperationState = services.homeServiceOperationState
+    val applyingConfig = serviceOperationState.operation == HomeServiceOperation.Applying
+    val serviceBusy = serviceOperationState.operation != HomeServiceOperation.Idle ||
+        serviceOperationState.modeOperationInProgress
+    // Work that must outlive this page (a sync started right before navigator.pop(), an
+    // install the user walked away from) runs on the app scope. Its results reach this page's
+    // dialogs only while the page is still composed, and fall back to a tip otherwise.
+    val pageActive = remember { AtomicBoolean(true) }
+    DisposableEffect(Unit) { onDispose { pageActive.set(false) } }
     var showAddMethodSheet by remember { mutableStateOf(false) }
     var addingFromQrCode by remember { mutableStateOf(false) }
     var addingFromFile by remember { mutableStateOf(false) }
-    val restartFailedMessage = stringResource(R.string.outbound_group_config_restart_failed)
+    val applyFailedMessage = stringResource(R.string.outbound_group_config_apply_failed)
+    val appliedMessage = stringResource(R.string.outbound_group_config_applied)
     val qrInvalidMessage = stringResource(R.string.outbound_group_add_qr_invalid)
     val addInstalledMessage = stringResource(R.string.outbound_group_add_installed)
+    val addExistingMessage = stringResource(R.string.outbound_group_add_existing)
     val addFailedMessage = stringResource(R.string.outbound_group_add_failed)
     val addFileFailedMessage = stringResource(R.string.outbound_group_add_file_failed)
     val importFailedMessage = stringResource(R.string.outbound_group_sync_failed)
@@ -197,6 +214,24 @@ internal fun OutboundGroupListPage(
     }
 
     /**
+     * Shows [presentation] in this page's result dialog, or [fallbackMessage] as a tip when
+     * the page has already been left (for example a sync started right before navigator.pop()).
+     */
+    suspend fun presentImportResult(
+        presentation: ImportResultPresentation,
+        fallbackMessage: String,
+        retryGroupId: Int? = null,
+    ) {
+        if (pageActive.get()) {
+            importResultPresentation = presentation
+            retrySyncGroupId = retryGroupId
+                ?.takeIf { presentation.status == ImportResultStatus.FAILURE }
+        } else {
+            services.tipNotifier.show(fallbackMessage)
+        }
+    }
+
+    /**
      * Scans a subscription QR code and installs it through the same use case the
      * clash://, v2rayng:// and sing-box:// deep links use, so a scanned link and a
      * tapped link produce identical groups.
@@ -204,7 +239,7 @@ internal fun OutboundGroupListPage(
     fun addFromQrCode() {
         if (addingFromQrCode) return
         addingFromQrCode = true
-        scope.launch {
+        services.appScope.launch(Dispatchers.Main.immediate) {
             try {
                 val scanned = services.qrCodeScanner()?.trim().orEmpty()
                 if (scanned.isBlank()) return@launch
@@ -213,11 +248,13 @@ internal fun OutboundGroupListPage(
                     services.tipNotifier.show(qrInvalidMessage)
                     return@launch
                 }
+                // The install matches an existing group by URL and re-syncs it instead.
+                val existing = stateStore.state.value.outboundGroups.any { group -> group.url == config.url }
                 when (val result = services.subscriptionInstallConfig.install(config)) {
                     is OutboundSubscriptionUpdateResult.Success,
                     is OutboundSubscriptionUpdateResult.Partial,
                     OutboundSubscriptionUpdateResult.NotModified,
-                    -> services.tipNotifier.show(addInstalledMessage)
+                    -> services.tipNotifier.show(if (existing) addExistingMessage else addInstalledMessage)
 
                     is OutboundSubscriptionUpdateResult.Failed -> services.tipNotifier.showError(
                         result.error,
@@ -249,86 +286,104 @@ internal fun OutboundGroupListPage(
     fun addFromFile() {
         if (addingFromFile) return
         addingFromFile = true
-        scope.launch {
+        val appContext = context.applicationContext
+        services.appScope.launch(Dispatchers.Main.immediate) {
             var stage = ImportStage.READ
             try {
                 val uri = services.importFilePicker() ?: return@launch
-                val file = withContext(Dispatchers.IO) { context.readGroupImportFile(uri) }
+                val file = withContext(Dispatchers.IO) { appContext.readGroupImportFile(uri) }
                 stage = ImportStage.PARSE
                 val parsed = withContext(Dispatchers.Default) {
                     parseOutboundImportContent(file.content)
                 }
                 if (parsed.accepted.isEmpty()) {
-                    importResultPresentation = parsed.toImportResultPresentation(committed = false)
-                    return@launch
-                }
-                val snapshot = stateStore.state.value
-                val withGroup = snapshot.withSavedOutboundGroup(
-                    OutboundGroupState(id = 0, name = file.groupName),
-                )
-                val group = withGroup.outboundGroups.last()
-                val plan = withGroup.planOutboundImport(
-                    groupId = group.id,
-                    parsed = parsed,
-                    replaceGroup = false,
-                    strict = false,
-                )
-                if (!plan.committed) {
-                    importResultPresentation = plan.outcome.toImportResultPresentation(
-                        committed = false,
+                    presentImportResult(
+                        parsed.toImportResultPresentation(committed = false),
+                        addFileFailedMessage,
                     )
                     return@launch
                 }
-                stage = ImportStage.VALIDATE
-                withContext(Dispatchers.IO) {
-                    validateSingBoxRuntimeConfiguration(context, plan.state)
+                val snapshot = stateStore.state.value
+                val groupName = disambiguateName(
+                    base = file.groupName,
+                    takenNames = snapshot.outboundGroups.map(OutboundGroupState::name),
+                ) { name, ordinal ->
+                    resources.getString(R.string.outbound_group_name_duplicate, name, ordinal)
                 }
+                val withGroup = snapshot.withSavedOutboundGroup(
+                    OutboundGroupState(id = 0, name = groupName),
+                )
+                val group = withGroup.outboundGroups.last()
+                val plan = withContext(Dispatchers.Default) {
+                    withGroup.planOutboundImport(
+                        groupId = group.id,
+                        parsed = parsed,
+                        replaceGroup = false,
+                        strict = false,
+                    )
+                }
+                if (!plan.committed) {
+                    presentImportResult(
+                        plan.outcome.toImportResultPresentation(committed = false),
+                        addFileFailedMessage,
+                    )
+                    return@launch
+                }
+                // persistImport validates the candidate itself; validating here as well would
+                // double the most expensive step and widen the window for a Conflict.
                 stage = ImportStage.COMMIT
                 when (
                     val persist = services.outboundRepository.persistImport(snapshot, plan.state)
                 ) {
                     OutboundCommandResult.ImportPersisted -> {
                         val presentation = plan.outcome.toImportResultPresentation(committed = true)
+                        val successMessage = resources.getQuantityString(
+                            R.plurals.outbound_import_success,
+                            plan.outcome.accepted.size,
+                            plan.outcome.accepted.size,
+                        )
                         if (presentation.showDialog) {
-                            importResultPresentation = presentation
+                            presentImportResult(presentation, successMessage)
                         } else {
-                            services.tipNotifier.show(
-                                resources.getQuantityString(
-                                    R.plurals.outbound_import_success,
-                                    plan.outcome.accepted.size,
-                                    plan.outcome.accepted.size,
-                                ),
-                            )
+                            services.tipNotifier.show(successMessage)
                         }
                     }
 
-                    OutboundCommandResult.Conflict -> reportImportFailure(
-                        operation = ImportOperation.OUTBOUND,
-                        source = ImportSource.FILE,
-                        stage = ImportStage.COMMIT,
-                    ).also {
-                        importResultPresentation = importFailureResultPresentation(stateChangedMessage)
-                    }
-
-                    is OutboundCommandResult.Invalid -> reportImportFailure(
-                        operation = ImportOperation.OUTBOUND,
-                        source = ImportSource.FILE,
-                        stage = ImportStage.VALIDATE,
-                        error = persist.error,
-                    ).also {
-                        importResultPresentation = importFailureResultPresentation(
-                            persist.error.message ?: addFileFailedMessage,
+                    OutboundCommandResult.Conflict -> {
+                        reportImportFailure(
+                            operation = ImportOperation.OUTBOUND,
+                            source = ImportSource.FILE,
+                            stage = ImportStage.COMMIT,
+                        )
+                        presentImportResult(
+                            importFailureResultPresentation(stateChangedMessage),
+                            stateChangedMessage,
                         )
                     }
 
-                    is OutboundCommandResult.PersistenceFailed -> reportImportFailure(
-                        operation = ImportOperation.OUTBOUND,
-                        source = ImportSource.FILE,
-                        stage = ImportStage.COMMIT,
-                        error = persist.error,
-                    ).also {
-                        importResultPresentation = importFailureResultPresentation(
-                            persist.error.message ?: addFileFailedMessage,
+                    is OutboundCommandResult.Invalid -> {
+                        reportImportFailure(
+                            operation = ImportOperation.OUTBOUND,
+                            source = ImportSource.FILE,
+                            stage = ImportStage.VALIDATE,
+                            error = persist.error,
+                        )
+                        presentImportResult(
+                            importFailureResultPresentation(persist.error.message ?: addFileFailedMessage),
+                            addFileFailedMessage,
+                        )
+                    }
+
+                    is OutboundCommandResult.PersistenceFailed -> {
+                        reportImportFailure(
+                            operation = ImportOperation.OUTBOUND,
+                            source = ImportSource.FILE,
+                            stage = ImportStage.COMMIT,
+                            error = persist.error,
+                        )
+                        presentImportResult(
+                            importFailureResultPresentation(persist.error.message ?: addFileFailedMessage),
+                            addFileFailedMessage,
                         )
                     }
 
@@ -350,12 +405,22 @@ internal fun OutboundGroupListPage(
         }
     }
 
-    fun restartService() {
-        if (restartInProgress) return
-        restartInProgress = true
-        scope.launch {
+    /**
+     * Applies the pending outbound changes to the running core: an in-place reload in VPN
+     * mode, a supervised restart in ROOT modes. Runs on the app scope like the home power
+     * button, so leaving the page cannot cancel it halfway through a restart.
+     */
+    fun applyPendingConfig() {
+        if (serviceBusy) return
+        val snapshot = stateStore.state.value
+        serviceOperationState.operation = HomeServiceOperation.Applying
+        services.appScope.launch(Dispatchers.Main.immediate) {
             try {
-                when (val result = services.proxyServiceUseCase.restart(stateStore.state.value)) {
+                val result = services.proxyServiceUseCase.applyConfiguration(
+                    snapshot,
+                    services.singBoxRuntime::reloadVpnConfiguration,
+                )
+                when (result) {
                     is ProxyServiceResult.Success -> {
                         updateAppState { state ->
                             state.copy(
@@ -364,19 +429,27 @@ internal fun OutboundGroupListPage(
                                     ?: state.localProxyPort,
                                 singBoxControlPort = result.appState?.singBoxControlPort
                                     ?: state.singBoxControlPort,
-                                // A successful restart relaunches the core from this state.
-                                pendingConfigRestart = false,
+                                // The core now runs [snapshot]; anything committed while the
+                                // apply was in flight is still pending.
+                                pendingConfigRestart = state.pendingConfigRestart &&
+                                    state.outboundConfigChangedFrom(snapshot),
                             )
                         }
+                        if (result.proxyRunning) services.tipNotifier.show(appliedMessage)
                     }
 
-                    is ProxyServiceResult.Failed -> services.tipNotifier.showError(
-                        result.error,
-                        restartFailedMessage,
-                    )
+                    is ProxyServiceResult.Failed -> {
+                        // A failed restart may already have stopped the core, so read back
+                        // what is really running instead of assuming either way.
+                        val running = services.proxyServiceUseCase.isRunning(snapshot)
+                        if (running != null) {
+                            updateAppState { state -> state.copy(proxyRunning = running) }
+                        }
+                        services.tipNotifier.showError(result.error, applyFailedMessage)
+                    }
                 }
             } finally {
-                restartInProgress = false
+                serviceOperationState.operation = HomeServiceOperation.Idle
             }
         }
     }
@@ -431,14 +504,26 @@ internal fun OutboundGroupListPage(
             return
         }
         syncingGroupIds += group.id
-        scope.launch {
+        // App scope: the sync that follows saving a new group must survive navigator.pop().
+        services.appScope.launch(Dispatchers.Main.immediate) {
             try {
                 when (val result = updateGroupSubscription(group)) {
                     is OutboundGroupUpdateResult.Success -> {
+                        val successMessage = resources.getQuantityString(
+                            R.plurals.outbound_import_success,
+                            result.outboundCount,
+                            result.outboundCount,
+                        )
                         if (result.presentation?.showDialog == true) {
-                            importResultPresentation = result.presentation
-                            retrySyncGroupId = group.id
-                                .takeIf { result.presentation.status == ImportResultStatus.FAILURE }
+                            presentImportResult(
+                                result.presentation,
+                                if (result.presentation.status == ImportResultStatus.FAILURE) {
+                                    importFailedMessage
+                                } else {
+                                    successMessage
+                                },
+                                retryGroupId = group.id,
+                            )
                         } else if (result.notModified) {
                             services.tipNotifier.show(
                                 resources.getString(
@@ -446,13 +531,7 @@ internal fun OutboundGroupListPage(
                                 ),
                             )
                         } else {
-                            services.tipNotifier.show(
-                                resources.getQuantityString(
-                                    R.plurals.outbound_import_success,
-                                    result.outboundCount,
-                                    result.outboundCount,
-                                ),
-                            )
+                            services.tipNotifier.show(successMessage)
                         }
                     }
                     is OutboundGroupUpdateResult.Failure -> {
@@ -462,11 +541,15 @@ internal fun OutboundGroupListPage(
                             stage = result.stage,
                             error = result.error,
                         )
-                        importResultPresentation = result.presentation
-                            ?: importFailureResultPresentation(
-                                result.error.message ?: importFailedMessage,
-                            )
-                        retrySyncGroupId = group.id
+                        presentImportResult(
+                            result.presentation
+                                ?: importFailureResultPresentation(
+                                    result.error.message ?: importFailedMessage,
+                                ),
+                            importFailedMessage,
+                        )
+                        // Any Failure is worth retrying, whatever status its outcome reports.
+                        if (pageActive.get()) retrySyncGroupId = group.id
                     }
                 }
             } finally {
@@ -719,6 +802,11 @@ internal fun OutboundGroupListPage(
             }
         }
         val displayedGroups = preview.items
+        // One pass over the outbounds instead of one per card on every recomposition; a large
+        // subscription makes the per-card count O(groups x outbounds) per frame.
+        val outboundCountsByGroup = remember(appState.outbounds) {
+            appState.outbounds.groupingBy(OutboundState::groupId).eachCount()
+        }
         val reorderableState = rememberAsteriskReorderableLazyListState(
             lazyListState = listState,
             itemCount = displayedGroups.size,
@@ -727,9 +815,10 @@ internal fun OutboundGroupListPage(
         )
         Column(modifier = Modifier.fillMaxSize()) {
             if (pinnedRestartBanner) {
-                OutboundGroupConfigRestartBanner(
-                    busy = restartInProgress,
-                    onRestart = { restartService() },
+                OutboundGroupConfigApplyBanner(
+                    applying = applyingConfig,
+                    enabled = !serviceBusy,
+                    onApply = { applyPendingConfig() },
                     modifier = Modifier.padding(
                         start = listContentPadding.calculateStartPadding(layoutDirection),
                         end = listContentPadding.calculateEndPadding(layoutDirection),
@@ -763,9 +852,7 @@ internal fun OutboundGroupListPage(
                     ) { isDragging ->
                         OutboundGroupCard(
                             group = group,
-                            outboundCount = appState.outbounds.count { outbound ->
-                                outbound.groupId == group.id
-                            },
+                            outboundCount = outboundCountsByGroup[group.id] ?: 0,
                             syncing = group.id in syncingGroupIds,
                             isDragging = isDragging,
                             enabledChangeBusy = group.id in enabledChangingGroupIds,
@@ -1239,9 +1326,10 @@ private fun OutboundGroupAddMethodSheet(
 }
 
 @Composable
-private fun OutboundGroupConfigRestartBanner(
-    busy: Boolean,
-    onRestart: () -> Unit,
+private fun OutboundGroupConfigApplyBanner(
+    applying: Boolean,
+    enabled: Boolean,
+    onApply: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -1264,14 +1352,14 @@ private fun OutboundGroupConfigRestartBanner(
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    text = stringResource(R.string.outbound_group_config_restart_required),
+                    text = stringResource(R.string.outbound_group_config_apply_title),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                 )
             }
             Text(
-                text = stringResource(R.string.outbound_group_config_restart_summary),
+                text = stringResource(R.string.outbound_group_config_apply_summary),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
             )
@@ -1280,11 +1368,11 @@ private fun OutboundGroupConfigRestartBanner(
                 horizontalArrangement = Arrangement.End,
             ) {
                 AsteriskActionButton(
-                    text = stringResource(R.string.outbound_group_config_restart_action),
+                    text = stringResource(R.string.outbound_group_config_apply_action),
                     icon = Icons.Rounded.Refresh,
-                    enabled = !busy,
-                    loading = busy,
-                    onClick = onRestart,
+                    enabled = enabled,
+                    loading = applying,
+                    onClick = onApply,
                 )
             }
         }

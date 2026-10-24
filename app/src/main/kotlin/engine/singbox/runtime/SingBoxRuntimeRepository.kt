@@ -158,6 +158,14 @@ internal class SingBoxRuntimeRepository(
         reloadConfiguration(appState)
     }
 
+    /**
+     * Recompiles [appState] and reloads it into the running VPN core through the Command API.
+     * Throws when the reload is not possible, so the caller can fall back to a restart.
+     */
+    suspend fun reloadVpnConfiguration(appState: AppState) {
+        reloadConfiguration(appState)
+    }
+
     private suspend fun reloadConfiguration(appState: AppState) {
         if (!appState.proxyRunning) return
         val active = requireActiveSession(appState)

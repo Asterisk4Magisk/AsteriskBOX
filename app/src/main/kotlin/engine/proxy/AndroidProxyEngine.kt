@@ -13,6 +13,8 @@ import engine.stats.SingBoxTrafficStatsNotificationService
 import engine.stats.toSingBoxTrafficStatsRuntime
 import engine.singbox.withResolvedSingBoxControlPort
 import engine.vpn.VpnSingBoxEngine
+import features.logs.AndroidAppLogger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,6 +96,37 @@ internal class AndroidProxyEngine(
         }
         mutableRootStatusWatchGeneration.update { generation -> generation + 1L }
         return status
+    }
+
+    /**
+     * Applies a recompiled configuration to a running VPN core in place: the VpnService, its
+     * foreground notification and the libbox command server stay up, and only the sing-box
+     * instance (including its TUN) is recreated inside them. Falls back to an explicit
+     * restart only when the in-place reload fails. Both steps run under [operationMutex], so a stop from the
+     * tile or a broadcast cannot slip in between and then be undone by the fallback.
+     *
+     * Only the VPN engine is consulted, so this path performs no ROOT probing.
+     */
+    suspend fun reloadVpnOrRestart(
+        request: ProxyEngineStartRequest,
+        requestVpnPermission: VpnPermissionRequester = DenyVpnPermission,
+        reload: suspend () -> Unit,
+    ): ProxyEngineStatus = operationMutex.withLock {
+        val status = vpnSingBoxEngine.status()
+        // Stopped since the caller looked: there is nothing to apply, and starting it here
+        // would override the stop.
+        if (!status.running) return@withLock status
+        try {
+            reload()
+            return@withLock status.copy(appState = request.appState)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            AndroidAppLogger.warn(LogTag, "VPN configuration reload failed; restarting the service", error)
+        }
+        withVpnPermissionRequester(requestVpnPermission) {
+            startUnlocked(request, explicitRestart = true)
+        }
     }
 
     private suspend fun <T> withVpnPermissionRequester(
@@ -372,3 +405,5 @@ internal fun shouldUsePreResolvedRootStart(
     resumeChecked: Boolean,
     nextEngineIsRoot: Boolean,
 ): Boolean = !explicitRestart && resumeChecked && nextEngineIsRoot
+
+private const val LogTag = "AndroidProxyEngine"
