@@ -1404,7 +1404,6 @@
     <string name="settings_resource_files_add_custom_summary">Enter a download URL or choose a local .srs/.json/.hosts file</string>
     <string name="settings_resource_files_add_geoip_summary">Add IP rule sets from sing-geoip</string>
     <string name="settings_resource_files_add_geosite_summary">Add domain rule sets from sing-geosite</string>
-    <string name="settings_resource_files_add_source_hint">Choose where the rule-set file comes from</string>
     <string name="settings_resource_files_auto_update_interval">Update interval (hours)</string>
     <string name="settings_resource_files_auto_update_summary">Periodically update resource files when connected</string>
     <string name="settings_resource_files_auto_update_title">Automatic resource updates</string>

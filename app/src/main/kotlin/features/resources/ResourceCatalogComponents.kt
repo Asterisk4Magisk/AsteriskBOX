@@ -65,13 +65,6 @@ internal fun ResourceAddSourceSheet(
         onDismissRequest = onDismissRequest,
         onHidden = onHidden,
         title = stringResource(R.string.settings_resource_files_add),
-        startAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
-                onClick = onDismissRequest,
-            )
-        },
     ) {
         Column(
             modifier = Modifier
@@ -81,12 +74,6 @@ internal fun ResourceAddSourceSheet(
                 .padding(bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                text = stringResource(R.string.settings_resource_files_add_source_hint),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
-            )
             ResourceAddSourceCard(
                 title = "sing-geosite",
                 summary = stringResource(R.string.settings_resource_files_add_geosite_summary),

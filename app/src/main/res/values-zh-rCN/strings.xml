@@ -1387,7 +1387,6 @@
     <string name="settings_resource_files_add_custom_summary">输入下载地址，或选取本地 .srs/.json/.hosts 文件</string>
     <string name="settings_resource_files_add_geoip_summary">添加来自 sing-geoip 的 IP 规则集</string>
     <string name="settings_resource_files_add_geosite_summary">添加来自 sing-geosite 的域名规则集</string>
-    <string name="settings_resource_files_add_source_hint">选择规则集文件的来源</string>
     <string name="settings_resource_files_auto_update_interval">更新周期（小时）</string>
     <string name="settings_resource_files_auto_update_summary">联网时定期更新资源文件</string>
     <string name="settings_resource_files_auto_update_title">资源自动更新</string>
