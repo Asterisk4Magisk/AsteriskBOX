@@ -641,7 +641,6 @@
         <item quantity="one">%1$d selector</item>
         <item quantity="other">%1$d selectors</item>
     </plurals>
-    <string name="selector_custom_badge">Custom</string>
     <string name="selector_custom_section">Custom selectors</string>
     <string name="selector_default_remarks">New selector</string>
     <string name="selector_delete_message">The selector “%1$s” will be permanently deleted.</string>
@@ -675,7 +674,6 @@
     <string name="selector_empty">No custom selectors</string>
     <string name="selector_empty_summary">Create a Selector or URLTest from any available managed outbounds.</string>
     <string name="selector_group_disabled">Group disabled</string>
-    <string name="selector_managed_badge">Automatic</string>
     <string name="selector_managed_section">Managed group selectors</string>
     <string name="selector_managed_summary">Membership follows this application outbound group.</string>
     <string name="selector_management">Selector management</string>

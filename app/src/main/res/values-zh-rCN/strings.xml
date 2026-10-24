@@ -632,7 +632,6 @@
     <plurals name="selector_count">
         <item quantity="other">%1$d 个选择器</item>
     </plurals>
-    <string name="selector_custom_badge">自定义</string>
     <string name="selector_custom_section">自定义选择器</string>
     <string name="selector_default_remarks">新选择器</string>
     <string name="selector_delete_message">选择器“%1$s”将被永久删除。</string>
@@ -666,7 +665,6 @@
     <string name="selector_empty">暂无自定义选择器</string>
     <string name="selector_empty_summary">创建 Selector 或 URLTest，自由组合当前所有可用的托管出站。</string>
     <string name="selector_group_disabled">分组已停用</string>
-    <string name="selector_managed_badge">自动维护</string>
     <string name="selector_managed_section">托管分组选择器</string>
     <string name="selector_managed_summary">成员自动跟随该应用出站分组。</string>
     <string name="selector_management">选择器管理</string>

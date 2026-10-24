@@ -428,7 +428,6 @@ private fun ManagedSelectorCard(
         modifier = modifier,
         title = group.name,
         badges = listOf(
-            stringResource(R.string.selector_managed_badge),
             stringResource(R.string.selector_type_selector),
         ),
         memberCount = memberCount,
@@ -458,7 +457,6 @@ private fun CustomSelectorCard(
         modifier = modifier,
         title = selector.remarks,
         badges = listOf(
-            stringResource(R.string.selector_custom_badge),
             stringResource(
                 if (isUrlTest) R.string.selector_type_urltest
                 else R.string.selector_type_selector,
