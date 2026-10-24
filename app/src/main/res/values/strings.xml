@@ -80,6 +80,7 @@
     <string name="home_service_disabled">Service disabled</string>
     <string name="home_service_enabled">Service enabled</string>
     <string name="home_service_start">Start service</string>
+    <string name="home_service_applying">Applying…</string>
     <string name="home_service_starting">Starting…</string>
     <string name="home_service_stop">Stop service</string>
     <string name="home_service_stopping">Stopping…</string>
@@ -326,12 +327,11 @@
     <string name="outbound_group_hwid">HWID</string>
     <string name="outbound_group_local">Local group</string>
     <string name="outbound_group_management">Group management</string>
-    <string name="outbound_group_config_restart_required">Restart required</string>
-    <string name="outbound_group_config_restart_summary">Configuration changed. The running service still uses the previous configuration until it restarts.</string>
-    <string name="outbound_group_config_restart_action">Restart now</string>
-    <string name="outbound_group_config_restart_message">Group and proxy changes are saved. The running sing-box core keeps its launch configuration, so the change only takes effect after a restart.</string>
-    <string name="outbound_group_config_restart_later">Later</string>
-    <string name="outbound_group_config_restart_failed">Unable to restart the service</string>
+    <string name="outbound_group_config_apply_title">Changes not applied</string>
+    <string name="outbound_group_config_apply_summary">Groups or proxies changed. The running service keeps the previous configuration until the change is applied.</string>
+    <string name="outbound_group_config_apply_action">Apply now</string>
+    <string name="outbound_group_config_apply_failed">Unable to apply the configuration</string>
+    <string name="outbound_group_config_applied">Configuration applied</string>
     <string name="outbound_group_add_method_title">Add group</string>
     <string name="outbound_group_add_from_qr">Scan subscription QR code</string>
     <string name="outbound_group_add_from_qr_summary">Create a group from a subscription link and sync it</string>
@@ -343,6 +343,7 @@
     <string name="outbound_group_add_qr_invalid">The QR code does not contain a subscription link</string>
     <string name="outbound_group_add_installed">Group added</string>
     <string name="outbound_group_add_failed">Unable to add the group</string>
+    <string name="outbound_group_add_existing">Subscription already added; group updated</string>
     <string name="outbound_group_name">Name</string>
     <string name="outbound_group_name_duplicate">%1$s(%2$d)</string>
     <string name="outbound_group_name_placeholder">Leave blank to auto-assign on first sync</string>

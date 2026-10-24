@@ -4,6 +4,7 @@
 package engine.proxy
 
 import app.AppState
+import app.modes.RunModeVpnService
 import engine.root.runtime.RootFailureKind
 import engine.root.runtime.RootOperationBlockedException
 import engine.root.runtime.RootOperationLogRecord
@@ -52,6 +53,39 @@ internal class ProxyServiceUseCase(
             onSuccess = { status -> ProxyServiceResult.Success(proxyRunning = status.running, appState = status.appState) },
             onFailure = { error -> error.toProxyServiceFailure(RootRequestedAction.RestartSameOwner) },
         )
+    }
+
+    /**
+     * Applies changed configuration to the running core. VPN reloads in place (see
+     * [AndroidProxyEngine.reloadVpnOrRestart]), which is cheaper on a phone than stopping and
+     * relaunching the VpnService; ROOT modes have no hot API and take a supervised [restart].
+     */
+    suspend fun applyConfiguration(
+        state: AppState,
+        reloadVpn: suspend (AppState) -> Unit,
+    ): ProxyServiceResult {
+        if (state.runMode != RunModeVpnService) return restart(state)
+        return runCatching {
+            proxyEngine.reloadVpnOrRestart(ProxyEngineStartRequest(state), requestVpnPermission) {
+                reloadVpn(state)
+            }
+        }.fold(
+            onSuccess = { status -> ProxyServiceResult.Success(proxyRunning = status.running, appState = status.appState) },
+            onFailure = { error ->
+                if (error is CancellationException) throw error
+                ProxyServiceResult.Failed(error)
+            },
+        )
+    }
+
+    /** The live running state for [state]'s run mode, or `null` when it cannot be read. */
+    suspend fun isRunning(state: AppState): Boolean? = try {
+        proxyEngine.status(state.runMode, state).running
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Throwable) {
+        AndroidAppLogger.warn(LogTag, "Failed to read proxy status", error)
+        null
     }
 
     private suspend fun start(state: AppState): ProxyServiceResult {
