@@ -154,7 +154,7 @@
     <string name="monitor_resource_cpu">进程 CPU</string>
     <string name="monitor_resource_cpu_peak">CPU 峰值</string>
     <string name="monitor_resource_details">采样详情</string>
-    <string name="monitor_resource_embedded_explanation">CPU 包含同一进程内的 sing-box 与 AsteriskBOX 开销，不能与 Root 模式直接横向比较。</string>
+    <string name="monitor_resource_embedded_explanation">CPU 包含同一进程内的 sing-box 与 AsteriskBOX 开销，不能与 ROOT 模式直接横向比较。</string>
     <string name="monitor_resource_focus_memory">内存 %1$s</string>
     <string name="monitor_resource_interval">采样间隔</string>
     <string name="monitor_resource_memory">sing-box 内存</string>
@@ -163,7 +163,7 @@
     <string name="monitor_resource_root_explanation">CPU 数据来自独立运行的 sing-box 进程。</string>
     <string name="monitor_resource_source_embedded">AsteriskBOX 进程 · 内嵌</string>
     <string name="monitor_resource_source_info">CPU 统计说明</string>
-    <string name="monitor_resource_source_root">sing-box 进程 · Root</string>
+    <string name="monitor_resource_source_root">sing-box 进程 · ROOT</string>
     <string name="monitor_resource_title">资源监控</string>
     <string name="monitor_resource_trend">共享趋势</string>
 
@@ -241,7 +241,7 @@
     <string name="monitor_network_quality_http3">HTTP/3</string>
     <string name="monitor_network_quality_http3_summary">当服务端支持时,使用 QUIC / HTTP/3 探测。</string>
     <string name="monitor_network_quality_idle_latency">空闲延迟</string>
-    <string name="monitor_network_quality_idle_latency_explanation">空闲时链路的响应延迟。300 毫秒以内对实时交互足够好,300–700 毫秒可以接受,超过 700 毫秒会明显迟滞。</string>
+    <string name="monitor_network_quality_idle_latency_explanation">空闲时链路的响应延迟。300 ms 以内对实时交互足够好,300–700 ms 可以接受,超过 700 ms 会明显迟滞。</string>
     <string name="monitor_network_quality_info_action">参数说明</string>
     <string name="monitor_network_quality_max_runtime">最长耗时(秒)</string>
     <string name="monitor_network_quality_outbound_default">默认</string>
@@ -301,7 +301,7 @@
     <string name="connection_test_ignore_handshake_time_summary">在 TCP/TLS 握手完成后再开始计时</string>
     <string name="connection_test_settings_summary">调整 sing-box URL 测试的测量行为</string>
     <string name="connection_test_settings_title">连接测试</string>
-    <string name="connection_test_timeout">测试超时(毫秒)</string>
+    <string name="connection_test_timeout">测试超时(ms)</string>
     <string name="connection_test_unified_delay">统一延迟</string>
     <string name="connection_test_unified_delay_summary">在已建立会话上测第二次请求,剔除一次性握手成本</string>
     <string name="connection_test_url">测试链接</string>
@@ -431,12 +431,12 @@
     <string name="outbound_option_layout_multiple">多列</string>
     <string name="outbound_option_layout_single">单列</string>
     <string name="outbound_options">出站选项</string>
-    <string name="outbound_ping">Ping</string>
+    <string name="outbound_ping">PING</string>
     <string name="outbound_ping_failed">失败</string>
-    <string name="outbound_ping_group">Ping 当前分组</string>
+    <string name="outbound_ping_group">PING 当前分组</string>
     <string name="outbound_ping_latency">%1$d ms</string>
-    <string name="outbound_ping_no_targets">当前分组没有可 Ping 的服务器地址</string>
-    <string name="outbound_ping_running">正在 Ping</string>
+    <string name="outbound_ping_no_targets">当前分组没有可 PING 的服务器地址</string>
+    <string name="outbound_ping_running">正在 PING</string>
     <plurals name="outbound_proxy_servers_deleted">
         <item quantity="other">已删除 %1$d 个代理节点</item>
     </plurals>
@@ -449,7 +449,7 @@
     <string name="outbound_share_qr">生成二维码</string>
     <string name="outbound_share_url">复制 URL</string>
     <string name="outbound_sort">排序</string>
-    <string name="outbound_sort_latency">Ping 延迟</string>
+    <string name="outbound_sort_latency">PING 延迟</string>
     <string name="outbound_sort_original">手动顺序</string>
     <string name="outbound_sort_remarks">别名</string>
     <string name="outbound_sort_type">协议</string>
@@ -574,7 +574,7 @@
     <string name="outbound_field_password">密码</string>
     <string name="outbound_field_path">路径</string>
     <string name="outbound_field_permit_without_stream">无活动流时允许保活</string>
-    <string name="outbound_field_ping_timeout">Ping 超时</string>
+    <string name="outbound_field_ping_timeout">PING 超时</string>
     <string name="outbound_field_plugin">插件</string>
     <string name="outbound_field_plugin_options">插件选项</string>
     <string name="outbound_field_port_hopping_interval">端口跳跃间隔</string>
