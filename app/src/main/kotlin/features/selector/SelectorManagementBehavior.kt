@@ -6,6 +6,7 @@ package features.selector
 import app.AppState
 import app.DefaultSingBoxUrlTestIdleTimeout
 import app.DefaultSingBoxUrlTestInterval
+import app.DefaultSingBoxUrlTestTolerance
 import app.DefaultSingBoxUrlTestUrl
 import app.ManagedOutboundChoice
 import app.SingBoxSelectorTypeSelector
@@ -17,6 +18,7 @@ import app.selectableManagedOutbounds
 import engine.singbox.SingBoxUnsigned16Max
 import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.isSingBoxDurationNotGreaterThan
+import engine.singbox.singBoxDurationNanosOrNull
 import java.net.URI
 
 internal fun selectorTargetChoices(
@@ -41,16 +43,6 @@ internal fun selectorCardMemberCount(
         memberReferences = selector.outbounds,
         targets = targets,
     ).size
-}
-
-internal fun List<SingBoxSelectorState>.moveSelector(
-    fromIndex: Int,
-    toIndex: Int,
-): List<SingBoxSelectorState> {
-    if (fromIndex !in indices || toIndex !in indices || fromIndex == toIndex) return this
-    return toMutableList().apply {
-        add(toIndex, removeAt(fromIndex))
-    }
 }
 
 internal fun selectorCustomSectionIndexOffset(managedSelectorCount: Int): Int =
@@ -134,17 +126,20 @@ internal fun validateSelectorDraft(
         }
         SingBoxSelectorTypeUrlTest -> {
             val url = draft.url.trim().ifBlank { DefaultSingBoxUrlTestUrl }
-            val interval = draft.interval.trim().ifBlank { DefaultSingBoxUrlTestInterval }
-            val idleTimeout = draft.idleTimeout.trim()
-                .ifBlank { DefaultSingBoxUrlTestIdleTimeout }
+            val interval = effectiveUrlTestDuration(draft.interval, DefaultSingBoxUrlTestInterval)
+            val idleTimeout = effectiveUrlTestDuration(draft.idleTimeout, DefaultSingBoxUrlTestIdleTimeout)
+            val fallbackMaxDelay = draft.fallbackMaxDelay.trim()
             require(isValidUrlTestUrl(url)) { "URLTest URL is invalid" }
             require(isValidSingBoxDuration(interval)) { "URLTest interval is invalid" }
-            require(draft.tolerance in 0..SingBoxUnsigned16Max) {
+            require(draft.fallbackEnabled || draft.tolerance in 0..SingBoxUnsigned16Max) {
                 "URLTest tolerance is invalid"
             }
             require(isValidSingBoxDuration(idleTimeout)) { "URLTest idle timeout is invalid" }
             require(isSingBoxDurationNotGreaterThan(interval, idleTimeout)) {
                 "URLTest interval must not exceed idle timeout"
+            }
+            require(!draft.fallbackEnabled || fallbackMaxDelay.isEmpty() || isValidSingBoxDuration(fallbackMaxDelay)) {
+                "URLTest fallback maximum delay is invalid"
             }
             draft.copy(
                 type = type,
@@ -154,6 +149,9 @@ internal fun validateSelectorDraft(
                 url = url,
                 interval = interval,
                 idleTimeout = idleTimeout,
+                tolerance = draft.tolerance.takeIf { it in 0..SingBoxUnsigned16Max }
+                    ?: DefaultSingBoxUrlTestTolerance,
+                fallbackMaxDelay = fallbackMaxDelay,
             )
         }
         else -> error("Unreachable selector type")
@@ -176,3 +174,8 @@ internal fun isValidUrlTestUrl(value: String): Boolean {
 
 internal fun isValidSingBoxDuration(value: String): Boolean =
     isNonNegativeSingBoxDuration(value)
+
+internal fun effectiveUrlTestDuration(value: String, defaultValue: String): String =
+    value.trim().takeUnless { duration ->
+        duration.isEmpty() || singBoxDurationNanosOrNull(duration)?.signum() == 0
+    } ?: defaultValue

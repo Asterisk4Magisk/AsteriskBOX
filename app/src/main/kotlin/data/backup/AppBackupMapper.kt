@@ -271,6 +271,8 @@ private fun SingBoxSelectorState.toBackup(): AppBackupSelector =
         tolerance = tolerance,
         idleTimeout = idleTimeout,
         interruptExistConnections = interruptExistConnections,
+        fallbackEnabled = fallbackEnabled,
+        fallbackMaxDelay = fallbackMaxDelay,
     )
 
 private fun CustomResourceFileState.toBackup(): AppBackupCustomResourceFile =
@@ -472,6 +474,8 @@ private fun AppBackupSelector.toState(): SingBoxSelectorState =
         tolerance = tolerance,
         idleTimeout = idleTimeout,
         interruptExistConnections = interruptExistConnections,
+        fallbackEnabled = fallbackEnabled,
+        fallbackMaxDelay = fallbackMaxDelay,
     )
 
 private fun AppBackupCustomResourceFile.toState(): CustomResourceFileState =

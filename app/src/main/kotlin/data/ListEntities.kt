@@ -212,6 +212,8 @@ internal data class SelectorEntity(
     val tolerance: Int = DefaultSingBoxUrlTestTolerance,
     val idleTimeout: String = DefaultSingBoxUrlTestIdleTimeout,
     val interruptExistConnections: Boolean,
+    @ColumnInfo(defaultValue = "0") val fallbackEnabled: Boolean = false,
+    @ColumnInfo(defaultValue = "''") val fallbackMaxDelay: String = "",
 ) {
     fun toState(): SingBoxSelectorState =
         SingBoxSelectorState(
@@ -225,6 +227,8 @@ internal data class SelectorEntity(
             tolerance = tolerance,
             idleTimeout = idleTimeout,
             interruptExistConnections = interruptExistConnections,
+            fallbackEnabled = fallbackEnabled,
+            fallbackMaxDelay = fallbackMaxDelay,
         )
 
     companion object {
@@ -241,6 +245,8 @@ internal data class SelectorEntity(
                 tolerance = selector.tolerance,
                 idleTimeout = selector.idleTimeout,
                 interruptExistConnections = selector.interruptExistConnections,
+                fallbackEnabled = selector.fallbackEnabled,
+                fallbackMaxDelay = selector.fallbackMaxDelay,
             )
     }
 }

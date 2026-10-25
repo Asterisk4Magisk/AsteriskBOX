@@ -181,6 +181,8 @@ data class SingBoxSelectorState(
     val tolerance: Int = DefaultSingBoxUrlTestTolerance,
     val idleTimeout: String = DefaultSingBoxUrlTestIdleTimeout,
     val interruptExistConnections: Boolean = true,
+    val fallbackEnabled: Boolean = false,
+    val fallbackMaxDelay: String = "",
 ) {
     val tag: String
         get() = managedSelectorTag(id, remarks)

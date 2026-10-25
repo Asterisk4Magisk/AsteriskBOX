@@ -707,9 +707,19 @@ private fun buildUrlTestOutbound(
         ?: DefaultSingBoxUrlTestUrl
     put("url", effectiveUrl)
     put("interval", selector.interval.trim())
-    put("tolerance", selector.tolerance)
+    if (!selector.fallbackEnabled) {
+        put("tolerance", selector.tolerance)
+    }
     put("idle_timeout", selector.idleTimeout.trim())
     put("interrupt_exist_connections", selector.interruptExistConnections)
+    if (selector.fallbackEnabled) {
+        putJsonObject("fallback") {
+            put("enabled", true)
+            selector.fallbackMaxDelay.trim().takeIf(String::isNotEmpty)?.let { maxDelay ->
+                put("max_delay", maxDelay)
+            }
+        }
+    }
 }
 
 internal fun compileEndpoints(root: JsonObject, appState: AppState): JsonArray {

@@ -14,6 +14,8 @@ internal sealed interface SelectorEditorSection {
 
     data class ConnectionOptions(
         val showUrlTestSettings: Boolean,
+        val showTolerance: Boolean,
+        val showFallbackMaxDelay: Boolean,
     ) : SelectorEditorSection
 
     data class MemberHeader(
@@ -23,13 +25,18 @@ internal sealed interface SelectorEditorSection {
     data object MemberContent : SelectorEditorSection
 }
 
-internal fun selectorEditorSections(type: String): List<SelectorEditorSection> {
+internal fun selectorEditorSections(
+    type: String,
+    fallbackEnabled: Boolean,
+): List<SelectorEditorSection> {
     require(type in SupportedSingBoxSelectorTypes) { "Unsupported selector type" }
     return listOf(
         SelectorEditorSection.Remarks,
         SelectorEditorSection.Type,
         SelectorEditorSection.ConnectionOptions(
             showUrlTestSettings = type == SingBoxSelectorTypeUrlTest,
+            showTolerance = type == SingBoxSelectorTypeUrlTest && !fallbackEnabled,
+            showFallbackMaxDelay = type == SingBoxSelectorTypeUrlTest && fallbackEnabled,
         ),
         SelectorEditorSection.MemberHeader(
             showDefaultOutbound = type == SingBoxSelectorTypeSelector,
@@ -39,4 +46,4 @@ internal fun selectorEditorSections(type: String): List<SelectorEditorSection> {
 }
 
 internal fun selectorDefaultOptionTags(members: List<String>): List<String?> =
-    if (members.isEmpty()) listOf(null) else members
+    members.ifEmpty { listOf(null) }

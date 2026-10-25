@@ -736,6 +736,12 @@ internal fun SelectorEditorScaffold(
     var idleTimeout by remember(selector?.id) {
         mutableStateOf(selector?.idleTimeout ?: DefaultSingBoxUrlTestIdleTimeout)
     }
+    var fallbackEnabled by remember(selector?.id) {
+        mutableStateOf(selector?.fallbackEnabled ?: false)
+    }
+    var fallbackMaxDelay by remember(selector?.id) {
+        mutableStateOf(selector?.fallbackMaxDelay.orEmpty())
+    }
     var interrupt by remember(selector?.id) {
         mutableStateOf(selector?.interruptExistConnections ?: true)
     }
@@ -811,20 +817,31 @@ internal fun SelectorEditorScaffold(
         memberReferences,
         interactiveVisibleTargetTags,
     )
-    val urlInvalid = url.isNotBlank() && !isValidUrlTestUrl(url)
-    val intervalInvalid = interval.isNotBlank() && !isValidSingBoxDuration(interval)
-    val toleranceValue = tolerance.toIntOrNull()
-    val toleranceInvalid = tolerance.isNotBlank() &&
+    val editorSections = selectorEditorSections(type, fallbackEnabled)
+    val connectionOptions = editorSections
+        .filterIsInstance<SelectorEditorSection.ConnectionOptions>()
+        .single()
+    val memberHeader = editorSections
+        .filterIsInstance<SelectorEditorSection.MemberHeader>()
+        .single()
+    val urlInvalid = connectionOptions.showUrlTestSettings &&
+        url.isNotBlank() && !isValidUrlTestUrl(url)
+    val intervalInvalid = connectionOptions.showUrlTestSettings &&
+        interval.isNotBlank() && !isValidSingBoxDuration(interval)
+    val toleranceValue = tolerance.trim().toIntOrNull()
+    val toleranceInvalid = connectionOptions.showTolerance && tolerance.isNotBlank() &&
         (toleranceValue == null || toleranceValue !in 0..SingBoxUnsigned16Max)
-    val idleTimeoutInvalid = idleTimeout.isNotBlank() &&
+    val idleTimeoutInvalid = connectionOptions.showUrlTestSettings && idleTimeout.isNotBlank() &&
         !isValidSingBoxDuration(idleTimeout)
-    val intervalExceedsIdleTimeout = !intervalInvalid &&
-        !idleTimeoutInvalid &&
-        isValidSingBoxDuration(interval.ifBlank { DefaultSingBoxUrlTestInterval }) &&
-        isValidSingBoxDuration(idleTimeout.ifBlank { DefaultSingBoxUrlTestIdleTimeout }) &&
+    val fallbackMaxDelayInvalid = connectionOptions.showFallbackMaxDelay && fallbackMaxDelay.isNotBlank() &&
+        !isValidSingBoxDuration(fallbackMaxDelay)
+    val effectiveInterval = effectiveUrlTestDuration(interval, DefaultSingBoxUrlTestInterval)
+    val effectiveIdleTimeout = effectiveUrlTestDuration(idleTimeout, DefaultSingBoxUrlTestIdleTimeout)
+    val intervalExceedsIdleTimeout = connectionOptions.showUrlTestSettings &&
+        !intervalInvalid && !idleTimeoutInvalid &&
         !isSingBoxDurationNotGreaterThan(
-            interval.ifBlank { DefaultSingBoxUrlTestInterval },
-            idleTimeout.ifBlank { DefaultSingBoxUrlTestIdleTimeout },
+            effectiveInterval,
+            effectiveIdleTimeout,
         )
     val draft = SingBoxSelectorState(
         id = selector?.id ?: 0,
@@ -842,6 +859,8 @@ internal fun SelectorEditorScaffold(
         },
         idleTimeout = idleTimeout,
         interruptExistConnections = interrupt,
+        fallbackEnabled = fallbackEnabled,
+        fallbackMaxDelay = fallbackMaxDelay,
     )
     val canSave = !saving && runCatching {
         validateSelectorDraft(state, draft)
@@ -856,13 +875,7 @@ internal fun SelectorEditorScaffold(
             SingBoxSelectorTypeUrlTest,
         ),
     )
-    val editorSections = selectorEditorSections(type)
-    val connectionOptions = editorSections
-        .filterIsInstance<SelectorEditorSection.ConnectionOptions>()
-        .single()
-    val memberHeader = editorSections
-        .filterIsInstance<SelectorEditorSection.MemberHeader>()
-        .single()
+    val selectionOptionsMotion = AsteriskMotion.fastEffects<Float>()
     val resolvedDefault = draft.default
     val defaultOptionTags = selectorDefaultOptionTags(effectiveMembers)
     val toggleableState = when (selectionState) {
@@ -1002,12 +1015,91 @@ internal fun SelectorEditorScaffold(
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.primary,
                             )
+                            SettingsDropdownRow(
+                                title = stringResource(R.string.selector_editor_urltest_selection),
+                                horizontalPadding = 0.dp,
+                                summary = stringResource(
+                                    if (fallbackEnabled) {
+                                        R.string.selector_editor_urltest_fallback_summary
+                                    } else {
+                                        R.string.selector_editor_urltest_latency_summary
+                                    },
+                                ),
+                                icon = Icons.AutoMirrored.Rounded.AltRoute,
+                                items = listOf(
+                                    stringResource(R.string.selector_editor_urltest_latency),
+                                    stringResource(R.string.selector_editor_urltest_fallback),
+                                ),
+                                selectedIndex = if (fallbackEnabled) 1 else 0,
+                                onSelectedIndexChange = { fallbackEnabled = it == 1 },
+                            )
+                            AnimatedContent(
+                                targetState = fallbackEnabled,
+                                transitionSpec = AsteriskMotion.fadeThrough(selectionOptionsMotion),
+                                label = "urltest-selection-options",
+                            ) { showFallbackMaxDelay ->
+                                if (showFallbackMaxDelay) {
+                                    OutlinedTextField(
+                                        value = fallbackMaxDelay,
+                                        onValueChange = { fallbackMaxDelay = it },
+                                        label = {
+                                            Text(stringResource(R.string.selector_editor_urltest_fallback_max_delay))
+                                        },
+                                        placeholder = {
+                                            Text(stringResource(R.string.selector_editor_urltest_fallback_max_delay_placeholder))
+                                        },
+                                        isError = fallbackMaxDelayInvalid,
+                                        supportingText = {
+                                            Text(
+                                                stringResource(
+                                                    if (fallbackMaxDelayInvalid) {
+                                                        R.string.selector_editor_urltest_fallback_max_delay_invalid
+                                                    } else {
+                                                        R.string.selector_editor_urltest_fallback_max_delay_summary
+                                                    },
+                                                ),
+                                            )
+                                        },
+                                        singleLine = true,
+                                        shape = AsteriskShapeTokens.InnerContainer,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                } else {
+                                    OutlinedTextField(
+                                        value = tolerance,
+                                        onValueChange = { tolerance = it },
+                                        label = {
+                                            Text(stringResource(R.string.selector_editor_urltest_tolerance))
+                                        },
+                                        placeholder = { Text(DefaultSingBoxUrlTestTolerance.toString()) },
+                                        isError = toleranceInvalid,
+                                        supportingText = {
+                                            Text(
+                                                stringResource(
+                                                    if (toleranceInvalid) {
+                                                        R.string.selector_editor_urltest_tolerance_invalid
+                                                    } else {
+                                                        R.string.selector_editor_urltest_tolerance_summary
+                                                    },
+                                                ),
+                                            )
+                                        },
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Number,
+                                        ),
+                                        singleLine = true,
+                                        shape = AsteriskShapeTokens.InnerContainer,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                }
+                            }
                             OutlinedTextField(
                                 value = url,
                                 onValueChange = { url = it },
                                 label = {
                                     Text(stringResource(R.string.selector_editor_urltest_url))
                                 },
+                                placeholder = { Text(DefaultSingBoxUrlTestUrl) },
                                 isError = urlInvalid,
                                 supportingText = if (urlInvalid) {
                                     {
@@ -1037,49 +1129,21 @@ internal fun SelectorEditorScaffold(
                                         ),
                                     )
                                 },
-                                isError = intervalInvalid,
-                                supportingText = if (intervalInvalid) {
-                                    {
-                                        Text(
-                                            stringResource(
-                                                R.string.selector_editor_urltest_duration_invalid,
-                                            ),
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                                singleLine = true,
-                                shape = AsteriskShapeTokens.InnerContainer,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            OutlinedTextField(
-                                value = tolerance,
-                                onValueChange = { value ->
-                                    tolerance = value.filter(Char::isDigit)
-                                },
-                                label = {
+                                placeholder = { Text(DefaultSingBoxUrlTestInterval) },
+                                isError = intervalInvalid || intervalExceedsIdleTimeout,
+                                supportingText = {
                                     Text(
                                         stringResource(
-                                            R.string.selector_editor_urltest_tolerance,
+                                            if (intervalInvalid) {
+                                                R.string.selector_editor_urltest_duration_invalid
+                                            } else if (intervalExceedsIdleTimeout) {
+                                                R.string.selector_editor_urltest_interval_exceeds_idle
+                                            } else {
+                                                R.string.selector_editor_urltest_interval_summary
+                                            },
                                         ),
                                     )
                                 },
-                                isError = toleranceInvalid,
-                                supportingText = if (toleranceInvalid) {
-                                    {
-                                        Text(
-                                            stringResource(
-                                                R.string.selector_editor_urltest_tolerance_invalid,
-                                            ),
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number,
-                                ),
                                 singleLine = true,
                                 shape = AsteriskShapeTokens.InnerContainer,
                                 modifier = Modifier.fillMaxWidth(),
@@ -1094,25 +1158,20 @@ internal fun SelectorEditorScaffold(
                                         ),
                                     )
                                 },
+                                placeholder = { Text(DefaultSingBoxUrlTestIdleTimeout) },
                                 isError = idleTimeoutInvalid || intervalExceedsIdleTimeout,
-                                supportingText = if (idleTimeoutInvalid) {
-                                    {
-                                        Text(
-                                            stringResource(
-                                                R.string.selector_editor_urltest_duration_invalid,
-                                            ),
-                                        )
-                                    }
-                                } else if (intervalExceedsIdleTimeout) {
-                                    {
-                                        Text(
-                                            stringResource(
-                                                R.string.selector_editor_urltest_interval_exceeds_idle,
-                                            ),
-                                        )
-                                    }
-                                } else {
-                                    null
+                                supportingText = {
+                                    Text(
+                                        stringResource(
+                                            if (idleTimeoutInvalid) {
+                                                R.string.selector_editor_urltest_duration_invalid
+                                            } else if (intervalExceedsIdleTimeout) {
+                                                R.string.selector_editor_urltest_interval_exceeds_idle
+                                            } else {
+                                                R.string.selector_editor_urltest_idle_timeout_summary
+                                            },
+                                        ),
+                                    )
                                 },
                                 singleLine = true,
                                 shape = AsteriskShapeTokens.InnerContainer,

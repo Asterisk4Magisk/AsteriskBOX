@@ -235,6 +235,8 @@ internal data class AppBackupSelector(
     val tolerance: Int = DefaultSingBoxUrlTestTolerance,
     val idleTimeout: String = DefaultSingBoxUrlTestIdleTimeout,
     val interruptExistConnections: Boolean = true,
+    val fallbackEnabled: Boolean = false,
+    val fallbackMaxDelay: String = "",
 )
 
 @Serializable
