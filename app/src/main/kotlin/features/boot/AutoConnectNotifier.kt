@@ -38,7 +38,7 @@ internal object AutoConnectNotifier {
         manager.createNotificationChannel(
             NotificationChannel(
                 ChannelId,
-                appContext.getString(R.string.settings_auto_connect),
+                appContext.getString(R.string.settings_start_on_boot),
                 NotificationManager.IMPORTANCE_DEFAULT,
             ),
         )
@@ -50,7 +50,7 @@ internal object AutoConnectNotifier {
         )
         val notification = NotificationCompat.Builder(appContext, ChannelId)
             .setSmallIcon(R.drawable.ic_qs_proxy)
-            .setContentTitle(appContext.getString(R.string.settings_auto_connect))
+            .setContentTitle(appContext.getString(R.string.settings_start_on_boot))
             .setContentText(appContext.getString(R.string.auto_connect_permission_text))
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

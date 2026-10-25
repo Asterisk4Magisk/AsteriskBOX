@@ -409,7 +409,7 @@ internal fun SettingsProxyModeSections(
             SmallTitle(text = stringResource(R.string.settings_proxy_vpn_service))
             SettingsSectionCard {
                 SwitchPreference(
-                    title = stringResource(R.string.settings_auto_connect),
+                    title = stringResource(R.string.settings_start_on_boot),
                     icon = Icons.Rounded.PowerSettingsNew,
                     summary = stringResource(R.string.settings_auto_connect_summary),
                     checked = enableAutoConnect,
@@ -483,7 +483,7 @@ internal fun SettingsProxyModeSections(
             exit = AsteriskMotion.contentExit(),
                 ) {
                     SwitchPreference(
-                        title = stringResource(R.string.settings_root_boot_script),
+                        title = stringResource(R.string.settings_start_on_boot),
                         icon = Icons.Rounded.PowerSettingsNew,
                         summary = stringResource(R.string.settings_root_boot_script_summary),
                         checked = enableRootBootScript,

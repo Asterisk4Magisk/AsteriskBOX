@@ -1119,9 +1119,8 @@
     <string name="settings_vpn_hev_tun_summary">Use hev-socks5-tunnel to create the TUN device</string>
     <string name="settings_vpn_local_dns">Enable DNS hijacking</string>
     <string name="settings_vpn_local_dns_summary">Use the core to handle DNS requests</string>
-    <string name="settings_auto_connect">Auto connect on boot</string>
-    <string name="settings_auto_connect_summary">Start the VPN Service after boot and restore it after an app update</string>
-    <string name="auto_connect_permission_text">Tap to grant the VPN permission and start the VPN Service</string>
+    <string name="settings_auto_connect_summary">Start the VPN Service on boot and restore it after updates</string>
+    <string name="auto_connect_permission_text">Tap to grant permission and start the VPN Service</string>
 
     <!-- ROOT -->
     <string name="error_bpf2socks_root_required">ROOT access is required for BPF2SOCKS mode</string>
@@ -1144,7 +1143,7 @@
     <string name="settings_ebpf_local_dns_mode_summary">hijack: port 53; respect_policy: app list</string>
     <string name="settings_ebpf_shared_data_plane_summary">socket_assign uses transparent listeners; packet_rewrite rewrites Ethernet packets.</string>
     <string name="settings_ebpf_shared_dns_mode_summary">hijack captures port 53; respect_policy follows client selection.</string>
-    <string name="settings_root_boot_script">Start on boot</string>
+    <string name="settings_start_on_boot">Start on boot</string>
     <string name="settings_root_boot_script_failed">Failed to update start on boot</string>
     <string name="settings_root_boot_script_summary">Generate service.d startup script</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs">Bypass direct addresses</string>

@@ -1103,9 +1103,8 @@
     <string name="settings_vpn_hev_tun_summary">使用 hev-socks5-tunnel 创建 TUN 设备</string>
     <string name="settings_vpn_local_dns">启用 DNS 劫持</string>
     <string name="settings_vpn_local_dns_summary">使用核心处理 DNS 请求</string>
-    <string name="settings_auto_connect">开机自动连接</string>
-    <string name="settings_auto_connect_summary">设备启动后自动启动 VPN Service，应用更新后恢复运行</string>
-    <string name="auto_connect_permission_text">点击授予 VPN 权限并启动 VPN Service</string>
+    <string name="settings_auto_connect_summary">开机启动 VPN Service，更新后自动恢复</string>
+    <string name="auto_connect_permission_text">点击授权并启动 VPN Service</string>
 
     <!-- ROOT -->
     <string name="error_bpf2socks_root_required">ROOT 权限不可用，无法启动 BPF2SOCKS 模式</string>
@@ -1128,7 +1127,7 @@
     <string name="settings_ebpf_local_dns_mode_summary">hijack 接管 53 端口；respect_policy 遵循应用筛选</string>
     <string name="settings_ebpf_shared_data_plane_summary">socket_assign 使用透明监听器；packet_rewrite 改写以太网报文。</string>
     <string name="settings_ebpf_shared_dns_mode_summary">hijack 接管 53 端口；respect_policy 遵循客户端筛选。</string>
-    <string name="settings_root_boot_script">开机自启</string>
+    <string name="settings_start_on_boot">开机自启</string>
     <string name="settings_root_boot_script_failed">开机自启设置失败</string>
     <string name="settings_root_boot_script_summary">生成 service.d 启动脚本</string>
     <string name="settings_root_ebpf_bypass_direct_cidrs">绕过直连地址</string>
