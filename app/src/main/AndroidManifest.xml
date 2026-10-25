@@ -120,7 +120,8 @@
             android:exported="true"
             tools:ignore="ExportedReceiver" />
 
-        <!-- Starts the VPN Service after boot or an app update while auto connect is on.
+        <!-- Starts the VPN Service after boot, or restores it after an app update, while auto
+             connect is on.
              Disabled by default and enabled from BootAutoConnect.setComponentEnabled, so a
              user who never opts in pays no boot wake-up. -->
         <receiver

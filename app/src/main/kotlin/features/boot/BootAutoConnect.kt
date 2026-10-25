@@ -12,11 +12,11 @@ import androidx.core.content.ContextCompat
 import app.AsteriskApplication
 import app.MainActivity
 import app.modes.RunModeVpnService
-import engine.proxy.ProxyServiceResult
-import engine.proxy.ProxyServiceUseCase
+import engine.proxy.ProxyEngineStartRequest
 import engine.proxy.VpnPermissionRequester
 import engine.vpn.AsteriskVpnServiceIntents
 import features.logs.AndroidAppLogger
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Entry points for the VPN Service that run without a visible activity.
@@ -28,7 +28,7 @@ import features.logs.AndroidAppLogger
  * reuses the activity consent flow through [connectAfterConsent].
  */
 internal object BootAutoConnect {
-    const val ExtraConnectAfterConsent = "app.asterisk.extra.CONNECT_AFTER_CONSENT"
+    const val ActionConnectAfterConsent = "app.action.CONNECT_AFTER_CONSENT"
 
     private const val LogTag = "BootAutoConnect"
 
@@ -63,42 +63,45 @@ internal object BootAutoConnect {
         )
     }
 
-    /** Notification target: opens the app, which asks for consent and then connects. */
+    /**
+     * Notification target: opens the app, which asks for consent and then connects. A dedicated
+     * action keeps this PendingIntent apart from the other MainActivity PendingIntents, which
+     * would otherwise share one token and overwrite each other's extras.
+     */
     fun consentIntent(context: Context): Intent {
         return Intent(context, MainActivity::class.java)
+            .setAction(ActionConnectAfterConsent)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            .putExtra(ExtraConnectAfterConsent, true)
     }
 
+    /**
+     * Starts the VPN Service once the user is in front of the activity. This only ever starts:
+     * the engine returns the live status when the tunnel is already up, so a stale notification
+     * cannot turn a running VPN off.
+     */
     suspend fun connectAfterConsent(
         context: Context,
         requestVpnPermission: VpnPermissionRequester,
-    ): Boolean {
-        val application = context.applicationContext as? AsteriskApplication ?: return false
+    ): Result<Boolean> {
+        val application = context.applicationContext as? AsteriskApplication
+            ?: return Result.success(false)
         val state = application.stateStore.state.value
-        if (state.runMode != RunModeVpnService) return false
-        val useCase = ProxyServiceUseCase(application.proxyEngine, requestVpnPermission)
-        return when (val result = useCase.toggle(state.copy(proxyRunning = false))) {
-            is ProxyServiceResult.Success -> {
-                application.stateStore.update { current ->
-                    current.copy(
-                        proxyRunning = result.proxyRunning,
-                        localProxyPort = result.appState?.localProxyPort ?: current.localProxyPort,
-                        singBoxControlPort = result.appState?.singBoxControlPort
-                            ?: current.singBoxControlPort,
-                    )
-                }
-                result.proxyRunning
-            }
-
-            is ProxyServiceResult.Failed -> {
-                AndroidAppLogger.warn(
-                    LogTag,
-                    "Failed to connect after granting the VPN permission",
-                    result.error,
+        if (state.runMode != RunModeVpnService) return Result.success(false)
+        return runCatching {
+            application.proxyEngine.start(ProxyEngineStartRequest(state), requestVpnPermission)
+        }.onSuccess { status ->
+            application.stateStore.update { current ->
+                current.copy(
+                    proxyRunning = status.running,
+                    localProxyPort = status.appState?.localProxyPort ?: current.localProxyPort,
+                    singBoxControlPort = status.appState?.singBoxControlPort
+                        ?: current.singBoxControlPort,
                 )
-                false
             }
-        }
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            AndroidAppLogger.warn(LogTag, "Failed to connect after granting the VPN permission", error)
+            application.stateStore.update { current -> current.copy(proxyRunning = false) }
+        }.map { status -> status.running }
     }
 }

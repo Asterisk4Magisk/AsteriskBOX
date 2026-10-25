@@ -19,12 +19,12 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import app.R
 import app.AsteriskApplication
-import app.MainActivity
 import app.modes.ProxyAppListModeBlacklist
 import app.modes.ProxyAppListModeGlobal
 import app.modes.ProxyAppListModeWhitelist
 import app.modes.RunModeVpnService
 import androidx.core.app.NotificationCompat
+import data.AppSettingsPreferences
 import engine.proxy.DenyVpnPermission
 import engine.proxy.ProxyEngineStartRequest
 import engine.singbox.logDirectoryPath
@@ -42,6 +42,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import system.AndroidLauncherIcon
 import system.getInstalledApplicationsCompat
 import utils.toTrimmedNonEmptyDistinctList
 import java.io.File
@@ -57,7 +58,12 @@ class AsteriskVpnService : VpnService() {
     private val serviceScope = CoroutineScope(serviceJob + Dispatchers.IO)
     private val operationMutex = Mutex()
     private val mainHandler = Handler(Looper.getMainLooper())
+    @Volatile
     private var foregroundStarted = false
+
+    @Volatile
+    private var latestStartId = 0
+    private val sessionPreferences by lazy { AppSettingsPreferences(this) }
     private val libboxPlatform by lazy {
         AndroidLibboxPlatformInterface(this)
     }
@@ -73,6 +79,7 @@ class AsteriskVpnService : VpnService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        latestStartId = startId
         when (intent?.action) {
             AsteriskVpnServiceIntents.ACTION_STOP -> {
                 serviceScope.launch {
@@ -98,6 +105,7 @@ class AsteriskVpnService : VpnService() {
                         runCatching {
                             startVpn(config)
                         }.onSuccess {
+                            sessionPreferences.setVpnSessionActive(true)
                             completeStart(Result.success(Unit))
                         }.onFailure { error ->
                             AndroidAppLogger.error(LogTag, "Failed to start VPN Service", error)
@@ -112,7 +120,7 @@ class AsteriskVpnService : VpnService() {
             // The boot receiver and the system's always-on VPN start carry no configuration.
             AsteriskVpnServiceIntents.ACTION_RESUME,
             VpnService.SERVICE_INTERFACE,
-            null -> resumeVpn(startId)
+            -> resumeVpn(startId)
         }
         return START_NOT_STICKY
     }
@@ -122,10 +130,12 @@ class AsteriskVpnService : VpnService() {
      * boot receiver's resume request and the system's always-on VPN start.
      *
      * The service must already be a foreground service before it spends time compiling the
-     * configuration, both because a `startForegroundService()` caller has five seconds to
-     * reach `startForeground()` and because the system requires an always-on VPN to promote
-     * itself. The actual start is delegated to the shared proxy engine, which resolves the
-     * dynamic ports and compiles the configuration exactly as a manual start does.
+     * configuration: a `startForegroundService()` caller has five seconds to reach
+     * `startForeground()`, and a background start would otherwise be stopped while it compiles.
+     * The actual start is delegated to the shared proxy engine, which resolves the dynamic
+     * ports and compiles the configuration exactly as a manual start does. Once the tunnel is
+     * up, the system's binding to the VPN service keeps the process alive just as after a
+     * manual start, so the start-up notification is removed again.
      */
     private fun resumeVpn(startId: Int) {
         val asteriskApplication = application as? AsteriskApplication
@@ -148,7 +158,7 @@ class AsteriskVpnService : VpnService() {
             return
         }
         serviceScope.launch {
-            runCatching {
+            val result = runCatching {
                 val state = asteriskApplication.stateStore.state.value
                 check(state.runMode == RunModeVpnService) {
                     "VPN Service is not the active run mode"
@@ -157,19 +167,36 @@ class AsteriskVpnService : VpnService() {
                     ProxyEngineStartRequest(state),
                     DenyVpnPermission,
                 )
-            }.onSuccess { status ->
+            }
+            val status = result.getOrNull()
+            if (status?.running == true) {
                 asteriskApplication.stateStore.update { current ->
                     current.copy(
-                        proxyRunning = status.running,
+                        proxyRunning = true,
                         localProxyPort = status.appState?.localProxyPort ?: current.localProxyPort,
                         singBoxControlPort = status.appState?.singBoxControlPort
                             ?: current.singBoxControlPort,
                     )
                 }
-            }.onFailure { error ->
-                AndroidAppLogger.error(LogTag, "Failed to resume VPN Service", error)
+                stopForegroundNotification()
+                return@launch
+            }
+            AndroidAppLogger.error(
+                LogTag,
+                "Failed to resume VPN Service",
+                result.exceptionOrNull() ?: IllegalStateException("VPN Service did not start"),
+            )
+            operationMutex.withLock {
+                // Another start may own the service by now; leave its tunnel alone.
+                if (running || pendingStart != null) {
+                    stopForegroundNotification()
+                    return@withLock
+                }
                 stopVpn()
-                stopSelfOnMain(startId)
+                asteriskApplication.stateStore.update { current -> current.copy(proxyRunning = false) }
+                // The engine's own start used a newer start id; stopSelf(id) only stops the
+                // service when no start arrived after the one it names.
+                stopSelfOnMain(latestStartId)
             }
         }
     }
@@ -180,19 +207,19 @@ class AsteriskVpnService : VpnService() {
         manager?.createNotificationChannel(
             NotificationChannel(
                 ForegroundChannelId,
-                getString(R.string.vpn_service_notification_channel),
+                getString(R.string.settings_run_mode_vpn_service),
                 NotificationManager.IMPORTANCE_LOW,
             ),
         )
         val notification = NotificationCompat.Builder(this, ForegroundChannelId)
             .setSmallIcon(R.drawable.ic_qs_proxy)
             .setContentTitle(getString(R.string.app_name))
-            .setContentText(getString(R.string.vpn_service_notification_running))
+            .setContentText(getString(R.string.quick_settings_tile_running))
             .setContentIntent(
                 PendingIntent.getActivity(
                     this,
                     0,
-                    Intent(this, MainActivity::class.java),
+                    AndroidLauncherIcon.launchIntent(this),
                     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                 ),
             )
@@ -405,6 +432,7 @@ class AsteriskVpnService : VpnService() {
         tunFileDescriptor = null
         LocalProxyRuntime.clear()
         running = false
+        sessionPreferences.setVpnSessionActive(false)
         if (removeForeground) stopForegroundNotification()
     }
 
