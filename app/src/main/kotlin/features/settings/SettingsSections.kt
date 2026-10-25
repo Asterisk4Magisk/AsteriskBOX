@@ -367,6 +367,7 @@ internal fun SettingsProxyModeSections(
     enableTrafficStatsNotification: Boolean,
     enableVpnAppendHttpProxy: Boolean,
     enableVpnHevTun: Boolean,
+    enableAutoConnect: Boolean,
     tunSettingsSummary: String,
     enableRootBootScript: Boolean,
     enableRootEbpfRules: Boolean,
@@ -384,6 +385,7 @@ internal fun SettingsProxyModeSections(
     onEnableTrafficStatsNotificationChange: (Boolean) -> Unit,
     onEnableVpnAppendHttpProxyChange: (Boolean) -> Unit,
     onEnableVpnHevTunChange: (Boolean) -> Unit,
+    onEnableAutoConnectChange: (Boolean) -> Unit,
     onOpenTunSettings: () -> Unit,
     onEnableRootBootScriptChange: (Boolean) -> Unit,
     onEnableRootEbpfRulesChange: (Boolean) -> Unit,
@@ -406,6 +408,14 @@ internal fun SettingsProxyModeSections(
         Column {
             SmallTitle(text = stringResource(R.string.settings_proxy_vpn_service))
             SettingsSectionCard {
+                SwitchPreference(
+                    title = stringResource(R.string.settings_auto_connect),
+                    icon = Icons.Rounded.PowerSettingsNew,
+                    summary = stringResource(R.string.settings_auto_connect_summary),
+                    checked = enableAutoConnect,
+                    onCheckedChange = onEnableAutoConnectChange,
+                    accent = IconAccent.MaskPink,
+                )
                 ArrowPreference(
                     title = stringResource(R.string.settings_local_proxy),
                     icon = Icons.Rounded.Router,

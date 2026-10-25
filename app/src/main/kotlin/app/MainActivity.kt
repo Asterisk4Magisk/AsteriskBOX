@@ -33,6 +33,7 @@ import features.importing.ImportOperation
 import features.importing.ImportSource
 import features.importing.ImportStage
 import features.importing.reportImportFailure
+import features.boot.BootAutoConnect
 import features.subscription.parseSubscriptionDeepLink
 import features.subscription.usecase.OutboundSubscriptionUpdateResult
 import kotlinx.coroutines.CancellationException
@@ -45,6 +46,8 @@ import system.setRecentTasksHidden
 import ui.feedback.AndroidToastTipNotifier
 
 class MainActivity : ComponentActivity() {
+    private var pendingAutoConnect = false
+
     private val vpnPermissionRequester = AndroidVpnPermissionRequester {
         appString(R.string.error_vpn_permission_launcher_missing)
     }
@@ -152,7 +155,30 @@ class MainActivity : ComponentActivity() {
         }
         showAppContent()
         requestStartupPermissions()
+        readAutoConnectRequest(intent)
         if (savedInstanceState == null) handleExternalIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!pendingAutoConnect) return
+        pendingAutoConnect = false
+        lifecycleScope.launch {
+            BootAutoConnect.connectAfterConsent(applicationContext, vpnPermissionRequester::request)
+        }
+    }
+
+    /**
+     * The auto connect notification lands here when the VPN consent is missing: the activity is
+     * the only place that may show the system consent dialog, so the request is completed after
+     * the user answers it.
+     */
+    private fun readAutoConnectRequest(intent: Intent?) {
+        if (intent?.getBooleanExtra(BootAutoConnect.ExtraConnectAfterConsent, false) != true) {
+            return
+        }
+        intent.removeExtra(BootAutoConnect.ExtraConnectAfterConsent)
+        pendingAutoConnect = true
     }
 
     private fun observeRecentTasksVisibility() {
@@ -195,6 +221,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleExternalIntent(intent)
+        readAutoConnectRequest(intent)
     }
 
     private fun handleExternalIntent(intent: Intent?) {

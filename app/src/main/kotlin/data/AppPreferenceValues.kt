@@ -76,6 +76,7 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
     string(KeyCoreLogLevel, coreLogLevel)
     boolean(KeyEnableTrafficStatsNotification, enableTrafficStatsNotification)
     boolean(KeyEnableBroadcastControl, enableBroadcastControl)
+    boolean(KeyEnableAutoConnect, enableAutoConnect)
     boolean(KeyEnableResourceAutoUpdate, enableResourceAutoUpdate)
     string(KeyResourceAutoUpdateInterval, resourceAutoUpdateInterval)
     int(KeyResourceFileSource, resourceFileSource)
