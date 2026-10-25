@@ -18,8 +18,9 @@ import app.R
  *
  * A receiver running in the background may not launch the system consent dialog, so the
  * notification is the only sanctioned way to hand that step back to the user. It is posted
- * only when notifications are allowed; otherwise the start is dropped without a trace, which
- * matches the behaviour of the quick settings tile.
+ * only when notifications are allowed; otherwise the skipped start is left to the log entry
+ * the receiver writes. The settings switch asks for the consent up front, so this is the
+ * fallback for a consent revoked later.
  */
 internal object AutoConnectNotifier {
     private const val ChannelId = "auto-connect"
@@ -37,7 +38,7 @@ internal object AutoConnectNotifier {
         manager.createNotificationChannel(
             NotificationChannel(
                 ChannelId,
-                appContext.getString(R.string.auto_connect_notification_channel),
+                appContext.getString(R.string.settings_auto_connect),
                 NotificationManager.IMPORTANCE_DEFAULT,
             ),
         )
@@ -49,7 +50,7 @@ internal object AutoConnectNotifier {
         )
         val notification = NotificationCompat.Builder(appContext, ChannelId)
             .setSmallIcon(R.drawable.ic_qs_proxy)
-            .setContentTitle(appContext.getString(R.string.auto_connect_permission_title))
+            .setContentTitle(appContext.getString(R.string.settings_auto_connect))
             .setContentText(appContext.getString(R.string.auto_connect_permission_text))
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

@@ -155,8 +155,10 @@ class MainActivity : ComponentActivity() {
         }
         showAppContent()
         requestStartupPermissions()
-        readAutoConnectRequest(intent)
-        if (savedInstanceState == null) handleExternalIntent(intent)
+        if (savedInstanceState == null) {
+            readAutoConnectRequest(intent)
+            handleExternalIntent(intent)
+        }
     }
 
     override fun onResume() {
@@ -164,20 +166,27 @@ class MainActivity : ComponentActivity() {
         if (!pendingAutoConnect) return
         pendingAutoConnect = false
         lifecycleScope.launch {
+            val notifier = AndroidToastTipNotifier(application)
             BootAutoConnect.connectAfterConsent(applicationContext, vpnPermissionRequester::request)
+                .onSuccess { running ->
+                    if (running) notifier.show(appString(R.string.proxy_service_started))
+                }
+                .onFailure { error ->
+                    notifier.showError(error, appString(R.string.sing_box_dashboard_start_failed))
+                }
         }
     }
 
     /**
      * The auto connect notification lands here when the VPN consent is missing: the activity is
      * the only place that may show the system consent dialog, so the request is completed after
-     * the user answers it.
+     * the user answers it. A launch from recents or a restored activity replays the original
+     * intent, so only a fresh delivery counts as a request.
      */
     private fun readAutoConnectRequest(intent: Intent?) {
-        if (intent?.getBooleanExtra(BootAutoConnect.ExtraConnectAfterConsent, false) != true) {
-            return
-        }
-        intent.removeExtra(BootAutoConnect.ExtraConnectAfterConsent)
+        if (intent?.action != BootAutoConnect.ActionConnectAfterConsent) return
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        intent.action = null
         pendingAutoConnect = true
     }
 

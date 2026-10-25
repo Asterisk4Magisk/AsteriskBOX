@@ -6,9 +6,9 @@ package features.boot
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.os.UserManager
 import app.modes.RunModeVpnService
 import data.AndroidAppStateStore
+import data.AppSettingsPreferences
 import features.logs.AndroidAppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,7 +17,8 @@ import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * Starts the VPN Service after boot or an app update when the user enabled auto connect.
+ * Starts the VPN Service after boot when the user enabled auto connect, and restores it after
+ * an app update when it was running before.
  *
  * Only the foreground-service hand-off happens here; compiling the configuration and
  * establishing the tunnel stay in [engine.vpn.AsteriskVpnService], exactly like a manual
@@ -67,9 +68,12 @@ class AutoConnectBootReceiver : BroadcastReceiver() {
             AndroidAppLogger.warn(LogTag, "Auto connect skipped because no outbound is configured")
             return false
         }
-        if (action == Intent.ACTION_BOOT_COMPLETED) {
-            val userManager = context.getSystemService(UserManager::class.java)
-            if (userManager?.isUserUnlocked != true) return false
+        // An update only restores a tunnel that was up when the old version was killed; it must
+        // not start one the user had stopped.
+        if (action == Intent.ACTION_MY_PACKAGE_REPLACED &&
+            !AppSettingsPreferences(context).isVpnSessionActive()
+        ) {
+            return false
         }
         return true
     }
