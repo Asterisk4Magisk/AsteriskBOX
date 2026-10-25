@@ -14,8 +14,8 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.ProxyInfo
 import android.net.VpnService
-import android.net.wifi.WifiManager
 import android.net.wifi.WifiInfo
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
@@ -34,6 +34,7 @@ import io.nekohasekai.libbox.BridgeSession
 import io.nekohasekai.libbox.ConnectionOwner
 import io.nekohasekai.libbox.ExchangeContext
 import io.nekohasekai.libbox.InterfaceUpdateListener
+import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.LocalDNSTransport
 import io.nekohasekai.libbox.NeighborUpdateListener
 import io.nekohasekai.libbox.NetworkInterfaceIterator
@@ -48,8 +49,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
-import system.getInstalledApplicationsCompat
 import system.AndroidNetworks
+import system.getInstalledApplicationsCompat
 import utils.toTrimmedNonEmptyDistinctList
 import java.net.Inet6Address
 import java.net.InetAddress
@@ -133,7 +134,7 @@ internal class AndroidLibboxPlatformInterface(
         }
 
         if (options.autoRoute) {
-            if (options.dnsMode.value != io.nekohasekai.libbox.Libbox.DNSModeDisabled) {
+            if (options.dnsMode.value != Libbox.DNSModeDisabled) {
                 options.dnsServerAddress.toList().forEach { address -> builder.addDnsServer(address) }
             }
             builder.applyRoutes(options, inet4Addresses.isNotEmpty(), inet6Addresses.isNotEmpty())
@@ -205,8 +206,6 @@ internal class AndroidLibboxPlatformInterface(
         }
     }
 
-    override fun useProcFS(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
-
     override fun findConnectionOwner(
         ipProtocol: Int,
         sourceAddress: String,
@@ -214,15 +213,23 @@ internal class AndroidLibboxPlatformInterface(
         destinationAddress: String,
         destinationPort: Int,
     ): ConnectionOwner {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            error("android: connection owner lookup requires Android 10")
+        val uid = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            Libbox.findConnectionOwner(
+                ipProtocol,
+                sourceAddress,
+                sourcePort,
+                destinationAddress,
+                destinationPort,
+            ).userId
+        } else {
+            val ownerUid = connectivityManager.getConnectionOwnerUid(
+                ipProtocol,
+                InetSocketAddress(sourceAddress, sourcePort),
+                InetSocketAddress(destinationAddress, destinationPort),
+            )
+            check(ownerUid != Process.INVALID_UID) { "android: connection owner not found" }
+            ownerUid
         }
-        val uid = connectivityManager.getConnectionOwnerUid(
-            ipProtocol,
-            InetSocketAddress(sourceAddress, sourcePort),
-            InetSocketAddress(destinationAddress, destinationPort),
-        )
-        check(uid != Process.INVALID_UID) { "android: connection owner not found" }
         val packages = service.packageManager.getPackagesForUid(uid).orEmpty().toList()
         return ConnectionOwner().apply {
             userId = uid
@@ -281,7 +288,7 @@ internal class AndroidLibboxPlatformInterface(
                     .toStringIterator()
                 flags = networkInterface.toFlags()
                 type = androidNetwork?.second?.toLibboxInterfaceType()
-                    ?: io.nekohasekai.libbox.Libbox.InterfaceTypeOther
+                    ?: Libbox.InterfaceTypeOther
                 dnsServer = androidNetwork?.first?.dnsServers
                     .orEmpty()
                     .mapNotNull { it.hostAddress }
@@ -373,12 +380,12 @@ internal class AndroidLibboxPlatformInterface(
 
     private fun NetworkCapabilities.toLibboxInterfaceType(): Int = when {
         hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ->
-            io.nekohasekai.libbox.Libbox.InterfaceTypeWIFI
+            Libbox.InterfaceTypeWIFI
         hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ->
-            io.nekohasekai.libbox.Libbox.InterfaceTypeCellular
+            Libbox.InterfaceTypeCellular
         hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ->
-            io.nekohasekai.libbox.Libbox.InterfaceTypeEthernet
-        else -> io.nekohasekai.libbox.Libbox.InterfaceTypeOther
+            Libbox.InterfaceTypeEthernet
+        else -> Libbox.InterfaceTypeOther
     }
 
     private fun NetworkInterface.toFlags(): Int {

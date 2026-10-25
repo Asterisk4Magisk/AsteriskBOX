@@ -15,6 +15,7 @@ import app.ServiceControlSettings
 import app.ServiceControlWifi
 import app.ServiceControlWifiRule
 import features.settings.servicecontrol.normalizeServiceControlSettings
+import engine.singbox.normalizedEbpfLocalDataPlane
 import java.util.UUID
 
 internal class AppSettingsPreferences(
@@ -247,7 +248,8 @@ internal class AppSettingsPreferences(
                 KeyEnableRootEbpfDirectCidrBypass,
                 defaults.enableRootEbpfDirectCidrBypass,
             ),
-            ebpfLocalDataPlane = preferences.getString(KeyEbpfLocalDataPlane, defaults.ebpfLocalDataPlane) ?: defaults.ebpfLocalDataPlane,
+            ebpfLocalDataPlane = (preferences.getString(KeyEbpfLocalDataPlane, defaults.ebpfLocalDataPlane)
+                ?: defaults.ebpfLocalDataPlane).normalizedEbpfLocalDataPlane(),
             enableRootEbpfPrivateAddressBypass = preferences.getBoolean(
                 KeyEnableRootEbpfPrivateAddressBypass,
                 defaults.enableRootEbpfPrivateAddressBypass,

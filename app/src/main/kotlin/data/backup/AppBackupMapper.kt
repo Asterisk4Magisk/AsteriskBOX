@@ -5,6 +5,7 @@ package data.backup
 
 import engine.singbox.config.DnsConfigurationMatchFields
 import engine.singbox.config.dnsConfigurationEntryTag
+import engine.singbox.normalizedEbpfLocalDataPlane
 
 import app.withCompatibleProxyAppListMode
 import app.AppState
@@ -384,7 +385,7 @@ private fun AppBackupData.toAppState(): AppState {
         transparentProxyPort = settings.transparentProxyPort,
         enableRootBootScript = false,
         enableRootEbpfRules = false,
-        ebpfLocalDataPlane = settings.ebpfLocalDataPlane,
+        ebpfLocalDataPlane = settings.ebpfLocalDataPlane.normalizedEbpfLocalDataPlane(),
         ebpfSharedDataPlane = settings.ebpfSharedDataPlane,
         ebpfLocalDnsMode = settings.ebpfLocalDnsMode,
         ebpfSharedDnsMode = settings.ebpfSharedDnsMode,

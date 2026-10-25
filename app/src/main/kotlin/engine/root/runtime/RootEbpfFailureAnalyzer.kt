@@ -34,7 +34,8 @@ internal object RootEbpfFailureAnalyzer {
     )
 
     private val rules: List<Rule> = listOf(
-        // Observed on alioth (kernel 4.19 + KernelSU Next): the eBPF `tc` data plane needs a
+        // Observed on alioth (kernel 4.19 + KernelSU Next): the eBPF `socket_assign` data plane
+        // (named `tc` before alpha.13) needs a
         // self-created veth pair plus a clsact qdisc. strace of the core showed the kernel
         // rejecting the veth link creation with EOPNOTSUPP, which sing-box reports against the
         // clsact step. The cgroup data plane starts normally on the same device.

@@ -1070,11 +1070,11 @@
     <string name="proxy_error_dialog_occurred_at">时间：%1$s</string>
     <string name="proxy_error_dialog_service_log">启动日志</string>
     <string name="proxy_error_dialog_title">代理启动失败</string>
-    <!-- Proxy error: eBPF tc data plane unavailable (confirmed on kernel 4.19 + KernelSU Next) -->
-    <string name="proxy_error_ebpf_tc_unsupported_explanation">eBPF tc 数据面需要内核同时支持 veth 设备与 clsact qdisc。当前内核拒绝在当前网络命名空间内创建 veth pair（内核返回 EOPNOTSUPP）。</string>
+    <!-- Proxy error: eBPF socket_assign data plane unavailable (confirmed on kernel 4.19 + KernelSU Next) -->
+    <string name="proxy_error_ebpf_tc_unsupported_explanation">eBPF socket_assign 数据面需要内核支持 veth 设备与 TC 挂载。当前内核拒绝创建 veth pair（内核返回 EOPNOTSUPP）。</string>
     <string name="proxy_error_ebpf_tc_unsupported_fallback">若 cgroup 也无法启动：进入 设置 → 高级设置，在 运行模式 中改选 TUN（ROOT）作为备用方案。</string>
     <string name="proxy_error_ebpf_tc_unsupported_report">上报时请附上上方错误原文，以及 logcat 中 asteriskd / sing-box 相关段落。</string>
-    <string name="proxy_error_ebpf_tc_unsupported_switch">临时方案：进入 设置 → 高级设置，在 运行模式 中确认已选择 eBPF（ROOT）；再在 代理设置（eBPF） 中把 数据面 从 tc 改为 cgroup，然后重试。</string>
+    <string name="proxy_error_ebpf_tc_unsupported_switch">临时方案：进入 设置 → 高级设置，在 运行模式 中确认已选择 eBPF（ROOT）；再在 代理设置（eBPF） 中把 数据面 从 socket_assign 改为 cgroup，然后重试。</string>
     <string name="proxy_service_started">代理服务已启动</string>
     <string name="proxy_service_stopped">代理服务已停止</string>
     <string name="settings_proxy_bpf2socks">代理设置（BPF2SOCKS）</string>
@@ -1121,7 +1121,7 @@
     <string name="settings_ebpf_data_plane">数据面</string>
     <string name="settings_ebpf_dns_disabled">本地 DNS 已关闭，当前使用 off。</string>
     <string name="settings_ebpf_dns_mode">DNS 模式</string>
-    <string name="settings_ebpf_local_data_plane_summary">tc 接管接口流量；cgroup 接管 socket</string>
+    <string name="settings_ebpf_local_data_plane_summary">socket_assign 接管接口流量；cgroup 接管 socket</string>
     <string name="settings_ebpf_local_dns_mode_summary">hijack 接管 53 端口；respect_policy 遵循应用筛选</string>
     <string name="settings_ebpf_shared_data_plane_summary">socket_assign 使用透明监听器；packet_rewrite 改写以太网报文。</string>
     <string name="settings_ebpf_shared_dns_mode_summary">hijack 接管 53 端口；respect_policy 遵循客户端筛选。</string>

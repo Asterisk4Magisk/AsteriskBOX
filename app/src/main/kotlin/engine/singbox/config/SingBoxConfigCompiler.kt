@@ -321,7 +321,7 @@ internal fun compileEbpfInbound(
         "eBPF shared interfaces must be exact, non-loopback interface names"
     }
     require(appState.ebpfLocalDataPlane in EbpfLocalDataPlanes) {
-        "eBPF local data_plane must be tc or cgroup"
+        "eBPF local data_plane must be socket_assign or cgroup"
     }
     require(sharedInterfaces.isEmpty() || appState.ebpfSharedDataPlane in EbpfSharedDataPlanes) {
         "eBPF shared data_plane must be socket_assign or packet_rewrite"

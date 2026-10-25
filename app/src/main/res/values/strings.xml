@@ -1086,11 +1086,11 @@
     <string name="proxy_error_dialog_occurred_at">Time: %1$s</string>
     <string name="proxy_error_dialog_service_log">Start log</string>
     <string name="proxy_error_dialog_title">Failed to start proxy</string>
-    <!-- Proxy error: eBPF tc data plane unavailable (confirmed on kernel 4.19 + KernelSU Next) -->
-    <string name="proxy_error_ebpf_tc_unsupported_explanation">The eBPF tc data plane needs both veth devices and the clsact qdisc. This kernel refuses to create a veth pair in the current network namespace (EOPNOTSUPP).</string>
+    <!-- Proxy error: eBPF socket_assign data plane unavailable (confirmed on kernel 4.19 + KernelSU Next) -->
+    <string name="proxy_error_ebpf_tc_unsupported_explanation">The eBPF socket_assign data plane needs veth devices and TC attachment support. This kernel refuses to create a veth pair (EOPNOTSUPP).</string>
     <string name="proxy_error_ebpf_tc_unsupported_fallback">If cgroup also fails to start, open Settings → Advanced settings and select TUN (ROOT) in Run mode instead.</string>
     <string name="proxy_error_ebpf_tc_unsupported_report">When reporting this, include the error text above and the asteriskd / sing-box section of logcat.</string>
-    <string name="proxy_error_ebpf_tc_unsupported_switch">Workaround: open Settings → Advanced settings, confirm eBPF (ROOT) is selected in Run mode, then under Proxy settings (eBPF) change Data plane from tc to cgroup and retry.</string>
+    <string name="proxy_error_ebpf_tc_unsupported_switch">Workaround: open Settings → Advanced settings, confirm eBPF (ROOT) is selected in Run mode, then under Proxy settings (eBPF) change Data plane from socket_assign to cgroup and retry.</string>
     <string name="proxy_service_started">Proxy service started</string>
     <string name="proxy_service_stopped">Proxy service stopped</string>
     <string name="settings_proxy_bpf2socks">Proxy settings (BPF2SOCKS)</string>
@@ -1137,7 +1137,7 @@
     <string name="settings_ebpf_data_plane">Data plane</string>
     <string name="settings_ebpf_dns_disabled">Local DNS is disabled; off is in effect.</string>
     <string name="settings_ebpf_dns_mode">DNS mode</string>
-    <string name="settings_ebpf_local_data_plane_summary">tc: interface traffic; cgroup: sockets</string>
+    <string name="settings_ebpf_local_data_plane_summary">socket_assign: interface traffic; cgroup: sockets</string>
     <string name="settings_ebpf_local_dns_mode_summary">hijack: port 53; respect_policy: app list</string>
     <string name="settings_ebpf_shared_data_plane_summary">socket_assign uses transparent listeners; packet_rewrite rewrites Ethernet packets.</string>
     <string name="settings_ebpf_shared_dns_mode_summary">hijack captures port 53; respect_policy follows client selection.</string>

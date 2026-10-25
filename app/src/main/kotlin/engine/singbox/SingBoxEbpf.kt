@@ -3,13 +3,16 @@
 
 package engine.singbox
 
-internal const val DefaultEbpfLocalDataPlane = "tc"
+internal const val DefaultEbpfLocalDataPlane = "socket_assign"
 internal const val DefaultEbpfSharedDataPlane = "socket_assign"
 internal const val DefaultEbpfDnsMode = "hijack"
 
-internal val EbpfLocalDataPlanes = listOf("tc", "cgroup")
+internal val EbpfLocalDataPlanes = listOf("socket_assign", "cgroup")
 internal val EbpfSharedDataPlanes = listOf("socket_assign", "packet_rewrite")
 internal val EbpfDnsModes = listOf("hijack", "respect_policy")
+
+internal fun String.normalizedEbpfLocalDataPlane(): String =
+    takeIf { it in EbpfLocalDataPlanes } ?: DefaultEbpfLocalDataPlane
 
 internal fun String.effectiveEbpfDnsMode(enableLocalDns: Boolean): String {
     if (!enableLocalDns) return "off"
