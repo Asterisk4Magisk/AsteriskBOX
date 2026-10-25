@@ -159,6 +159,10 @@ internal class AppSettingsPreferences(
                 KeyEnableBroadcastControl,
                 defaults.enableBroadcastControl,
             ),
+            enableAutoConnect = preferences.getBoolean(
+                KeyEnableAutoConnect,
+                defaults.enableAutoConnect,
+            ),
             enableResourceAutoUpdate = preferences.getBoolean(KeyEnableResourceAutoUpdate, defaults.enableResourceAutoUpdate),
             resourceAutoUpdateInterval = preferences.getString(KeyResourceAutoUpdateInterval, defaults.resourceAutoUpdateInterval)
                 ?: defaults.resourceAutoUpdateInterval,
@@ -476,6 +480,7 @@ internal const val KeyConfigOverrideScript = "config_override_script"
 internal const val KeyCoreLogLevel = "core_log_level"
 internal const val KeyEnableTrafficStatsNotification = "enable_traffic_stats_notification"
 internal const val KeyEnableBroadcastControl = "enable_broadcast_control"
+internal const val KeyEnableAutoConnect = "enable_auto_connect"
 internal const val KeyEnableResourceAutoUpdate = "enable_resource_auto_update"
 internal const val KeyResourceAutoUpdateInterval = "resource_auto_update_interval"
 internal const val KeyResourceFileSource = "resource_file_source"

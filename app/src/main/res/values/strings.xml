@@ -1119,6 +1119,8 @@
     <string name="settings_vpn_hev_tun_summary">Use hev-socks5-tunnel to create the TUN device</string>
     <string name="settings_vpn_local_dns">Enable DNS hijacking</string>
     <string name="settings_vpn_local_dns_summary">Use the core to handle DNS requests</string>
+    <string name="settings_auto_connect">Auto connect on boot</string>
+    <string name="settings_auto_connect_summary">Start the VPN service after boot or an app update</string>
 
     <!-- ROOT -->
     <string name="error_bpf2socks_root_required">ROOT access is required for BPF2SOCKS mode</string>
@@ -1326,6 +1328,13 @@
     <string name="proxy_traffic_stats_notification_traffic">Traffic: ↑ %1$s / ↓ %2$s</string>
     <string name="settings_traffic_stats_notification">Show statistics</string>
     <string name="settings_traffic_stats_notification_summary">Show current speed and total traffic in notifications and the status bar</string>
+
+    <!-- Service notifications -->
+    <string name="vpn_service_notification_channel">VPN service</string>
+    <string name="vpn_service_notification_running">VPN service is running</string>
+    <string name="auto_connect_notification_channel">Auto connect</string>
+    <string name="auto_connect_permission_title">VPN permission required</string>
+    <string name="auto_connect_permission_text">Tap to grant the VPN permission and start the service</string>
 
     <!-- Quick settings tile -->
     <string name="quick_settings_tile_label">AsteriskBOX</string>

@@ -1103,6 +1103,8 @@
     <string name="settings_vpn_hev_tun_summary">使用 hev-socks5-tunnel 创建 TUN 设备</string>
     <string name="settings_vpn_local_dns">启用 DNS 劫持</string>
     <string name="settings_vpn_local_dns_summary">使用核心处理 DNS 请求</string>
+    <string name="settings_auto_connect">开机自动连接</string>
+    <string name="settings_auto_connect_summary">设备启动或应用更新后自动启动 VPN 服务</string>
 
     <!-- ROOT -->
     <string name="error_bpf2socks_root_required">ROOT 权限不可用，无法启动 BPF2SOCKS 模式</string>
@@ -1309,6 +1311,13 @@
     <string name="proxy_traffic_stats_notification_traffic">流量：↑ %1$s / ↓ %2$s</string>
     <string name="settings_traffic_stats_notification">显示统计数据</string>
     <string name="settings_traffic_stats_notification_summary">在通知和状态栏中显示当前速度和累计流量</string>
+
+    <!-- Service notifications -->
+    <string name="vpn_service_notification_channel">VPN 服务</string>
+    <string name="vpn_service_notification_running">VPN 服务运行中</string>
+    <string name="auto_connect_notification_channel">自动连接</string>
+    <string name="auto_connect_permission_title">需要 VPN 授权</string>
+    <string name="auto_connect_permission_text">点击授予 VPN 权限并启动服务</string>
 
     <!-- Quick settings tile -->
     <string name="quick_settings_tile_label">AsteriskBOX</string>

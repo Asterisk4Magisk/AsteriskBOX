@@ -455,6 +455,7 @@ private fun SettingsContent(
                     enableTrafficStatsNotification = appState.enableTrafficStatsNotification,
                     enableVpnAppendHttpProxy = appState.enableVpnAppendHttpProxy,
                     enableVpnHevTun = appState.enableVpnHevTun,
+                    enableAutoConnect = appState.enableAutoConnect,
                     tunSettingsSummary = tunSettingsSummary,
                     enableRootBootScript = appState.enableRootBootScript,
                     enableRootEbpfRules = appState.enableRootEbpfRules,
@@ -484,6 +485,9 @@ private fun SettingsContent(
                             state.copy(enableVpnHevTun = enabled)
                                 .withPrunedManagedInboundReferences()
                         }
+                    },
+                    onEnableAutoConnectChange = { enabled ->
+                        updateAppState { state -> state.copy(enableAutoConnect = enabled) }
                     },
                     onOpenTunSettings = { sheetState.openTunSettings(appState) },
                     onEnableRootBootScriptChange = { enabled ->

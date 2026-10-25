@@ -172,6 +172,11 @@ internal fun settingsTopLevelSearchItems(
         SettingsSearchItem(SettingsSectionId.Vpn, stringResource(R.string.settings_local_proxy), localProxySummary),
         SettingsSearchItem(
             SettingsSectionId.Vpn,
+            stringResource(R.string.settings_auto_connect),
+            stringResource(R.string.settings_auto_connect_summary),
+        ),
+        SettingsSearchItem(
+            SettingsSectionId.Vpn,
             stringResource(R.string.settings_traffic_stats_notification),
             stringResource(R.string.settings_traffic_stats_notification_summary),
         ),
