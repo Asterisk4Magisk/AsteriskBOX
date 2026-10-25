@@ -156,7 +156,7 @@ internal fun RoutingSettingsSheet(
                             items = listOf(
                                 stringResource(R.string.common_not_specified),
                                 singBoxOptionLabel(
-                                    stringResource(R.string.routing_settings_strategy_default),
+                                    stringResource(R.string.common_default),
                                     "default",
                                 ),
                                 singBoxOptionLabel(

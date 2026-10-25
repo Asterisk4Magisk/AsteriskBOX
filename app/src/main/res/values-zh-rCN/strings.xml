@@ -57,7 +57,6 @@
     <string name="nav_dashboard">首页</string>
     <string name="nav_groups">分组</string>
     <string name="nav_proxies">代理</string>
-    <string name="nav_settings">设置</string>
 
     <!-- Home -->
     <string name="home_accumulated_download">累计下载</string>
@@ -70,7 +69,6 @@
     <string name="home_monitor_network">网络</string>
     <string name="home_monitor_resource">资源</string>
     <string name="home_monitor_traffic">流量</string>
-    <string name="home_more_actions">更多操作</string>
     <string name="home_network_activity">网络活动</string>
     <string name="home_network_speed_summary">↑ %1$s   ↓ %2$s</string>
     <string name="home_network_summary">IPv4 · %1$s\nIPv6 · %2$s</string>
@@ -97,7 +95,6 @@
     <string name="monitor_copy_value">复制数值</string>
     <string name="monitor_data_stale">数据可能已过期</string>
     <string name="monitor_data_unavailable">数据不可用</string>
-    <string name="monitor_filter_all">全部</string>
     <string name="monitor_filter_direct">直连</string>
     <string name="monitor_filter_proxy">代理</string>
     <string name="monitor_loading">正在读取实时数据…</string>
@@ -105,13 +102,11 @@
     <string name="monitor_no_samples">暂无采样；暂停期间会保留断点。</string>
     <string name="monitor_rate_pair">↓ %1$s/s · ↑ %2$s/s</string>
     <string name="monitor_refresh">刷新</string>
-    <string name="monitor_retry">重试</string>
     <string name="monitor_service_not_enabled">服务未启用</string>
     <string name="monitor_sort_rate">实时速率</string>
     <string name="monitor_sort_started">开始时间</string>
     <string name="monitor_sort_target">目标</string>
     <string name="monitor_speed_per_second">%1$s/s</string>
-    <string name="monitor_value_unknown">未知</string>
 
     <!-- Monitoring - Connections -->
     <string name="monitor_connections_active">活动连接</string>
@@ -244,7 +239,6 @@
     <string name="monitor_network_quality_idle_latency_explanation">空闲时链路的响应延迟。300 ms 以内对实时交互足够好,300–700 ms 可以接受,超过 700 ms 会明显迟滞。</string>
     <string name="monitor_network_quality_info_action">参数说明</string>
     <string name="monitor_network_quality_max_runtime">最长耗时(秒)</string>
-    <string name="monitor_network_quality_outbound_default">默认</string>
     <string name="monitor_network_quality_outbound_label">出站</string>
     <string name="monitor_network_quality_rating_fair">一般</string>
     <string name="monitor_network_quality_rating_good">良好</string>
@@ -284,7 +278,6 @@
     <string name="sing_box_proxies_option_layout_multiple">多列</string>
     <string name="sing_box_proxies_option_layout_single">单列</string>
     <string name="sing_box_proxies_option_sort">排序</string>
-    <string name="sing_box_proxies_option_sort_default">默认</string>
     <string name="sing_box_proxies_option_sort_delay">延迟</string>
     <string name="sing_box_proxies_option_sort_name">名称</string>
     <string name="sing_box_proxies_options">代理显示选项</string>
@@ -409,8 +402,6 @@
     <string name="outbound_empty">当前分组暂无出站</string>
     <string name="outbound_empty_summary">点击添加按钮导入，或可视化配置一个出站。</string>
     <string name="outbound_import">导入出站</string>
-    <string name="outbound_import_clipboard">从剪切板导入</string>
-    <string name="outbound_import_empty_clipboard">剪切板为空</string>
     <string name="outbound_import_failed">出站导入失败</string>
     <string name="outbound_import_file">从文件导入</string>
     <string name="outbound_import_manual">手动添加</string>
@@ -709,8 +700,6 @@
     <string name="endpoint_editor_type">端点类型</string>
     <string name="endpoint_empty">暂无托管端点</string>
     <string name="endpoint_empty_summary">添加受支持的 sing-box 端点，或导入端点 JSON。</string>
-    <string name="endpoint_import_clipboard">从剪切板导入</string>
-    <string name="endpoint_import_empty_clipboard">剪切板为空</string>
     <string name="endpoint_import_failed">端点导入失败</string>
     <string name="endpoint_import_file">从文件导入</string>
     <string name="endpoint_import_formats_summary">sing-box JSON、WireGuard、OpenVPN 或 OpenConnect</string>
@@ -899,11 +888,9 @@
     <string name="settings_dns_predefined_hosts_format">格式：域名=地址1,地址2,…</string>
     <string name="settings_dns_prefer_go">优先使用 Go 解析器</string>
     <string name="settings_dns_reject_method">拒绝方式</string>
-    <string name="settings_dns_reject_method_default">默认</string>
     <string name="settings_dns_reject_method_drop">丢弃</string>
     <string name="settings_dns_resolved_service">Resolved 服务</string>
     <string name="settings_dns_response_code">响应码</string>
-    <string name="settings_dns_response_code_default">默认</string>
     <string name="settings_dns_response_ip_match_summary">请选择已评估的响应，以匹配其中的地址。</string>
     <string name="settings_dns_rewrite_ttl">重写 TTL（可选）</string>
     <string name="settings_dns_rule_action">动作</string>
@@ -941,9 +928,7 @@
     <string name="settings_dns_server_type_quic">QUIC</string>
     <string name="settings_dns_server_type_resolved">Resolved</string>
     <string name="settings_dns_server_type_tailscale">Tailscale</string>
-    <string name="settings_dns_server_type_tcp">TCP</string>
     <string name="settings_dns_server_type_tls">TLS</string>
-    <string name="settings_dns_server_type_udp">UDP</string>
     <string name="settings_dns_servers_empty">还没有添加 DNS 服务器</string>
     <string name="settings_dns_store_dns">持久化 DNS 缓存</string>
     <string name="settings_dns_store_dns_summary">将 DNS 缓存保存到磁盘，重启后仍然有效</string>
@@ -990,8 +975,6 @@
     <string name="routing_ip_cidr">目标 IP CIDR</string>
     <string name="routing_ip_is_private">目标是私有 IP</string>
     <string name="routing_ip_version_any">不限</string>
-    <string name="routing_ipv4">IPv4</string>
-    <string name="routing_ipv6">IPv6</string>
     <string name="routing_list_empty">暂无内容</string>
     <string name="routing_logical_mode">匹配方式</string>
     <string name="routing_logical_mode_and">全部满足</string>
@@ -1005,18 +988,15 @@
     </plurals>
     <string name="routing_match_summary">%1$s：%2$s</string>
     <string name="routing_network_icmp">ICMP</string>
-    <string name="routing_network_tcp">TCP</string>
     <string name="routing_network_type_cellular">蜂窝网络</string>
     <string name="routing_network_type_ethernet">以太网</string>
     <string name="routing_network_type_other">其他</string>
     <string name="routing_network_type_wifi">Wi-Fi</string>
-    <string name="routing_network_udp">UDP</string>
     <string name="routing_new_condition">新建条件</string>
     <string name="routing_new_rule">新建路由规则</string>
     <string name="routing_outbound">出站</string>
     <string name="routing_port_invalid">请输入 0 至 65535 的端口匹配值</string>
     <string name="routing_port_range_invalid">请使用 起始:结束、起始: 或 :结束，取值范围为 0 至 65535</string>
-    <string name="routing_reject_default">默认</string>
     <string name="routing_reject_drop">丢弃</string>
     <string name="routing_reject_method">拒绝方式</string>
     <string name="routing_reject_no_drop">重复连接后仍不丢弃</string>
@@ -1051,7 +1031,6 @@
     <string name="routing_settings_section_fallback">回退设置</string>
     <string name="routing_settings_section_interface">接口检测</string>
     <string name="routing_settings_section_network">网络选择</string>
-    <string name="routing_settings_strategy_default">默认</string>
     <string name="routing_settings_strategy_fallback">回退</string>
     <string name="routing_settings_strategy_hybrid">混合</string>
     <string name="routing_settings_summary">配置接口检测、网络选择与进程查找</string>
@@ -1152,7 +1131,6 @@
     <string name="enhancement_module_apk_install_failed">刷入失败，请检查错误输出。可尝试导出本应用，将 .apk 后缀改为 .zip，在 ROOT 管理器中刷入</string>
     <string name="enhancement_module_failed">模块操作失败。请检查 ROOT 管理器，确认 Zygisk Next 已安装且启用后重试</string>
     <string name="enhancement_module_incompatible">当前运行的增强模块不支持此运行环境</string>
-    <string name="enhancement_module_install_close">关闭</string>
     <string name="enhancement_module_install_output_waiting">等待刷入输出…</string>
     <string name="enhancement_module_install_title">刷入增强模块</string>
     <string name="enhancement_module_installing">正在安装增强模块…</string>
@@ -1166,7 +1144,6 @@
     <string name="enhancement_module_root_denied">ROOT 授权被拒绝。请授权后重试</string>
     <string name="enhancement_module_timeout">模块操作超时。请检查 ROOT 管理器后重试</string>
     <string name="enhancement_module_title">增强模块</string>
-    <string name="enhancement_module_update">更新增强模块</string>
     <string name="enhancement_module_update_available">当前应用提供增强模块更新。请更新并重启设备后再使用应用名单增强</string>
 
     <!-- TUN -->
@@ -1353,7 +1330,6 @@
     <string name="proxy_app_list_mode_blacklist">黑名单模式</string>
     <string name="proxy_app_list_mode_global">全应用模式</string>
     <string name="proxy_app_list_mode_whitelist">白名单模式</string>
-    <string name="proxy_app_list_more_actions">更多操作</string>
     <string name="proxy_app_list_pick_installed_apps">从已安装应用中选择</string>
     <string name="proxy_app_list_picker_title">选择应用</string>
     <string name="proxy_app_list_scan_china_apps">扫描中国应用</string>
@@ -1372,7 +1348,6 @@
 
     <!-- Resource management -->
     <string name="error_resource_file_picker_missing">资源文件选择器未注册</string>
-    <string name="resource_file_download_notification_cancel">取消</string>
     <string name="resource_file_download_notification_cancelled">资源文件更新已取消</string>
     <string name="resource_file_download_notification_channel">资源文件更新</string>
     <string name="resource_file_download_notification_complete">资源文件更新完成</string>
@@ -1577,7 +1552,6 @@
     <plurals name="logs_total_count">
         <item quantity="other">共 %1$d 条</item>
     </plurals>
-    <string name="settings_core_logs">核心日志</string>
     <string name="settings_log_level">日志等级</string>
     <string name="settings_logcat">Logcat</string>
     <string name="settings_logs">日志</string>
@@ -1590,7 +1564,6 @@
     <string name="about_view_source">在 GitHub 查看源码</string>
     <string name="license_load_failed">无法加载许可证信息</string>
     <string name="license_title">第三方开源许可</string>
-    <string name="settings_about">关于</string>
     <string name="settings_about_project">关于项目</string>
     <string name="settings_open_source_licenses">开源许可</string>
 </resources>

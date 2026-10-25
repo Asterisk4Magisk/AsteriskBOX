@@ -118,7 +118,7 @@ private fun mainNavigationItems(): List<MainNavigationItem> {
     val home = stringResource(R.string.nav_dashboard)
     val proxies = stringResource(R.string.nav_proxies)
     val groups = stringResource(R.string.nav_groups)
-    val settings = stringResource(R.string.nav_settings)
+    val settings = stringResource(R.string.settings_title)
 
     return remember(home, proxies, groups, settings) {
         listOf(

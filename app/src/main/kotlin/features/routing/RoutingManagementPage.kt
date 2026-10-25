@@ -838,7 +838,7 @@ internal fun RouteRuleEditorScaffold(
                                             RuleEditorChoice(
                                                 "default",
                                                 singBoxOptionLabel(
-                                                    stringResource(R.string.routing_reject_default),
+                                                    stringResource(R.string.common_default),
                                                     "default",
                                                 ),
                                             ),
@@ -963,11 +963,11 @@ internal fun RouteRuleEditorScaffold(
                         items = listOf(
                             stringResource(R.string.routing_ip_version_any),
                             singBoxOptionLabel(
-                                stringResource(R.string.routing_ipv4),
+                                stringResource(R.string.common_ipv4),
                                 "4",
                             ),
                             singBoxOptionLabel(
-                                stringResource(R.string.routing_ipv6),
+                                stringResource(R.string.common_ipv6),
                                 "6",
                             ),
                         ),
@@ -982,11 +982,11 @@ internal fun RouteRuleEditorScaffold(
                         title = routeRuleMatcherLabel("network"),
                         choices = listOf(
                             "tcp" to singBoxOptionLabel(
-                                stringResource(R.string.routing_network_tcp),
+                                stringResource(R.string.common_tcp),
                                 "tcp",
                             ),
                             "udp" to singBoxOptionLabel(
-                                stringResource(R.string.routing_network_udp),
+                                stringResource(R.string.common_udp),
                                 "udp",
                             ),
                             "icmp" to singBoxOptionLabel(
@@ -1654,15 +1654,15 @@ private fun routeRuleMatchValueLabel(
     "protocol" -> singBoxProtocolChoices().toMap()[value] ?: value
     "ip_version" -> singBoxOptionLabel(
         stringResource(
-            if (value == "4") R.string.routing_ipv4 else R.string.routing_ipv6,
+            if (value == "4") R.string.common_ipv4 else R.string.common_ipv6,
         ),
         value,
     )
     "network" -> singBoxOptionLabel(
         stringResource(
             when (value) {
-                "tcp" -> R.string.routing_network_tcp
-                "udp" -> R.string.routing_network_udp
+                "tcp" -> R.string.common_tcp
+                "udp" -> R.string.common_udp
                 else -> R.string.routing_network_icmp
             },
         ),

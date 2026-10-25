@@ -1396,7 +1396,7 @@ private fun DnsRuleActionFields(
                 }
                 val responseCodeLabels = DnsResponseCodes.map { code ->
                     code.ifBlank {
-                        stringResource(R.string.settings_dns_response_code_default)
+                        stringResource(R.string.common_default)
                     }
                 }
                 RuleEditorChoiceCard(
@@ -2012,8 +2012,8 @@ private fun dnsServerTypeLabelResource(type: String): Int = when (type) {
     "local" -> R.string.settings_dns_server_type_local
     "hosts" -> R.string.settings_dns_server_type_hosts
     "group" -> R.string.settings_dns_server_type_group
-    "udp" -> R.string.settings_dns_server_type_udp
-    "tcp" -> R.string.settings_dns_server_type_tcp
+    "udp" -> R.string.common_udp
+    "tcp" -> R.string.common_tcp
     "tls" -> R.string.settings_dns_server_type_tls
     "quic" -> R.string.settings_dns_server_type_quic
     "https" -> R.string.settings_dns_server_type_https
@@ -2047,7 +2047,7 @@ private fun dnsRejectMethodLabel(method: String): String =
     singBoxOptionLabel(
         stringResource(
             when (method) {
-                "default" -> R.string.settings_dns_reject_method_default
+                "default" -> R.string.common_default
                 "drop" -> R.string.settings_dns_reject_method_drop
                 else -> R.string.common_unknown
             },

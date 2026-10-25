@@ -269,7 +269,7 @@ internal fun OutboundListPage(
     val columns = resolveOutboundListColumns(appState.outboundListLayout, isWideScreen)
     val importFailedMessage = stringResource(R.string.outbound_import_failed)
     val stateChangedMessage = stringResource(R.string.outbound_group_sync_failed)
-    val emptyClipboardMessage = stringResource(R.string.outbound_import_empty_clipboard)
+    val emptyClipboardMessage = stringResource(R.string.common_clipboard_empty)
     val copiedMessage = stringResource(R.string.common_copied)
     val noPingTargetsMessage = stringResource(R.string.outbound_ping_no_targets)
 
@@ -548,7 +548,7 @@ internal fun OutboundListPage(
                                                     },
                                                 )
                                                 OutboundMenuItem(
-                                                    text = stringResource(R.string.outbound_import_clipboard),
+                                                    text = stringResource(R.string.common_import_from_clipboard),
                                                     icon = Icons.Rounded.ContentPaste,
                                                     onClick = {
                                                         importMenuExpanded = false

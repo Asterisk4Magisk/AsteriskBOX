@@ -203,7 +203,7 @@ private fun LogViewerPage(
                             IconButton(onClick = { menuExpanded = true }) {
                                 Icon(
                                     imageVector = Icons.Rounded.MoreVert,
-                                    contentDescription = stringResource(R.string.home_more_actions),
+                                    contentDescription = stringResource(R.string.common_more_actions),
                                 )
                             }
                             DropdownMenu(

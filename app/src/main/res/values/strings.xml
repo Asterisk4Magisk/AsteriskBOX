@@ -57,7 +57,6 @@
     <string name="nav_dashboard">Home</string>
     <string name="nav_groups">Groups</string>
     <string name="nav_proxies">Proxies</string>
-    <string name="nav_settings">Settings</string>
 
     <!-- Home -->
     <string name="home_accumulated_download">Downloaded</string>
@@ -71,7 +70,6 @@
     <string name="home_monitor_network">Network</string>
     <string name="home_monitor_resource">Resource</string>
     <string name="home_monitor_traffic">Traffic</string>
-    <string name="home_more_actions">More actions</string>
     <string name="home_network_activity">Network activity</string>
     <string name="home_network_speed_summary">↑ %1$s   ↓ %2$s</string>
     <string name="home_network_summary">IPv4 · %1$s\nIPv6 · %2$s</string>
@@ -98,7 +96,6 @@
     <string name="monitor_copy_value">Copy value</string>
     <string name="monitor_data_stale">Data may be out of date</string>
     <string name="monitor_data_unavailable">Data unavailable</string>
-    <string name="monitor_filter_all">All</string>
     <string name="monitor_filter_direct">Direct</string>
     <string name="monitor_filter_proxy">Proxy</string>
     <string name="monitor_loading">Loading live data…</string>
@@ -106,13 +103,11 @@
     <string name="monitor_no_samples">No samples yet. Paused intervals remain as gaps.</string>
     <string name="monitor_rate_pair">↓ %1$s/s · ↑ %2$s/s</string>
     <string name="monitor_refresh">Refresh</string>
-    <string name="monitor_retry">Retry</string>
     <string name="monitor_service_not_enabled">Service not enabled</string>
     <string name="monitor_sort_rate">Real-time rate</string>
     <string name="monitor_sort_started">Start time</string>
     <string name="monitor_sort_target">Target</string>
     <string name="monitor_speed_per_second">%1$s/s</string>
-    <string name="monitor_value_unknown">Unknown</string>
 
     <!-- Monitoring - Connections -->
     <string name="monitor_connections_active">Active</string>
@@ -246,7 +241,6 @@
     <string name="monitor_network_quality_idle_latency_explanation">How quickly the link responds when no traffic is flowing. Under 300 ms is good for real-time work; 300–700 ms is acceptable; over 700 ms feels sluggish.</string>
     <string name="monitor_network_quality_info_action">About the metrics</string>
     <string name="monitor_network_quality_max_runtime">Max runtime (seconds)</string>
-    <string name="monitor_network_quality_outbound_default">Default</string>
     <string name="monitor_network_quality_outbound_label">Outbound</string>
     <string name="monitor_network_quality_rating_fair">Fair</string>
     <string name="monitor_network_quality_rating_good">Good</string>
@@ -286,7 +280,6 @@
     <string name="sing_box_proxies_option_layout_multiple">Multiple</string>
     <string name="sing_box_proxies_option_layout_single">Single</string>
     <string name="sing_box_proxies_option_sort">Sort</string>
-    <string name="sing_box_proxies_option_sort_default">Default</string>
     <string name="sing_box_proxies_option_sort_delay">Delay</string>
     <string name="sing_box_proxies_option_sort_name">Name</string>
     <string name="sing_box_proxies_options">Proxy display options</string>
@@ -415,8 +408,6 @@
     <string name="outbound_empty">No outbounds in this group</string>
     <string name="outbound_empty_summary">Use the add button to import or visually configure an outbound.</string>
     <string name="outbound_import">Import outbound</string>
-    <string name="outbound_import_clipboard">Import from clipboard</string>
-    <string name="outbound_import_empty_clipboard">Clipboard is empty</string>
     <string name="outbound_import_failed">Unable to import outbounds</string>
     <string name="outbound_import_file">Import file</string>
     <string name="outbound_import_manual">Add manually</string>
@@ -720,8 +711,6 @@
     <string name="endpoint_editor_type">Endpoint type</string>
     <string name="endpoint_empty">No managed endpoints</string>
     <string name="endpoint_empty_summary">Add a supported sing-box endpoint or import endpoint JSON.</string>
-    <string name="endpoint_import_clipboard">Import from clipboard</string>
-    <string name="endpoint_import_empty_clipboard">Clipboard is empty</string>
     <string name="endpoint_import_failed">Unable to import endpoints</string>
     <string name="endpoint_import_file">Import file</string>
     <string name="endpoint_import_formats_summary">sing-box JSON, WireGuard, OpenVPN, or OpenConnect</string>
@@ -912,11 +901,9 @@
     <string name="settings_dns_predefined_hosts_format">Format: domain=address1,address2,…</string>
     <string name="settings_dns_prefer_go">Prefer Go resolver</string>
     <string name="settings_dns_reject_method">Reject method</string>
-    <string name="settings_dns_reject_method_default">Default</string>
     <string name="settings_dns_reject_method_drop">Drop</string>
     <string name="settings_dns_resolved_service">Resolved service</string>
     <string name="settings_dns_response_code">Response code</string>
-    <string name="settings_dns_response_code_default">Default</string>
     <string name="settings_dns_response_ip_match_summary">Select an evaluated response to match its addresses.</string>
     <string name="settings_dns_rewrite_ttl">Rewrite TTL (optional)</string>
     <string name="settings_dns_rule_action">Action</string>
@@ -954,9 +941,7 @@
     <string name="settings_dns_server_type_quic">QUIC</string>
     <string name="settings_dns_server_type_resolved">Resolved</string>
     <string name="settings_dns_server_type_tailscale">Tailscale</string>
-    <string name="settings_dns_server_type_tcp">TCP</string>
     <string name="settings_dns_server_type_tls">TLS</string>
-    <string name="settings_dns_server_type_udp">UDP</string>
     <string name="settings_dns_servers_empty">No DNS servers added</string>
     <string name="settings_dns_store_dns">Persist DNS cache</string>
     <string name="settings_dns_store_dns_summary">Save DNS cache to disk so it survives restarts</string>
@@ -1004,8 +989,6 @@
     <string name="routing_ip_cidr">Destination IP CIDRs</string>
     <string name="routing_ip_is_private">Destination is a private IP</string>
     <string name="routing_ip_version_any">Any</string>
-    <string name="routing_ipv4">IPv4</string>
-    <string name="routing_ipv6">IPv6</string>
     <string name="routing_list_empty">No values</string>
     <string name="routing_logical_mode">Match mode</string>
     <string name="routing_logical_mode_and">Match all</string>
@@ -1020,18 +1003,15 @@
     </plurals>
     <string name="routing_match_summary">%1$s: %2$s</string>
     <string name="routing_network_icmp">ICMP</string>
-    <string name="routing_network_tcp">TCP</string>
     <string name="routing_network_type_cellular">Cellular</string>
     <string name="routing_network_type_ethernet">Ethernet</string>
     <string name="routing_network_type_other">Other</string>
     <string name="routing_network_type_wifi">Wi-Fi</string>
-    <string name="routing_network_udp">UDP</string>
     <string name="routing_new_condition">New condition</string>
     <string name="routing_new_rule">New routing rule</string>
     <string name="routing_outbound">Outbound</string>
     <string name="routing_port_invalid">Enter a port matcher from 0 to 65535</string>
     <string name="routing_port_range_invalid">Use start:end, start:, or :end with values from 0 to 65535</string>
-    <string name="routing_reject_default">Default</string>
     <string name="routing_reject_drop">Drop</string>
     <string name="routing_reject_method">Reject method</string>
     <string name="routing_reject_no_drop">Do not drop after repeated connections</string>
@@ -1067,7 +1047,6 @@
     <string name="routing_settings_section_fallback">Fallback</string>
     <string name="routing_settings_section_interface">Interface detection</string>
     <string name="routing_settings_section_network">Network selection</string>
-    <string name="routing_settings_strategy_default">Default</string>
     <string name="routing_settings_strategy_fallback">Fallback</string>
     <string name="routing_settings_strategy_hybrid">Hybrid</string>
     <string name="routing_settings_summary">Configure interface detection, network selection, and process lookup</string>
@@ -1168,7 +1147,6 @@
     <string name="enhancement_module_apk_install_failed">Installation failed. Check the error output. You can try exporting this app, changing the .apk extension to .zip, and installing it with your ROOT manager</string>
     <string name="enhancement_module_failed">Module operation failed. Check your ROOT manager and ensure Zygisk Next is installed and enabled, then retry</string>
     <string name="enhancement_module_incompatible">The running enhancement module does not support this runtime</string>
-    <string name="enhancement_module_install_close">Close</string>
     <string name="enhancement_module_install_output_waiting">Waiting for installer output…</string>
     <string name="enhancement_module_install_title">Install enhancement module</string>
     <string name="enhancement_module_installing">Installing enhancement module…</string>
@@ -1182,7 +1160,6 @@
     <string name="enhancement_module_root_denied">ROOT permission was denied. Grant access and retry</string>
     <string name="enhancement_module_timeout">Module operation timed out. Check your ROOT manager and retry</string>
     <string name="enhancement_module_title">Enhancement module</string>
-    <string name="enhancement_module_update">Update enhancement module</string>
     <string name="enhancement_module_update_available">A module update is available from this app. Update it and reboot before using application list enhancement</string>
 
     <!-- TUN -->
@@ -1370,7 +1347,6 @@
     <string name="proxy_app_list_mode_blacklist">Blacklist mode</string>
     <string name="proxy_app_list_mode_global">All-app mode</string>
     <string name="proxy_app_list_mode_whitelist">Whitelist mode</string>
-    <string name="proxy_app_list_more_actions">More actions</string>
     <string name="proxy_app_list_pick_installed_apps">Choose from installed apps</string>
     <string name="proxy_app_list_picker_title">Select apps</string>
     <string name="proxy_app_list_scan_china_apps">Scan Chinese apps</string>
@@ -1389,7 +1365,6 @@
 
     <!-- Resource management -->
     <string name="error_resource_file_picker_missing">Resource file picker is not registered</string>
-    <string name="resource_file_download_notification_cancel">Cancel</string>
     <string name="resource_file_download_notification_cancelled">Resource file update cancelled</string>
     <string name="resource_file_download_notification_channel">Resource file updates</string>
     <string name="resource_file_download_notification_complete">Resource files updated</string>
@@ -1598,7 +1573,6 @@
         <item quantity="one">%1$d entry</item>
         <item quantity="other">%1$d entries</item>
     </plurals>
-    <string name="settings_core_logs">Core logs</string>
     <string name="settings_log_level">Log level</string>
     <string name="settings_logcat">Logcat</string>
     <string name="settings_logs">Logs</string>
@@ -1611,7 +1585,6 @@
     <string name="about_view_source">View source on GitHub</string>
     <string name="license_load_failed">Could not load license metadata</string>
     <string name="license_title">Third Party Licenses</string>
-    <string name="settings_about">About</string>
     <string name="settings_about_project">About project</string>
     <string name="settings_open_source_licenses">Open source licenses</string>
 </resources>

@@ -200,7 +200,7 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
                     onClick = { showMenu = true },
                     enabled = appState.proxyRunning && liveIds.isNotEmpty() && !operationInProgress,
                 ) {
-                    Icon(Icons.Rounded.MoreVert, stringResource(R.string.home_more_actions))
+                    Icon(Icons.Rounded.MoreVert, stringResource(R.string.common_more_actions))
                 }
                 DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
                     DropdownMenuItem(
@@ -481,7 +481,7 @@ private fun ConnectionCard(
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
-                    text = connection.destinationAddress.ifBlank { stringResource(R.string.monitor_value_unknown) },
+                    text = connection.destinationAddress.ifBlank { stringResource(R.string.common_unknown) },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -490,7 +490,7 @@ private fun ConnectionCard(
                 Text(
                     text = listOf(
                         connection.process.ifBlank { stringResource(R.string.monitor_connections_unknown_source) },
-                        connection.network.uppercase().ifBlank { stringResource(R.string.monitor_value_unknown) },
+                        connection.network.uppercase().ifBlank { stringResource(R.string.common_unknown) },
                         formatDuration(connection.startedAtMillis, detectedClosedAt),
                     ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
@@ -585,7 +585,7 @@ private fun StatusCard(message: String, loading: Boolean = false) {
 @Composable
 private fun connectionRouteLabel(route: ConnectionRouteFilter): String = stringResource(
     when (route) {
-        ConnectionRouteFilter.All -> R.string.monitor_filter_all
+        ConnectionRouteFilter.All -> R.string.common_all
         ConnectionRouteFilter.Proxy -> R.string.monitor_filter_proxy
         ConnectionRouteFilter.Direct -> R.string.monitor_filter_direct
     },

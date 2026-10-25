@@ -114,7 +114,7 @@ internal fun EndpointListPage(padding: PaddingValues) {
     }
     val importFailedMessage = stringResource(R.string.endpoint_import_failed)
     val stateChangedMessage = stringResource(R.string.endpoint_import_state_changed)
-    val emptyClipboardMessage = stringResource(R.string.endpoint_import_empty_clipboard)
+    val emptyClipboardMessage = stringResource(R.string.common_clipboard_empty)
     val copiedMessage = stringResource(R.string.common_copied)
     val countEffectsMotion = AsteriskMotion.fastEffects<Float>()
 
@@ -314,7 +314,7 @@ internal fun EndpointListPage(padding: PaddingValues) {
                                 DropdownMenuItem(
                                     text = {
                                         Column {
-                                            Text(stringResource(R.string.endpoint_import_clipboard))
+                                            Text(stringResource(R.string.common_import_from_clipboard))
                                             Text(
                                                 stringResource(
                                                     R.string.endpoint_import_formats_summary,

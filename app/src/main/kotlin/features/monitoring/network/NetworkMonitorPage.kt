@@ -207,7 +207,7 @@ private fun PublicAddressFamilyCard(
                         onClick = onRetry,
                         enabled = !refreshing,
                     ) {
-                        Text(stringResource(R.string.monitor_retry))
+                        Text(stringResource(R.string.common_retry))
                     }
                 }
             }

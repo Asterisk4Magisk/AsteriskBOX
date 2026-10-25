@@ -216,7 +216,7 @@ private fun AppPackagePickerMoreMenu(
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
-            Icon(Icons.Rounded.MoreVert, stringResource(R.string.proxy_app_list_more_actions))
+            Icon(Icons.Rounded.MoreVert, stringResource(R.string.common_more_actions))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(

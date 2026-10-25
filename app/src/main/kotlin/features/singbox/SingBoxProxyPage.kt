@@ -717,7 +717,7 @@ private fun SingBoxProxyOptionsMenu(
         when (sort) {
             SingBoxProxySortName -> R.string.sing_box_proxies_option_sort_name
             SingBoxProxySortDelay -> R.string.sing_box_proxies_option_sort_delay
-            else -> R.string.sing_box_proxies_option_sort_default
+            else -> R.string.common_default
         },
     )
     val menuSpatialMotion = AsteriskMotion.fastSpatial<IntOffset>()
@@ -830,7 +830,7 @@ private fun SingBoxProxyOptionsMenu(
                     listOf(
                         Triple(
                             SingBoxProxySortDefault,
-                            R.string.sing_box_proxies_option_sort_default,
+                            R.string.common_default,
                             Icons.AutoMirrored.Rounded.Sort,
                         ),
                         Triple(

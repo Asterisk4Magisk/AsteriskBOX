@@ -196,7 +196,7 @@ private fun OutboundCard(
     enabled: Boolean,
     onSelect: (String) -> Unit,
 ) {
-    val defaultLabel = stringResource(R.string.monitor_network_quality_outbound_default)
+    val defaultLabel = stringResource(R.string.common_default)
     val label = stringResource(R.string.monitor_network_quality_outbound_label)
     val unavailableLabel = stringResource(R.string.common_unavailable)
     val tags = remember(outboundTags) { listOf("") + outboundTags }
