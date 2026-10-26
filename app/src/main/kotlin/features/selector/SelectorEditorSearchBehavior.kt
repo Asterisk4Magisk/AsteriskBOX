@@ -46,12 +46,14 @@ internal fun filterSelectorTargets(
     }
     val matchedTags = targets
         .filter { target ->
-            listOfNotNull(target.tag, target.label, target.groupName).any { value ->
-                regex?.containsMatchIn(value)
-                    ?: value.contains(normalized, ignoreCase = true)
-            }
-        }
-        .map(SelectorTargetSearchCandidate::tag)
+            // Match a single name so exclusion patterns like ^(?!.*HK).*$ are not
+            // satisfied by another field such as the subscription group name.
+            regex?.containsMatchIn(target.label.ifBlank { target.tag }) ?: listOfNotNull(
+                target.tag,
+                target.label,
+                target.groupName
+            ).any { value -> value.contains(normalized, ignoreCase = true) }
+        }.map(SelectorTargetSearchCandidate::tag)
     return SelectorTargetSearchResult.Valid(matchedTags)
 }
 
@@ -62,9 +64,9 @@ internal fun selectorTargetSelectionState(
     val uniqueMatches = matchedTags.toSet()
     val selected = selectedTags.toSet()
     val selectedCount = uniqueMatches.count(selected::contains)
-    return when {
-        selectedCount == 0 -> SelectorTargetSelectionState.None
-        selectedCount == uniqueMatches.size -> SelectorTargetSelectionState.All
+    return when (selectedCount) {
+        0 -> SelectorTargetSelectionState.None
+        uniqueMatches.size -> SelectorTargetSelectionState.All
         else -> SelectorTargetSelectionState.Partial
     }
 }
