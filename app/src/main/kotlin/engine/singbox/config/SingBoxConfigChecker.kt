@@ -16,7 +16,7 @@ internal object SingBoxConfigChecker {
         val root = parseSingBoxJson(content)
         SingBoxDeprecatedConfigValidator.validate(root)
         val compatibleRoot = root.withLibboxCompatibleEbpfInbounds()
-        Libbox.checkConfig(if (compatibleRoot === root) content else encodeSingBoxJson(compatibleRoot))
+        Libbox.checkConfig(encodeSingBoxJson(compatibleRoot))
     }
 
     fun format(content: String): String {

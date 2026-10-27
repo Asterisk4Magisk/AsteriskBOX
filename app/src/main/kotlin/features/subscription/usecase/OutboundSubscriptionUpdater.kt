@@ -72,7 +72,7 @@ internal class OutboundSubscriptionUpdater(
         group: OutboundGroupState,
         state: AppState,
     ) -> SubscriptionPreparation,
-    private val parse: (String) -> ImportOutcome<ImportedSingBoxOutbound>,
+    private val parse: suspend (String, OutboundGroupState, AppState) -> ImportOutcome<ImportedSingBoxOutbound>,
     private val validate: suspend (AppState) -> Unit,
     private val formatDuplicateName: (name: String, ordinal: Int) -> String,
     private val nowMillis: () -> Long = System::currentTimeMillis,
@@ -152,7 +152,7 @@ internal class OutboundSubscriptionUpdater(
                     val outcome = try {
                         onStage(ImportStage.PARSE)
                         preparePermits.withPermit {
-                            parse(prepared.content)
+                            parse(prepared.content, group, initialState)
                         }
                     } catch (error: CancellationException) {
                         throw error

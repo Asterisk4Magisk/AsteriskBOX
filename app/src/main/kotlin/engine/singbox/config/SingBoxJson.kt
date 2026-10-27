@@ -15,11 +15,15 @@ internal val SingBoxJson = Json {
     prettyPrintIndent = "  "
 }
 
+internal val SingBoxImportJson = Json(SingBoxJson) {
+    allowComments = true
+}
+
 internal fun parseSingBoxJson(content: String): JsonObject {
     if (content.isBlank()) {
         error("sing-box configuration is empty")
     }
-    return SingBoxJson.parseToJsonElement(content) as? JsonObject
+    return SingBoxImportJson.parseToJsonElement(content) as? JsonObject
         ?: error("sing-box configuration root must be a JSON object")
 }
 

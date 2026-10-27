@@ -152,7 +152,15 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
                     verifyConfiguration = false,
                 )
             },
-            parse = ::parseOutboundImportContent,
+            parse = { content, group, state ->
+                parseOutboundImportContent(
+                    content,
+                    providerFetcher = { request ->
+                        subscriptionPreparer.fetchProvider(request, group.userAgent, state.toSubscriptionFetchOptions(group))
+                    },
+                    sourceUrl = group.url,
+                )
+            },
             validate = { state ->
                 validateSingBoxRuntimeConfiguration(applicationContext, state)
             },

@@ -10,6 +10,7 @@ import app.modes.OutboundListLayoutMultiple
 import app.modes.OutboundListLayoutSingle
 import engine.singbox.config.SingBoxJson
 import features.importing.ImportOutcome
+import features.subscription.runtime.fetchMihomoProvider
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -17,22 +18,6 @@ import kotlinx.serialization.json.contentOrNull
 internal const val OutboundListBaseBottomExtraDp = 12
 internal const val OutboundGridSpacingDp = 10
 internal const val OutboundCardHeightDp = 112
-
-internal class ReorderPreviewOwnership<K> {
-    private var nextGeneration = 0L
-    private val generations = mutableMapOf<K, Long>()
-
-    fun claim(key: K): Long {
-        nextGeneration += 1L
-        return nextGeneration.also { generation -> generations[key] = generation }
-    }
-
-    fun releaseIfOwned(key: K, generation: Long): Boolean {
-        if (generations[key] != generation) return false
-        generations.remove(key)
-        return true
-    }
-}
 
 internal data class OutboundCardMenuIconOffsetDp(
     val x: Int,
@@ -66,13 +51,19 @@ internal fun outboundListBottomExtraDp(): Int {
     return OutboundListBaseBottomExtraDp
 }
 
-internal fun parseOutboundImportContent(
+internal suspend fun parseOutboundImportContent(
     content: String,
     jsonFormatter: SingBoxOutboundConfigFormatter = LibboxSingBoxOutboundConfigFormatter,
+    providerFetcher: MihomoProviderFetcher = MihomoProviderFetcher { fetchMihomoProvider(it) },
+    sourceUrl: String? = null,
 ): ImportOutcome<ImportedSingBoxOutbound> {
     return OutboundImportPipeline.parseOutcome(
         content = content,
         jsonFormatter = jsonFormatter,
+        providerContext = MihomoProviderImportContext(
+            fetcher = providerFetcher,
+            urls = setOfNotNull(sourceUrl),
+        ),
     )
 }
 

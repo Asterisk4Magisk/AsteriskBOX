@@ -5,6 +5,10 @@ package features.subscription.runtime
 
 import app.SubscriptionInfo
 import engine.singbox.config.SingBoxConfigChecker
+import engine.singbox.config.encodeSingBoxJson
+import engine.singbox.config.parseSingBoxJson
+import features.outbound.MihomoProviderRequest
+import features.outbound.containsMihomoProviders
 import features.importing.MaxImportErrorPreviewBytes
 import features.importing.readImportUtf8WithinLimit
 import features.importing.requireImportTextWithinLimit
@@ -55,6 +59,12 @@ internal sealed interface AndroidSubscriptionPreparation {
 internal class AndroidSubscriptionPreparer(
     private val installationHwid: String,
 ) {
+    suspend fun fetchProvider(
+        request: MihomoProviderRequest,
+        userAgent: String,
+        fetchOptions: AndroidSubscriptionFetchOptions,
+    ): String = fetchMihomoProvider(request, userAgent, fetchOptions, installationHwid)
+
     suspend fun prepare(
         sourceContent: String?,
         sourceUrl: String,
@@ -117,16 +127,20 @@ internal class AndroidSubscriptionPreparer(
             if (verifyConfiguration) {
                 onStage(SubscriptionSyncStage.Verifying)
                 stage = SubscriptionSyncStage.Verifying
-                withContext(Dispatchers.Default) {
-                    SingBoxConfigChecker.check(decryptedContent)
+                decryptedContent = withContext(Dispatchers.Default) {
+                    val normalized = encodeSingBoxJson(parseSingBoxJson(decryptedContent))
+                    SingBoxConfigChecker.check(normalized)
+                    normalized
                 }
             }
+
+            val hasProviders = !verifyConfiguration && containsMihomoProviders(decryptedContent)
 
             AndroidSubscriptionPreparation.Success(
                 content = decryptedContent,
                 subscriptionInfo = downloaded?.subscriptionInfo ?: SubscriptionInfo(),
-                etag = downloaded?.etag.orEmpty(),
-                lastModified = downloaded?.lastModified.orEmpty(),
+                etag = if (hasProviders) "" else downloaded?.etag.orEmpty(),
+                lastModified = if (hasProviders) "" else downloaded?.lastModified.orEmpty(),
                 remoteName = downloadedRawName,
             )
         } catch (error: CancellationException) {
@@ -143,6 +157,24 @@ internal class AndroidSubscriptionPreparer(
             )
         }
         }
+}
+
+internal suspend fun fetchMihomoProvider(
+    request: MihomoProviderRequest,
+    userAgent: String = DefaultUserAgent,
+    fetchOptions: AndroidSubscriptionFetchOptions = AndroidSubscriptionFetchOptions(),
+    installationHwid: String = "",
+): String {
+    val proxy = fetchOptions.toHttpProxy()
+    return runCancellableHttpRequest { track ->
+        val result = downloadSubscription(
+            track, request.url, userAgent,
+            fetchOptions.hwid.trim().ifBlank { installationHwid }, proxy,
+            etag = "", lastModified = "", headers = request.headers,
+        )
+        (result as? DownloadedSubscription.Content)?.content
+            ?: error("Provider returned no content")
+    }
 }
 
 private sealed interface DownloadedSubscription {
@@ -174,6 +206,7 @@ private fun downloadSubscription(
     proxy: AndroidSubscriptionProxy?,
     etag: String,
     lastModified: String,
+    headers: Map<String, List<String>> = emptyMap(),
 ): DownloadedSubscription {
     val url = URI(sourceUrl).toURL()
     val connection = (
@@ -196,6 +229,7 @@ private fun downloadSubscription(
         proxy?.basicAuthorizationOrNull()?.let { authorization ->
             connection.setRequestProperty("Proxy-Authorization", authorization)
         }
+        applySubscriptionRequestHeaders(connection, headers)
         val responseCode = connection.responseCode
         val responseEtag = connection.getHeaderField(EtagHeader).orEmpty().ifBlank { etag }
         val responseLastModified = connection
@@ -241,6 +275,18 @@ private fun downloadSubscription(
         )
     } finally {
         connection.disconnect()
+    }
+}
+
+internal fun applySubscriptionRequestHeaders(
+    connection: HttpURLConnection,
+    headers: Map<String, List<String>>,
+) {
+    headers.forEach { (name, values) ->
+        values.forEachIndexed { index, value ->
+            if (index == 0) connection.setRequestProperty(name, value)
+            else connection.addRequestProperty(name, value)
+        }
     }
 }
 

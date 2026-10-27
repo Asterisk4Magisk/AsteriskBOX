@@ -4,6 +4,7 @@
 package features.outbound
 
 import engine.singbox.config.SingBoxJson
+import engine.singbox.config.SingBoxImportJson
 import features.importing.ImportFormat
 import features.importing.ImportIssue
 import features.importing.ImportIssueReason
@@ -66,7 +67,7 @@ private fun canonicalProxyUrlOutboundType(scheme: String): String =
         "http", "https" -> "http"
         "socks", "socks4", "socks4a", "socks5", "socks5h" -> "socks"
         "hy1" -> "hysteria"
-        "hy2" -> "hysteria2"
+        "hy2", "hysteria2+realm", "hysteria2+realm+http" -> "hysteria2"
         "naive", "naive+https", "naive+quic" -> "naive"
         else -> scheme.lowercase()
     }
@@ -115,7 +116,7 @@ private val NaiveUrlQueryParameters = setOf(
  * sing-box JSON, Mihomo YAML, then conventional proxy URLs.
  */
 internal object OutboundImportPipeline {
-    fun parse(
+    suspend fun parse(
         content: String,
         jsonFormatter: SingBoxOutboundConfigFormatter =
             LibboxSingBoxOutboundConfigFormatter,
@@ -132,10 +133,11 @@ internal object OutboundImportPipeline {
         )
     }
 
-    fun parseOutcome(
+    suspend fun parseOutcome(
         content: String,
         jsonFormatter: SingBoxOutboundConfigFormatter =
             LibboxSingBoxOutboundConfigFormatter,
+        providerContext: MihomoProviderImportContext = MihomoProviderImportContext(),
     ): ImportOutcome<ImportedSingBoxOutbound> {
         require(content.isNotBlank()) { "Outbound import content is empty" }
         requireImportTextWithinLimit(content)
@@ -148,7 +150,9 @@ internal object OutboundImportPipeline {
         candidates.forEach { candidate ->
             if (candidate.isJsonDocument()) {
                 return runCatching {
-                    SingBoxOutboundImporter.parseImportOutcome(candidate, jsonFormatter)
+                    providerContext.options.fold(SingBoxOutboundImporter.parseImportOutcome(candidate, jsonFormatter)) { result, options ->
+                        options.apply(result)
+                    }
                 }.getOrElse {
                     invalidRecognizedOutboundDocument(
                         format = OutboundImportFormat.JSON,
@@ -158,23 +162,32 @@ internal object OutboundImportPipeline {
             }
         }
         candidates.forEach { candidate ->
-            MihomoYamlOutboundParser.parseOutcomeOrNull(candidate)?.let { return it }
+            MihomoYamlOutboundParser.parseOutcomeOrNull(candidate, jsonFormatter, providerContext)?.let { return it }
         }
         candidates.forEach { candidate ->
-            ProxyUrlOutboundParser.parseOutcomeOrNull(candidate)?.let { return it }
+            ProxyUrlOutboundParser.parseOutcomeOrNull(candidate)?.let { parsed ->
+                return providerContext.options.fold(parsed) { result, options -> options.apply(result) }
+            }
         }
         throw IllegalArgumentException("No supported proxy outbounds found")
     }
 }
 
 private fun String.isJsonDocument(): Boolean =
-    runCatching { SingBoxJson.parseToJsonElement(this) }
+    runCatching { SingBoxImportJson.parseToJsonElement(this) }
         .getOrNull()
         .let { element -> element is JsonObject || element is JsonArray } ||
         looksLikeJsonContainer()
 
 private fun String.looksLikeJsonContainer(): Boolean {
-    val trimmed = trimStart()
+    var trimmed = trimStart()
+    while (trimmed.startsWith("//") || trimmed.startsWith("/*")) {
+        val end = if (trimmed.startsWith("//")) trimmed.indexOf('\n') else {
+            trimmed.indexOf("*/", 2).takeIf { it >= 0 }?.plus(2) ?: -1
+        }
+        if (end < 0) return false
+        trimmed = trimmed.substring(end).trimStart()
+    }
     if (trimmed.firstOrNull() == '{') return true
     if (trimmed.firstOrNull() != '[') return false
     val nextToken = trimmed.drop(1).firstOrNull { character -> !character.isWhitespace() }
@@ -200,10 +213,13 @@ private fun invalidRecognizedOutboundDocument(
     ),
 )
 
-private object MihomoYamlOutboundParser {
-    private val loader = Load(LoadSettings.builder().build())
-
-    fun parseOutcomeOrNull(content: String): ImportOutcome<ImportedSingBoxOutbound>? {
+internal object MihomoYamlOutboundParser {
+    suspend fun parseOutcomeOrNull(
+        content: String,
+        jsonFormatter: SingBoxOutboundConfigFormatter,
+        providerContext: MihomoProviderImportContext,
+    ): ImportOutcome<ImportedSingBoxOutbound>? {
+        val loader = Load(LoadSettings.builder().build())
         val loaded = runCatching { loader.loadFromString(content) as? Map<*, *> }
         val root = loaded.getOrNull() ?: return if (MihomoProxiesHeader.containsMatchIn(content)) {
             invalidRecognizedOutboundDocument(
@@ -213,12 +229,21 @@ private object MihomoYamlOutboundParser {
         } else {
             null
         }
-        if ("proxies" !in root) return null
-        val proxies = root["proxies"] as? List<*>
+        if ("proxies" !in root && "proxy-providers" !in root) return null
+        val proxies = if ("proxies" !in root) emptyList<Any>() else root["proxies"] as? List<*>
             ?: return invalidRecognizedOutboundDocument(
                 format = OutboundImportFormat.YAML,
                 message = "Mihomo YAML proxies must be a list",
             )
+        return importMihomoProviders(root, parseProxies(proxies, providerContext.options), jsonFormatter, providerContext)
+    }
+
+    fun parseProxies(
+        source: List<*>,
+        options: List<MihomoProviderOptions> = emptyList(),
+    ): ImportOutcome<ImportedSingBoxOutbound> {
+        requireImportCandidateCount(source.size)
+        val proxies = options.fold(source) { nodes, option -> option.applyToYaml(nodes) }
         try {
             requireImportCandidateCount(proxies.size)
         } catch (_: ImportLimitException) {
@@ -312,7 +337,7 @@ private object MihomoYamlOutboundParser {
         ) return null
         if (type == "trojan" && map("ss-opts").bool("enabled")) return null
         if (type == "tuic" && string("token").isNotBlank()) return null
-        if (string("fingerprint").isNotBlank()) return null
+        if (string("fingerprint").isNotBlank() && type !in TlsCapableOutboundTypes) return null
         if (
             listOf("shadow-tls-opts", "restls-opts", "jls-opts", "tlsmirror-opts")
                 .any { option -> map(option).isNotEmpty() }
@@ -322,15 +347,7 @@ private object MihomoYamlOutboundParser {
         if (realityOptions.isNotEmpty() && realityOptions.string("public-key").isBlank()) return null
         val ipVersion = string("ip-version").lowercase()
         if (ipVersion.isNotBlank() && ipVersion != "dual") return null
-        val nameCertVerify = string("name-cert-verify")
-        val configuredServerName = string("servername").ifBlank { string("sni") }
-        if (
-            nameCertVerify.isNotBlank() &&
-            !nameCertVerify.equals(
-                configuredServerName.ifBlank { server },
-                ignoreCase = true,
-            )
-        ) return null
+        if (string("fingerprint").isNotBlank() && realityOptions.isNotEmpty()) return null
         if (type == "naive" && hasUnsupportedNaiveTlsOptions()) return null
         val certificate = string("certificate")
         val privateKey = string("private-key")
@@ -608,7 +625,6 @@ private object MihomoYamlOutboundParser {
     private fun buildTls(proxy: Map<*, *>, type: String): JsonObject? {
         val serverName = proxy.string("servername")
             .ifBlank { proxy.string("sni") }
-            .ifBlank { proxy.string("name-cert-verify") }
         val enabled = proxy.bool("tls") ||
             proxy.string("security").let { security ->
                 security.equals("tls", ignoreCase = true) ||
@@ -630,6 +646,10 @@ private object MihomoYamlOutboundParser {
         return buildJsonObject {
             put("enabled", true)
             putNotBlank("server_name", serverName)
+            putNotBlank("certificate_server_name", proxy.string("name-cert-verify"))
+            proxy.string("fingerprint").takeIf(String::isNotBlank)?.let {
+                put("certificate_pin_sha256", normalizeCertificateFingerprint(it))
+            }
             putIfTrue("insecure", insecure)
             putIfTrue("disable_sni", disableSni)
             val alpn = proxy.stringList("alpn")
@@ -724,12 +744,14 @@ private object MihomoYamlOutboundParser {
                     options.headers()?.let { put("headers", it) }
                 }
                 "ws" -> {
-                    putNotBlank("path", options.string("path"))
+                    val (path, pathEarlyData) = extractWebSocketPathEarlyData(options.string("path"))
+                    val hasPathEarlyData = path != options.string("path")
+                    putNotBlank("path", path)
                     options.headers()?.let { put("headers", it) }
-                    putPositive("max_early_data", options.int("max-early-data"))
+                    putPositive("max_early_data", if (hasPathEarlyData) pathEarlyData else options.int("max-early-data"))
                     putNotBlank(
                         "early_data_header_name",
-                        options.string("early-data-header-name"),
+                        if (hasPathEarlyData) "Sec-WebSocket-Protocol" else options.string("early-data-header-name"),
                     )
                 }
                 "grpc" -> {
@@ -767,6 +789,7 @@ private object MihomoYamlOutboundParser {
                 "servername",
                 "sni",
                 "name-cert-verify",
+                "fingerprint",
                 "client-fingerprint",
                 "certificate",
             ).any { key -> string(key).isNotBlank() } ||
@@ -799,7 +822,7 @@ private object MihomoYamlOutboundParser {
 
 private object ProxyUrlOutboundParser {
     private val urlPattern = Regex(
-        """(?i)(?:socks(?:4a?|5h?)?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2|hy2|anytls|snell|ssh|tor|naive(?:\+(?:https|quic))?|wg|wireguard|awg|warp)://[^\s<>"']+""",
+        """(?i)(?:socks(?:4a?|5h?)?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2(?:\+realm(?:\+http)?)?|hy2|anytls|snell|ssh|tor|naive(?:\+(?:https|quic))?|wg|wireguard|awg|warp)://[^\s<>"']+""",
     )
 
     fun parseOutcomeOrNull(content: String): ImportOutcome<ImportedSingBoxOutbound>? {
@@ -884,6 +907,9 @@ private object ProxyUrlOutboundParser {
             return parseLegacyVmess(link, index)
         }
         if (scheme == "ss") return parseShadowsocks(link, index)
+        if (scheme == "hysteria2+realm" || scheme == "hysteria2+realm+http") {
+            return parseHysteria2Realm(link, index)
+        }
         val hopping = parsePortHoppingAuthority(link, scheme)
         val uri = URI(hopping?.normalizedLink ?: link)
         val query = parseQuery(uri.rawQuery)
@@ -931,9 +957,10 @@ private object ProxyUrlOutboundParser {
                 .any { key -> query.first(key).isNotBlank() }
         ) return null
         if (
-            listOf("pinSHA256", "pcs", "vcn", "pqv", "fm")
+            listOf("pcs", "pqv", "fm")
                 .any { key -> query.first(key).isNotBlank() }
         ) return null
+        if (query.first("pinSHA256").isNotBlank() && type != "hysteria2") return null
         if (type == "naive") validateNaiveUrlOptions(query)
         val security = query.first("security", "tls")
         val tlsEnabled = scheme == "https" ||
@@ -968,6 +995,8 @@ private object ProxyUrlOutboundParser {
                 "short-id",
                 "short_id",
                 "ech",
+                "vcn",
+                "pinSHA256",
             ).any { key -> query.values(key).isNotEmpty() }
         if (type !in TlsCapableOutboundTypes && (tlsEnabled || tlsOptionsPresent)) return null
         if (type in TlsCapableOutboundTypes && tlsOptionsPresent && !tlsEnabled) return null
@@ -985,16 +1014,13 @@ private object ProxyUrlOutboundParser {
             }
         ) return null
         if (type in setOf("vmess", "vless") && credentials.first.isBlank()) return null
-        val queryServerPorts = if (type == "hysteria2") {
-            normalizePortRanges(query.first("mport"))
-        } else {
-            emptyList()
-        }
-        if (type == "hysteria2" &&
-            query.first("mport").isNotBlank() &&
-            queryServerPorts.isEmpty()
-        ) return null
-        val serverPorts = hopping?.serverPorts ?: queryServerPorts
+        // Match NG: presence (including an empty value) wins over lower-priority sources.
+        val selectedPorts = query["mport"]?.firstOrNull() ?: query["ports"]?.firstOrNull()
+        val serverPorts = if (type == "hysteria2" && selectedPorts != null) {
+            if (selectedPorts.isBlank()) emptyList() else normalizeHysteria2Ports(selectedPorts).also {
+                require(it.isNotEmpty()) { "Invalid Hysteria2 port hopping range" }
+            }
+        } else hopping?.serverPorts.orEmpty()
         val tag = decodeComponent(uri.rawFragment).ifBlank { "$type-${index + 1}" }
         return buildJsonObject {
             put("type", type)
@@ -1149,6 +1175,45 @@ private object ProxyUrlOutboundParser {
         }
     }
 
+    private fun parseHysteria2Realm(link: String, index: Int): JsonObject {
+        val uri = URI(link)
+        require(!uri.host.isNullOrBlank() && (uri.port == -1 || uri.port in 1..65535)) {
+            "Invalid Hysteria2 Realm rendezvous address"
+        }
+        val realmId = decodeComponent(uri.rawPath.orEmpty().removePrefix("/"))
+        require(realmId.isNotBlank()) { "Hysteria2 Realm name is required" }
+        val query = parseQuery(uri.rawQuery)
+        // The pinned core has no configurable local UDP port for Realm connections.
+        require(query["lport"] == null || query["lport"]?.singleOrNull() == "0") {
+            "Hysteria2 Realm local port is not supported by this core"
+        }
+        require(query.first("mport", "ports").isBlank()) { "Hysteria2 Realm does not use port hopping" }
+        val obfs = query.first("obfs")
+        require(obfs.isBlank() || obfs in setOf("salamander", "gecko")) { "Unsupported Hysteria2 obfuscation" }
+        val rendezvousScheme = if (uri.scheme.equals("hysteria2+realm+http", true)) "http" else "https"
+        val serverUrl = URI(rendezvousScheme, null, uri.host, uri.port, null, null, null).toASCIIString()
+        return buildJsonObject {
+            put("type", "hysteria2")
+            put("tag", decodeComponent(uri.rawFragment).ifBlank { "hysteria2-${index + 1}" })
+            putNotBlank("password", query.first("auth"))
+            put("realm", buildJsonObject {
+                put("server_url", serverUrl)
+                put("realm_id", realmId)
+                putNotBlank("token", decodeComponent(uri.rawUserInfo))
+                query.values("stun").takeIf(List<String>::isNotEmpty)?.let { servers ->
+                    put("stun_servers", JsonArray(servers.map(::JsonPrimitive)))
+                }
+            })
+            if (obfs.isNotBlank() || query.first("obfs-password").isNotBlank()) {
+                put("obfs", buildJsonObject {
+                    putNotBlank("type", obfs)
+                    putNotBlank("password", query.first("obfs-password"))
+                })
+            }
+            put("tls", checkNotNull(buildUrlTls("hysteria2", uri.scheme, query)))
+        }
+    }
+
     private fun parseLegacyVmess(link: String, index: Int): JsonObject {
         val encoded = link.substringAfter("://").substringBefore('#')
         val decoded = decodeBase64(encoded)
@@ -1298,6 +1363,14 @@ private object ProxyUrlOutboundParser {
         return buildJsonObject {
             put("enabled", true)
             putNotBlank("server_name", serverName)
+            putNotBlank("certificate_server_name", query.first("vcn"))
+            if (type == "hysteria2") {
+                query.first("pinSHA256").takeIf(String::isNotBlank)?.let { fingerprint ->
+                    val hex = normalizeCertificateFingerprint(fingerprint)
+                    val bytes = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+                    put("certificate_sha256", JsonArray(listOf(JsonPrimitive(Base64.Default.encode(bytes)))))
+                }
+            }
             putIfTrue("insecure", insecure)
             query.values("alpn")
                 .flatMap { value -> value.split(',') }
@@ -1448,7 +1521,7 @@ private fun decodeBase64Payload(content: String): String? {
     }
 }
 
-private val MihomoProxiesHeader = Regex("""(?m)^\s*proxies\s*:""", RegexOption.IGNORE_CASE)
+private val MihomoProxiesHeader = Regex("""(?m)^\s*(?:proxies|proxy-providers)\s*:""", RegexOption.IGNORE_CASE)
 
 internal fun decodeBase64ImportPayload(
     value: String,
@@ -1528,7 +1601,7 @@ private fun extractWebSocketPathEarlyData(path: String): Pair<String, Int> {
     val earlyDataPart = parts.firstOrNull { decodeComponent(it.substringBefore('=')) == "ed" }
         ?: return path to 0
     val earlyData = decodeComponent(earlyDataPart.substringAfter('=', "")).toIntOrNull()
-        ?.takeIf { it > 0 } ?: return path to 0
+        ?: return path to 0
     val remaining = parts.filterNot { decodeComponent(it.substringBefore('=')) == "ed" }
     val cleanPath = path.substring(0, queryIndex) +
         (if (remaining.isEmpty()) "" else "?" + remaining.joinToString("&")) +
@@ -1562,19 +1635,24 @@ private fun parsePortHoppingAuthority(link: String, scheme: String): PortHopping
     val authority = link.substring(authorityStart, authorityEnd)
     val userInfo = authority.substringBeforeLast('@', "")
     val endpoint = authority.substringAfterLast('@')
-    val host = if (endpoint.startsWith('[')) {
-        endpoint.substringBefore(']') + "]"
+    val separator = if (endpoint.startsWith('[')) {
+        val hostEnd = endpoint.indexOf(']')
+        require(hostEnd > 0) { "Invalid Hysteria2 IPv6 address" }
+        when {
+            hostEnd == endpoint.lastIndex -> -1
+            endpoint[hostEnd + 1] == ':' -> hostEnd + 1
+            else -> error("Invalid Hysteria2 endpoint")
+        }
     } else {
-        endpoint.substringBefore(':')
+        require(endpoint.count { it == ':' } <= 1) { "Hysteria2 IPv6 addresses must use brackets" }
+        endpoint.indexOf(':')
     }
-    val portList = if (endpoint.startsWith('[')) {
-        endpoint.substringAfter(']', "").removePrefix(":")
-    } else {
-        endpoint.substringAfter(':', "")
-    }
+    if (separator < 0) return null
+    val host = endpoint.substring(0, separator)
+    val portList = endpoint.substring(separator + 1)
+    val serverPorts = normalizeHysteria2Ports(portList)
+    require(serverPorts.isNotEmpty()) { "Invalid Hysteria2 port hopping range" }
     if (',' !in portList && '-' !in portList) return null
-    val serverPorts = normalizePortRanges(portList)
-    if (serverPorts.isEmpty()) return null
     val firstPort = serverPorts.firstOrNull()
         ?.substringBefore(':')
         ?.toIntOrNull()
@@ -1588,6 +1666,19 @@ private fun parsePortHoppingAuthority(link: String, scheme: String): PortHopping
         normalizedLink = link.replaceRange(authorityStart, authorityEnd, normalizedAuthority),
         serverPorts = serverPorts,
     )
+}
+
+private fun normalizeHysteria2Ports(value: String): List<String> {
+    if (value.isBlank()) return emptyList()
+    val items = value.split(',').map(String::trim)
+    if (items.any { !it.matches(Regex("[0-9]+(?:-[0-9]+)?")) }) return emptyList()
+    return normalizePortRanges(items.joinToString(","))
+}
+
+internal fun normalizeCertificateFingerprint(value: String): String {
+    val hex = value.trim().replace(":", "").lowercase()
+    require(hex.matches(Regex("[0-9a-f]{64}"))) { "Invalid SHA-256 certificate fingerprint" }
+    return hex
 }
 
 private fun splitUserInfo(
@@ -1762,6 +1853,10 @@ private fun Map<*, *>.hasUnsupportedNaiveTlsOptions(): Boolean {
         bool("skip-cert-verify") ||
         bool("disable-sni") ||
         string("client-fingerprint").isNotBlank() ||
+        string("fingerprint").isNotBlank() ||
+        string("name-cert-verify").let { name ->
+            name.isNotBlank() && !name.equals(string("servername").ifBlank { string("sni") }.ifBlank { string("server") }, true)
+        } ||
         stringList("alpn").isNotEmpty() ||
         map("reality-opts").isNotEmpty() ||
         string("certificate").isNotBlank() ||
@@ -1909,7 +2004,7 @@ private fun String.asSecondsDuration(): String {
     return if (any(Char::isLetter)) this else "${this}s"
 }
 
-private fun bandwidthMbps(value: Any?): Int {
+internal fun bandwidthMbps(value: Any?): Int {
     if (value is Number) return value.toInt().coerceAtLeast(0)
     val text = value?.toString()?.trim().orEmpty()
     text.toIntOrNull()?.let { return it.coerceAtLeast(0) }

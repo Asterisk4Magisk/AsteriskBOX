@@ -22,7 +22,7 @@ internal fun parseSubscriptionDeepLink(value: String): SubscriptionInstallConfig
     val host = uri.host?.lowercase() ?: return null
     val userAgent = when (scheme) {
         "clash", "clashmeta" -> {
-            if (host != "install-config") return null
+            if (host !in setOf("install-config", "install-sub")) return null
             ClashMetaSubscriptionUserAgent
         }
         "v2rayng" -> {

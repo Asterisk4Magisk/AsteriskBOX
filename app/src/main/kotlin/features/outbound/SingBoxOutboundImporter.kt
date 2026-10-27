@@ -13,6 +13,7 @@ import engine.singbox.config.APP_DIRECT_OUTBOUND
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.config.SingBoxDeprecatedConfigValidator
 import engine.singbox.config.SingBoxJson
+import engine.singbox.config.SingBoxImportJson
 import engine.singbox.config.parseSingBoxJson
 import features.importing.ImportIssue
 import features.importing.ImportIssueReason
@@ -48,7 +49,7 @@ internal object SingBoxOutboundImporter {
         formatter: SingBoxOutboundConfigFormatter = LibboxSingBoxOutboundConfigFormatter,
     ): ImportOutcome<ImportedSingBoxOutbound> {
         require(content.isNotBlank()) { "Outbound import content is empty" }
-        val element = SingBoxJson.parseToJsonElement(content)
+        val element = SingBoxImportJson.parseToJsonElement(content)
         val mutations = mutableListOf<ImportMutation>()
         val outbounds = when (element) {
             is JsonObject -> {
