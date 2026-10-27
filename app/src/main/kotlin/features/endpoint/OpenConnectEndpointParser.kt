@@ -3,6 +3,7 @@
 
 package features.endpoint
 
+import utils.requireIntIn
 import engine.singbox.config.SingBoxJson
 import features.importing.ImportIssue
 import features.importing.ImportIssueReason
@@ -86,11 +87,11 @@ private fun parseOpenConnect(content: String): ImportOutcome<ImportedSingBoxEndp
     val formEntries = options.filter { it.first == "form-entry" }.map { (_, value) ->
         parseOpenConnectFormEntry(value)
     }
-    val fingerprints = options.filter { it.first == "servercert" }
+    val fingerprints = options.asSequence().filter { it.first == "servercert" }
         .flatMap { it.second.split(',') }
         .map(String::trim)
         .filter(String::isNotBlank)
-        .map(::normalizeOpenConnectFingerprint)
+        .map(::normalizeOpenConnectFingerprint).toList()
     val tls = buildJsonObject {
         if (present("no-cert-check")) put("insecure", true)
         last("sni")?.let { put("server_name", it) }
@@ -121,8 +122,8 @@ private fun parseOpenConnect(content: String): ImportOutcome<ImportedSingBoxEndp
         if (present("pfs")) put("pfs", true)
         if (present("disable-ipv6")) put("ipv6_disabled", true)
         if (present("allow-insecure-crypto")) put("allow_insecure_crypto", true)
-        last("mtu")?.toIntIn("OpenConnect MTU", 1, 65_535)?.let { put("mtu", it) }
-        last("base-mtu")?.toIntIn("OpenConnect base MTU", 1, 65_535)
+        last("mtu")?.requireIntIn("OpenConnect MTU", 1, 65_535)?.let { put("mtu", it) }
+        last("base-mtu")?.requireIntIn("OpenConnect base MTU", 1, 65_535)
             ?.let { put("base_mtu", it) }
         last("dpd")?.secondsDuration("OpenConnect DPD")
             ?.let { put("dpd_interval", it) }
@@ -220,15 +221,9 @@ private fun String.requireHexFingerprint(prefix: String, maximumLength: Int): St
 }
 
 private fun String?.toBooleanOption(): Boolean =
-    this == null || isBlank() || lowercase() in setOf("1", "true", "yes", "on")
+    isNullOrBlank() || lowercase() in setOf("1", "true", "yes", "on")
 
-private fun String.toPortOrNull(label: String): Int = toIntIn(label, 1, 65_535)
-
-private fun String.toIntIn(label: String, minimum: Int, maximum: Int): Int {
-    val parsed = toIntOrNull()
-    require(parsed != null && parsed in minimum..maximum) { "$label is invalid" }
-    return parsed
-}
+private fun String.toPortOrNull(label: String): Int = requireIntIn(label, 1, 65_535)
 
 private fun String.secondsDuration(label: String): String {
     val seconds = toLongOrNull()

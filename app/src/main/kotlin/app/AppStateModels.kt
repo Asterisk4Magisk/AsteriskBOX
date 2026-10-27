@@ -197,6 +197,11 @@ const val SingBoxRouteRuleLogicalModeOr = "or"
 val SingBoxRouteNetworkStrategies = listOf("default", "hybrid", "fallback")
 val SingBoxRouteNetworkTypes = listOf("wifi", "cellular", "ethernet", "other")
 
+internal fun List<String>.sanitizedRouteNetworkTypes(): List<String> {
+    val selected = map { value -> value.trim().lowercase() }.toSet()
+    return SingBoxRouteNetworkTypes.filter(selected::contains)
+}
+
 @Stable
 @Serializable
 data class SingBoxRouteRuleState(

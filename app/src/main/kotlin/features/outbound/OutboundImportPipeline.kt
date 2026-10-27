@@ -3,6 +3,7 @@
 
 package features.outbound
 
+import utils.decodePaddedBase64OrNull
 import engine.singbox.config.SingBoxJson
 import engine.singbox.config.SingBoxImportJson
 import features.importing.ImportFormat
@@ -25,8 +26,7 @@ import kotlinx.serialization.json.put
 import org.snakeyaml.engine.v2.api.Load
 import org.snakeyaml.engine.v2.api.LoadSettings
 import java.net.URI
-import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
+import utils.decodeUrlComponentPreservingPlus
 import kotlin.io.encoding.Base64
 
 internal enum class OutboundImportFormat(
@@ -1527,11 +1527,7 @@ internal fun decodeBase64ImportPayload(
     value: String,
     maxDecodedBytes: Int = MaxImportBytes,
 ): String? {
-    val compact = value.trim().filterNot(Char::isWhitespace)
-    val padded = compact + "=".repeat((4 - compact.length % 4) % 4)
-    return sequenceOf(Base64.UrlSafe, Base64.Default).firstNotNullOfOrNull { decoder ->
-        runCatching { decoder.decode(padded) }.getOrNull()
-    }?.let { decoded ->
+    return value.decodePaddedBase64OrNull()?.let { decoded ->
         if (decoded.size > maxDecodedBytes) {
             throw ImportLimitException(
                 reason = ImportIssueReason.INPUT_TOO_LARGE,
@@ -1542,15 +1538,8 @@ internal fun decodeBase64ImportPayload(
     }
 }
 
-private fun decodeBase64(value: String): String? {
-    val compact = value.trim().filterNot(Char::isWhitespace)
-    val padded = compact + "=".repeat((4 - compact.length % 4) % 4)
-    return sequenceOf(Base64.UrlSafe, Base64.Default).firstNotNullOfOrNull { decoder ->
-        runCatching {
-            decoder.decode(padded).decodeToString()
-        }.getOrNull()
-    }
-}
+private fun decodeBase64(value: String): String? =
+    value.decodePaddedBase64OrNull()?.decodeToString()
 
 private data class IndexedProxyLink(
     val sourceIndex: Int,
@@ -1744,9 +1733,7 @@ private fun String.isHttpHeaderName(): Boolean =
 
 private fun decodeComponent(value: String?): String {
     if (value.isNullOrBlank()) return ""
-    return runCatching {
-        URLDecoder.decode(value.replace("+", "%2B"), StandardCharsets.UTF_8.name())
-    }.getOrDefault(value)
+    return value.decodeUrlComponentPreservingPlus()
 }
 
 private fun JsonObject.string(name: String): String =

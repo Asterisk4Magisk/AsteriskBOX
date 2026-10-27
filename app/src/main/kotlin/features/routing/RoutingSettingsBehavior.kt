@@ -3,9 +3,9 @@
 
 package features.routing
 
+import app.sanitizedRouteNetworkTypes
 import app.AppState
 import app.SingBoxRouteNetworkStrategies
-import app.SingBoxRouteNetworkTypes
 import engine.singbox.isNonNegativeSingBoxDuration
 
 internal data class RoutingSettingsDraft(
@@ -64,9 +64,4 @@ internal fun AppState.withRoutingSettings(draft: RoutingSettingsDraft): AppState
         routeDefaultFallbackDelay = sanitized.routeDefaultFallbackDelay,
         routeFindProcess = sanitized.routeFindProcess,
     )
-}
-
-private fun List<String>.sanitizedRouteNetworkTypes(): List<String> {
-    val selected = map { value -> value.trim().lowercase() }.toSet()
-    return SingBoxRouteNetworkTypes.filter(selected::contains)
 }

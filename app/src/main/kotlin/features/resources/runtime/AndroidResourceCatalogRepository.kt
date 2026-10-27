@@ -3,6 +3,7 @@
 
 package features.resources.runtime
 
+import engine.network.withProxyAuthenticator
 import features.resources.ResourceCatalogEntry
 import features.resources.ResourceCatalogSource
 import features.resources.ResourceFileUpdateOptions
@@ -46,7 +47,7 @@ internal object AndroidResourceCatalogTextFetcher : ResourceCatalogTextFetcher {
     ): String = withContext(Dispatchers.IO) {
         val coroutineContext = currentCoroutineContext()
         val proxy = options.toHttpProxy()
-        proxy.withAuthenticator {
+        proxy.withProxyAuthenticator {
             val connection = URI.create(url).toHttpConnection(proxy, headers)
             val cancellationHandle = coroutineContext[Job]?.invokeOnCompletion { cause ->
                 if (cause is CancellationException) connection.disconnect()

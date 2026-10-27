@@ -19,3 +19,8 @@ internal fun String.toIntInRangeOrDefault(range: IntRange, default: Int): Int {
     return toIntInRangeOrNull(range) ?: default
 }
 
+internal fun String.requireIntIn(label: String, minimum: Int, maximum: Int): Int {
+    val parsed = toIntOrNull()
+    require(parsed != null && parsed in minimum..maximum) { "$label is invalid" }
+    return parsed
+}

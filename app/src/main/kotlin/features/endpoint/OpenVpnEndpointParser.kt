@@ -3,6 +3,7 @@
 
 package features.endpoint
 
+import utils.requireIntIn
 import engine.singbox.config.SingBoxJson
 import features.importing.ImportIssue
 import features.importing.ImportIssueReason
@@ -98,7 +99,7 @@ private fun parseOpenVpn(content: String): ImportOutcome<ImportedSingBoxEndpoint
     val servers = remotes.map { remote ->
         require(remote.arguments.size in 1..3) { "OpenVPN remote is malformed" }
         val port = remote.arguments.getOrNull(1)
-            ?.toIntIn("OpenVPN remote port", 1, 65_535)
+            ?.requireIntIn("OpenVPN remote port", 1, 65_535)
             ?: 1194
         require(port in 1..65_535) { "OpenVPN remote port is invalid" }
         val network = remote.arguments.getOrNull(2)
@@ -290,7 +291,7 @@ private fun parseOpenVpn(content: String): ImportOutcome<ImportedSingBoxEndpoint
             }
             put(
                 "explicit_exit_notify",
-                item.arguments.singleOrNull()?.toIntIn("OpenVPN explicit-exit-notify", 0, Int.MAX_VALUE)
+                item.arguments.singleOrNull()?.requireIntIn("OpenVPN explicit-exit-notify", 0, Int.MAX_VALUE)
                     ?: 1,
             )
         }
@@ -394,13 +395,7 @@ private fun OpenVpnDirective.singleInt(
     label: String,
     minimum: Int,
     maximum: Int,
-): Int = singleArgument(label).toIntIn(label, minimum, maximum)
-
-private fun String.toIntIn(label: String, minimum: Int, maximum: Int): Int {
-    val parsed = toIntOrNull()
-    require(parsed != null && parsed in minimum..maximum) { "$label is invalid" }
-    return parsed
-}
+): Int = singleArgument(label).requireIntIn(label, minimum, maximum)
 
 private fun List<String>.toSingleJsonStringArray(): JsonArray =
     JsonArray(

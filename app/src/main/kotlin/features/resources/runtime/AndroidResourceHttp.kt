@@ -4,23 +4,21 @@
 package features.resources.runtime
 
 import app.ProjectInfo
+import engine.network.ProxyCredentials
 import engine.network.isPort
+import engine.network.toSocksProxy
 import engine.proxy.LocalProxyLoopbackAddress
 import engine.proxy.LocalProxyRuntime
 import features.resources.ResourceFileUpdateOptions
-import java.net.Authenticator
 import java.net.HttpURLConnection
-import java.net.InetSocketAddress
-import java.net.PasswordAuthentication
-import java.net.Proxy
 import java.net.URI
 
 internal data class AndroidResourceHttpProxy(
-    val host: String,
-    val port: Int,
-    val username: String,
-    val password: String,
-)
+    override val host: String,
+    override val port: Int,
+    override val username: String,
+    override val password: String,
+) : ProxyCredentials
 
 internal fun ResourceFileUpdateOptions.toHttpProxy(): AndroidResourceHttpProxy? {
     if (!useRunningProxy) return null
@@ -43,7 +41,7 @@ internal fun URI.toHttpConnection(
     val connection = if (proxy == null) {
         toURL().openConnection()
     } else {
-        toURL().openConnection(proxy.toJavaProxy())
+        toURL().openConnection(proxy.toSocksProxy())
     }
     return (connection as HttpURLConnection).apply {
         connectTimeout = 15_000
@@ -55,30 +53,4 @@ internal fun URI.toHttpConnection(
     }
 }
 
-internal inline fun <T> AndroidResourceHttpProxy?.withAuthenticator(block: () -> T): T {
-    if (this == null || username.isBlank()) return block()
-    synchronized(ProxyAuthenticatorLock) {
-        Authenticator.setDefault(toAuthenticator())
-        return try {
-            block()
-        } finally {
-            Authenticator.setDefault(null)
-        }
-    }
-}
-
-private fun AndroidResourceHttpProxy.toJavaProxy(): Proxy {
-    return Proxy(Proxy.Type.SOCKS, InetSocketAddress(host, port))
-}
-
-private fun AndroidResourceHttpProxy.toAuthenticator(): Authenticator {
-    return object : Authenticator() {
-        override fun getPasswordAuthentication(): PasswordAuthentication? {
-            if (requestingHost != host || requestingPort != port) return null
-            return PasswordAuthentication(username, password.toCharArray())
-        }
-    }
-}
-
-private val ProxyAuthenticatorLock = Any()
 private const val ResourceFileDefaultUserAgent = "${ProjectInfo.PROJECT_NAME}/v${ProjectInfo.VERSION_NAME}"

@@ -23,3 +23,10 @@ internal fun String.decodeBase64StringOrNull(): String? {
     return decodeBase64OrNull()?.toString(Charsets.UTF_8)
 }
 
+internal fun String.decodePaddedBase64OrNull(): ByteArray? {
+    val compact = trim().filterNot(Char::isWhitespace)
+    val padded = compact + "=".repeat((4 - compact.length % 4) % 4)
+    return sequenceOf(Base64.UrlSafe, Base64.Default).firstNotNullOfOrNull { decoder ->
+        runCatching { decoder.decode(padded) }.getOrNull()
+    }
+}

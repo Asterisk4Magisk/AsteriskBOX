@@ -3,6 +3,7 @@
 
 package engine.singbox.config
 
+import app.sanitizedRouteNetworkTypes
 import android.content.Context
 import app.AppState
 import app.DefaultSingBoxUrlTestUrl
@@ -16,7 +17,6 @@ import app.ManagedRootInboundTag
 import app.ManagedTunInboundTag
 import app.OutboundState
 import app.SingBoxRouteNetworkStrategies
-import app.SingBoxRouteNetworkTypes
 import app.SingBoxRouteRuleActionReject
 import app.SingBoxRouteRuleLogicalModeOr
 import app.SingBoxRouteRuleState
@@ -891,11 +891,6 @@ private val ManagedRouteSettingKeys = setOf(
     "default_fallback_delay",
     "find_process",
 )
-
-private fun List<String>.sanitizedRouteNetworkTypes(): List<String> {
-    val selected = map { value -> value.trim().lowercase() }.toSet()
-    return SingBoxRouteNetworkTypes.filter(selected::contains)
-}
 
 internal fun SingBoxRouteRuleState.hasLegacyRouteModeMatcher(): Boolean =
     if (type == SingBoxRouteRuleTypeLogical) {

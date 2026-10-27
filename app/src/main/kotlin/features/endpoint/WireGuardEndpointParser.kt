@@ -3,6 +3,7 @@
 
 package features.endpoint
 
+import utils.requireIntIn
 import engine.singbox.config.SingBoxJson
 import features.importing.ImportIssue
 import features.importing.ImportIssueReason
@@ -15,7 +16,7 @@ import features.importing.MaxImportBytes
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.URI
-import java.net.URLDecoder
+import utils.decodeUrlComponentPreservingPlusStrict
 import kotlin.io.encoding.Base64
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -86,7 +87,7 @@ internal object WireGuardEndpointParser {
             "AmneziaWG URL options are not supported"
         }
         val privateKey = query.firstValue("privatekey", "pk")
-            ?: uri.rawUserInfo?.substringBefore(':')?.percentDecodedOnce()
+            ?: uri.rawUserInfo?.substringBefore(':')?.decodeUrlComponentPreservingPlusStrict()
         val publicKey = query.firstValue(
             "publickey",
             "peerpublickey",
@@ -118,7 +119,7 @@ internal object WireGuardEndpointParser {
         val workers = query.firstValue("workers")
             ?.requireIntIn("WireGuard worker count", 1, Int.MAX_VALUE)
         val reserved = query.firstValue("reserved")?.let(::parseReservedBytes)
-        val remarks = uri.rawFragment?.percentDecodedOnce()?.trim()
+        val remarks = uri.rawFragment?.decodeUrlComponentPreservingPlusStrict()?.trim()
             .orEmpty()
             .ifBlank { "wireguard" }
         return singleWireGuardOutcome(
@@ -342,8 +343,8 @@ private fun parseQuery(rawQuery: String?): Map<String, List<String>> {
     if (rawQuery.isNullOrBlank()) return emptyMap()
     return buildMap<String, MutableList<String>> {
         rawQuery.split('&').forEach { part ->
-            val key = part.substringBefore('=').percentDecodedOnce().normalizedOption()
-            val value = part.substringAfter('=', "").percentDecodedOnce()
+            val key = part.substringBefore('=').decodeUrlComponentPreservingPlusStrict().normalizedOption()
+            val value = part.substringAfter('=', "").decodeUrlComponentPreservingPlusStrict()
             getOrPut(key) { mutableListOf() } += value
         }
     }
@@ -352,8 +353,7 @@ private fun parseQuery(rawQuery: String?): Map<String, List<String>> {
 private fun Map<String, List<String>>.firstValue(vararg names: String): String? =
     names.asSequence()
         .map(String::normalizedOption)
-        .mapNotNull { name -> get(name)?.lastOrNull() }
-        .firstOrNull()
+        .firstNotNullOfOrNull { name -> get(name)?.lastOrNull() }
         ?.takeIf(String::isNotBlank)
 
 private fun Map<String, List<String>>.values(vararg names: String): List<String> =
@@ -362,18 +362,16 @@ private fun Map<String, List<String>>.values(vararg names: String): List<String>
 private fun String.normalizedOption(): String =
     lowercase().replace("_", "").replace("-", "")
 
-private fun String.percentDecodedOnce(): String =
-    URLDecoder.decode(replace("+", "%2B"), Charsets.UTF_8.name())
-
 private fun splitCommaValues(value: String): List<String> =
     value.split(',').map(String::trim).filter(String::isNotBlank)
 
 private fun requireWireGuardKey(value: String?, label: String) {
     require(!value.isNullOrBlank()) { "$label is required" }
     val padded = value + "=".repeat((4 - value.length % 4) % 4)
-    val decoded = sequenceOf(Base64.Default, Base64.UrlSafe)
-        .mapNotNull { decoder -> runCatching { decoder.decode(padded) }.getOrNull() }
-        .firstOrNull()
+    val decoded = sequenceOf(
+        Base64.Default,
+        Base64.UrlSafe
+    ).firstNotNullOfOrNull { decoder -> runCatching { decoder.decode(padded) }.getOrNull() }
     require(decoded?.size == WireGuardKeyBytes) { "$label is invalid" }
 }
 
@@ -412,12 +410,6 @@ private fun parseHostPort(value: String): Pair<String, Int> {
 private fun Int.requirePort(label: String): Int {
     require(this in 1..65_535) { "$label is invalid" }
     return this
-}
-
-private fun String.requireIntIn(label: String, minimum: Int, maximum: Int): Int {
-    val parsed = toIntOrNull()
-    require(parsed != null && parsed in minimum..maximum) { "$label is invalid" }
-    return parsed
 }
 
 private fun parseReservedBytes(value: String): List<Int> {

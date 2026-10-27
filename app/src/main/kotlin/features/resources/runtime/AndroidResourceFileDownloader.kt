@@ -3,6 +3,7 @@
 
 package features.resources.runtime
 
+import engine.network.withProxyAuthenticator
 import features.resources.runtime.writeResourceAtomically as writeAtomically
 import java.io.File
 import java.net.URI
@@ -14,7 +15,7 @@ internal class AndroidResourceFileDownloader {
         proxy: AndroidResourceHttpProxy? = null,
         onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _ -> },
     ) {
-        proxy.withAuthenticator {
+        proxy.withProxyAuthenticator {
             val connection = URI.create(url).toHttpConnection(proxy)
             try {
                 AndroidResourceFileDownloadCancellation.track(connection)
