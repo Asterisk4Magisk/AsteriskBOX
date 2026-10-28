@@ -289,9 +289,12 @@ internal class SingBoxRuntimeRepository(
                         runCatching {
                             // Read inside the lock: a reconnect must not restore its original snapshot.
                             modeMutex.withLock {
-                                appContext.withRootDnsMutation(appState) {
-                                    check(isCurrent(nextGeneration, target)) { "sing-box session changed before mode restore" }
-                                    next.setMode(desiredMode)
+                                // A reconnect to an unchanged core must not withdraw and rebuild DNS enhancement.
+                                if (!next.modeApplied(desiredMode)) {
+                                    appContext.withRootDnsMutation(appState) {
+                                        check(isCurrent(nextGeneration, target)) { "sing-box session changed before mode restore" }
+                                        next.setMode(desiredMode)
+                                    }
                                 }
                             }
                         }.onFailure { error ->

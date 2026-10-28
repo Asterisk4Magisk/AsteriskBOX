@@ -178,6 +178,16 @@ internal class SingBoxCommandClient(
         requireClient().closeConnections()
     }
 
+    /** Reports whether this session's mode subscription already confirms [mode]. */
+    suspend fun modeApplied(mode: String): Boolean = modeMutex.withLock {
+        val active = requireClient()
+        val requested = mode.toOfficialClashMode()
+        val status = withTimeoutOrNull(ModeConfirmationTimeoutMillis.milliseconds) {
+            modeStatus.first { it.supported != null || it.disconnected }
+        } ?: return@withLock false
+        !status.disconnected && requireClient() === active && status.current.equals(requested, ignoreCase = true)
+    }
+
     suspend fun setMode(mode: String) = modeMutex.withLock {
         val active = requireClient()
         val requested = mode.toOfficialClashMode()
