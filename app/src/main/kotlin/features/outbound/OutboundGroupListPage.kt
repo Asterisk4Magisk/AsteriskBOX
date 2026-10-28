@@ -86,7 +86,6 @@ import app.LocalUpdateAppState
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
 import app.OutboundState
-import app.outboundConfigChangedFrom
 import app.SubscriptionInfo
 import app.collectAppState
 import features.importing.ImportOperation
@@ -125,6 +124,7 @@ import kotlinx.coroutines.withContext
 import app.R
 import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskActionButton
+import ui.components.AsteriskConfigApplyBanner
 import ui.components.AsteriskModalBottomSheet
 import ui.components.WarningConfirmDialog
 import ui.components.localizedLabel
@@ -431,10 +431,7 @@ internal fun OutboundGroupListPage(
                                     ?: state.localProxyPort,
                                 singBoxControlPort = result.appState?.singBoxControlPort
                                     ?: state.singBoxControlPort,
-                                // The core now runs [snapshot]; anything committed while the
-                                // apply was in flight is still pending.
-                                pendingConfigRestart = state.pendingConfigRestart &&
-                                    state.outboundConfigChangedFrom(snapshot),
+                                pendingConfigRestart = false,
                             )
                         }
                         if (result.proxyRunning) services.tipNotifier.show(appliedMessage)
@@ -772,6 +769,7 @@ internal fun OutboundGroupListPage(
                     end = contentPadding.calculateEndPadding(layoutDirection),
                     bottom = contentPadding.calculateBottomPadding(),
                 ),
+                topExtra = 12.dp,
             )
         } else {
             listContentPadding
@@ -817,14 +815,17 @@ internal fun OutboundGroupListPage(
         )
         Column(modifier = Modifier.fillMaxSize()) {
             if (pinnedRestartBanner) {
-                OutboundGroupConfigApplyBanner(
+                AsteriskConfigApplyBanner(
+                    title = stringResource(R.string.outbound_group_config_apply_title),
+                    summary = stringResource(R.string.outbound_group_config_apply_summary),
+                    actionLabel = stringResource(R.string.outbound_group_config_apply_action),
                     applying = applyingConfig,
                     enabled = !serviceBusy,
                     onApply = { applyPendingConfig() },
                     modifier = Modifier.padding(
                         start = listContentPadding.calculateStartPadding(layoutDirection),
                         end = listContentPadding.calculateEndPadding(layoutDirection),
-                        top = contentPadding.calculateTopPadding() + 8.dp,
+                        top = listContentPadding.calculateTopPadding(),
                     ),
                 )
             }
@@ -1371,60 +1372,6 @@ private fun OutboundGroupAddMethodOption(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 3.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun OutboundGroupConfigApplyBanner(
-    applying: Boolean,
-    enabled: Boolean,
-    onApply: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = AsteriskShapeTokens.ListCard,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 14.dp, bottom = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Rounded.Sync,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = stringResource(R.string.outbound_group_config_apply_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                )
-            }
-            Text(
-                text = stringResource(R.string.outbound_group_config_apply_summary),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                AsteriskActionButton(
-                    text = stringResource(R.string.outbound_group_config_apply_action),
-                    icon = Icons.Rounded.Refresh,
-                    enabled = enabled,
-                    loading = applying,
-                    onClick = onApply,
                 )
             }
         }

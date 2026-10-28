@@ -18,6 +18,7 @@ import app.modes.RunModeEbpf
 import app.modes.RunModeTproxy
 import app.modes.RunModeTun2Socks
 import app.modes.RunModeVpnService
+import app.modes.isRootRunMode
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.logs.FailureLogContext
 import features.logs.reportFailure
@@ -295,11 +296,12 @@ internal fun SettingsBottomSheetsHost(
                     try {
                         val applied = applyServiceControl.apply(appState, draft)
                         updateAppState { current ->
-                            current.copy(
+                            val updated = current.copy(
                                 serviceControl = applied.serviceControl,
                                 proxyRunning = applied.proxyRunning,
                                 localProxyPort = applied.localProxyPort,
                             )
+                            if (applied.runMode.isRootRunMode()) updated.copy(pendingConfigRestart = false) else updated
                         }
                         sheetState.showServiceControl = false
                     } catch (error: Throwable) {
