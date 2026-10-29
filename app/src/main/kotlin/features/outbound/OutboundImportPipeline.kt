@@ -538,6 +538,9 @@ internal object MihomoYamlOutboundParser {
                         putNotBlank("hop_interval_max", maximum)
                     }
                     putNotBlank("bbr_profile", string("bbr-profile"))
+                    if (this@toSingBoxOutbound.containsKey("disable-chrome-parrot")) {
+                        put("disable_chrome_parrot", bool("disable-chrome-parrot"))
+                    }
                     putModernQuicFields(this@toSingBoxOutbound)
                 }
                 "anytls" -> {
@@ -1142,6 +1145,7 @@ private object ProxyUrlOutboundParser {
                     }
                     putPositive("up_mbps", query.int("upmbps", "up"))
                     putPositive("down_mbps", query.int("downmbps", "down"))
+                    putHysteria2ChromeParrot(query)
                 }
                 "anytls" -> {
                     putNotBlank("password", authentication)
@@ -1210,6 +1214,7 @@ private object ProxyUrlOutboundParser {
                     putNotBlank("password", query.first("obfs-password"))
                 })
             }
+            putHysteria2ChromeParrot(query)
             put("tls", checkNotNull(buildUrlTls("hysteria2", uri.scheme, query)))
         }
     }
@@ -1797,6 +1802,13 @@ private fun Map<String, List<String>>.int(vararg names: String): Int =
 
 private fun Map<String, List<String>>.bool(vararg names: String): Boolean =
     first(*names).let { it == "1" || it.equals("true", true) }
+
+// Only an explicit link value is copied; an absent one gets the import default.
+private fun kotlinx.serialization.json.JsonObjectBuilder.putHysteria2ChromeParrot(query: Map<String, List<String>>) {
+    if (query.first("disable_chrome_parrot").isNotBlank()) {
+        put("disable_chrome_parrot", query.bool("disable_chrome_parrot"))
+    }
+}
 
 private fun Map<*, *>.string(name: String): String = get(name)?.toString().orEmpty()
 

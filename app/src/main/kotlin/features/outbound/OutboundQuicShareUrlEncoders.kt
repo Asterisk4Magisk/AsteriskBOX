@@ -83,6 +83,7 @@ private fun JsonObject.encodeHysteria2ShareUrl(remarks: String): String {
         "congestion_control",
         "max_idle_timeout",
         "keep_alive_period",
+        HYSTERIA2_DISABLE_CHROME_PARROT,
     )
     require(stringValue("hop_interval").isBlank()) { "Hysteria2 hop interval cannot be shared" }
     require(intValue("up_mbps") == 0 && intValue("down_mbps") == 0) {
@@ -111,6 +112,9 @@ private fun JsonObject.encodeHysteria2ShareUrl(remarks: String): String {
     val tls = readShareTls(required = true)
         .requireOnlyShareParameters("Hysteria2", "sni", "insecure", "ech")
     parameters += tls.parameters
+    // Always explicit: an absent value means disabled on import, but enabled in the core.
+    parameters += HYSTERIA2_DISABLE_CHROME_PARROT to
+        booleanValue(HYSTERIA2_DISABLE_CHROME_PARROT).toString()
     val serverPorts = stringListValue("server_ports")
     val encodedServerPorts = serverPorts.map(::encodeHysteriaPortRange)
     val endpoint = if (encodedServerPorts.isEmpty()) {

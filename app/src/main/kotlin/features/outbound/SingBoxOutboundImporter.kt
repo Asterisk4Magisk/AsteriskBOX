@@ -160,7 +160,7 @@ internal object SingBoxOutboundImporter {
     fun parsePreparedOutbounds(
         outbounds: List<JsonObject>,
     ): List<ImportedSingBoxOutbound> = parsePreparedOutboundArray(
-        outbounds = JsonArray(outbounds),
+        outbounds = JsonArray(outbounds.map(JsonObject::withHysteria2ChromeParrotDefault)),
         sourceIndexes = outbounds.indices.toList(),
     )
 
@@ -243,9 +243,10 @@ internal object SingBoxOutboundImporter {
                 ?: throw IllegalArgumentException("Outbound at index $index must be a JSON object")
             val type = outbound.stringField("type")
                 ?: throw IllegalArgumentException("Outbound at index $index has no type")
+            // Applied before formatting, which drops an explicit false.
             outbound
                 .takeIf { type in SupportedSingBoxProxyOutboundTypes }
-                ?.let { RawOutboundImportCandidate(index, it) }
+                ?.let { RawOutboundImportCandidate(index, it.withHysteria2ChromeParrotDefault()) }
         }
         if (candidates.isEmpty()) {
             throw IllegalArgumentException("No supported proxy outbounds found")
@@ -517,6 +518,19 @@ private fun removedManagedReferenceMutations(
         }
     }
 }
+
+// sing-box parrots Chrome's QUIC handshake for Hysteria2 by default. That handshake
+// fails against Ed25519 certificates and rejects disable_sni, certificate_pin_sha256,
+// certificate_server_name and client certificates, so new nodes turn it off unless
+// the source states a value.
+internal fun JsonObject.withHysteria2ChromeParrotDefault(): JsonObject =
+    if (stringField("type") != "hysteria2" || HYSTERIA2_DISABLE_CHROME_PARROT in this) {
+        this
+    } else {
+        JsonObject(this + (HYSTERIA2_DISABLE_CHROME_PARROT to JsonPrimitive(true)))
+    }
+
+internal const val HYSTERIA2_DISABLE_CHROME_PARROT = "disable_chrome_parrot"
 
 private fun JsonObject.hasNonBlankString(name: String): Boolean =
     (get(name) as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true

@@ -918,7 +918,7 @@ internal data class OutboundEditorDocument(
                         .setText("congestion_control", "bbr")
                         .setText("udp_relay_mode", "native")
                 }
-                "hysteria2" -> Unit
+                "hysteria2" -> document = document.setBoolean(HYSTERIA2_DISABLE_CHROME_PARROT, true)
                 "snell" -> document = document.setText("version", "4")
             }
             if (type in MandatoryTlsOutboundTypes) {
