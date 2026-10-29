@@ -4,6 +4,8 @@
 package features.settings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,6 +24,7 @@ import app.modes.isRootRunMode
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.logs.FailureLogContext
 import features.logs.reportFailure
+import features.settings.servicecontrol.ServiceControlOperationState
 import features.settings.sheets.TunBypassRuleSetBottomSheet
 import features.settings.sheets.TunSharedNetworkBottomSheet
 import features.settings.sheets.ExternalInterfacesBottomSheet
@@ -54,13 +57,14 @@ internal fun SettingsBottomSheetsHost(
     updateAppState: ((AppState) -> AppState) -> Unit,
 ) {
     val context = LocalContext.current
-    val tipNotifier = LocalAppServices.current.tipNotifier
+    val services = LocalAppServices.current
+    val tipNotifier = services.tipNotifier
     val scope = rememberCoroutineScope()
     val validationFailedMessage = stringResource(R.string.settings_sing_box_validation_failed)
     var validating by remember { mutableStateOf(false) }
-    var serviceControlSaving by remember { mutableStateOf(false) }
-    var serviceControlError by remember { mutableStateOf<String?>(null) }
-    val applyServiceControl = LocalAppServices.current.applyServiceControlUseCase
+    val serviceControlSaving by ServiceControlOperationState.saving.collectAsState()
+    val serviceControlError by ServiceControlOperationState.error.collectAsState()
+    val applyServiceControl = services.applyServiceControlUseCase
     val serviceControlFailedMessage = stringResource(R.string.settings_service_control_save_failed)
 
     fun validateAndCommit(
@@ -276,13 +280,19 @@ internal fun SettingsBottomSheetsHost(
             sheetState.showExternalInterfaces = false
         },
     )
+    if (sheetState.showServiceControl) {
+        DisposableEffect(Unit) {
+            val observation = ServiceControlOperationState.observeSheet()
+            onDispose { observation.close() }
+        }
+    }
     ServiceControlBottomSheet(
         show = sheetState.showServiceControl,
         saving = serviceControlSaving,
         draft = sheetState.serviceControlDraft,
         runtimeError = serviceControlError,
         onDraftChange = {
-            serviceControlError = null
+            ServiceControlOperationState.clearError()
             sheetState.serviceControlDraft = it
         },
         onDismissRequest = {
@@ -290,9 +300,7 @@ internal fun SettingsBottomSheetsHost(
         },
         onSave = { draft ->
             if (!serviceControlSaving) {
-                serviceControlSaving = true
-                serviceControlError = null
-                scope.launch {
+                ServiceControlOperationState.launch(services.appScope) {
                     try {
                         val applied = applyServiceControl.apply(appState, draft)
                         updateAppState { current ->
@@ -313,10 +321,11 @@ internal fun SettingsBottomSheetsHost(
                             ),
                             error = error,
                         )
-                        serviceControlError = error.message?.takeIf(String::isNotBlank)
+                        val message = error.message?.takeIf(String::isNotBlank)
                             ?: serviceControlFailedMessage
-                    } finally {
-                        serviceControlSaving = false
+                        if (!ServiceControlOperationState.reportError(message)) {
+                            tipNotifier.show(message)
+                        }
                     }
                 }
             }

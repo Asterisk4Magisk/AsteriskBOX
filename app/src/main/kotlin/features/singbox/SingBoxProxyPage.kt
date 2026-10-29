@@ -98,6 +98,7 @@ import engine.singbox.runtime.SingBoxProxiesState
 import engine.singbox.runtime.SingBoxProxyGroup
 import engine.singbox.runtime.SingBoxProxyNode
 import engine.singbox.runtime.SingBoxRuntimeState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -301,7 +302,8 @@ fun SingBoxProxyPage(
         val pendingProxyName = pendingSelections[group.name]
         if (pendingProxyName == node.name || (pendingProxyName == null && group.now == node.name)) return
         pendingSelections = pendingSelections + (group.name to node.name)
-        scope.launch {
+        // Finish the DNS transaction even if this page leaves composition.
+        services.appScope.launch(Dispatchers.Main.immediate) {
             services.singBoxRuntime.selectProxy(appState, group.name, node.name)
                 .onSuccess {
                     if (isSingBoxProxySelectionPersistent(group)) {
