@@ -263,7 +263,7 @@ class SingBoxTrafficStatsNotificationService : Service() {
             trafficLine = trafficLine,
         )
         return Notification.Builder(this, ChannelId)
-            .setSmallIcon(speedIcon.create(snapshot.downSpeed))
+            .setSmallIcon(speedIcon.create(snapshot.upSpeed + snapshot.downSpeed))
             .apply {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
