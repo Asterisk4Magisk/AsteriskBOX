@@ -6,6 +6,7 @@ package engine.singbox.runtime
 import engine.root.dns.withRootDnsMutation
 import android.content.Context
 import app.AppState
+import app.effects.SingBoxRuntimeLifecycleTarget
 import app.DefaultConnectionTestUrl
 import app.isValidConnectionTestUrl
 import app.modes.RunModeVpnService
@@ -38,7 +39,7 @@ import kotlin.time.Duration.Companion.milliseconds
 internal class SingBoxRuntimeRepository(
     private val appScope: CoroutineScope,
     context: Context,
-) {
+) : SingBoxRuntimeLifecycleTarget {
     private val appContext = context.applicationContext
     private val mutableState = MutableStateFlow(SingBoxRuntimeState())
     private val trafficHistory = SingBoxTrafficHistoryBuffer(MaxTrafficHistorySize)
@@ -82,6 +83,14 @@ internal class SingBoxRuntimeRepository(
             }
         }
         replaceSession(target, appState)
+    }
+
+    override fun resumeForForeground(appState: AppState) {
+        start(appState)
+    }
+
+    override fun pauseForBackground(appState: AppState) {
+        stop(resetSnapshots = false)
     }
 
     fun stop(resetSnapshots: Boolean = false) {

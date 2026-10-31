@@ -11,6 +11,8 @@ import features.resources.ResourceFileUpdateRequest
 import features.resources.runtime.AndroidResourceFileDownloadCancellation
 import android.app.Application
 import features.home.HomeServiceOperationState
+import app.effects.AppActivityForegroundTracker
+import app.effects.SingBoxRuntimeLifecycleCoordinator
 import app.modes.RunModeVpnService
 import features.boot.BootAutoConnect
 import data.AndroidAppStateStore
@@ -55,6 +57,10 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     internal val homeServiceOperationState = HomeServiceOperationState()
     internal val singBoxRuntime: SingBoxRuntimeRepository by lazy { SingBoxRuntimeRepository(appScope, this) }
+    internal val singBoxRuntimeLifecycle: SingBoxRuntimeLifecycleCoordinator by lazy {
+        SingBoxRuntimeLifecycleCoordinator(appScope, singBoxRuntime)
+    }
+    private lateinit var foregroundTracker: AppActivityForegroundTracker
     internal val outboundPingRuntime: OutboundPingRuntimeRepository by lazy {
         OutboundPingRuntimeRepository(
             scope = appScope,
@@ -222,6 +228,8 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
         AndroidLogcatRepository.initialize(applicationContext)
         AndroidCoreLogRepository.initialize(applicationContext)
         AndroidAsteriskdLogRepository.initialize(applicationContext)
+        foregroundTracker = AppActivityForegroundTracker(singBoxRuntimeLifecycle)
+        registerActivityLifecycleCallbacks(foregroundTracker)
         appScope.launch {
             stateStore.state
                 .map { state ->

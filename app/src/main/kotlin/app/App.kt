@@ -206,7 +206,7 @@ fun App(
     )
     SingBoxRuntimeSynchronizer(
         stateStore = stateStore,
-        singBoxRuntime = application.singBoxRuntime,
+        singBoxRuntimeLifecycle = application.singBoxRuntimeLifecycle,
     )
     ResourceFileSynchronizer(
         resourceFileUseCase = resourceFileUseCase,
