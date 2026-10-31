@@ -10,6 +10,7 @@ import features.resources.ResourceFileUpdateCoordinator
 import features.resources.ResourceFileUpdateRequest
 import features.resources.runtime.AndroidResourceFileDownloadCancellation
 import android.app.Application
+import androidx.work.Configuration
 import features.home.HomeServiceOperationState
 import app.modes.RunModeVpnService
 import features.boot.BootAutoConnect
@@ -50,8 +51,9 @@ import engine.singbox.runtime.SingBoxRuntimeRepository
 import engine.proxy.AndroidProxyEngine
 import system.AndroidRootShellGateway
 import engine.vpn.AndroidLibboxRuntime
+import engine.vpn.isVpnServiceProcess
 
-class AsteriskApplication : Application(), SingletonImageLoader.Factory {
+class AsteriskApplication : Application(), SingletonImageLoader.Factory, Configuration.Provider {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     internal val homeServiceOperationState = HomeServiceOperationState()
     internal val singBoxRuntime: SingBoxRuntimeRepository by lazy { SingBoxRuntimeRepository(appScope, this) }
@@ -211,6 +213,14 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        AndroidLibboxRuntime.setup(this)
+        AndroidLogcatRepository.initialize(applicationContext)
+        // The VPN Service runs in its own process and hosts the sing-box core only. The state
+        // store, the schedulers and the log repositories that read service logs belong to the UI
+        // process; initializing them here would open the same database and files twice.
+        if (isVpnServiceProcess()) return
+        AndroidCoreLogRepository.initialize(applicationContext)
+        AndroidAsteriskdLogRepository.initialize(applicationContext)
         appScope.launch {
             val scheduler = ResourceAutoUpdateScheduler(applicationContext)
             stateStore.state
@@ -218,10 +228,6 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
                 .distinctUntilChanged()
                 .collect(scheduler::reconcile)
         }
-        AndroidLibboxRuntime.setup(this)
-        AndroidLogcatRepository.initialize(applicationContext)
-        AndroidCoreLogRepository.initialize(applicationContext)
-        AndroidAsteriskdLogRepository.initialize(applicationContext)
         appScope.launch {
             stateStore.state
                 .map { state ->
@@ -252,6 +258,14 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
                 }
         }
     }
+
+    /**
+     * WorkManager is initialized on demand instead of at process start (see the manifest):
+     * its automatic initializer would also run in the ":vpn" process, which never uses it and
+     * must not open a second WorkManager database.
+     */
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().build()
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {
         return ImageLoader.Builder(context)

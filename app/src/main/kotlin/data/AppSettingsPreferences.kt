@@ -16,6 +16,8 @@ import app.ServiceControlWifi
 import app.ServiceControlWifiRule
 import features.settings.servicecontrol.normalizeServiceControlSettings
 import engine.singbox.normalizedEbpfLocalDataPlane
+import app.modes.RunModeVpnService
+import app.modes.normalizeRunMode
 import java.util.UUID
 
 internal class AppSettingsPreferences(
@@ -47,6 +49,12 @@ internal class AppSettingsPreferences(
      * tunnel without starting one the user had stopped.
      */
     fun isVpnSessionActive(): Boolean = preferences.getBoolean(KeyVpnSessionActive, false)
+
+    /**
+     * The persisted run mode. The VPN service process reads it cold at boot to refuse a resume
+     * request while the user has switched to a ROOT mode, so it must not need the app state.
+     */
+    fun loadRunMode(): Int = normalizeRunMode(preferences.getInt(KeyRunMode, RunModeVpnService))
 
     @SuppressLint("UseKtx", "ApplySharedPref")
     fun setVpnSessionActive(active: Boolean) {

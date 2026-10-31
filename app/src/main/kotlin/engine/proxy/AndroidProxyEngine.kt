@@ -183,7 +183,7 @@ internal class AndroidProxyEngine(
             if (status.running) {
                 SingBoxTrafficStatsNotificationService.reconcile(
                     appContext,
-                    request.appState.toSingBoxTrafficStatsRuntime(status.runMode ?: request.appState.runMode),
+                    request.appState.toSingBoxTrafficStatsRuntime(),
                 )
                 return@withContext status.copy(appState = request.appState)
             }
@@ -195,7 +195,7 @@ internal class AndroidProxyEngine(
                 val resumed = status.copy(appState = request.appState)
                 SingBoxTrafficStatsNotificationService.reconcile(
                     appContext,
-                    request.appState.toSingBoxTrafficStatsRuntime(status.runMode ?: request.appState.runMode),
+                    request.appState.toSingBoxTrafficStatsRuntime(),
                 )
                 return@withContext resumed
             }
@@ -229,9 +229,7 @@ internal class AndroidProxyEngine(
                     appState = resolvedRequest.appState,
                 )
             val runtime = if (status.running) {
-                resolvedRequest.appState.toSingBoxTrafficStatsRuntime(
-                    runMode = status.runMode ?: resolvedRequest.appState.runMode,
-                )
+                resolvedRequest.appState.toSingBoxTrafficStatsRuntime()
             } else {
                 null
             }

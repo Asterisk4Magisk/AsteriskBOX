@@ -769,7 +769,7 @@ private fun compileServices(
             (service["type"] as? JsonPrimitive)?.contentOrNull == "api" || service.hasAppTag()
         }
         .toMutableList()
-    if (exposePorts && runMode.isRootRunMode()) {
+    if (exposePorts) {
         val control = appState.singBoxControlConfig()
         retained += buildJsonObject {
             put("type", "api")
