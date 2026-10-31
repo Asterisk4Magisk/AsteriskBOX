@@ -67,6 +67,8 @@ class SingBoxTrafficStatsNotificationService : Service() {
     private var activeRuntime: SingBoxTrafficStatsRuntime? = null
     private var foregroundStarted = false
     private var latestStartId = 0
+    private var lastSnapshot = TrafficStatsSnapshot()
+    private val screenObserver = ScreenInteractiveObserver(this, ::onScreenInteractiveChanged)
     private val notificationManager by lazy { getSystemService(NotificationManager::class.java) }
     private val speedIcon by lazy { TrafficSpeedNotificationIcon(resources.displayMetrics.density) }
     private val contentIntent by lazy {
@@ -112,14 +114,28 @@ class SingBoxTrafficStatsNotificationService : Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
-        if (activeRuntime == runtime && monitor.isActive) {
+        if (activeRuntime == runtime && (monitor.isActive || !screenObserver.isInteractive)) {
             return START_NOT_STICKY
         }
 
+        if (activeRuntime != runtime) lastSnapshot = TrafficStatsSnapshot()
         activeRuntime = runtime
         if (!startForegroundNotification(startId)) return START_NOT_STICKY
-        startMonitor(runtime)
+        screenObserver.register()
+        if (screenObserver.isInteractive) startMonitor(runtime)
         return START_NOT_STICKY
+    }
+
+    // Sampling pauses while the screen is off. The core keeps counting, so the totals it
+    // reports after resuming already include that time.
+    private fun onScreenInteractiveChanged(interactive: Boolean) {
+        val runtime = activeRuntime ?: return
+        if (!interactive) {
+            monitor.cancel()
+            updateNotification(lastSnapshot.copy(upSpeed = 0L, downSpeed = 0L))
+        } else if (!monitor.isActive) {
+            startMonitor(runtime)
+        }
     }
 
     private fun startForegroundNotification(startId: Int): Boolean {
@@ -143,9 +159,10 @@ class SingBoxTrafficStatsNotificationService : Service() {
     }
 
     private fun startMonitor(runtime: SingBoxTrafficStatsRuntime) {
+        // Created on the main thread, which owns lastSnapshot and every accept() call.
+        val accumulator = TrafficStatsAccumulator(lastSnapshot.totalUp, lastSnapshot.totalDown)
         monitor.start {
             val repository = (application as AsteriskApplication).singBoxRuntime
-            val accumulator = TrafficStatsAccumulator()
             var consecutiveFailures = 0
 
             while (currentCoroutineContext().isActive) {
@@ -241,6 +258,7 @@ class SingBoxTrafficStatsNotificationService : Service() {
     }
 
     private fun updateNotification(snapshot: TrafficStatsSnapshot) {
+        lastSnapshot = snapshot
         notificationManager.notify(NotificationId, buildNotification(snapshot))
     }
 
@@ -281,8 +299,10 @@ class SingBoxTrafficStatsNotificationService : Service() {
     }
 
     private fun stopStats() {
+        screenObserver.unregister()
         monitor.cancel()
         activeRuntime = null
+        lastSnapshot = TrafficStatsSnapshot()
         stopForegroundCompat()
         foregroundStarted = false
         notificationManager.cancel(NotificationId)
@@ -365,9 +385,10 @@ private data class TrafficSpeedSample(
     val down: Long,
 )
 
-internal class TrafficStatsAccumulator {
-    private var totalUp = 0L
-    private var totalDown = 0L
+internal class TrafficStatsAccumulator(
+    private var totalUp: Long = 0L,
+    private var totalDown: Long = 0L,
+) {
     private val speedSamples = ArrayDeque<TrafficSpeedSample>(TrafficSpeedWindowSamples)
 
     fun accept(sample: SingBoxTrafficSample): TrafficStatsSnapshot {
