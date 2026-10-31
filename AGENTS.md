@@ -28,6 +28,14 @@ VPN Service is an independent non-ROOT execution path. Even on a rooted device, 
 - When switching from ROOT to VPN, any active ROOT cycle must be stopped by the ROOT lifecycle boundary before entering VPN. The VPN runtime itself must not perform ROOT cleanup.
 - Changes to proxy orchestration, mode selection, or lifecycle handling must include a regression check that the entire VPN lifecycle performs zero ROOT operations.
 
+### Keep the VPN Service in Its Own Process
+
+`engine.vpn.AsteriskVpnService` declares `android:process=":vpn"` and hosts the sing-box core there. The tunnel must never be created in the UI process.
+
+- The UI process talks to the tunnel only through `AsteriskVpnService.start/stop/reload` (explicit intents with a `ResultReceiver` reply) and reads its state from `VpnSessionStore`. Do not reintroduce in-process statics such as a shared `pendingStart`/`running` field; they are invisible across the process boundary and silently break the start result.
+- The `:vpn` process must not touch the app state store, WorkManager, subscription/resource schedulers, or UI state. `AsteriskApplication.onCreate` therefore returns early for it. When the system needs a tunnel without an explicit start request (boot receiver, always-on VPN), the service replays `VpnStartConfigStore`, which records the last successful start configuration; it must not recompile from app state.
+- The sing-box command channel is remote in every mode: the compiled configuration always exposes the `api` service and the app connects with `newRemoteCommandClient`. Do not call `Libbox.newCommandClient` from the UI process, and do not route configuration reloads through the command client — the core is restarted by the service that owns it (`ACTION_RELOAD`).
+
 ### Respect Core API Stability and Product-Specific Control Paths
 
 - As a rule, do not introduce or depend on an experimental core feature. An exception exists only when this repository already uses that feature or a developer explicitly authorizes its use; adoption by a sibling app is not authorization for this app.

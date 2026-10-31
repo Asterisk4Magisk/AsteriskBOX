@@ -12,6 +12,7 @@ import app.modes.RunModeVpnService
 import engine.proxy.ProxyEngineStartRequest
 import engine.singbox.singBoxControlConfig
 import engine.singbox.singBoxModeName
+import engine.vpn.AsteriskVpnService
 import engine.vpn.VpnSingBoxConfigFactory
 import features.logs.AndroidAppLogger
 import io.nekohasekai.libbox.Libbox
@@ -180,7 +181,9 @@ internal class SingBoxRuntimeRepository(
                     "sing-box API session changed during reload"
                 }
                 try {
-                    active.reloadService()
+                    // The tunnel lives in its own process; only it can restart the core around
+                    // the rewritten configuration file.
+                    AsteriskVpnService.reload(appContext)
                 } catch (error: Throwable) {
                     refreshServiceStartedAt(activeGeneration, active)
                     throw error
@@ -588,8 +591,10 @@ internal class SingBoxRuntimeRepository(
     }
 
     private fun AppState.commandTarget(): SingBoxCommandTarget {
-        val local = runMode == RunModeVpnService
-        return SingBoxCommandTarget(local = local, control = singBoxControlConfig())
+        // The sing-box core never runs in this process: ROOT modes own it through asteriskd, and
+        // the VPN Service hosts it in its own ":vpn" process. Both are reached over the command
+        // API listener the core exposes, exactly like a remote client.
+        return SingBoxCommandTarget(control = singBoxControlConfig())
     }
 
     private fun refreshDeviceState() {

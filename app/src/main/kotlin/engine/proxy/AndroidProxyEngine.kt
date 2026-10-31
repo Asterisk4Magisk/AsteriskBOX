@@ -183,7 +183,7 @@ internal class AndroidProxyEngine(
             if (status.running) {
                 SingBoxTrafficStatsNotificationService.reconcile(
                     appContext,
-                    request.appState.toSingBoxTrafficStatsRuntime(status.runMode ?: request.appState.runMode),
+                    request.appState.toSingBoxTrafficStatsRuntime(),
                 )
                 return@withContext status.copy(appState = request.appState)
             }
@@ -195,7 +195,7 @@ internal class AndroidProxyEngine(
                 val resumed = status.copy(appState = request.appState)
                 SingBoxTrafficStatsNotificationService.reconcile(
                     appContext,
-                    request.appState.toSingBoxTrafficStatsRuntime(status.runMode ?: request.appState.runMode),
+                    request.appState.toSingBoxTrafficStatsRuntime(),
                 )
                 return@withContext resumed
             }
@@ -229,9 +229,7 @@ internal class AndroidProxyEngine(
                     appState = resolvedRequest.appState,
                 )
             val runtime = if (status.running) {
-                resolvedRequest.appState.toSingBoxTrafficStatsRuntime(
-                    runMode = status.runMode ?: resolvedRequest.appState.runMode,
-                )
+                resolvedRequest.appState.toSingBoxTrafficStatsRuntime()
             } else {
                 null
             }
@@ -302,6 +300,13 @@ internal class AndroidProxyEngine(
 
         fun accept(status: ProxyEngineStatus, source: AndroidModeProxyEngine): ProxyEngineStatus {
             activeEngine = status.runMode?.let(rootEnginesByRunMode::get) ?: source
+            if (source === vpnSingBoxEngine && status.running) {
+                // The tunnel outlives this process: after a task swipe or a boot restore this
+                // process has no runtime record of the local proxy, and its own fetches would
+                // otherwise bypass it. The persisted state carries the port the tunnel started
+                // with, which is the closest authority available here.
+                appState?.let { state -> LocalProxyRuntime.update(state.toLocalProxyOptions()) }
+            }
             return status.withTrafficStatsReconciled(appState)
         }
 

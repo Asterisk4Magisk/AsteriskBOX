@@ -4,7 +4,6 @@
 package engine.stats
 
 import app.AppState
-import app.modes.RunModeVpnService
 import engine.singbox.SingBoxControlConfig
 import engine.singbox.singBoxControlConfig
 import java.util.concurrent.CancellationException
@@ -107,17 +106,13 @@ internal class TrafficStatsServiceRequests<T : Any> {
 
 internal data class SingBoxTrafficStatsRuntime(
     val control: SingBoxControlConfig,
-    val local: Boolean,
 )
 
-internal fun AppState.toSingBoxTrafficStatsRuntime(
-    runMode: Int = this.runMode,
-): SingBoxTrafficStatsRuntime? {
+internal fun AppState.toSingBoxTrafficStatsRuntime(): SingBoxTrafficStatsRuntime? {
     if (!enableTrafficStatsNotification) return null
-    return SingBoxTrafficStatsRuntime(
-        control = singBoxControlConfig(),
-        local = runMode == RunModeVpnService,
-    )
+    // The core runs outside this process in every mode (asteriskd for ROOT, ":vpn" for the VPN
+    // Service), so the notification service always reaches it as a remote client.
+    return SingBoxTrafficStatsRuntime(control = singBoxControlConfig())
 }
 
 internal data class TrafficStatsNotificationContent(

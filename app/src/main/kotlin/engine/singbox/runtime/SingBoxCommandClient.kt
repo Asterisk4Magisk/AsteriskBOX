@@ -34,7 +34,6 @@ import kotlin.coroutines.resumeWithException
 import kotlin.time.Duration.Companion.milliseconds
 
 internal data class SingBoxCommandTarget(
-    val local: Boolean,
     val control: SingBoxControlConfig,
 )
 
@@ -70,18 +69,16 @@ internal class SingBoxCommandClient(
             addCommand(Libbox.CommandClashMode)
             statusInterval = StatusIntervalNanos
         }
-        val nextClient = if (target.local) {
-            Libbox.newCommandClient(this, options)
-        } else {
-            Libbox.newRemoteCommandClient(
-                this,
-                options,
-                RemoteConnectionOptions().apply {
-                    url = target.control.baseUrl
-                    secret = target.control.secret
-                },
-            )
-        }
+        // The core never runs in this process: ROOT modes own it through asteriskd, the VPN
+        // Service hosts it in ":vpn". Both are reached over the command API listener.
+        val nextClient = Libbox.newRemoteCommandClient(
+            this,
+            options,
+            RemoteConnectionOptions().apply {
+                url = target.control.baseUrl
+                secret = target.control.secret
+            },
+        )
         synchronized(access) {
             client = nextClient
             connections = Libbox.newConnections()
@@ -213,10 +210,6 @@ internal class SingBoxCommandClient(
             true
         }
         check(confirmed == true) { "Timed out confirming sing-box Clash mode $requested" }
-    }
-
-    fun reloadService() {
-        requireClient().serviceReload()
     }
 
     fun serviceStartedAtMillis(): Long = requireClient().startedAt

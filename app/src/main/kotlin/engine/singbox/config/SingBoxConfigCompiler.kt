@@ -191,7 +191,7 @@ internal object SingBoxConfigCompiler {
             )
             .updated("endpoints", compileEndpoints(managedSourceRoot, appState))
             .updated("outbounds", compileOutbounds(managedSourceRoot, appState))
-            .updated("services", compileServices(managedSourceRoot, appState, runMode, exposePorts))
+            .updated("services", compileServices(managedSourceRoot, appState, exposePorts))
 
         runtime = runtime.updated("dns", dnsResult?.dns)
         val availableOutboundTags = sequenceOf(
@@ -760,7 +760,6 @@ internal fun compileEndpoints(root: JsonObject, appState: AppState): JsonArray {
 private fun compileServices(
     root: JsonObject,
     appState: AppState,
-    runMode: Int,
     exposePorts: Boolean,
 ): JsonArray? {
     val retained = (root["services"] as? JsonArray)
@@ -769,7 +768,7 @@ private fun compileServices(
             (service["type"] as? JsonPrimitive)?.contentOrNull == "api" || service.hasAppTag()
         }
         .toMutableList()
-    if (exposePorts && runMode.isRootRunMode()) {
+    if (exposePorts) {
         val control = appState.singBoxControlConfig()
         retained += buildJsonObject {
             put("type", "api")

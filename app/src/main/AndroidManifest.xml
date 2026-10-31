@@ -39,6 +39,21 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
+        <!--
+            Content providers are created in every process of the app, including the VPN
+            service's ":vpn" process. WorkManager is neither multi-process safe nor needed
+            there, so its automatic initializer is dropped and the UI process initializes it
+            on demand through AsteriskApplication's Configuration.Provider.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                tools:node="remove" />
+        </provider>
         <activity
             android:name="app.MainActivity"
             android:exported="true"
@@ -185,6 +200,7 @@
             android:exported="false"
             android:foregroundServiceType="systemExempted"
             android:permission="android.permission.BIND_VPN_SERVICE"
+            android:process=":vpn"
             tools:ignore="ForegroundServicePermission,VpnServicePolicy">
             <intent-filter>
                 <action android:name="android.net.VpnService" />
