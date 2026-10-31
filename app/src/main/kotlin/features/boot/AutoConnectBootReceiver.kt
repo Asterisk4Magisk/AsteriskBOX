@@ -8,7 +8,7 @@ import android.content.Context
 import android.content.Intent
 import app.modes.RunModeVpnService
 import data.AndroidAppStateStore
-import data.AppSettingsPreferences
+import engine.vpn.VpnSessionStore
 import features.logs.AndroidAppLogger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -71,7 +71,7 @@ class AutoConnectBootReceiver : BroadcastReceiver() {
         // An update only restores a tunnel that was up when the old version was killed; it must
         // not start one the user had stopped.
         if (action == Intent.ACTION_MY_PACKAGE_REPLACED &&
-            !AppSettingsPreferences(context).isVpnSessionActive()
+            !VpnSessionStore.wasRunning(context)
         ) {
             return false
         }

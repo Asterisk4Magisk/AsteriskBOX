@@ -34,29 +34,26 @@ internal object AsteriskVpnServiceIntents {
         }
     }
 
-    fun startIntent(
-        context: Context,
-        config: VpnServiceStartConfig,
-        resultReceiver: ResultReceiver? = null,
-    ): Intent {
+    /**
+     * The reply channel is installed by [AsteriskVpnService.awaitServiceCall] on the intent it
+     * sends, because the service process is the only party that knows when a call is answered.
+     */
+    fun startIntent(context: Context, config: VpnServiceStartConfig): Intent {
         return Intent(context, AsteriskVpnService::class.java).apply {
             action = ACTION_START
             writeStartConfig(config)
-            putServiceResultReceiver(resultReceiver)
         }
     }
 
-    fun reloadIntent(context: Context, resultReceiver: ResultReceiver? = null): Intent {
+    fun reloadIntent(context: Context): Intent {
         return Intent(context, AsteriskVpnService::class.java).apply {
             action = ACTION_RELOAD
-            putServiceResultReceiver(resultReceiver)
         }
     }
 
-    fun stopIntent(context: Context, resultReceiver: ResultReceiver? = null): Intent {
+    fun stopIntent(context: Context): Intent {
         return Intent(context, AsteriskVpnService::class.java).apply {
             action = ACTION_STOP
-            putServiceResultReceiver(resultReceiver)
         }
     }
 }

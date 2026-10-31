@@ -594,7 +594,7 @@ internal class SingBoxRuntimeRepository(
         // The sing-box core never runs in this process: ROOT modes own it through asteriskd, and
         // the VPN Service hosts it in its own ":vpn" process. Both are reached over the command
         // API listener the core exposes, exactly like a remote client.
-        return SingBoxCommandTarget(local = false, control = singBoxControlConfig())
+        return SingBoxCommandTarget(control = singBoxControlConfig())
     }
 
     private fun refreshDeviceState() {

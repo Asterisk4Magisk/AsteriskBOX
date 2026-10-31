@@ -300,6 +300,13 @@ internal class AndroidProxyEngine(
 
         fun accept(status: ProxyEngineStatus, source: AndroidModeProxyEngine): ProxyEngineStatus {
             activeEngine = status.runMode?.let(rootEnginesByRunMode::get) ?: source
+            if (source === vpnSingBoxEngine && status.running) {
+                // The tunnel outlives this process: after a task swipe or a boot restore this
+                // process has no runtime record of the local proxy, and its own fetches would
+                // otherwise bypass it. The persisted state carries the port the tunnel started
+                // with, which is the closest authority available here.
+                appState?.let { state -> LocalProxyRuntime.update(state.toLocalProxyOptions()) }
+            }
             return status.withTrafficStatsReconciled(appState)
         }
 

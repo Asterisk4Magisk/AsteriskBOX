@@ -12,6 +12,8 @@ import engine.proxy.mode.AndroidModeProxyEngine
 import engine.proxy.LocalProxyRuntime
 import engine.proxy.ProxyEngineStartRequest
 import engine.proxy.ProxyEngineStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal class VpnSingBoxEngine(
     private val context: Context,
@@ -43,10 +45,17 @@ internal class VpnSingBoxEngine(
             error(context.getString(R.string.error_vpn_permission_denied))
         }
         val config = VpnSingBoxConfigFactory.create(context, request)
-        AsteriskVpnService.start(
-            context = context,
-            config = config,
-        )
+        try {
+            AsteriskVpnService.start(
+                context = context,
+                config = config,
+            )
+        } catch (error: Throwable) {
+            // Nothing of this attempt may be left behind: a stale local proxy would send this
+            // process' own fetches to a port that no longer serves.
+            LocalProxyRuntime.clear()
+            throw error
+        }
         // The tunnel owns the local proxy now, and the service process cannot publish that to
         // this process, so record it here for the HTTP fetches this process performs.
         if (config.localProxyOptions.port > 0) {
@@ -62,17 +71,10 @@ internal class VpnSingBoxEngine(
         return status()
     }
 
-    /**
-     * Reapplies the configuration file that [VpnSingBoxConfigFactory] just rewrote to the running
-     * tunnel. The tunnel and its foreground notification stay up; the caller reconnects its
-     * command session afterwards.
-     */
-    suspend fun reload() {
-        AsteriskVpnService.reload(context)
-    }
-
-    override suspend fun status(): ProxyEngineStatus {
-        return ProxyEngineStatus(
+    override suspend fun status(): ProxyEngineStatus = withContext(Dispatchers.IO) {
+        // `runtimeRunning` opens and locks the session lease, so it must not run on the caller's
+        // thread: applyConfiguration reaches this from Dispatchers.Main.immediate.
+        ProxyEngineStatus(
             running = runtimeRunning(),
             runMode = runMode,
         )

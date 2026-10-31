@@ -44,26 +44,11 @@ internal class AppSettingsPreferences(
     }
 
     /**
-     * Whether the VPN Service tunnel was up when the process last ran. It is cleared on every
-     * orderly stop and survives only a process kill, which lets an app update restore the
-     * tunnel without starting one the user had stopped.
-     */
-    fun isVpnSessionActive(): Boolean = preferences.getBoolean(KeyVpnSessionActive, false)
-
-    /**
-     * The persisted run mode. The VPN service process reads it cold at boot to refuse a resume
-     * request while the user has switched to a ROOT mode, so it must not need the app state.
+     * The persisted run mode, normalized. Shared with the VPN service process only as a fallback:
+     * a long-lived service process serves a stale cache, so the UI also mirrors the mode into
+     * [engine.vpn.VpnRunModeStore].
      */
     fun loadRunMode(): Int = normalizeRunMode(preferences.getInt(KeyRunMode, RunModeVpnService))
-
-    @SuppressLint("UseKtx", "ApplySharedPref")
-    fun setVpnSessionActive(active: Boolean) {
-        if (isVpnSessionActive() == active) return
-        val editor = preferences.edit().putBoolean(KeyVpnSessionActive, active)
-        // A start is committed synchronously: an app update kills the process without a
-        // callback. A stop may also run on the main thread, so it is applied asynchronously.
-        if (active) editor.commit() else editor.apply()
-    }
 
     fun load(): AppState {
         val defaults = AppState(singBoxControlSecret = UUID.randomUUID().toString())
@@ -123,7 +108,7 @@ internal class AppSettingsPreferences(
             ),
             routeFinal = preferences.getString(KeyRouteFinal, defaults.routeFinal)
                 ?: defaults.routeFinal,
-            runMode = preferences.getInt(KeyRunMode, defaults.runMode),
+            runMode = loadRunMode(),
             singBoxMode = preferences.getInt(KeySingBoxMode, defaults.singBoxMode),
             singBoxProxyLayout = preferences.getInt(
                 KeySingBoxProxyLayout,
@@ -507,7 +492,6 @@ internal const val KeyCoreLogLevel = "core_log_level"
 internal const val KeyEnableTrafficStatsNotification = "enable_traffic_stats_notification"
 internal const val KeyEnableBroadcastControl = "enable_broadcast_control"
 internal const val KeyEnableAutoConnect = "enable_auto_connect"
-private const val KeyVpnSessionActive = "vpn_session_active"
 internal const val KeyEnableResourceAutoUpdate = "enable_resource_auto_update"
 internal const val KeyResourceAutoUpdateInterval = "resource_auto_update_interval"
 internal const val KeyResourceFileSource = "resource_file_source"

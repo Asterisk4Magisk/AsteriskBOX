@@ -28,11 +28,25 @@ internal object VpnSessionLease {
     private const val FileName = "vpn-session.lock"
     private const val LogTag = "VpnSessionLease"
 
+    /**
+     * Whether this process holds the lease. POSIX record locks cannot be probed from the lock
+     * owner — an overlapping `tryLock` in the same JVM throws and closing a second descriptor
+     * drops every lock this process holds — so an in-process query is answered from here.
+     */
+    @Volatile
+    private var ownedLocally = false
+
     /** Taken by the service process; closing it, or the process dying, ends the lease. */
     fun acquire(context: Context): Closeable? {
         return runCatching {
             val access = RandomAccessFile(file(context), "rw")
-            val lock = access.channel.lock()
+            val lock = try {
+                access.channel.lock()
+            } catch (error: Throwable) {
+                runCatching { access.close() }
+                throw error
+            }
+            ownedLocally = true
             object : Closeable {
                 override fun close() {
                     runCatching { lock.release() }
@@ -40,6 +54,7 @@ internal object VpnSessionLease {
                             AndroidAppLogger.warn(LogTag, "Failed to release the VPN session lease", error)
                         }
                     runCatching { access.close() }
+                    ownedLocally = false
                 }
             }
         }.onFailure { error ->
@@ -59,20 +74,23 @@ internal object VpnSessionLease {
      * Serialized because two overlapping locks on the same file inside one JVM throw
      * [java.nio.channels.OverlappingFileLockException]; status reads are not single-flight.
      */
-    fun isHeld(context: Context): Boolean = synchronized(probeLock) {
-        val target = file(context)
-        if (!target.isFile) return false
-        runCatching {
-            // Read-only: probing must never create the file that marks a session.
-            RandomAccessFile(target, "r").use { access ->
-                val shared = access.channel.tryLock(0L, Long.MAX_VALUE, true) ?: return true
-                // Nobody holds an exclusive lease: this process just took it provisionally.
-                runCatching { shared.release() }
+    fun isHeld(context: Context): Boolean {
+        if (ownedLocally) return true
+        return synchronized(probeLock) {
+            val target = file(context)
+            if (!target.isFile) return false
+            runCatching {
+                // Read-only: probing must never create the file that marks a session.
+                RandomAccessFile(target, "r").use { access ->
+                    val shared = access.channel.tryLock(0L, Long.MAX_VALUE, true) ?: return true
+                    // Nobody holds an exclusive lease: this process just took it provisionally.
+                    runCatching { shared.release() }
+                    false
+                }
+            }.getOrElse { error ->
+                AndroidAppLogger.warn(LogTag, "Failed to probe the VPN session lease", error)
                 false
             }
-        }.getOrElse { error ->
-            AndroidAppLogger.warn(LogTag, "Failed to probe the VPN session lease", error)
-            false
         }
     }
 
@@ -111,8 +129,18 @@ internal object VpnSessionStore {
         write(context, JSONObject().put(KeyVersion, Version).put(KeyRunning, false))
     }
 
-    fun isRunning(context: Context): Boolean {
-        return VpnSessionLease.isHeld(context) && read(context)?.optBoolean(KeyRunning, false) == true
+    /** Answered by the lease alone; the JSON record is telemetry and may lag behind a failed write. */
+    fun isRunning(context: Context): Boolean = VpnSessionLease.isHeld(context)
+
+    /**
+     * Whether the last session was still up when its process ended without an orderly stop.
+     *
+     * The boot receiver uses this to decide if an app update should restore the tunnel. After a
+     * clean stop [markStopped] has already written `false`, so this is only `true` for a session
+     * that was killed (update, crash).
+     */
+    fun wasRunning(context: Context): Boolean {
+        return read(context)?.optBoolean(KeyRunning, false) == true
     }
 
     private fun read(context: Context): JSONObject? {
@@ -135,12 +163,47 @@ internal object VpnSessionStore {
 }
 
 /**
+ * The run mode as the UI process last saw it.
+ *
+ * The service process cannot read the app state database and cannot trust its own cached
+ * `SharedPreferences` copy after a stop left the process alive, so the UI mirrors the mode into
+ * this file. A system-driven start (always-on VPN after a network change) must not bring a VPN
+ * tunnel up while the user has switched to a ROOT mode.
+ */
+internal object VpnRunModeStore {
+    private const val FileName = "vpn-run-mode"
+    private const val LogTag = "VpnRunModeStore"
+
+    fun write(context: Context, runMode: Int) {
+        runCatching {
+            writeAtomically(file(context)) { output ->
+                output.write(runMode.toString().toByteArray(Charsets.UTF_8))
+            }
+        }.onFailure { error ->
+            AndroidAppLogger.warn(LogTag, "Failed to persist the VPN run mode", error)
+        }
+    }
+
+    fun read(context: Context): Int? {
+        val file = file(context)
+        if (!file.isFile) return null
+        return runCatching { file.readText().trim().toIntOrNull() }.getOrNull()
+    }
+
+    private fun file(context: Context): File = File(vpnRuntimeDirectory(context), FileName)
+}
+
+/**
  * The configuration of the last successfully started tunnel.
  *
  * The boot receiver and the system's always-on VPN start the service with no configuration and
  * no access to the app state database (which stays owned by the UI process), so the service
  * replays the configuration that produced the last tunnel instead of recompiling it. The record
  * reuses the intent wire format, so the two paths cannot drift apart.
+ *
+ * It is deliberately kept across stops: auto connect at boot restores the last configuration even
+ * when the user had stopped the tunnel before shutting down, and every successful start or reload
+ * overwrites it.
  */
 internal object VpnStartConfigStore {
     private const val FileName = "vpn-start-config.parcel"
@@ -178,10 +241,6 @@ internal object VpnStartConfigStore {
         } finally {
             parcel.recycle()
         }
-    }
-
-    fun clear(context: Context) {
-        runCatching { file(context).delete() }
     }
 
     private fun file(context: Context): File = File(vpnRuntimeDirectory(context), FileName)

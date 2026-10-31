@@ -16,7 +16,7 @@ import kotlin.time.Duration.Companion.milliseconds
 /** ROOT startup also runs without a dashboard/runtime repository (for example, from a tile). */
 internal suspend fun restoreRootSingBoxMode(appState: AppState) = withContext(Dispatchers.IO) {
     val client = SingBoxCommandClient(
-        target = SingBoxCommandTarget(local = false, control = appState.singBoxControlConfig()),
+        target = SingBoxCommandTarget(control = appState.singBoxControlConfig()),
         listener = object : SingBoxCommandListener {
             override fun onConnected() = Unit
             override fun onDisconnected(message: String) = Unit

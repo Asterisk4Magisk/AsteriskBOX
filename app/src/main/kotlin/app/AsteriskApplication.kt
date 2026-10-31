@@ -51,12 +51,25 @@ import engine.singbox.runtime.SingBoxRuntimeRepository
 import engine.proxy.AndroidProxyEngine
 import system.AndroidRootShellGateway
 import engine.vpn.AndroidLibboxRuntime
+import engine.vpn.VpnRunModeStore
 import engine.vpn.isVpnServiceProcess
 
 class AsteriskApplication : Application(), SingletonImageLoader.Factory, Configuration.Provider {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /**
+     * State and orchestration belong to the UI process. The VPN service process hosts the core
+     * only; a stray access there would open a second state database (or a second ROOT engine)
+     * instead of failing, so it fails loudly.
+     */
+    private fun requireUiProcess(owner: String) {
+        check(!isVpnServiceProcess()) { "$owner is not available in the VPN service process" }
+    }
     internal val homeServiceOperationState = HomeServiceOperationState()
-    internal val singBoxRuntime: SingBoxRuntimeRepository by lazy { SingBoxRuntimeRepository(appScope, this) }
+    internal val singBoxRuntime: SingBoxRuntimeRepository by lazy {
+        requireUiProcess("SingBoxRuntimeRepository")
+        SingBoxRuntimeRepository(appScope, this)
+    }
     internal val outboundPingRuntime: OutboundPingRuntimeRepository by lazy {
         OutboundPingRuntimeRepository(
             scope = appScope,
@@ -67,11 +80,13 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory, Configu
         OutboundListProjectionCache()
     }
     internal val stateStore: AndroidAppStateStore by lazy {
+        requireUiProcess("AndroidAppStateStore")
         AndroidAppStateStore.get(applicationContext)
     }
 
     /** Shared by every entry point so proxy and traffic stats operations are serialized. */
     internal val proxyEngine: AndroidProxyEngine by lazy {
+        requireUiProcess("AndroidProxyEngine")
         AndroidProxyEngine(
             context = applicationContext,
             rootAccess = AndroidRootShellGateway(),
@@ -85,6 +100,7 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory, Configu
         )
     }
     internal val outboundRepository: OutboundRepository by lazy {
+        requireUiProcess("OutboundRepository")
         OutboundRepository(
             gateway = object : OutboundStateGateway {
                 override fun snapshot(): AppState = stateStore.state.value
@@ -216,8 +232,9 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory, Configu
         AndroidLibboxRuntime.setup(this)
         AndroidLogcatRepository.initialize(applicationContext)
         // The VPN Service runs in its own process and hosts the sing-box core only. The state
-        // store, the schedulers and the log repositories that read service logs belong to the UI
-        // process; initializing them here would open the same database and files twice.
+        // store, the schedulers and the repositories that read core/asteriskd logs belong to the
+        // UI process; initializing them here would open the same state database twice. Only the
+        // application log stays shared, and its writer is serialized across processes.
         if (isVpnServiceProcess()) return
         AndroidCoreLogRepository.initialize(applicationContext)
         AndroidAsteriskdLogRepository.initialize(applicationContext)
@@ -227,6 +244,14 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory, Configu
                 .map { state -> resourceAutoUpdateIntervalMillis(state.enableResourceAutoUpdate, state.resourceAutoUpdateInterval) }
                 .distinctUntilChanged()
                 .collect(scheduler::reconcile)
+        }
+        appScope.launch {
+            // The service process cannot read the state database, so mirror the run mode where it
+            // can see it before the next system-driven start.
+            stateStore.state
+                .map { state -> state.runMode }
+                .distinctUntilChanged()
+                .collect { runMode -> VpnRunModeStore.write(applicationContext, runMode) }
         }
         appScope.launch {
             stateStore.state
@@ -262,10 +287,13 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory, Configu
     /**
      * WorkManager is initialized on demand instead of at process start (see the manifest):
      * its automatic initializer would also run in the ":vpn" process, which never uses it and
-     * must not open a second WorkManager database.
+     * must not open a second WorkManager database. Asking for the configuration there is a
+     * programming error, so it fails instead of silently starting WorkManager twice.
      */
-    override val workManagerConfiguration: Configuration
-        get() = Configuration.Builder().build()
+    override val workManagerConfiguration: Configuration by lazy {
+        requireUiProcess("WorkManager")
+        Configuration.Builder().build()
+    }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader {
         return ImageLoader.Builder(context)

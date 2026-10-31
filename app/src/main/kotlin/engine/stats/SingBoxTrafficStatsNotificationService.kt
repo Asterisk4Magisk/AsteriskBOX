@@ -53,7 +53,6 @@ private const val ActionStop = "engine.stats.action.STOP"
 private const val ExtraHost = "host"
 private const val ExtraPort = "port"
 private const val ExtraSecret = "secret"
-private const val ExtraLocal = "local"
 private const val ChannelId = "singBox_traffic_stats"
 private const val NotificationId = 3001
 private const val LogTag = "SingBoxTrafficStats"
@@ -212,7 +211,7 @@ class SingBoxTrafficStatsNotificationService : Service() {
 
     private fun commandTraffic(runtime: SingBoxTrafficStatsRuntime): Flow<SingBoxTrafficSample> = callbackFlow {
         val client = SingBoxCommandClient(
-            target = SingBoxCommandTarget(local = runtime.local, control = runtime.control),
+            target = SingBoxCommandTarget(control = runtime.control),
             listener = object : SingBoxCommandListener {
                 override fun onConnected() = Unit
 
@@ -400,7 +399,6 @@ private fun Intent.putRuntime(runtime: SingBoxTrafficStatsRuntime) {
     putExtra(ExtraPort, runtime.control.port)
     putExtra(ExtraSecret, runtime.control.secret)
     putExtra(ExtraScheme, runtime.control.scheme)
-    putExtra(ExtraLocal, runtime.local)
 }
 
 private fun Intent.readRuntime(): SingBoxTrafficStatsRuntime? {
@@ -413,7 +411,6 @@ private fun Intent.readRuntime(): SingBoxTrafficStatsRuntime? {
             secret = getStringExtra(ExtraSecret).orEmpty(),
             scheme = getStringExtra(ExtraScheme).orEmpty().takeIf { it in setOf("http", "https") } ?: "http",
         ),
-        local = getBooleanExtra(ExtraLocal, true),
     )
 }
 
