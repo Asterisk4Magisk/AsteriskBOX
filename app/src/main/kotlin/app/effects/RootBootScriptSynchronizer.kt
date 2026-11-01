@@ -69,6 +69,7 @@ private fun AppState.toRootBootScriptRefresh(): RootBootScriptRefresh {
             languageMode = 0,
             seedIndex = 0,
             singBoxProxyLayout = 0,
+            singBoxProxyGroupLayout = 0,
             singBoxProxySort = 0,
             proxyRunning = false,
             enableTrafficStatsNotification = false,

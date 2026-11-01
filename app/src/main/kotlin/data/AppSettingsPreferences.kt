@@ -105,6 +105,10 @@ internal class AppSettingsPreferences(
                 KeySingBoxProxyLayout,
                 defaults.singBoxProxyLayout,
             ),
+            singBoxProxyGroupLayout = preferences.getInt(
+                KeySingBoxProxyGroupLayout,
+                defaults.singBoxProxyGroupLayout,
+            ),
             singBoxProxySort = preferences.getInt(
                 KeySingBoxProxySort,
                 defaults.singBoxProxySort,
@@ -462,6 +466,7 @@ internal const val KeyRouteFinal = "route_final"
 internal const val KeyRunMode = "run_mode"
 internal const val KeySingBoxMode = "sing_box_mode"
 internal const val KeySingBoxProxyLayout = "sing_box_proxy_layout"
+internal const val KeySingBoxProxyGroupLayout = "sing_box_proxy_group_layout"
 internal const val KeySingBoxProxySort = "sing_box_proxy_sort"
 internal const val KeySingBoxControlPort = "sing_box_control_port"
 internal const val KeySingBoxControlSecret = "sing_box_control_secret"

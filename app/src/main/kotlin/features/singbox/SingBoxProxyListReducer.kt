@@ -89,6 +89,36 @@ internal fun reduceSingBoxProxyNodeNames(
         .orEmpty()
 }
 
+internal data class SingBoxProxyGroupSection(
+    val group: SingBoxProxyGroup,
+    val nodes: List<String>,
+)
+
+internal fun reduceSingBoxProxyGroupSections(
+    proxies: SingBoxProxiesState,
+    query: String,
+    sort: Int,
+    displayNamesForGroup: (SingBoxProxyGroup) -> Map<String, String>,
+    testingBaselines: Map<String, Long>,
+    failedNodes: Set<String>,
+): List<SingBoxProxyGroupSection> {
+    val keyword = query.trim()
+    return proxies.groups.mapNotNull { group ->
+        val matchesGroup = group.displayName.contains(keyword, ignoreCase = true) ||
+            group.name.contains(keyword, ignoreCase = true)
+        val nodes = reduceSingBoxProxyNodeNames(
+            group = group,
+            proxies = proxies,
+            query = if (matchesGroup) "" else keyword,
+            sort = sort,
+            displayNames = displayNamesForGroup(group),
+            testingBaselines = testingBaselines,
+            failedNodes = failedNodes,
+        )
+        if (matchesGroup || nodes.isNotEmpty()) SingBoxProxyGroupSection(group, nodes) else null
+    }
+}
+
 internal fun resolveSingBoxProxyLayout(layout: Int, isWideScreen: Boolean): Int {
     return when (layout) {
         SingBoxProxyLayoutSingle, SingBoxProxyLayoutDouble, SingBoxProxyLayoutMultiple -> layout

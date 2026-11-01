@@ -45,6 +45,9 @@ const val SingBoxProxyLayoutSingle = 1
 const val SingBoxProxyLayoutDouble = 2
 const val SingBoxProxyLayoutMultiple = 3
 
+const val SingBoxProxyGroupLayoutExpandable = 0
+const val SingBoxProxyGroupLayoutTabs = 1
+
 const val SingBoxProxySortDefault = 0
 const val SingBoxProxySortName = 1
 const val SingBoxProxySortDelay = 2

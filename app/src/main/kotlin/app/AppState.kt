@@ -12,6 +12,7 @@ import app.modes.isRootRunMode
 import app.modes.supportsAppListEnhancement
 import app.modes.RunModeVpnService
 import app.modes.SingBoxModeRule
+import app.modes.SingBoxProxyGroupLayoutTabs
 import app.modes.SingBoxProxyLayoutAuto
 import app.modes.SingBoxProxySortDefault
 import engine.singbox.DefaultSingBoxControlPort
@@ -66,6 +67,7 @@ data class AppState(
     val runMode: Int = RunModeVpnService,
     val singBoxMode: Int = SingBoxModeRule,
     val singBoxProxyLayout: Int = SingBoxProxyLayoutAuto,
+    val singBoxProxyGroupLayout: Int = SingBoxProxyGroupLayoutTabs,
     val singBoxProxySort: Int = SingBoxProxySortDefault,
     val singBoxControlPort: String = DefaultSingBoxControlPort.toString(),
     val singBoxControlSecret: String = "",

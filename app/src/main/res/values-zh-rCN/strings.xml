@@ -270,9 +270,14 @@
     <string name="sing_box_proxies_delay_testing">测试中</string>
     <string name="sing_box_proxies_delay_testing_progress">%1$d/%2$d</string>
     <string name="sing_box_proxies_group_test">整组测试</string>
+    <string name="sing_box_proxies_group_expanded">已展开</string>
+    <string name="sing_box_proxies_group_collapsed">已折叠</string>
     <string name="sing_box_proxies_loading">正在加载代理…</string>
     <string name="sing_box_proxies_locate_selected">定位当前选中节点</string>
-    <string name="sing_box_proxies_option_layout">布局</string>
+    <string name="sing_box_proxies_option_group_layout">代理组布局</string>
+    <string name="sing_box_proxies_option_group_layout_expandable">展开列表</string>
+    <string name="sing_box_proxies_option_group_layout_tabs">顶栏标签页</string>
+    <string name="sing_box_proxies_option_layout">代理布局</string>
     <string name="sing_box_proxies_option_layout_auto">自动</string>
     <string name="sing_box_proxies_option_layout_double">双列</string>
     <string name="sing_box_proxies_option_layout_multiple">多列</string>

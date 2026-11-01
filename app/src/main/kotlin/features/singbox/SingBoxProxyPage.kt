@@ -63,8 +63,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -84,6 +87,8 @@ import app.R
 import app.collectAppState
 import app.isManagedSingBoxTag
 import app.managedOutboundGroupSelectorTag
+import app.modes.SingBoxProxyGroupLayoutExpandable
+import app.modes.SingBoxProxyGroupLayoutTabs
 import app.modes.SingBoxProxyLayoutAuto
 import app.modes.SingBoxProxyLayoutDouble
 import app.modes.SingBoxProxyLayoutMultiple
@@ -103,6 +108,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import ui.components.AsteriskDropdownMenuItem
+import ui.components.AsteriskExpansionIndicator
+import ui.components.AsteriskExpressiveCard
 import ui.components.AsteriskFilterChip
 import ui.components.AsteriskInfoChip
 import ui.components.AsteriskScaffold
@@ -195,6 +202,13 @@ fun SingBoxProxyPage(
     val managedGroupNames = appState.outboundGroups.associate { group ->
         managedOutboundGroupSelectorTag(group.id, group.name) to group.name
     }
+    fun groupNodeDisplayNames(group: SingBoxProxyGroup?) = if (
+        group != null && group.name in managedGroupNames
+    ) {
+        outboundDisplayNamesWithoutGroup
+    } else {
+        outboundDisplayNames
+    }
     val visibleProxies = remember(
         proxies,
         managedGroupNames,
@@ -227,12 +241,20 @@ fun SingBoxProxyPage(
     val testingTarget = runtimeState.delayTestingTarget
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val selectedGroup = visibleProxies.groups.firstOrNull { group -> group.name == resolvedSelectedGroupName }
+    val groupLayout = if (appState.singBoxProxyGroupLayout == SingBoxProxyGroupLayoutExpandable) {
+        SingBoxProxyGroupLayoutExpandable
+    } else {
+        SingBoxProxyGroupLayoutTabs
+    }
     val proxyLayout = resolveSingBoxProxyLayout(appState.singBoxProxyLayout, isWideScreen)
     val columns = resolveSingBoxProxyColumns(proxyLayout)
     var pendingSelections by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var locateRequestTrigger by remember { mutableIntStateOf(0) }
+    var expandedGroupNames by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
+    val keyword = searchQuery.trim()
+    var searchCollapsedGroupNames by remember(keyword) { mutableStateOf<Set<String>>(emptySet()) }
     val resolvedSelectedGroupIndex = groupNames.indexOf(resolvedSelectedGroupName).coerceAtLeast(0)
-    val groupPagerState = key(groupNames) {
+    val groupPagerState = key(groupNames, groupLayout) {
         rememberPagerState(
             initialPage = resolvedSelectedGroupIndex,
             pageCount = { groupNames.size.coerceAtLeast(1) },
@@ -243,11 +265,12 @@ fun SingBoxProxyPage(
 
     LaunchedEffect(groupNames) {
         pendingSelections = pendingSelections.filterKeys { groupName -> groupName in groupNames }
+        expandedGroupNames = expandedGroupNames.filter { groupName -> groupName in groupNames }.toSet()
         if (selectedGroupName !in groupNames) {
             selectedGroupName = groupNames.firstOrNull().orEmpty()
         }
         val lastIndex = groupNames.lastIndex
-        if (lastIndex >= 0 && groupPagerState.currentPage > lastIndex) {
+        if (groupLayout == SingBoxProxyGroupLayoutTabs && lastIndex >= 0 && groupPagerState.currentPage > lastIndex) {
             groupPagerState.scrollToPage(lastIndex)
         }
     }
@@ -260,7 +283,8 @@ fun SingBoxProxyPage(
         }
     }
 
-    LaunchedEffect(resolvedSelectedGroupName, groupNames) {
+    LaunchedEffect(resolvedSelectedGroupName, groupNames, groupLayout) {
+        if (groupLayout != SingBoxProxyGroupLayoutTabs) return@LaunchedEffect
         val selectedIndex = groupNames.indexOf(resolvedSelectedGroupName)
         if (
             selectedIndex >= 0 &&
@@ -275,6 +299,7 @@ fun SingBoxProxyPage(
     }
 
     LaunchedEffect(groupPagerState, groupNames) {
+        if (groupLayout != SingBoxProxyGroupLayoutTabs) return@LaunchedEffect
         snapshotFlow { groupPagerState.targetPage }
             .collect { page ->
                 groupNames.getOrNull(page)?.let { groupName ->
@@ -366,8 +391,12 @@ fun SingBoxProxyPage(
                             exit = AsteriskMotion.fadeExit(contentEffectsMotion),
                         ) {
                             SingBoxProxyOptionsMenu(
+                                groupLayout = groupLayout,
                                 layout = appState.singBoxProxyLayout,
                                 sort = resolveSingBoxProxySort(appState.singBoxProxySort),
+                                onGroupLayoutChange = { layout ->
+                                    updateAppState { state -> state.copy(singBoxProxyGroupLayout = layout) }
+                                },
                                 onLayoutChange = { layout ->
                                     updateAppState { state ->
                                         state.copy(singBoxProxyLayout = layout)
@@ -383,7 +412,8 @@ fun SingBoxProxyPage(
                     },
                 )
                 AnimatedVisibility(
-                    visible = contentState != SingBoxProxyContentState.ServiceStopped && visibleProxies.groups.size > 1,
+                    visible = groupLayout == SingBoxProxyGroupLayoutTabs &&
+                        contentState != SingBoxProxyContentState.ServiceStopped && visibleProxies.groups.size > 1,
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
@@ -406,7 +436,8 @@ fun SingBoxProxyPage(
             outerPadding = padding,
             isWideScreen = isWideScreen,
         )
-        val listPadding = pageListPadding(contentPadding, bottomExtra = 104.dp)
+        val expandable = groupLayout == SingBoxProxyGroupLayoutExpandable && visibleProxies.groups.isNotEmpty()
+        val listPadding = pageListPadding(contentPadding, bottomExtra = if (expandable) 12.dp else 104.dp)
 
         AnimatedContent(
             targetState = contentState == SingBoxProxyContentState.ServiceStopped,
@@ -420,19 +451,165 @@ fun SingBoxProxyPage(
                 )
             } else {
                 Box {
-                    HorizontalPager(
+                    if (expandable) {
+                        val sections = remember(
+                            visibleProxies,
+                            keyword,
+                            appState.singBoxProxySort,
+                            managedGroupNames,
+                            outboundDisplayNames,
+                            outboundDisplayNamesWithoutGroup,
+                            runtimeState.delayTestingBaselines,
+                            runtimeState.delayFailedNodes,
+                        ) {
+                            reduceSingBoxProxyGroupSections(
+                                proxies = visibleProxies,
+                                query = keyword,
+                                sort = appState.singBoxProxySort,
+                                displayNamesForGroup = ::groupNodeDisplayNames,
+                                testingBaselines = runtimeState.delayTestingBaselines,
+                                failedNodes = runtimeState.delayFailedNodes,
+                            )
+                        }
+                        fun isExpanded(group: SingBoxProxyGroup) = if (keyword.isNotEmpty()) {
+                            group.name !in searchCollapsedGroupNames
+                        } else {
+                            group.name in expandedGroupNames
+                        }
+                        val gridState = rememberLazyGridState()
+                        var previousKeyword by remember { mutableStateOf(keyword) }
+                        LaunchedEffect(keyword) {
+                            if (previousKeyword != keyword) {
+                                previousKeyword = keyword
+                                gridState.scrollToItem(0)
+                            }
+                        }
+                        var handledLocateRequest by remember { mutableIntStateOf(locateRequestTrigger) }
+                        LaunchedEffect(locateRequestTrigger) {
+                            if (handledLocateRequest == locateRequestTrigger) return@LaunchedEffect
+                            handledLocateRequest = locateRequestTrigger
+                            var itemIndex = 0
+                            for ((group, nodes) in sections) {
+                                if (group.name == selectedGroupName) {
+                                    val currentName = pendingSelections[group.name] ?: group.now
+                                    val nodeIndex = nodes.indexOf(currentName)
+                                    if (nodeIndex >= 0) {
+                                        gridState.animateScrollToItem(itemIndex + 1 + (nodeIndex / columns) * columns)
+                                    }
+                                    break
+                                }
+                                itemIndex += 1 + if (isExpanded(group)) nodes.size.coerceAtLeast(1) else 0
+                            }
+                        }
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(columns),
+                            state = gridState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = listPadding,
+                            verticalArrangement = Arrangement.spacedBy(SingBoxProxyNodeGridSpacing),
+                            horizontalArrangement = Arrangement.spacedBy(SingBoxProxyNodeGridSpacing),
+                        ) {
+                            if (sections.isEmpty()) {
+                                item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                                    SingBoxProxyEmptyCard()
+                                }
+                            }
+                            sections.forEach { (group, nodes) ->
+                                val expanded = isExpanded(group)
+                                val currentName = pendingSelections[group.name] ?: group.now
+                                val displayNames = groupNodeDisplayNames(group)
+                                item(
+                                    key = "group:${group.name}",
+                                    contentType = "group",
+                                    span = { GridItemSpan(maxLineSpan) },
+                                ) {
+                                    SingBoxProxyGroupCard(
+                                        group = group,
+                                        currentDisplayName = displayNames[currentName]
+                                            ?: currentName.visibleRuntimeName(unavailableLabel),
+                                        expanded = expanded,
+                                        testing = testingTarget == group.name,
+                                        testingCompleted = runtimeState.delayTestingCompleted,
+                                        testingTotal = runtimeState.delayTestingTotal,
+                                        delayTestEnabled = runtimeAvailable && testingTarget == null,
+                                        canLocate = currentName in nodes,
+                                        onToggle = {
+                                            selectedGroupName = group.name
+                                            if (keyword.isNotEmpty()) {
+                                                searchCollapsedGroupNames = if (expanded) searchCollapsedGroupNames + group.name
+                                                    else searchCollapsedGroupNames - group.name
+                                            } else {
+                                                expandedGroupNames = if (expanded) expandedGroupNames - group.name
+                                                    else expandedGroupNames + group.name
+                                            }
+                                        },
+                                        onLocate = {
+                                            selectedGroupName = group.name
+                                            expandedGroupNames = expandedGroupNames + group.name
+                                            searchCollapsedGroupNames = searchCollapsedGroupNames - group.name
+                                            locateRequestTrigger++
+                                        },
+                                        onDelayTest = { testGroup(group) },
+                                        modifier = Modifier.animateItem(
+                                            fadeInSpec = AsteriskMotion.effects(),
+                                            placementSpec = AsteriskMotion.spatial(),
+                                            fadeOutSpec = AsteriskMotion.effects(),
+                                        ),
+                                    )
+                                }
+                                if (expanded) {
+                                    if (nodes.isEmpty()) {
+                                        item(key = "empty:${group.name}", span = { GridItemSpan(maxLineSpan) }) {
+                                            SingBoxProxyEmptyCard()
+                                        }
+                                    }
+                                    items(
+                                        items = nodes,
+                                        key = { "node:${group.name.length}:${group.name}:$it" },
+                                        contentType = { "node" },
+                                    ) { nodeName ->
+                                        val node = proxies.node(nodeName)
+                                        val selectionBehavior = resolveSingBoxProxySelectionBehavior(group, runtimeAvailable)
+                                        val onSelect: (() -> Unit)? = if (selectionBehavior.canSelect) {
+                                            { selectProxy(group, node) }
+                                        } else {
+                                            null
+                                        }
+                                        SingBoxProxyNodeCard(
+                                            node = node,
+                                            displayName = displayNames[node.name]
+                                                ?: node.name.visibleRuntimeName(unavailableLabel),
+                                            selected = isSingBoxProxyNodeCurrent(group, node.name, pendingSelections),
+                                            selectionEnabled = selectionBehavior.cardEnabled,
+                                            delayTestEnabled = runtimeAvailable && testingTarget == null,
+                                            compact = columns > 1,
+                                            delayStatus = resolveSingBoxProxyDelayStatus(
+                                                nodeName = node.name,
+                                                delay = node.delay,
+                                                delayUpdatedAtEpochSeconds = node.delayUpdatedAtEpochSeconds,
+                                                testingBaselines = runtimeState.delayTestingBaselines,
+                                                failedNodes = runtimeState.delayFailedNodes,
+                                            ),
+                                            testing = testingTarget == node.name,
+                                            onSelect = onSelect,
+                                            onDelayTest = { testProxy(node) },
+                                            modifier = Modifier.animateItem(
+                                                fadeInSpec = AsteriskMotion.effects(),
+                                                placementSpec = AsteriskMotion.spatial(),
+                                                fadeOutSpec = AsteriskMotion.effects(),
+                                            ).fillMaxWidth(),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else HorizontalPager(
                         state = groupPagerState,
                         modifier = Modifier.fillMaxSize(),
                         verticalAlignment = Alignment.Top,
                     ) { page ->
                         val group = visibleProxies.groups.getOrNull(page)
-                        val pageDisplayNames = if (
-                            group != null && group.name in managedGroupNames
-                        ) {
-                            outboundDisplayNamesWithoutGroup
-                        } else {
-                            outboundDisplayNames
-                        }
+                        val pageDisplayNames = groupNodeDisplayNames(group)
                         val pageNodes = remember(
                             group,
                             visibleProxies,
@@ -455,9 +632,12 @@ fun SingBoxProxyPage(
                         val selectedNodeName = (pendingSelections[group?.name] ?: group?.now).orEmpty().takeIf(String::isNotBlank)
                         val pageGridState = rememberLazyGridState()
                         val isCurrentPage = groupPagerState.currentPage == page
+                        var handledLocateRequest by remember { mutableIntStateOf(locateRequestTrigger) }
 
                         LaunchedEffect(locateRequestTrigger) {
-                            if (locateRequestTrigger == 0 || !isCurrentPage) return@LaunchedEffect
+                            if (handledLocateRequest == locateRequestTrigger) return@LaunchedEffect
+                            handledLocateRequest = locateRequestTrigger
+                            if (!isCurrentPage) return@LaunchedEffect
                             if (group == null || pageNodes.isEmpty() || selectedNodeName == null) return@LaunchedEffect
                             val selectedIndex = pageNodes.indexOf(selectedNodeName)
                             if (selectedIndex < 0) return@LaunchedEffect
@@ -552,7 +732,7 @@ fun SingBoxProxyPage(
                             }
                         }
                     }
-                    selectedGroup?.let { group ->
+                    selectedGroup?.takeIf { !expandable }?.let { group ->
                         ProxyFloatingActions(
                             runtimeAvailable = runtimeAvailable,
                             testing = testingTarget == group.name,
@@ -567,6 +747,89 @@ fun SingBoxProxyPage(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SingBoxProxyGroupCard(
+    group: SingBoxProxyGroup,
+    currentDisplayName: String,
+    expanded: Boolean,
+    testing: Boolean,
+    testingCompleted: Int,
+    testingTotal: Int,
+    delayTestEnabled: Boolean,
+    canLocate: Boolean,
+    onToggle: () -> Unit,
+    onLocate: () -> Unit,
+    onDelayTest: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val expansionState = stringResource(
+        if (expanded) R.string.sing_box_proxies_group_expanded else R.string.sing_box_proxies_group_collapsed,
+    )
+    AsteriskExpressiveCard(
+        expanded = expanded,
+        selected = expanded,
+        onClick = onToggle,
+        modifier = modifier.fillMaxWidth().semantics {
+            role = Role.Button
+            stateDescription = expansionState
+        },
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = group.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = if (testing && testingTotal > 0) {
+                        stringResource(
+                            R.string.sing_box_proxies_delay_testing_progress,
+                            testingCompleted.coerceAtMost(testingTotal),
+                            testingTotal,
+                        )
+                    } else {
+                        "${group.type.displaySingBoxProtocolName()} · ${group.all.size}"
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (currentDisplayName.isNotBlank()) {
+                    Text(
+                        text = currentDisplayName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            IconButton(onClick = onLocate, enabled = canLocate) {
+                Icon(Icons.Rounded.MyLocation, stringResource(R.string.sing_box_proxies_locate_selected))
+            }
+            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                if (testing) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                } else {
+                    IconButton(onClick = onDelayTest, enabled = delayTestEnabled) {
+                        Icon(Icons.Rounded.Speed, stringResource(R.string.sing_box_proxies_group_test))
+                    }
+                }
+            }
+            AsteriskExpansionIndicator(expanded = expanded)
         }
     }
 }
@@ -696,8 +959,10 @@ private data class ProxyGroupTabBounds(
 
 @Composable
 private fun SingBoxProxyOptionsMenu(
+    groupLayout: Int,
     layout: Int,
     sort: Int,
+    onGroupLayoutChange: (Int) -> Unit,
     onLayoutChange: (Int) -> Unit,
     onSortChange: (Int) -> Unit,
 ) {
@@ -720,6 +985,13 @@ private fun SingBoxProxyOptionsMenu(
             SingBoxProxySortName -> R.string.sing_box_proxies_option_sort_name
             SingBoxProxySortDelay -> R.string.sing_box_proxies_option_sort_delay
             else -> R.string.common_default
+        },
+    )
+    val groupLayoutLabel = stringResource(
+        if (groupLayout == SingBoxProxyGroupLayoutExpandable) {
+            R.string.sing_box_proxies_option_group_layout_expandable
+        } else {
+            R.string.sing_box_proxies_option_group_layout_tabs
         },
     )
     val menuSpatialMotion = AsteriskMotion.fastSpatial<IntOffset>()
@@ -753,6 +1025,21 @@ private fun SingBoxProxyOptionsMenu(
                     DropdownMenuItem(
                         text = {
                             Column {
+                                Text(stringResource(R.string.sing_box_proxies_option_group_layout))
+                                Text(
+                                    groupLayoutLabel,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
+                        onClick = { level = ProxyOptionsLevel.GroupLayout },
+                        leadingIcon = { Icon(Icons.Rounded.ViewAgenda, contentDescription = null) },
+                        trailingIcon = { Icon(Icons.Rounded.ChevronRight, contentDescription = null) },
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Column {
                                 Text(stringResource(R.string.sing_box_proxies_option_layout))
                                 Text(
                                     layoutLabel,
@@ -780,6 +1067,28 @@ private fun SingBoxProxyOptionsMenu(
                         leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null) },
                         trailingIcon = { Icon(Icons.Rounded.ChevronRight, contentDescription = null) },
                     )
+                }
+
+                ProxyOptionsLevel.GroupLayout -> {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.sing_box_proxies_option_group_layout)) },
+                        onClick = { level = ProxyOptionsLevel.Main },
+                        leadingIcon = { Icon(Icons.Rounded.ChevronLeft, contentDescription = null) },
+                    )
+                    HorizontalDivider()
+                    listOf(
+                        SingBoxProxyGroupLayoutTabs to R.string.sing_box_proxies_option_group_layout_tabs,
+                        SingBoxProxyGroupLayoutExpandable to R.string.sing_box_proxies_option_group_layout_expandable,
+                    ).forEach { (value, label) ->
+                        AsteriskDropdownMenuItem(
+                            text = stringResource(label),
+                            selected = groupLayout == value,
+                            onClick = {
+                                dismissMenu()
+                                onGroupLayoutChange(value)
+                            },
+                        )
+                    }
                 }
 
                 ProxyOptionsLevel.Layout -> {
@@ -865,6 +1174,7 @@ private fun SingBoxProxyOptionsMenu(
 
 private enum class ProxyOptionsLevel {
     Main,
+    GroupLayout,
     Layout,
     Sort,
 }

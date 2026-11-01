@@ -69,6 +69,7 @@ internal data class AppBackupSettings(
     val routeFinal: String = BackupDefaults.routeFinal,
     val singBoxMode: Int = BackupDefaults.singBoxMode,
     val singBoxProxyLayout: Int = BackupDefaults.singBoxProxyLayout,
+    val singBoxProxyGroupLayout: Int = BackupDefaults.singBoxProxyGroupLayout,
     val singBoxProxySort: Int = BackupDefaults.singBoxProxySort,
     val singBoxControlPort: String = BackupDefaults.singBoxControlPort,
     val singBoxControlSecret: String = BackupDefaults.singBoxControlSecret,

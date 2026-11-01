@@ -56,6 +56,7 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
     int(KeyRunMode, runMode)
     int(KeySingBoxMode, singBoxMode)
     int(KeySingBoxProxyLayout, singBoxProxyLayout)
+    int(KeySingBoxProxyGroupLayout, singBoxProxyGroupLayout)
     int(KeySingBoxProxySort, singBoxProxySort)
     string(KeySingBoxControlPort, singBoxControlPort)
     string(KeySingBoxControlSecret, singBoxControlSecret)
