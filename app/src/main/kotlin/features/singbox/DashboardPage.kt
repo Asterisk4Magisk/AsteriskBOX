@@ -7,6 +7,7 @@
 
 package features.singbox
 
+import android.os.SystemClock
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +57,7 @@ import app.modes.RunModeEbpf
 import app.modes.RunModeTproxy
 import app.modes.RunModeTun
 import app.modes.RunModeTun2Socks
+import app.modes.RunModeVpnService
 import app.modes.SingBoxModeDirect
 import app.modes.SingBoxModeGlobal
 import app.modes.SingBoxModeRule
@@ -76,6 +78,7 @@ import features.home.formatHomeRuntimeBytes
 import features.home.homeFocusTone
 import features.monitoring.MonitoringIntent
 import features.monitoring.ObserveMonitoring
+import features.monitoring.resource.ProcessStatsSourceKind
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.sample
@@ -646,9 +649,16 @@ private fun HomeServiceRuntimeSummary() {
         value = null
         if (!appState.proxyRunning) return@produceState
         while (true) {
-            value = services.singBoxRuntime.state.value.serviceStartedAtMillis
-                .takeIf { it > 0L }
-                ?.let { (System.currentTimeMillis() - it).coerceAtLeast(0L) }
+            value = if (appState.runMode == RunModeVpnService) {
+                val resource = services.monitoring.state.value.resource
+                resource.uptimeMillis
+                    .takeIf { resource.source == ProcessStatsSourceKind.VpnProcess }
+                    ?.let { it + (SystemClock.elapsedRealtime() - resource.uptimeMeasuredAtElapsedMillis).coerceAtLeast(0L) }
+            } else {
+                services.singBoxRuntime.state.value.serviceStartedAtMillis
+                    .takeIf { it > 0L }
+                    ?.let { (System.currentTimeMillis() - it).coerceAtLeast(0L) }
+            }
             delay(1_000L.milliseconds)
         }
     }

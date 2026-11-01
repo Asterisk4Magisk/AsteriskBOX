@@ -47,7 +47,7 @@ internal fun parseTotalCpuTicks(procStat: String): Long? {
 internal fun parseProcessStat(procStat: String): ProcessStat? {
     val openParenthesis = procStat.indexOf('(')
     val closeParenthesis = procStat.lastIndexOf(')')
-    if (openParenthesis <= 0 || closeParenthesis <= openParenthesis) return null
+    if (openParenthesis !in 1..<closeParenthesis) return null
     val pid = procStat.substring(0, openParenthesis).trim().toIntOrNull() ?: return null
     val fields = procStat.substring(closeParenthesis + 1)
         .trim()
@@ -62,6 +62,14 @@ internal fun parseProcessStat(procStat: String): ProcessStat? {
         processTicks = userTicks + systemTicks,
         startTimeTicks = startTimeTicks,
     )
+}
+
+internal fun parseProcessResidentMemoryBytes(procStatm: String, pageSizeBytes: Long): Long? {
+    if (pageSizeBytes <= 0L) return null
+    val residentPages = procStatm.trim().split(WhitespaceRegex)
+        .getOrNull(1)?.toLongOrNull() ?: return null
+    if (residentPages < 0L) return null
+    return runCatching { Math.multiplyExact(residentPages, pageSizeBytes) }.getOrNull()
 }
 
 internal fun calculateProcessCpuPercent(

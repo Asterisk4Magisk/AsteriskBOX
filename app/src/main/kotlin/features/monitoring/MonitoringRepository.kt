@@ -4,6 +4,8 @@
 package features.monitoring
 
 import android.content.Context
+import android.os.SystemClock
+import app.modes.RunModeVpnService
 import app.modes.isRootRunMode
 import data.AndroidAppStateStore
 import engine.proxy.LocalProxyLoopbackAddress
@@ -195,12 +197,14 @@ internal class MonitoringRepository(
                             cpuPercent = null,
                             source = null,
                             uptimeMillis = null,
+                            uptimeMeasuredAtElapsedMillis = 0L,
                             processId = null,
                         ),
                     )
                 }
             } else {
                 val reading = processStatsSource.read(appState)
+                val isVpnMode = appState.runMode == RunModeVpnService
                 val baseline = previousProcessSnapshot.takeIf {
                     previousProcessSource == reading?.source
                 }
@@ -210,19 +214,28 @@ internal class MonitoringRepository(
                 val cpuPercent = reading?.snapshot?.let { current ->
                     calculateProcessCpuPercent(baseline, current)
                 }
-                if (reading != null) {
-                    previousProcessSnapshot = reading.snapshot
-                    previousProcessSource = reading.source
+                if (reading != null || isVpnMode) {
+                    previousProcessSnapshot = reading?.snapshot
+                    previousProcessSource = reading?.source
                 }
                 val timestampMillis = System.currentTimeMillis()
                 mutableState.update { current ->
+                    val latestAppState = stateStore.state.value
+                    if (!latestAppState.proxyRunning || latestAppState.runMode != appState.runMode) {
+                        return@update current
+                    }
+                    val fallbackResource = current.resource.takeUnless { isVpnMode }
+                    val memoryBytes = if (isVpnMode) reading?.memoryBytes else current.resource.memoryBytes
                     val sample = ProcessStatsSample(
                         timestampMillis = timestampMillis,
                         cpuPercent = cpuPercent,
-                        memoryBytes = current.resource.memoryBytes,
+                        memoryBytes = memoryBytes,
                     )
                     val history = if (recordHistory) {
-                        appendProcessStatsSample(current.resource.oneHourSamples, sample)
+                        val previousSamples = current.resource.oneHourSamples.takeIf {
+                            reading == null || current.resource.source == reading.source
+                        }.orEmpty()
+                        appendProcessStatsSample(previousSamples, sample)
                     } else {
                         null
                     }
@@ -230,12 +243,19 @@ internal class MonitoringRepository(
                         resource = current.resource.copy(
                             cpuPercent = when {
                                 cpuPercent != null -> cpuPercent
-                                reading == null || sameProcess -> current.resource.cpuPercent
+                                reading == null || sameProcess -> fallbackResource?.cpuPercent
                                 else -> null
                             },
-                            source = reading?.source ?: current.resource.source,
-                            uptimeMillis = reading?.uptimeMillis ?: current.resource.uptimeMillis,
-                            processId = reading?.snapshot?.pid ?: current.resource.processId,
+                            memoryBytes = memoryBytes,
+                            memoryLimitBytes = if (isVpnMode) null else current.resource.memoryLimitBytes,
+                            source = reading?.source ?: fallbackResource?.source,
+                            uptimeMillis = reading?.uptimeMillis ?: fallbackResource?.uptimeMillis,
+                            uptimeMeasuredAtElapsedMillis = if (reading?.uptimeMillis != null) {
+                                SystemClock.elapsedRealtime()
+                            } else {
+                                fallbackResource?.uptimeMeasuredAtElapsedMillis ?: 0L
+                            },
+                            processId = reading?.snapshot?.pid ?: fallbackResource?.processId,
                             sampleIntervalMillis = intervalMillis,
                             fifteenMinuteSamples = history?.fifteenMinutes.orEmpty(),
                             oneHourSamples = history?.oneHour.orEmpty(),
@@ -259,10 +279,14 @@ internal class MonitoringRepository(
                         ),
                     )
                 }
-            } else {
+            } else if (appState.runMode.isRootRunMode()) {
                 val memoryBytes = singBoxRuntime.refreshMemoryNow(appState)
                 val memoryLimitBytes = singBoxRuntime.state.value.memory.osLimitBytes.takeIf { it > 0L }
                 mutableState.update { current ->
+                    val latestAppState = stateStore.state.value
+                    if (!latestAppState.proxyRunning || latestAppState.runMode != appState.runMode) {
+                        return@update current
+                    }
                     current.copy(
                         resource = current.resource.copy(
                             memoryBytes = memoryBytes ?: current.resource.memoryBytes,
