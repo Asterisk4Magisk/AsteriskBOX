@@ -284,7 +284,7 @@
     <string name="sing_box_proxies_option_layout_double">Double</string>
     <string name="sing_box_proxies_option_layout_multiple">Multiple</string>
     <string name="sing_box_proxies_option_layout_single">Single</string>
-    <string name="sing_box_proxies_option_sort">Sort</string>
+    <string name="sing_box_proxies_option_sort">Proxy sorting</string>
     <string name="sing_box_proxies_option_sort_delay">Delay</string>
     <string name="sing_box_proxies_option_sort_name">Name</string>
     <string name="sing_box_proxies_options">Proxy display options</string>
