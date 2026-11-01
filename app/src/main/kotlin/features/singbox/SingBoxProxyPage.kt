@@ -551,16 +551,22 @@ fun SingBoxProxyPage(
                                         },
                                         onDelayTest = { testGroup(group) },
                                         modifier = Modifier.animateItem(
-                                            fadeInSpec = AsteriskMotion.effects(),
-                                            placementSpec = AsteriskMotion.spatial(),
-                                            fadeOutSpec = AsteriskMotion.effects(),
+                                            fadeInSpec = AsteriskMotion.contentFade(),
+                                            placementSpec = AsteriskMotion.contentPlacement(),
+                                            fadeOutSpec = AsteriskMotion.fastEffects(),
                                         ),
                                     )
                                 }
                                 if (expanded) {
                                     if (nodes.isEmpty()) {
                                         item(key = "empty:${group.name}", span = { GridItemSpan(maxLineSpan) }) {
-                                            SingBoxProxyEmptyCard()
+                                            SingBoxProxyEmptyCard(
+                                                modifier = Modifier.animateItem(
+                                                    fadeInSpec = AsteriskMotion.contentFade(),
+                                                    placementSpec = AsteriskMotion.contentPlacement(),
+                                                    fadeOutSpec = AsteriskMotion.fastEffects(),
+                                                ),
+                                            )
                                         }
                                     }
                                     items(
@@ -594,9 +600,9 @@ fun SingBoxProxyPage(
                                             onSelect = onSelect,
                                             onDelayTest = { testProxy(node) },
                                             modifier = Modifier.animateItem(
-                                                fadeInSpec = AsteriskMotion.effects(),
-                                                placementSpec = AsteriskMotion.spatial(),
-                                                fadeOutSpec = AsteriskMotion.effects(),
+                                                fadeInSpec = AsteriskMotion.contentFade(),
+                                                placementSpec = AsteriskMotion.contentPlacement(),
+                                                fadeOutSpec = AsteriskMotion.fastEffects(),
                                             ).fillMaxWidth(),
                                         )
                                     }
@@ -817,19 +823,27 @@ private fun SingBoxProxyGroupCard(
                     )
                 }
             }
-            IconButton(onClick = onLocate, enabled = canLocate) {
-                Icon(Icons.Rounded.MyLocation, stringResource(R.string.sing_box_proxies_locate_selected))
-            }
-            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-                if (testing) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                } else {
-                    IconButton(onClick = onDelayTest, enabled = delayTestEnabled) {
-                        Icon(Icons.Rounded.Speed, stringResource(R.string.sing_box_proxies_group_test))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onLocate,
+                    enabled = canLocate,
+                    modifier = Modifier.size(48.dp),
+                ) {
+                    Icon(Icons.Rounded.MyLocation, stringResource(R.string.sing_box_proxies_locate_selected))
+                }
+                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    if (testing) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                    } else {
+                        IconButton(onClick = onDelayTest, enabled = delayTestEnabled) {
+                            Icon(Icons.Rounded.Speed, stringResource(R.string.sing_box_proxies_group_test))
+                        }
                     }
                 }
+                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                    AsteriskExpansionIndicator(expanded = expanded)
+                }
             }
-            AsteriskExpansionIndicator(expanded = expanded)
         }
     }
 }
@@ -1463,10 +1477,10 @@ private fun DelayToolbarGlyph() {
 }
 
 @Composable
-private fun SingBoxProxyEmptyCard() {
+private fun SingBoxProxyEmptyCard(modifier: Modifier = Modifier) {
     Text(
         text = stringResource(R.string.common_empty),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 16.dp),
         textAlign = TextAlign.Center,
