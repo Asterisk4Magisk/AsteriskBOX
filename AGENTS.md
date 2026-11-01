@@ -28,6 +28,16 @@ VPN Service is an independent non-ROOT execution path. Even on a rooted device, 
 - When switching from ROOT to VPN, any active ROOT cycle must be stopped by the ROOT lifecycle boundary before entering VPN. The VPN runtime itself must not perform ROOT cleanup.
 - Changes to proxy orchestration, mode selection, or lifecycle handling must include a regression check that the entire VPN lifecycle performs zero ROOT operations.
 
+### Keep the VPN Service in Its Own Process
+
+`engine.vpn.AsteriskVpnService` and the sing-box core it hosts run in the `:vpn` process so the app process stays reclaimable while a tunnel is up. The app process remains the only place that decides anything; `:vpn` only executes.
+
+- The processes share exactly three contracts in `engine/vpn`: `AsteriskVpnService.start/stop` (explicit intents answered through a `ResultReceiver`), `VpnSession` (the `vpn-session` file whose lock the service holds while the tunnel is up; the only source for "is the tunnel running"), and the resume hand-off (a boot or always-on start promotes the service to the foreground and hands the start back to `features.boot.VpnResumeReceiver`). Do not reintroduce in-process statics that another process would have to see.
+- `:vpn` must not initialize the app state store, schedulers, WorkManager, or any log repository, and must not read or write files owned by the app process such as `logcat.log` or the core `error.log`; the app process clears the previous session's service logs before it sends a start. `AsteriskApplication.onCreate` returns early there after `AndroidLibboxRuntime.setup`.
+- The configuration is always compiled in the app process, including for boot and always-on starts; the service never recompiles or replays it.
+- The command channel is the libbox `command.sock` shared through the common `basePath`; the app process keeps using `Libbox.newCommandClient`. Do not add a TCP control listener to the VPN configuration for cross-process access.
+- AsteriskNG and AsteriskMETA still host their VPN Service in the app process: their core control paths differ (in-process libxray, the embedded Mihomo bridge) and need their own feasibility check before adopting these contracts.
+
 ### Respect Core API Stability and Product-Specific Control Paths
 
 - As a rule, do not introduce or depend on an experimental core feature. An exception exists only when this repository already uses that feature or a developer explicitly authorizes its use; adoption by a sibling app is not authorization for this app.

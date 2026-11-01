@@ -52,6 +52,7 @@ import engine.singbox.runtime.SingBoxRuntimeRepository
 import engine.proxy.AndroidProxyEngine
 import system.AndroidRootShellGateway
 import engine.vpn.AndroidLibboxRuntime
+import engine.vpn.AsteriskVpnService
 
 class AsteriskApplication : Application(), SingletonImageLoader.Factory {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -217,6 +218,12 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        // The VPN Service process hosts the core only. The state store, the schedulers,
+        // WorkManager and the log repositories belong to this app process.
+        if (AsteriskVpnService.isServiceProcess(this)) {
+            AndroidLibboxRuntime.setup(this)
+            return
+        }
         appScope.launch {
             val scheduler = ResourceAutoUpdateScheduler(applicationContext)
             stateStore.state

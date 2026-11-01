@@ -9,15 +9,28 @@ import android.net.VpnService
 import app.modes.RunModeVpnService
 import app.R
 import engine.proxy.mode.AndroidModeProxyEngine
+import engine.proxy.LocalProxyOptions
+import engine.proxy.LocalProxyRuntime
 import engine.proxy.ProxyEngineStartRequest
 import engine.proxy.ProxyEngineStatus
+import engine.singbox.logDirectoryPath
+import features.logs.AndroidAppLogger
+import features.logs.clearVpnServiceLogsAsApp
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 
 internal class VpnSingBoxEngine(
     private val context: Context,
     private val requestVpnPermission: suspend (Intent) -> Boolean,
-    private val runtimeRunning: () -> Boolean = AsteriskVpnService::isRunning,
+    private val runtimeRunning: () -> Boolean = { AsteriskVpnService.isRunning(context) },
 ) : AndroidModeProxyEngine {
     override val runMode: Int = RunModeVpnService
+
+    /** The local proxy this engine published for this process, so it never clears a ROOT one. */
+    @Volatile
+    private var publishedLocalProxy: LocalProxyOptions? = null
 
     override suspend fun start(request: ProxyEngineStartRequest): ProxyEngineStatus {
         return startWithPolicy(request, explicitRestart = false)
@@ -41,10 +54,21 @@ internal class VpnSingBoxEngine(
         if (prepareIntent != null && !requestVpnPermission(prepareIntent)) {
             error(context.getString(R.string.error_vpn_permission_denied))
         }
-        AsteriskVpnService.start(
-            context = context,
-            config = VpnSingBoxConfigFactory.create(context, request),
-        )
+        try {
+            val config = VpnSingBoxConfigFactory.create(context, request)
+            // The core log files and their in-memory copies belong to this process; the service
+            // process only hosts the core, so the previous session's logs are cleared here.
+            clearVpnServiceLogsAsApp(File(config.coreLogPaths.logDirectoryPath()), LogTag)
+            AsteriskVpnService.start(
+                context = context,
+                config = config,
+            )
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            // The service may run in another process and does not write this process' log.
+            AndroidAppLogger.error(LogTag, "Failed to start VPN Service", error)
+            throw error
+        }
     }
 
     override suspend fun stop(): ProxyEngineStatus {
@@ -52,11 +76,38 @@ internal class VpnSingBoxEngine(
         return status()
     }
 
-    override suspend fun status(): ProxyEngineStatus {
-        return ProxyEngineStatus(
-            running = runtimeRunning(),
+    override suspend fun status(): ProxyEngineStatus = withContext(Dispatchers.IO) {
+        val running = runtimeRunning()
+        syncLocalProxy(running)
+        ProxyEngineStatus(
+            running = running,
             runMode = runMode,
         )
+    }
+
+    /**
+     * Mirrors the tunnel's local proxy into this process, which performs its own HTTP fetches
+     * through it. The service publishes it with the session; after a crash only the value this
+     * engine published is withdrawn.
+     */
+    private fun syncLocalProxy(running: Boolean) {
+        val published = publishedLocalProxy
+        if (!running) {
+            if (published != null && LocalProxyRuntime.current() == published) LocalProxyRuntime.clear()
+            publishedLocalProxy = null
+            return
+        }
+        val options = VpnSession.localProxyOptions(context)
+        if (options != null) {
+            LocalProxyRuntime.update(options)
+        } else if (published != null && LocalProxyRuntime.current() == published) {
+            LocalProxyRuntime.clear()
+        }
+        publishedLocalProxy = options
+    }
+
+    private companion object {
+        const val LogTag = "VpnSingBoxEngine"
     }
 }
 
