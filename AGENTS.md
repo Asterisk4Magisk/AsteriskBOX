@@ -36,7 +36,6 @@ VPN Service is an independent non-ROOT execution path. Even on a rooted device, 
 - `:vpn` must not initialize the app state store, schedulers, WorkManager, or any log repository, and must not read or write files owned by the app process such as `logcat.log` or the core `error.log`; the app process clears the previous session's service logs before it sends a start. `AsteriskApplication.onCreate` returns early there after `AndroidLibboxRuntime.setup`.
 - The configuration is always compiled in the app process, including for boot and always-on starts; the service never recompiles or replays it.
 - The command channel is the libbox `command.sock` shared through the common `basePath`; the app process keeps using `Libbox.newCommandClient`. Do not add a TCP control listener to the VPN configuration for cross-process access.
-- AsteriskNG and AsteriskMETA still host their VPN Service in the app process: their core control paths differ (in-process libxray, the embedded Mihomo bridge) and need their own feasibility check before adopting these contracts.
 
 ### Respect Core API Stability and Product-Specific Control Paths
 
