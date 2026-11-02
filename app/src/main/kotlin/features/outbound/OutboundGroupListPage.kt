@@ -295,8 +295,9 @@ internal fun OutboundGroupListPage(
                 val uri = services.importFilePicker() ?: return@launch
                 val file = withContext(Dispatchers.IO) { appContext.readGroupImportFile(uri) }
                 stage = ImportStage.PARSE
+                val formatter = appContext.singBoxOutboundConfigFormatter(stateStore.state.value.runMode)
                 val parsed = withContext(Dispatchers.Default) {
-                    parseOutboundImportContent(file.content)
+                    parseOutboundImportContent(file.content, formatter)
                 }
                 if (parsed.accepted.isEmpty()) {
                     presentImportResult(

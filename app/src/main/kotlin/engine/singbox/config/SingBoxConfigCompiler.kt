@@ -49,6 +49,7 @@ import engine.singbox.EbpfSharedDataPlanes
 import engine.singbox.singBoxControlConfig
 import engine.vpn.toTunOptions
 import features.resources.runtime.singBoxHostsFiles
+import features.resources.runtime.skipsBundledCoreConfigCheck
 import features.resources.SingBoxRuleSetFileFormat
 import features.resources.runtime.singBoxRuleSetFiles
 import features.resources.singBoxRuleSetFormatOrNull
@@ -86,6 +87,7 @@ internal object SingBoxConfigCompiler {
     ): String = finalizeConfig(
         generate(context, appState, runMode, exposePorts, customResourceFileOverrides),
         appState,
+        checkWithBundledCore = !context.skipsBundledCoreConfigCheck(runMode),
     )
 
     internal fun generate(
@@ -138,12 +140,12 @@ internal object SingBoxConfigCompiler {
         )
     }
 
-    private fun finalizeConfig(root: JsonObject, appState: AppState): String {
+    private fun finalizeConfig(root: JsonObject, appState: AppState, checkWithBundledCore: Boolean): String {
         val overridden = applySingBoxConfigOverride(
             root, appState.enableConfigOverrideScript, appState.configOverrideScript,
         )
         val encoded = encodeSingBoxJson(overridden)
-        SingBoxConfigChecker.check(encoded)
+        if (checkWithBundledCore) SingBoxConfigChecker.check(encoded)
         return encoded
     }
 

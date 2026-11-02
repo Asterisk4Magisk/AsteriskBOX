@@ -19,6 +19,7 @@ import data.AndroidAppStateStore
 import data.AppSettingsPreferences
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.outbound.parseOutboundImportContent
+import features.outbound.singBoxOutboundConfigFormatter
 import features.outbound.AndroidOutboundPinger
 import features.outbound.OutboundListProjectionCache
 import features.outbound.OutboundCommandResult
@@ -165,6 +166,7 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
             parse = { content, group, state ->
                 parseOutboundImportContent(
                     content,
+                    jsonFormatter = applicationContext.singBoxOutboundConfigFormatter(state.runMode),
                     providerFetcher = { request ->
                         subscriptionPreparer.fetchProvider(request, group.userAgent, state.toSubscriptionFetchOptions(group))
                     },

@@ -11,6 +11,7 @@ import app.CustomResourceFileStatus
 import app.ResourceFileKind
 import app.ResourceFileStatus
 import app.ResourceFilesStatus
+import app.modes.isRootRunMode
 import features.resources.ResourceFileSourceDefault
 import features.resources.bundledRuleSetOrNull
 import features.resources.hasSingBoxRuleSetExtension
@@ -416,6 +417,13 @@ internal fun Context.prepareSingBoxResourceFilePaths(): SingBoxResourceFilePaths
 internal fun Context.singBoxResourceFilePaths(): SingBoxResourceFilePaths {
     return AndroidResourceFileStore(this).currentPaths()
 }
+
+/**
+ * A ROOT run with a user-supplied core skips checks made by the bundled core, which may reject
+ * fields that only the custom core understands. That core reports its own errors when it starts.
+ */
+internal fun Context.skipsBundledCoreConfigCheck(runMode: Int): Boolean =
+    runMode.isRootRunMode() && AndroidResourceFileStore(this).hasCustomSingBoxCore()
 
 internal fun Context.singBoxRuleSetFiles(
     customResourceFiles: List<CustomResourceFileState>,

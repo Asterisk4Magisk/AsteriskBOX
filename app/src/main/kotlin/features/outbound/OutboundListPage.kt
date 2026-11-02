@@ -287,8 +287,9 @@ internal fun OutboundListPage(
         val targetGroupId = selectedGroup?.id ?: return
         var stage = ImportStage.PARSE
         try {
+            val formatter = context.singBoxOutboundConfigFormatter(stateStore.state.value.runMode)
             val result = withContext(Dispatchers.Default) {
-                parseOutboundImportContent(content)
+                parseOutboundImportContent(content, formatter)
             }
             val snapshot = stateStore.state.value
             val plan = snapshot.planOutboundImport(

@@ -5,6 +5,7 @@ package engine.singbox.config
 
 import android.content.Context
 import app.AppState
+import features.resources.runtime.skipsBundledCoreConfigCheck
 import java.io.File
 
 internal fun validateSingBoxRuntimeConfiguration(
@@ -19,5 +20,6 @@ internal fun validateSingBoxRuntimeConfiguration(
         exposePorts = false,
         customResourceFileOverrides = customResourceFileOverrides,
     )
+    if (context.skipsBundledCoreConfigCheck(state.runMode)) return
     SingBoxConfigChecker.check(encodeSingBoxJson(generated))
 }
