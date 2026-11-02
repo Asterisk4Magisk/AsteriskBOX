@@ -83,6 +83,7 @@ import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.SettingsEthernet
 import androidx.compose.material.icons.rounded.SettingsInputComponent
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.SortByAlpha
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.Storage
@@ -176,6 +177,7 @@ internal object AsteriskIcons {
         val Settings: ImageVector = MaterialIcons.Rounded.Settings
         val SettingsEthernet: ImageVector = MaterialIcons.Rounded.SettingsEthernet
         val SettingsInputComponent: ImageVector = MaterialIcons.Rounded.SettingsInputComponent
+        val Share: ImageVector = MaterialIcons.Rounded.Share
         val SortByAlpha: ImageVector = MaterialIcons.Rounded.SortByAlpha
         val Speed: ImageVector = MaterialIcons.Rounded.Speed
         val Storage: ImageVector = MaterialIcons.Rounded.Storage
