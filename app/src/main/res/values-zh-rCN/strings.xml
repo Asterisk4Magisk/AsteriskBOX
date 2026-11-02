@@ -343,6 +343,13 @@
     <string name="outbound_group_name_duplicate">%1$s(%2$d)</string>
     <string name="outbound_group_name_placeholder">留空则首次同步后自动命名</string>
     <string name="outbound_group_required">请选择分组</string>
+    <string name="outbound_group_share">分享</string>
+    <string name="outbound_group_share_empty">该分组没有可分享的节点链接</string>
+    <string name="outbound_group_share_export_failed">分组导出失败</string>
+    <string name="outbound_group_share_exported">分组已导出</string>
+    <string name="outbound_group_share_file">导出链接到文件</string>
+    <string name="outbound_group_share_subscription_qr">订阅二维码</string>
+    <string name="outbound_group_share_subscription_url">复制订阅链接</string>
     <string name="outbound_group_status_checked_at">检查于 %1$s</string>
     <string name="outbound_group_status_failed">失败</string>
     <string name="outbound_group_status_import_counts">导入 %1$d，跳过 %2$d，重复 %3$d</string>
@@ -381,6 +388,7 @@
     <string name="outbound_group_user_agent_v2rayng">v2rayNG</string>
 
     <!-- Outbound management -->
+    <string name="error_outbound_share_file_creator_missing">出站分享文件创建请求器未注册</string>
     <string name="import_result_details_title">导入完成，存在详情</string>
     <string name="import_result_duplicates_title">没有新增项目</string>
     <string name="import_result_entry_prefix">第 %1$d 项：</string>

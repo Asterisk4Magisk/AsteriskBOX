@@ -61,6 +61,8 @@ internal data class AppServices(
     val rootEbpfProbeUseCase: RootEbpfProbeUseCase,
     val tipNotifier: AndroidToastTipNotifier,
     val logFileCreator: suspend (String) -> Uri?,
+    /** Creates the text document a group's share links are exported to. */
+    val outboundShareFileCreator: suspend (String) -> Uri?,
     val coreLogRepository: CoreLogRepository,
     val rootLogRepository: CoreLogRepository,
     val logcatRepository: CoreLogRepository,

@@ -40,6 +40,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -65,6 +66,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -133,6 +135,7 @@ import ui.components.rememberReorderPreview
 import ui.components.longPressReorderDragHandle
 import ui.components.rememberAsteriskReorderableLazyListState
 import ui.components.verticalReorderScrollThresholdPadding
+import ui.clipboard.setPlainText
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
@@ -208,6 +211,77 @@ internal fun OutboundGroupListPage(
     val importFailedMessage = stringResource(R.string.outbound_group_sync_failed)
     val stateChangedMessage = stringResource(R.string.outbound_group_sync_failed)
     val subscriptionGroups = appState.outboundGroups.outboundSubscriptionGroups()
+    val clipboard = LocalClipboard.current
+    val shareCopiedMessage = stringResource(R.string.common_copied)
+    val shareEmptyMessage = stringResource(R.string.outbound_group_share_empty)
+    val shareExportedMessage = stringResource(R.string.outbound_group_share_exported)
+    val shareExportFailedMessage = stringResource(R.string.outbound_group_share_export_failed)
+    // The subscription QR code is shown from the page, not the card, so it survives the menu
+    // closing and the card recomposing while the dialog is open.
+    var shareQrCodeState by remember { mutableStateOf<OutboundShareQrState?>(null) }
+
+    /**
+     * Copies the group's subscription link. Only the link itself is shared: the group's
+     * user agent, HWID and AGE key stay local.
+     */
+    fun copyGroupSubscriptionLink(group: OutboundGroupState) {
+        if (group.url.isBlank()) return
+        scope.launch {
+            clipboard.setPlainText(group.url)
+            services.tipNotifier.show(shareCopiedMessage)
+        }
+    }
+
+    /**
+     * Outbound share links of the group, or null right after showing the empty tip. Copying and
+     * exporting both go through here so they can never disagree about what is shareable.
+     */
+    suspend fun groupOutboundShareLinks(group: OutboundGroupState): String? {
+        val links = withContext(Dispatchers.Default) {
+            outboundGroupShareLinks(group.id, stateStore.state.value.outbounds)
+        }
+        if (links.isBlank()) {
+            services.tipNotifier.show(shareEmptyMessage)
+            return null
+        }
+        return links
+    }
+
+    /**
+     * Copies every outbound link in the group, one per line. Outbounds without a standard
+     * share link are skipped, so this stays identical to the exported document.
+     */
+    fun copyGroupOutboundLinks(group: OutboundGroupState) {
+        scope.launch {
+            val links = groupOutboundShareLinks(group) ?: return@launch
+            clipboard.setPlainText(links)
+            services.tipNotifier.show(shareCopiedMessage)
+        }
+    }
+
+    /** Writes the group's outbound links to a `text/plain` document chosen by the user. */
+    fun exportGroupOutboundLinks(group: OutboundGroupState) {
+        val appContext = context.applicationContext
+        scope.launch {
+            val links = groupOutboundShareLinks(group) ?: return@launch
+            val uri = try {
+                services.outboundShareFileCreator(outboundGroupShareFileName(group.name))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                services.tipNotifier.showError(error, shareExportFailedMessage)
+                return@launch
+            } ?: return@launch
+            try {
+                appContext.writeOutboundShareDocument(uri, links)
+                services.tipNotifier.show(shareExportedMessage)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                services.tipNotifier.showError(error, shareExportFailedMessage)
+            }
+        }
+    }
 
     fun openGroupEditor() {
         editorGroup = null
@@ -906,6 +980,15 @@ internal fun OutboundGroupListPage(
                                 showGroupEditor = true
                             },
                             onDelete = { pendingDelete = group },
+                            onShowSubscriptionQr = {
+                                shareQrCodeState = OutboundShareQrState(
+                                    title = group.name,
+                                    url = group.url,
+                                )
+                            },
+                            onCopySubscriptionLink = { copyGroupSubscriptionLink(group) },
+                            onCopyOutboundLinks = { copyGroupOutboundLinks(group) },
+                            onExportOutboundLinks = { exportGroupOutboundLinks(group) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .longPressReorderDragHandle(
@@ -949,6 +1032,14 @@ internal fun OutboundGroupListPage(
                 }
             },
             onSave = ::saveGroup,
+        )
+    }
+
+    shareQrCodeState?.let { state ->
+        OutboundQrCodeDialog(
+            title = state.title,
+            url = state.url,
+            onDismissRequest = { shareQrCodeState = null },
         )
     }
 
@@ -1426,6 +1517,10 @@ internal fun OutboundGroupCard(
     onSync: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    onShowSubscriptionQr: () -> Unit,
+    onCopySubscriptionLink: () -> Unit,
+    onCopyOutboundLinks: () -> Unit,
+    onExportOutboundLinks: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val containerColor by animateColorAsState(
@@ -1449,6 +1544,11 @@ internal fun OutboundGroupCard(
     )
     var showUpdateInfo by remember(group.id) { mutableStateOf(false) }
     var menuExpanded by remember(group.id) { mutableStateOf(false) }
+    var menuLevel by remember(group.id) { mutableStateOf(OutboundGroupCardMenuLevel.MAIN) }
+    val dismissMenu = {
+        menuExpanded = false
+        menuLevel = OutboundGroupCardMenuLevel.MAIN
+    }
     var infoAnchorPosition by remember(group.id) { mutableStateOf<Offset?>(null) }
     LaunchedEffect(syncing, isDragging, enabledChangeBusy, group) {
         showUpdateInfo = false
@@ -1602,44 +1702,138 @@ internal fun OutboundGroupCard(
                     }
                     DropdownMenu(
                         expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false },
+                        onDismissRequest = dismissMenu,
                     ) {
-                        if (group.url.isNotBlank()) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.common_update)) },
-                                leadingIcon = {
-                                    if (syncing) {
-                                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    } else {
-                                        Icon(Icons.Rounded.Refresh, contentDescription = null)
-                                    }
-                                },
-                                enabled = !syncing,
-                                onClick = {
-                                    menuExpanded = false
-                                    showUpdateInfo = false
-                                    onSync()
-                                },
-                            )
+                        when (menuLevel) {
+                            OutboundGroupCardMenuLevel.MAIN -> {
+                                if (group.url.isNotBlank()) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.common_update)) },
+                                        leadingIcon = {
+                                            if (syncing) {
+                                                CircularProgressIndicator(
+                                                    Modifier.size(18.dp),
+                                                    strokeWidth = 2.dp,
+                                                )
+                                            } else {
+                                                Icon(Icons.Rounded.Refresh, contentDescription = null)
+                                            }
+                                        },
+                                        enabled = !syncing,
+                                        onClick = {
+                                            dismissMenu()
+                                            showUpdateInfo = false
+                                            onSync()
+                                        },
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.common_edit)) },
+                                    leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                                    onClick = {
+                                        dismissMenu()
+                                        showUpdateInfo = false
+                                        onEdit()
+                                    },
+                                )
+                                if (group.url.isNotBlank() || outboundCount > 0) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.outbound_group_share)) },
+                                        leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
+                                        trailingIcon = {
+                                            Icon(Icons.Rounded.ChevronRight, contentDescription = null)
+                                        },
+                                        onClick = {
+                                            showUpdateInfo = false
+                                            menuLevel = OutboundGroupCardMenuLevel.SHARE
+                                        },
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.common_delete)) },
+                                    leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                                    onClick = {
+                                        dismissMenu()
+                                        showUpdateInfo = false
+                                        onDelete()
+                                    },
+                                )
+                            }
+
+                            OutboundGroupCardMenuLevel.SHARE -> {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.outbound_group_share)) },
+                                    leadingIcon = {
+                                        Icon(Icons.Rounded.ChevronLeft, contentDescription = null)
+                                    },
+                                    onClick = { menuLevel = OutboundGroupCardMenuLevel.MAIN },
+                                )
+                                HorizontalDivider()
+                                if (group.url.isNotBlank()) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                stringResource(R.string.outbound_group_share_subscription_qr),
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Rounded.QrCodeScanner, contentDescription = null)
+                                        },
+                                        onClick = {
+                                            dismissMenu()
+                                            showUpdateInfo = false
+                                            onShowSubscriptionQr()
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                stringResource(
+                                                    R.string.outbound_group_share_subscription_url,
+                                                ),
+                                            )
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Rounded.ContentCopy, contentDescription = null)
+                                        },
+                                        onClick = {
+                                            dismissMenu()
+                                            showUpdateInfo = false
+                                            onCopySubscriptionLink()
+                                        },
+                                    )
+                                }
+                                if (outboundCount > 0) {
+                                    if (group.url.isNotBlank()) HorizontalDivider()
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(stringResource(R.string.outbound_copy_all_urls))
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Rounded.ContentCopy, contentDescription = null)
+                                        },
+                                        onClick = {
+                                            dismissMenu()
+                                            showUpdateInfo = false
+                                            onCopyOutboundLinks()
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(stringResource(R.string.outbound_group_share_file))
+                                        },
+                                        leadingIcon = {
+                                            Icon(Icons.Rounded.FileDownload, contentDescription = null)
+                                        },
+                                        onClick = {
+                                            dismissMenu()
+                                            showUpdateInfo = false
+                                            onExportOutboundLinks()
+                                        },
+                                    )
+                                }
+                            }
                         }
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.common_edit)) },
-                            leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                            onClick = {
-                                menuExpanded = false
-                                showUpdateInfo = false
-                                onEdit()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.common_delete)) },
-                            leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
-                            onClick = {
-                                menuExpanded = false
-                                showUpdateInfo = false
-                                onDelete()
-                            },
-                        )
                     }
                 }
             }
@@ -2123,5 +2317,26 @@ private fun OutboundGroupSubscriptionInfo(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/** Levels of the group card's ⋮ menu; the share level is entered from the main one. */
+private enum class OutboundGroupCardMenuLevel {
+    MAIN,
+    SHARE,
+}
+
+/** What the group-level QR dialog encodes: a subscription URL and the group it belongs to. */
+private data class OutboundShareQrState(
+    val title: String,
+    val url: String,
+)
+
+/** Writes a group's share links into the `text/plain` document the user picked. */
+private suspend fun Context.writeOutboundShareDocument(uri: Uri, content: String) {
+    withContext(Dispatchers.IO) {
+        val stream = contentResolver.openOutputStream(uri)
+            ?: error("Unable to open the outbound share document")
+        stream.bufferedWriter(Charsets.UTF_8).use { writer -> writer.write(content) }
     }
 }

@@ -50,6 +50,7 @@ fun App(
     backupFilePicker: suspend () -> Uri?,
     backupFileCreator: suspend (String) -> Uri?,
     logFileCreator: suspend (String) -> Uri?,
+    outboundShareFileCreator: suspend (String) -> Uri?,
     requestVpnPermission: VpnPermissionRequester,
 ) {
     val appContext = LocalContext.current.applicationContext
@@ -159,6 +160,7 @@ fun App(
         enhancementModuleCoordinator,
         tipNotifier,
         logFileCreator,
+        outboundShareFileCreator,
     ) {
         AppServices(
             appScope = appScope,
@@ -189,6 +191,7 @@ fun App(
             enhancementModuleCoordinator = enhancementModuleCoordinator,
             tipNotifier = tipNotifier,
             logFileCreator = logFileCreator,
+            outboundShareFileCreator = outboundShareFileCreator,
             coreLogRepository = AndroidCoreLogRepository,
             rootLogRepository = AndroidAsteriskdLogRepository,
             logcatRepository = AndroidLogcatRepository,

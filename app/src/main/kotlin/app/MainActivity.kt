@@ -80,6 +80,11 @@ class MainActivity : ComponentActivity() {
             appString(R.string.error_backup_file_creator_missing)
         },
     )
+    private val outboundShareFileCreator = AndroidLogFileCreator(
+        missingLauncherMessage = {
+            appString(R.string.error_outbound_share_file_creator_missing)
+        },
+    )
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) {}
@@ -118,6 +123,12 @@ class MainActivity : ComponentActivity() {
         backupFileCreator.complete(uri)
     }
 
+    private val outboundShareFileCreatorLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain"),
+    ) { uri ->
+        outboundShareFileCreator.complete(uri)
+    }
+
     private fun appString(@StringRes id: Int, vararg args: Any): String {
         val languageMode = (application as AsteriskApplication).stateStore.state.value.languageMode
         return applicationContext.localizedAppContext(languageMode).getString(id, *args)
@@ -152,6 +163,9 @@ class MainActivity : ComponentActivity() {
         }
         backupFileCreator.registerLauncher { fileName ->
             backupFileCreatorLauncher.launch(fileName)
+        }
+        outboundShareFileCreator.registerLauncher { fileName ->
+            outboundShareFileCreatorLauncher.launch(fileName)
         }
         showAppContent()
         requestStartupPermissions()
@@ -306,6 +320,8 @@ class MainActivity : ComponentActivity() {
         logFileCreator.registerLauncher(null)
         backupFileCreator.complete(null)
         backupFileCreator.registerLauncher(null)
+        outboundShareFileCreator.complete(null)
+        outboundShareFileCreator.registerLauncher(null)
         super.onDestroy()
     }
 
@@ -328,6 +344,7 @@ class MainActivity : ComponentActivity() {
                 backupFilePicker = { resourceFilePicker.pick(BackupFileMimeTypes) },
                 backupFileCreator = backupFileCreator::create,
                 logFileCreator = logFileCreator::create,
+                outboundShareFileCreator = outboundShareFileCreator::create,
                 requestVpnPermission = vpnPermissionRequester::request,
             )
         }

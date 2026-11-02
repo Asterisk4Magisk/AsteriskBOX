@@ -346,6 +346,13 @@
     <string name="outbound_group_name_duplicate">%1$s(%2$d)</string>
     <string name="outbound_group_name_placeholder">Leave blank to auto-assign on first sync</string>
     <string name="outbound_group_required">Select a group</string>
+    <string name="outbound_group_share">Share</string>
+    <string name="outbound_group_share_empty">This group has no shareable outbound links</string>
+    <string name="outbound_group_share_export_failed">Unable to export the group</string>
+    <string name="outbound_group_share_exported">Group exported</string>
+    <string name="outbound_group_share_file">Export links to file</string>
+    <string name="outbound_group_share_subscription_qr">Subscription QR code</string>
+    <string name="outbound_group_share_subscription_url">Copy subscription link</string>
     <string name="outbound_group_status_checked_at">Checked %1$s</string>
     <string name="outbound_group_status_failed">Failed</string>
     <string name="outbound_group_status_import_counts">Imported %1$d, skipped %2$d, duplicate %3$d</string>
@@ -384,6 +391,7 @@
     <string name="outbound_group_user_agent_v2rayng">v2rayNG</string>
 
     <!-- Outbound management -->
+    <string name="error_outbound_share_file_creator_missing">Outbound share file creator is not registered</string>
     <string name="import_result_details_title">Import complete with details</string>
     <string name="import_result_duplicates_title">No new items</string>
     <string name="import_result_entry_prefix">Entry %1$d: </string>
