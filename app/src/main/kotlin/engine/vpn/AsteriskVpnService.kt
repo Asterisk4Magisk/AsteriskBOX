@@ -25,10 +25,10 @@ import app.modes.ProxyAppListModeWhitelist
 import androidx.core.app.NotificationCompat
 import engine.network.NetworkDefaults
 import engine.proxy.LocalProxyLoopbackAddress
-import engine.proxy.LocalProxyRuntime
 import engine.vpn.hevtun.HevTunRuntime
 import features.boot.VpnResumeReceiver
 import features.logs.AndroidAppLogger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -63,6 +63,14 @@ class AsteriskVpnService : VpnService() {
 
     /** Whether this instance received a lifecycle intent; a stats query alone must not keep it started. */
     private var lifecycleRequested = false
+
+    /**
+     * The newest start id of any intent, and of a lifecycle intent, both touched on the main
+     * thread only. Stats queries also consume start ids, so a lifecycle operation that finishes
+     * after a query compares against [latestLifecycleStartId] and then stops with [latestStartId].
+     */
+    private var latestStartId = 0
+    private var latestLifecycleStartId = 0
     private var session: Closeable? = null
     private val libboxPlatform by lazy {
         AndroidLibboxPlatformInterface(this)
@@ -80,6 +88,7 @@ class AsteriskVpnService : VpnService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val reply = intent?.serviceReply()
+        latestStartId = startId
         if (intent?.action == AsteriskVpnServiceIntents.ACTION_QUERY_PROCESS_STATS) {
             val isRunning = running
             reply?.sendProcessStats(if (isRunning) VpnProcessStats.sampleCurrentProcess() else null)
@@ -87,8 +96,13 @@ class AsteriskVpnService : VpnService() {
             return START_NOT_STICKY
         }
         lifecycleRequested = true
+        latestLifecycleStartId = startId
         when (intent?.action) {
             AsteriskVpnServiceIntents.ACTION_STOP -> {
+                if (!intent.acceptServiceCall()) {
+                    stopSelfIfIdle(startId)
+                    return START_NOT_STICKY
+                }
                 cancelResumeWatchdog()
                 serviceScope.launch {
                     val result = runCatching {
@@ -104,15 +118,19 @@ class AsteriskVpnService : VpnService() {
             }
 
             AsteriskVpnServiceIntents.ACTION_START -> {
-                cancelResumeWatchdog()
                 val config = intent.readVpnServiceStartConfig()
                 if (config == null) {
                     reply?.sendServiceResult(
                         Result.failure(IllegalStateException(getString(R.string.error_vpn_start_config_missing))),
                     )
-                    stopSelf(startId)
+                    stopSelfIfIdle(startId)
                     return START_NOT_STICKY
                 }
+                if (!intent.acceptServiceCall()) {
+                    stopSelfIfIdle(startId)
+                    return START_NOT_STICKY
+                }
+                cancelResumeWatchdog()
                 serviceScope.launch {
                     operationMutex.withLock {
                         val result = runCatching {
@@ -262,12 +280,29 @@ class AsteriskVpnService : VpnService() {
         super.onRevoke()
     }
 
+    /**
+     * Stops a service that has nothing to keep it, after a request it refused. A running or
+     * starting tunnel is left alone, and the resume watchdog keeps watching a resumed start.
+     */
+    private fun stopSelfIfIdle(startId: Int) {
+        if (!running && !operationMutex.isLocked && resumeWatchdog == null) stopSelfAfterLifecycle(startId)
+    }
+
     private fun stopSelfOnMain(startId: Int) {
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            stopSelf(startId)
+            stopSelfAfterLifecycle(startId)
         } else {
-            mainHandler.post { stopSelf(startId) }
+            mainHandler.post { stopSelfAfterLifecycle(startId) }
         }
+    }
+
+    /**
+     * Stops the service after the lifecycle intent [startId] unless a newer lifecycle intent
+     * arrived. Stats queries that arrived meanwhile do not keep it started: stopping with the
+     * newest start id still leaves the service alone when a start is not yet delivered.
+     */
+    private fun stopSelfAfterLifecycle(startId: Int) {
+        if (startId >= latestLifecycleStartId) stopSelf(latestStartId)
     }
 
     private fun stopSelfOnMain() {
@@ -298,11 +333,6 @@ class AsteriskVpnService : VpnService() {
                 val runtime = hevTunRuntime ?: HevTunRuntime().also { hevTunRuntime = it }
                 runtime.start(hevConfig, tunFd)
                 AndroidAppLogger.info(LogTag, "Started Hev TUN with VPN file descriptor")
-            }
-            if (config.localProxyOptions.port > 0) {
-                LocalProxyRuntime.update(config.localProxyOptions)
-            } else {
-                LocalProxyRuntime.clear()
             }
         } catch (error: Throwable) {
             stopVpn()
@@ -430,7 +460,6 @@ class AsteriskVpnService : VpnService() {
             AndroidAppLogger.warn(LogTag, "Failed to close VPN TUN file descriptor", error)
         }
         tunFileDescriptor = null
-        LocalProxyRuntime.clear()
         running = false
         runCatching { session?.close() }
         session = null
@@ -476,17 +505,27 @@ class AsteriskVpnService : VpnService() {
         private const val ForegroundChannelId = "vpn-service"
         private const val ForegroundNotificationId = 4
 
-        private const val StartTimeoutMillis = 10_000L
-        private const val StopTimeoutMillis = 5_000L
+        /** Covers launching the service process; the request itself may then run as long as it needs. */
+        private const val AcceptTimeoutMillis = 10_000L
         private const val ProcessStatsTimeoutMillis = 2_000L
         private const val ResumeWatchdogMillis = 60_000L
 
         internal suspend fun start(context: Context, config: VpnServiceStartConfig) {
-            awaitServiceCall(context, AsteriskVpnServiceIntents.startIntent(context, config), StartTimeoutMillis)
+            awaitServiceCall(context, AsteriskVpnServiceIntents.startIntent(context, config), AcceptTimeoutMillis) {
+                Result.failure(IllegalStateException("VPN Service process exited while starting the tunnel"))
+            }
         }
 
+        // The tunnel cannot outlive the process that holds it, so its death completes a stop.
         internal suspend fun stop(context: Context) {
-            awaitServiceCall(context, AsteriskVpnServiceIntents.stopIntent(context), StopTimeoutMillis)
+            try {
+                awaitServiceCall(context, AsteriskVpnServiceIntents.stopIntent(context), AcceptTimeoutMillis) {
+                    Result.success(Unit)
+                }
+            } catch (error: Throwable) {
+                // A service that died before it could answer took the tunnel with it.
+                if (error is CancellationException || isRunning(context)) throw error
+            }
         }
 
         internal fun isRunning(context: Context): Boolean = VpnSession.isRunning(context)

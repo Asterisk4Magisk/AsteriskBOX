@@ -9,8 +9,6 @@ import android.net.VpnService
 import app.modes.RunModeVpnService
 import app.R
 import engine.proxy.mode.AndroidModeProxyEngine
-import engine.proxy.LocalProxyOptions
-import engine.proxy.LocalProxyRuntime
 import engine.proxy.ProxyEngineStartRequest
 import engine.proxy.ProxyEngineStatus
 import engine.singbox.logDirectoryPath
@@ -27,10 +25,6 @@ internal class VpnSingBoxEngine(
     private val runtimeRunning: () -> Boolean = { AsteriskVpnService.isRunning(context) },
 ) : AndroidModeProxyEngine {
     override val runMode: Int = RunModeVpnService
-
-    /** The local proxy this engine published for this process, so it never clears a ROOT one. */
-    @Volatile
-    private var publishedLocalProxy: LocalProxyOptions? = null
 
     override suspend fun start(request: ProxyEngineStartRequest): ProxyEngineStatus {
         return startWithPolicy(request, explicitRestart = false)
@@ -72,38 +66,20 @@ internal class VpnSingBoxEngine(
     }
 
     override suspend fun stop(): ProxyEngineStatus {
-        AsteriskVpnService.stop(context)
+        // Without a session there is nothing to stop, and asking would launch the service process.
+        if (runtimeRunning()) AsteriskVpnService.stop(context)
         return status()
     }
 
     override suspend fun status(): ProxyEngineStatus = withContext(Dispatchers.IO) {
         val running = runtimeRunning()
-        syncLocalProxy(running)
+        // The local proxy is read from the session on demand (LocalProxyRuntime), and the
+        // watch reports the end of the tunnel, however it ends, to this process.
+        if (running) VpnSession.watch(context)
         ProxyEngineStatus(
             running = running,
             runMode = runMode,
         )
-    }
-
-    /**
-     * Mirrors the tunnel's local proxy into this process, which performs its own HTTP fetches
-     * through it. The service publishes it with the session; after a crash only the value this
-     * engine published is withdrawn.
-     */
-    private fun syncLocalProxy(running: Boolean) {
-        val published = publishedLocalProxy
-        if (!running) {
-            if (published != null && LocalProxyRuntime.current() == published) LocalProxyRuntime.clear()
-            publishedLocalProxy = null
-            return
-        }
-        val options = VpnSession.localProxyOptions(context)
-        if (options != null) {
-            LocalProxyRuntime.update(options)
-        } else if (published != null && LocalProxyRuntime.current() == published) {
-            LocalProxyRuntime.clear()
-        }
-        publishedLocalProxy = options
     }
 
     private companion object {
