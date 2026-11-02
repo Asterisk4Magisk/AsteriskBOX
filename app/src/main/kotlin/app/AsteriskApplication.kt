@@ -246,10 +246,11 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
-        // The VPN Service process hosts the core only. The state store, the schedulers,
-        // WorkManager and the log repositories belong to this app process.
+        // The `:service` process only executes: the VPN Service with its core and the traffic
+        // statistics service. The state store, the schedulers, WorkManager and the core log
+        // repositories belong to this app process; `:service` only appends its own app log.
         if (AsteriskVpnService.isServiceProcess(this)) {
-            AndroidLibboxRuntime.setup(this)
+            // libbox is set up on demand there: a ROOT traffic statistics service never needs it.
             AndroidLogcatRepository.initializeServiceProcess(this)
             return
         }
