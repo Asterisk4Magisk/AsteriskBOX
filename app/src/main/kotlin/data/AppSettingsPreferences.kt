@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import app.AppState
+import app.modes.normalizeNetworkActivityStyle
 import app.withNormalizedConnectionTestSettings
 import app.ServiceControlSchedule
 import app.ServiceControlKeyguard
@@ -51,6 +52,9 @@ internal class AppSettingsPreferences(
             }
         return defaults.copy(
             colorMode = preferences.getInt(KeyColorMode, defaults.colorMode),
+            networkActivityStyle = normalizeNetworkActivityStyle(
+                preferences.getInt(KeyNetworkActivityStyle, defaults.networkActivityStyle),
+            ),
             languageMode = preferences.getInt(KeyLanguageMode, defaults.languageMode),
             seedIndex = preferences.getInt(KeySeedIndex, defaults.seedIndex),
             hideRecentTasks = preferences.getBoolean(KeyHideRecentTasks, defaults.hideRecentTasks),
@@ -445,6 +449,7 @@ internal class AppSettingsPreferences(
 private const val PreferencesName = "asteriskbox_settings"
 private const val ObsoleteSettingsPayloadKey = "settings"
 internal const val KeyColorMode = "color_mode"
+internal const val KeyNetworkActivityStyle = "network_activity_style"
 internal const val KeyLanguageMode = "language_mode"
 internal const val KeySeedIndex = "seed_index"
 internal const val KeyHideRecentTasks = "hide_recent_tasks"

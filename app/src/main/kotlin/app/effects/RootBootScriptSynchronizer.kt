@@ -68,6 +68,7 @@ private fun AppState.toRootBootScriptRefresh(): RootBootScriptRefresh {
             colorMode = 0,
             languageMode = 0,
             seedIndex = 0,
+            networkActivityStyle = 0,
             singBoxProxyLayout = 0,
             singBoxProxyGroupLayout = 0,
             singBoxProxySort = 0,

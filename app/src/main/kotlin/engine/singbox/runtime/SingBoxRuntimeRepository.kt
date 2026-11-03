@@ -42,7 +42,7 @@ internal class SingBoxRuntimeRepository(
 ) : SingBoxRuntimeLifecycleTarget {
     private val appContext = context.applicationContext
     private val mutableState = MutableStateFlow(SingBoxRuntimeState())
-    private val trafficHistory = SingBoxTrafficHistoryBuffer(MaxTrafficHistorySize)
+    private val trafficHistory = SingBoxTrafficHistoryBuffer(TrafficHistoryCapacity)
     private val trafficHistoryLock = Any()
     private val sessionLock = Any()
     private val delayTestRunGate = SingBoxDelayTestRunGate()
@@ -650,7 +650,6 @@ internal class SingBoxRuntimeRepository(
     }
 
     private companion object {
-        const val MaxTrafficHistorySize = 48
         const val ConnectAttempts = 3
         const val ConnectRetryMillis = 750L
         const val ReconnectDelayMillis = 1_000L
