@@ -32,9 +32,10 @@ internal suspend fun AppServices.restoreSharedSingBoxCore(
     status
 }
 
+// Runs inside AndroidProxyEngine.changeRootCore, which already holds the lifecycle lock.
 internal suspend fun AppServices.refreshSingBoxCoreBoot(state: AppState) {
     if (state.runMode.isRootRunMode() && state.enableRootBootScript) {
-        when (val result = rootBootScriptUseCase.refresh(state)) {
+        when (val result = rootBootScriptUseCase.refreshWithinLifecycle(state)) {
             RootBootScriptResult.Success -> Unit
             is RootBootScriptResult.Failed -> throw result.error
             else -> error("Failed to refresh ROOT boot configuration after changing Core: $result")
