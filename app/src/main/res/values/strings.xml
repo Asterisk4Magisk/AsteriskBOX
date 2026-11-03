@@ -158,14 +158,9 @@
     <string name="monitor_resource_memory_average">Memory average</string>
     <string name="monitor_resource_memory_peak">Memory peak</string>
     <string name="monitor_resource_pid">Process PID</string>
-    <string name="monitor_resource_root_explanation">CPU is sampled from the independent sing-box process.</string>
-    <string name="monitor_resource_source_info">Process measurements</string>
-    <string name="monitor_resource_source_root">sing-box process · ROOT</string>
-    <string name="monitor_resource_source_vpn">sing-box process · VPN</string>
     <string name="monitor_resource_title">Resource monitor</string>
     <string name="monitor_resource_today_traffic">Today’s traffic</string>
     <string name="monitor_resource_uptime">Uptime</string>
-    <string name="monitor_resource_vpn_explanation">CPU, memory, PID, and uptime are sampled from the independent :service process.</string>
 
     <!-- Monitoring - Traffic -->
     <string name="monitor_traffic_30_days">Last 30 days</string>
