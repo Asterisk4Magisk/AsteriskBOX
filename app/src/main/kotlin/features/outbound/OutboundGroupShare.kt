@@ -3,7 +3,14 @@
 
 package features.outbound
 
+import android.content.res.Resources
+import androidx.compose.ui.platform.Clipboard
 import app.OutboundState
+import app.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import ui.clipboard.setPlainText
+import ui.feedback.AndroidToastTipNotifier
 
 /** Extension of the document a group's share links are exported to. */
 internal const val OutboundShareFileExtension = "txt"
@@ -18,6 +25,26 @@ internal fun outboundGroupShareLinks(
     groupId: Int,
     outbounds: List<OutboundState>,
 ): String = outboundUrls(outbounds.filter { outbound -> outbound.groupId == groupId })
+
+/**
+ * Copies [outboundGroupShareLinks] to the clipboard, or tips that the group has none. The outbound
+ * list's options menu and the group card's share menu both copy through here.
+ */
+internal suspend fun copyOutboundGroupShareLinks(
+    groupId: Int,
+    outbounds: List<OutboundState>,
+    clipboard: Clipboard,
+    tipNotifier: AndroidToastTipNotifier,
+    resources: Resources,
+) {
+    val links = withContext(Dispatchers.Default) { outboundGroupShareLinks(groupId, outbounds) }
+    if (links.isBlank()) {
+        tipNotifier.show(resources.getString(R.string.outbound_no_urls))
+    } else {
+        clipboard.setPlainText(links)
+        tipNotifier.show(resources.getString(R.string.common_copied))
+    }
+}
 
 /**
  * Suggested document name for [groupName]. Letters and digits survive, so a localized group

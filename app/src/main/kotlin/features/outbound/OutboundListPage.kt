@@ -670,15 +670,16 @@ internal fun OutboundListPage(
                             },
                             toolsEnabled = selectedGroup != null && activeOperations == 0,
                             onCopyAllUrls = {
-                                val groupId = selectedGroup?.id
-                                val targets = stateStore.state.value.outbounds.filter { it.groupId == groupId }
-                                launchOperation {
-                                    val urls = withContext(Dispatchers.Default) { outboundUrls(targets) }
-                                    if (urls.isBlank()) {
-                                        services.tipNotifier.show(resources.getString(R.string.outbound_no_urls))
-                                    } else {
-                                        clipboard.setPlainText(urls)
-                                        services.tipNotifier.show(copiedMessage)
+                                if (selectedGroup != null) {
+                                    val outbounds = stateStore.state.value.outbounds
+                                    launchOperation {
+                                        copyOutboundGroupShareLinks(
+                                            groupId = selectedGroup.id,
+                                            outbounds = outbounds,
+                                            clipboard = clipboard,
+                                            tipNotifier = services.tipNotifier,
+                                            resources = resources,
+                                        )
                                     }
                                 }
                             },

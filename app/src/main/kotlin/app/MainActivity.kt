@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
     )
     private val outboundShareFileCreator = AndroidLogFileCreator(
         missingLauncherMessage = {
-            appString(R.string.error_outbound_share_file_creator_missing)
+            appString(R.string.error_outbound_group_share_file_creator_missing)
         },
     )
     private val notificationPermissionLauncher = registerForActivityResult(
