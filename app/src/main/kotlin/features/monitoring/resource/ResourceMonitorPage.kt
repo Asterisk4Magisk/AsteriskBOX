@@ -71,11 +71,9 @@ internal fun ResourceMonitorPage(padding: PaddingValues) {
             intervalMillis = resource.sampleIntervalMillis ?: 1_000L,
         )
     }
+    // The resource intent also keeps the connection count and today's traffic current, at the
+    // lightweight home cadence, for the details card.
     ObserveMonitoring(MonitoringIntent.Resource)
-    // The details card reports today's traffic and the active connection count, which only exist
-    // while their own intents are observed.
-    ObserveMonitoring(MonitoringIntent.Traffic)
-    ObserveMonitoring(MonitoringIntent.Connections)
 
     MonitoringScaffold(
         title = stringResource(R.string.monitor_resource_title),
@@ -153,7 +151,7 @@ internal fun ResourceMonitorPage(padding: PaddingValues) {
                         title = stringResource(R.string.monitor_resource_card_cpu),
                         value = resource.cpuPercent?.let { "%.1f%%".format(it) } ?: "—",
                         amplitudes = chart.cpu,
-                        peakLabel = chart.cpuPeakLabel,
+                        scaleLabel = chart.cpuScaleLabel,
                         color = MaterialTheme.colorScheme.primary,
                     )
                 }
@@ -162,14 +160,13 @@ internal fun ResourceMonitorPage(padding: PaddingValues) {
                         title = stringResource(R.string.monitor_resource_card_memory),
                         value = resource.memoryBytes?.toReadableBytes() ?: "—",
                         amplitudes = chart.memory,
-                        peakLabel = chart.memoryPeakLabel,
+                        scaleLabel = chart.memoryScaleLabel,
                         color = MaterialTheme.colorScheme.tertiary,
                     )
                 }
                 item("details") {
                     ResourceDetails(
                         resource = resource,
-                        samples = chartWindowSamples,
                         todayTrafficBytes = monitoring.traffic.today.total,
                         activeConnectionCount = monitoring.connections.activeCount,
                     )
@@ -203,7 +200,7 @@ private fun ResourceMetricCard(
     title: String,
     value: String,
     amplitudes: FloatArray,
-    peakLabel: String?,
+    scaleLabel: String?,
     color: Color,
 ) {
     MonitoringSectionCard(title, ResourceContentModifier) {
@@ -216,7 +213,7 @@ private fun ResourceMetricCard(
                 fontWeight = FontWeight.SemiBold,
             )
             Spacer(Modifier.height(10.dp))
-            ResourceMetricPlot(amplitudes = amplitudes, peakLabel = peakLabel, color = color)
+            ResourceMetricPlot(amplitudes = amplitudes, scaleLabel = scaleLabel, color = color)
         }
     }
 }
@@ -224,10 +221,10 @@ private fun ResourceMetricCard(
 @Composable
 private fun ResourceMetricPlot(
     amplitudes: FloatArray,
-    peakLabel: String?,
+    scaleLabel: String?,
     color: Color,
 ) {
-    if (amplitudes.none { value -> !value.isNaN() }) {
+    if (amplitudes.all { value -> value.isNaN() }) {
         Text(
             stringResource(R.string.monitor_no_samples),
             style = MaterialTheme.typography.bodySmall,
@@ -258,7 +255,7 @@ private fun ResourceMetricPlot(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.TopEnd,
             ) {
-                ResourceAxisLabel(peakLabel)
+                ResourceAxisLabel(scaleLabel)
             }
         }
     }
@@ -276,22 +273,28 @@ private fun ResourceAxisLabel(text: String?) {
 }
 
 /**
- * One dot column per time slot: the window is split into [ResourceChartSlots] equal buckets and each
- * bucket keeps its peak, so a spike is never averaged away. CPU grows up, memory grows down, and the
- * two are normalised against their own peak instead of a shared maximum.
+ * Each series is a smooth line over equal time buckets; a bucket keeps its peak, so a spike is never
+ * averaged away. CPU and memory have their own scale, and the axis label states that scale's top.
  */
 private class ResourceChartData(
     val cpu: FloatArray,
     val memory: FloatArray,
-    val cpuPeakPercent: Double,
-    val memoryPeakBytes: Long,
+    val cpuScalePercent: Double,
+    val memoryScaleBytes: Long,
 ) {
-    val cpuPeakLabel: String?
-        get() = cpuPeakPercent.takeIf { it > 0.0 }?.let { value -> "%.1f%%".format(value) }
+    val cpuScaleLabel: String?
+        get() = cpuScalePercent.takeIf { it > 0.0 }?.let { value -> "%.1f%%".format(value) }
 
-    val memoryPeakLabel: String?
-        get() = memoryPeakBytes.takeIf { it > 0L }?.toReadableBytes()
+    val memoryScaleLabel: String?
+        get() = memoryScaleBytes.takeIf { it > 0L }?.toReadableBytes()
 }
+
+private class ResourceSampleStats(
+    val cpuAverage: Double?,
+    val cpuPeak: Double?,
+    val memoryAverage: Long?,
+    val memoryPeak: Long?,
+)
 
 private fun MonitoringResourceSummary.samplesFor(range: ResourceChartRange): List<ProcessStatsSample> =
     if (range == ResourceChartRange.FifteenMinutes) fifteenMinuteSamples else oneHourSamples
@@ -306,56 +309,53 @@ private fun buildResourceChartData(
     }
     val endTime = samples.last().timestampMillis
     val interval = intervalMillis.coerceAtLeast(1L)
-    val span = (endTime - samples.first().timestampMillis).coerceAtLeast(0L)
-    // One column per sampling interval, capped at the card's column count. When the history is
-    // still shorter than the range the window shrinks with it, so the data fills the card instead
-    // of being squeezed into its right-hand edge.
-    val slots = ((span / interval).toInt() + 2).coerceIn(2, ResourceChartSlots)
-    val visibleWindow = minOf(windowMillis, maxOf(span + interval, slots * interval))
-    val startTime = endTime - visibleWindow
+    // While the history is shorter than the range the axis spans only the history, so an early
+    // session fills the card instead of being squeezed into its right-hand edge.
+    val visibleWindow = (endTime - samples.first().timestampMillis).coerceIn(interval, windowMillis)
+    // A bucket covers at least two sampling intervals: the real sampling period runs a little longer
+    // than the nominal one (the read itself takes time), and one-interval buckets would then leave
+    // empty buckets that break the line.
+    val bucketMillis = maxOf(
+        (visibleWindow + ResourceChartSlots - 2) / (ResourceChartSlots - 1),
+        interval * ResourceChartMinBucketIntervals,
+    )
+    val slots = (visibleWindow / bucketMillis + 1).toInt().coerceIn(2, ResourceChartSlots)
     var cpuPeak = 0.0
     var memoryPeak = 0L
-    samples.forEach { sample ->
-        if (sample.timestampMillis < startTime) return@forEach
-        cpuPeak = maxOf(cpuPeak, sample.cpuPercent ?: 0.0)
-        memoryPeak = maxOf(memoryPeak, sample.memoryBytes ?: 0L)
-    }
-    // 10% headroom keeps the peak off the very top edge, so a nearly constant series still reads as a
-    // line inside the plot instead of being glued to the ceiling.
-    val cpuReference = maxOf(cpuPeak, 1.0) * ResourceChartHeadroom
-    val memoryReference = maxOf(memoryPeak, 1L) * ResourceChartHeadroom
-    // NaN marks a bucket without any sample, so it renders no column instead of a zero one.
+    // NaN marks a bucket without any sample, so the line breaks there instead of dropping to zero.
     val cpu = FloatArray(slots) { Float.NaN }
     val memory = FloatArray(slots) { Float.NaN }
-    samples.forEach { sample ->
-        if (sample.timestampMillis < startTime) return@forEach
-        val slot = (((sample.timestampMillis - startTime) * slots) / visibleWindow)
-            .toInt()
-            .coerceIn(0, slots - 1)
+    for (index in samples.indices.reversed()) {
+        val sample = samples[index]
+        // Buckets are aligned to the newest sample, which always owns the rightmost one.
+        val slot = slots - 1 - ((endTime - sample.timestampMillis) / bucketMillis).toInt()
+        if (slot < 0) break
         sample.cpuPercent?.let { value ->
-            val normalized = (value / cpuReference).toFloat()
-            cpu[slot] = if (cpu[slot].isNaN()) normalized else maxOf(cpu[slot], normalized)
+            cpuPeak = maxOf(cpuPeak, value)
+            cpu[slot] = if (cpu[slot].isNaN()) value.toFloat() else maxOf(cpu[slot], value.toFloat())
         }
         sample.memoryBytes?.let { value ->
-            val normalized = (value / memoryReference).toFloat()
-            memory[slot] = if (memory[slot].isNaN()) normalized else maxOf(memory[slot], normalized)
+            memoryPeak = maxOf(memoryPeak, value)
+            memory[slot] = if (memory[slot].isNaN()) value.toFloat() else maxOf(memory[slot], value.toFloat())
         }
+    }
+    // 10% headroom keeps a nearly constant series off the top edge. CPU also has a floor, so an idle
+    // core's sub-percent noise stays a low line instead of swinging across the whole plot.
+    val cpuScale = maxOf(cpuPeak * ResourceChartHeadroom, ResourceCpuScaleFloorPercent)
+    val memoryScale = (maxOf(memoryPeak, 1L) * ResourceChartHeadroom).toLong()
+    for (slot in 0 until slots) {
+        cpu[slot] = (cpu[slot] / cpuScale).toFloat()
+        memory[slot] = memory[slot] / memoryScale
     }
     return ResourceChartData(
         cpu = cpu,
         memory = memory,
-        cpuPeakPercent = cpuPeak,
-        memoryPeakBytes = memoryPeak,
+        cpuScalePercent = cpuScale,
+        memoryScaleBytes = memoryScale,
     )
 }
 
-@Composable
-private fun ResourceDetails(
-    resource: MonitoringResourceSummary,
-    samples: List<ProcessStatsSample>,
-    todayTrafficBytes: Long,
-    activeConnectionCount: Int?,
-) {
+private fun buildResourceSampleStats(samples: List<ProcessStatsSample>): ResourceSampleStats {
     var cpuPeak: Double? = null
     var cpuSum = 0.0
     var cpuCount = 0
@@ -374,23 +374,39 @@ private fun ResourceDetails(
             memoryCount += 1
         }
     }
+    return ResourceSampleStats(
+        cpuAverage = if (cpuCount > 0) cpuSum / cpuCount else null,
+        cpuPeak = cpuPeak,
+        memoryAverage = if (memoryCount > 0) (memorySum / memoryCount).toLong() else null,
+        memoryPeak = memoryPeak,
+    )
+}
+
+@Composable
+private fun ResourceDetails(
+    resource: MonitoringResourceSummary,
+    todayTrafficBytes: Long,
+    activeConnectionCount: Int?,
+) {
+    // Averages and peaks cover the whole recorded history, independent of the chart range above.
+    val stats = remember(resource.oneHourSamples) { buildResourceSampleStats(resource.oneHourSamples) }
     MonitoringSectionCard(stringResource(R.string.monitor_resource_details), ResourceContentModifier) {
         Column {
             MonitoringValueRow(
                 stringResource(R.string.monitor_resource_cpu_average),
-                if (cpuCount > 0) "%.1f%%".format(cpuSum / cpuCount) else "—",
+                stats.cpuAverage?.let { "%.1f%%".format(it) } ?: "—",
             )
             MonitoringValueRow(
                 stringResource(R.string.monitor_resource_cpu_peak),
-                cpuPeak?.let { "%.1f%%".format(it) } ?: "—",
+                stats.cpuPeak?.let { "%.1f%%".format(it) } ?: "—",
             )
             MonitoringValueRow(
                 stringResource(R.string.monitor_resource_memory_average),
-                if (memoryCount > 0) (memorySum / memoryCount).toLong().toReadableBytes() else "—",
+                stats.memoryAverage?.toReadableBytes() ?: "—",
             )
             MonitoringValueRow(
                 stringResource(R.string.monitor_resource_memory_peak),
-                memoryPeak?.toReadableBytes() ?: "—",
+                stats.memoryPeak?.toReadableBytes() ?: "—",
             )
             MonitoringValueRow(
                 stringResource(R.string.monitor_resource_uptime),
@@ -431,6 +447,8 @@ private enum class ResourceChartRange(val windowMillis: Long) {
 
 private const val ResourceChartSlots = 64
 private const val ResourceChartHeadroom = 1.1
+private const val ResourceChartMinBucketIntervals = 2L
+private const val ResourceCpuScaleFloorPercent = 5.0
 
 private val ResourceChartHeight = 160.dp
 private val ResourceChartLineWidth = 2.dp

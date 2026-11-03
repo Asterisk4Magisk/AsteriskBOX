@@ -4,6 +4,7 @@
 package features.home
 
 import engine.singbox.runtime.SingBoxTrafficSample
+import kotlin.math.roundToLong
 import kotlin.math.sqrt
 
 /**
@@ -17,9 +18,9 @@ import kotlin.math.sqrt
 internal class NetworkActivityWaveform(
     val download: FloatArray,
     val upload: FloatArray,
-    /** Fastest download and upload sample currently on screen, in bytes per second. */
-    val downloadPeakBytes: Long = 0L,
-    val uploadPeakBytes: Long = 0L,
+    /** Speed at the far edge of each half in bytes per second, or `0` when the series is idle. */
+    val downloadScaleBytes: Long = 0L,
+    val uploadScaleBytes: Long = 0L,
 ) {
     val sampleCount: Int = download.size
 }
@@ -38,64 +39,56 @@ internal fun buildNetworkActivityWaveform(samples: List<SingBoxTrafficSample>): 
         upload = FloatArray(samples.size) { index ->
             networkActivityAmplitude(uploadBytes[index], uploadReference)
         },
-        downloadPeakBytes = downloadBytes.maxOrNull() ?: 0L,
-        uploadPeakBytes = uploadBytes.maxOrNull() ?: 0L,
+        downloadScaleBytes = networkActivityScaleBytes(downloadBytes, downloadReference),
+        uploadScaleBytes = networkActivityScaleBytes(uploadBytes, uploadReference),
     )
 }
 
 /**
- * Two line-chart series sharing one scale: each edge is its own speed divided by the larger of the
- * two window peaks, so the download line and the upload line are directly comparable on the same
- * axis instead of one being stacked on top of the other.
+ * Two line-chart series sharing one scale: each edge is its own speed divided by [scaleBytes], so the
+ * download line and the upload line are directly comparable on the same axis.
  */
 internal class NetworkActivityLineBands(
     val downloadEdge: FloatArray,
     val uploadEdge: FloatArray,
-    val downloadPeakBytes: Long = 0L,
-    val uploadPeakBytes: Long = 0L,
+    /** Speed at the top of the plot in bytes per second, or `0` when both series are idle. */
+    val scaleBytes: Long = 0L,
 ) {
     val sampleCount: Int = downloadEdge.size
 }
 
+/**
+ * Builds the line series on the same fixed [slotCount] time axis as the dotted style: the newest
+ * sample owns the rightmost slot and leading slots stay NaN, the painters' "no sample" sentinel, so
+ * new data scrolls in instead of stretching a short buffer across the card.
+ */
 internal fun buildNetworkActivityLineBands(
     samples: List<SingBoxTrafficSample>,
+    slotCount: Int,
 ): NetworkActivityLineBands {
-    if (samples.isEmpty()) {
+    if (samples.isEmpty() || slotCount <= 0) {
         return NetworkActivityLineBands(FloatArray(0), FloatArray(0))
     }
-    var downloadPeak = 0L
-    var uploadPeak = 0L
-    samples.forEach { sample ->
-        downloadPeak = maxOf(downloadPeak, sample.down.coerceAtLeast(0L))
-        uploadPeak = maxOf(uploadPeak, sample.up.coerceAtLeast(0L))
+    val visible = minOf(samples.size, slotCount)
+    val firstSample = samples.size - visible
+    val firstSlot = slotCount - visible
+    var peak = 0L
+    for (index in firstSample until samples.size) {
+        peak = maxOf(peak, samples[index].down, samples[index].up)
     }
     // Both curves share the larger peak (plus headroom), so their heights can be compared directly.
-    val reference = maxOf(downloadPeak, uploadPeak, 1L) * NetworkActivityStackHeadroom
+    val reference = maxOf(peak, 1L) * NetworkActivityLineHeadroom
+    val downloadEdge = FloatArray(slotCount) { Float.NaN }
+    val uploadEdge = FloatArray(slotCount) { Float.NaN }
+    for (offset in 0 until visible) {
+        val sample = samples[firstSample + offset]
+        downloadEdge[firstSlot + offset] = sample.down.coerceAtLeast(0L) / reference
+        uploadEdge[firstSlot + offset] = sample.up.coerceAtLeast(0L) / reference
+    }
     return NetworkActivityLineBands(
-        downloadEdge = FloatArray(samples.size) { index ->
-            (samples[index].down.coerceAtLeast(0L) / reference).toFloat()
-        },
-        uploadEdge = FloatArray(samples.size) { index ->
-            (samples[index].up.coerceAtLeast(0L) / reference).toFloat()
-        },
-        downloadPeakBytes = downloadPeak,
-        uploadPeakBytes = uploadPeak,
-    )
-}
-
-/**
- * Right-aligns the edges inside a fixed [slotCount] axis: leading slots become NaN, the painters'
- * "no sample" sentinel, so the line style shares the dotted style's time axis and never stretches a
- * short buffer across the whole card.
- */
-internal fun NetworkActivityLineBands.alignedToSlotCount(slotCount: Int): NetworkActivityLineBands {
-    if (slotCount <= sampleCount) return this
-    val nanPadding = FloatArray(slotCount - sampleCount) { Float.NaN }
-    return NetworkActivityLineBands(
-        downloadEdge = nanPadding + downloadEdge,
-        uploadEdge = nanPadding + uploadEdge,
-        downloadPeakBytes = downloadPeakBytes,
-        uploadPeakBytes = uploadPeakBytes,
+        downloadEdge = downloadEdge,
+        uploadEdge = uploadEdge,
+        scaleBytes = if (peak > 0L) reference.roundToLong() else 0L,
     )
 }
 
@@ -131,7 +124,12 @@ internal fun networkActivityAmplitude(bytes: Long, referenceBytes: Float): Float
     return sqrt((bytes.toFloat() / referenceBytes).coerceIn(0f, 1f))
 }
 
+// The axis label states the edge of the half, not the window peak: a spike above the reference
+// saturates at the edge, so the reference is what the edge actually means.
+private fun networkActivityScaleBytes(values: LongArray, referenceBytes: Float): Long =
+    if (values.any { value -> value > 0L }) referenceBytes.roundToLong() else 0L
+
 private const val NetworkActivityReferencePercentile = 90
-private const val NetworkActivityStackHeadroom = 1.1f
+private const val NetworkActivityLineHeadroom = 1.1f
 private const val NetworkActivityReferenceHeadroom = 1.35f
 private const val NetworkActivityReferenceFloorBytes = 4f * 1024f

@@ -72,7 +72,6 @@ import features.home.HomeNetworkActivityState
 import features.home.HomeNetworkRowKind
 import features.home.HomeNetworkSampleLimit
 import features.home.HomeServiceStatus
-import features.home.alignedToSlotCount
 import features.home.buildHomeControllerState
 import features.home.buildHomeModeChange
 import features.home.buildHomeModeOperationState
@@ -430,10 +429,12 @@ private fun NetworkActivityCard(
     networkActivityState: HomeNetworkActivityState,
     chartStyle: Int,
 ) {
-    AsteriskPageCard(modifier = HomeContentModifier.height(220.dp)) {
+    // The card wraps its content and only the plot has a fixed height, so a large font scale grows
+    // the card instead of squeezing the chart away.
+    AsteriskPageCard(modifier = HomeContentModifier) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .padding(20.dp),
         ) {
             Text(
@@ -467,7 +468,7 @@ private fun NetworkActivityCard(
             if (networkActivityState.hasNetworkSamples) {
                 val chartModifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .height(NetworkActivityChartHeight)
                 if (chartStyle == NetworkActivityStyleLines) {
                     NetworkActivityLineChart(
                         state = networkActivityState,
@@ -483,7 +484,7 @@ private fun NetworkActivityCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
+                        .height(NetworkActivityChartHeight),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -508,12 +509,7 @@ private fun NetworkActivityLineChart(
     modifier: Modifier = Modifier,
 ) {
     val samples = state.networkSamples
-    val bands = remember(samples) {
-        // One column per sample, capped at the card's slot count: while the buffer is still filling
-        // the curves use the whole width instead of collapsing into a strip on the right.
-        val slots = minOf(NetworkActivitySlotCount, maxOf(samples.size, 2))
-        buildNetworkActivityLineBands(samples).alignedToSlotCount(slots)
-    }
+    val bands = remember(samples) { buildNetworkActivityLineBands(samples, NetworkActivitySlotCount) }
     val downloadColor = MaterialTheme.colorScheme.primary
     val uploadColor = MaterialTheme.colorScheme.tertiary
     Row(modifier = modifier) {
@@ -527,7 +523,7 @@ private fun NetworkActivityLineChart(
             drawSmoothAreaLine(values = bands.downloadEdge, color = downloadColor, strokeWidth = strokeWidth)
             drawSmoothAreaLine(values = bands.uploadEdge, color = uploadColor, strokeWidth = strokeWidth)
         }
-        // Both curves share one scale, so the axis carries one label: the taller of the two peaks.
+        // Both curves share one scale, so the axis carries one label: the top of that scale.
         Box(
             modifier = Modifier
                 .fillMaxHeight()
@@ -535,7 +531,7 @@ private fun NetworkActivityLineChart(
                 .widthIn(min = ChartAxisLabelMinWidth),
             contentAlignment = Alignment.TopEnd,
         ) {
-            NetworkActivityAxisLabel(maxOf(bands.downloadPeakBytes, bands.uploadPeakBytes))
+            NetworkActivityAxisLabel(bands.scaleBytes)
         }
     }
 }
@@ -601,8 +597,8 @@ private fun NetworkActivityChart(
                 ramp = uploadRamp,
             )
         }
-        // Y axis: only the maximum of each series, pinned to its far corner. Each direction uses its
-        // own range, so a slow upload never inherits the download maximum.
+        // Y axis: only the far edge of each half, pinned to its corner. Each direction uses its own
+        // scale, so a slow upload never inherits the download range.
         Column(
             modifier = Modifier
                 .fillMaxHeight()
@@ -614,23 +610,23 @@ private fun NetworkActivityChart(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.TopEnd,
             ) {
-                NetworkActivityAxisLabel(waveform.downloadPeakBytes)
+                NetworkActivityAxisLabel(waveform.downloadScaleBytes)
             }
             Box(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.BottomEnd,
             ) {
-                NetworkActivityAxisLabel(waveform.uploadPeakBytes)
+                NetworkActivityAxisLabel(waveform.uploadScaleBytes)
             }
         }
     }
 }
 
 @Composable
-private fun NetworkActivityAxisLabel(peakBytes: Long) {
-    if (peakBytes <= 0L) return
+private fun NetworkActivityAxisLabel(scaleBytes: Long) {
+    if (scaleBytes <= 0L) return
     Text(
-        text = formatHomeSpeed(peakBytes),
+        text = formatHomeSpeed(scaleBytes),
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -758,6 +754,7 @@ private const val HomeUiSampleIntervalMillis = 1_000L
 // sample sits in the rightmost column. It mirrors the sample limit of the home traffic state.
 private const val NetworkActivitySlotCount = HomeNetworkSampleLimit
 
+private val NetworkActivityChartHeight = 108.dp
 private val NetworkSpeedIconSize = 20.dp
 private val NetworkActivityAreaStrokeWidth = 2.dp
 private val NetworkSpeedPairSpacing = 14.dp
