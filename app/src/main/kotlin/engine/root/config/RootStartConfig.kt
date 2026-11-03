@@ -35,6 +35,7 @@ internal data class RootStartConfig(
     val fakeIpIpv4Pool: String,
     val enableBoot: Boolean,
     val serviceControl: ServiceControlSettings,
+    val runtimeEventReceiver: String,
 ) {
     val configPath: String
         get() = runtimePaths.coreConfigPath
@@ -53,7 +54,8 @@ internal data class RootStartConfig(
             enableFakeIp == other.enableFakeIp &&
             fakeIpIpv4Pool == other.fakeIpIpv4Pool &&
             enableBoot == other.enableBoot &&
-            serviceControl == other.serviceControl
+            serviceControl == other.serviceControl &&
+            runtimeEventReceiver == other.runtimeEventReceiver
     }
 
     override fun hashCode(): Int {
@@ -69,6 +71,7 @@ internal data class RootStartConfig(
         result = 31 * result + fakeIpIpv4Pool.hashCode()
         result = 31 * result + enableBoot.hashCode()
         result = 31 * result + serviceControl.hashCode()
+        result = 31 * result + runtimeEventReceiver.hashCode()
         return result
     }
 }

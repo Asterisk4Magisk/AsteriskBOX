@@ -3,6 +3,7 @@
 
 package engine.root.config
 
+import android.content.ComponentName
 import android.content.Context
 import app.AppState
 import app.effectiveFakeIpEnabled
@@ -14,6 +15,7 @@ import engine.singbox.SingBoxConfigFactory
 import engine.singbox.prepareSingBoxCoreLogPaths
 import features.resources.runtime.SingBoxResourceFilePaths
 import features.resources.runtime.singBoxResourceFilePaths
+import features.quicksettings.QuickSettingsTileRefreshReceiver
 import java.io.File
 
 internal class RootConfigBuildContext(
@@ -23,6 +25,8 @@ internal class RootConfigBuildContext(
 ) {
     fun buildRootStartConfig(): RootStartConfig {
         return appState.toRootStartConfig(
+            runtimeEventReceiver = ComponentName(androidContext, QuickSettingsTileRefreshReceiver::class.java)
+                .flattenToString(),
             singBoxConfigBytes = SingBoxConfigFactory.buildConfigBytes(androidContext, appState),
             resourceFilePaths = resourceFilePaths,
         )
@@ -43,6 +47,7 @@ internal fun Context.prepareRootConfigBuildContext(request: ProxyEngineStartRequ
 }
 
 private fun AppState.toRootStartConfig(
+    runtimeEventReceiver: String,
     singBoxConfigBytes: ByteArray,
     resourceFilePaths: SingBoxResourceFilePaths,
 ): RootStartConfig {
@@ -69,6 +74,7 @@ private fun AppState.toRootStartConfig(
         fakeIpIpv4Pool = rootFakeIpIpv4Pool(),
         enableBoot = enableRootBootScript,
         serviceControl = serviceControl,
+        runtimeEventReceiver = runtimeEventReceiver,
     )
 }
 
