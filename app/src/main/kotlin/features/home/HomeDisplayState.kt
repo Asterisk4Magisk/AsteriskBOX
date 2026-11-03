@@ -6,6 +6,7 @@ package features.home
 import app.AppState
 import engine.singbox.runtime.SingBoxTrafficSample
 import engine.singbox.runtime.SingBoxTrafficState
+import engine.singbox.runtime.TrafficHistoryCapacity
 import features.monitoring.MonitoringState
 import ui.theme.FocusTone
 import utils.toReadableBytes
@@ -147,7 +148,8 @@ internal fun formatHomeRuntimeBytes(bytes: Long?): String {
     return bytes?.toReadableBytes(keepTrailingZero = false) ?: HomeUnavailableValue
 }
 
-private const val HomeNetworkSampleLimit = 60
+// Fixed chart window, sourced from the ring-buffer capacity so the axis can always be filled.
+internal const val HomeNetworkSampleLimit = TrafficHistoryCapacity
 internal const val HomeUnavailableValue = "—"
 
 // Applying: a pending configuration change is being reloaded or restarted into the running core.

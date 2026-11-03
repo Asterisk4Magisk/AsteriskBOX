@@ -36,6 +36,7 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
     }
 
     int(KeyColorMode, colorMode)
+    int(KeyNetworkActivityStyle, networkActivityStyle)
     int(KeyLanguageMode, languageMode)
     int(KeySeedIndex, seedIndex)
     boolean(KeyHideRecentTasks, hideRecentTasks)
