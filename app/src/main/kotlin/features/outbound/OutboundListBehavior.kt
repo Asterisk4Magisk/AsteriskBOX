@@ -51,10 +51,16 @@ internal fun outboundListBottomExtraDp(): Int {
     return OutboundListBaseBottomExtraDp
 }
 
+// A named object instead of a SAM lambda: a suspend fun-interface lambda in a default
+// argument crashes the Kotlin JVM backend (AddContinuationLowering assertion).
+private object DefaultMihomoProviderFetcher : MihomoProviderFetcher {
+    override suspend fun fetch(request: MihomoProviderRequest): String = fetchMihomoProvider(request)
+}
+
 internal suspend fun parseOutboundImportContent(
     content: String,
     jsonFormatter: SingBoxOutboundConfigFormatter = LibboxSingBoxOutboundConfigFormatter,
-    providerFetcher: MihomoProviderFetcher = MihomoProviderFetcher { fetchMihomoProvider(it) },
+    providerFetcher: MihomoProviderFetcher = DefaultMihomoProviderFetcher,
     sourceUrl: String? = null,
 ): ImportOutcome<ImportedSingBoxOutbound> {
     return OutboundImportPipeline.parseOutcome(
