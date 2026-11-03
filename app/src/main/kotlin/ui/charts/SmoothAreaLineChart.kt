@@ -50,8 +50,7 @@ fun DrawScope.drawSmoothAreaLine(
                 lineTo(points.first().x, size.height)
                 close()
             }
-            // Anchor the fade at the series' own crest so a low series still shows a fill, matching
-            // the stacked-area painter.
+            // Anchor the fade at the series' own crest so a low series still shows a fill.
             val fillBrush = Brush.verticalGradient(
                 0f to color.copy(alpha = areaAlpha),
                 1f to color.copy(alpha = 0f),
@@ -74,20 +73,13 @@ fun DrawScope.drawSmoothAreaLine(
  * instead of a staircase of peaks. Control points are clamped to the canvas so the curve cannot
  * bulge outside the plot.
  */
-internal fun smoothedPath(points: List<Offset>, bottomY: Float): Path {
+private fun smoothedPath(points: List<Offset>, bottomY: Float): Path {
     val path = Path()
     if (points.isEmpty()) return path
     path.moveTo(points.first().x, points.first().y)
-    appendSmoothed(path, points, bottomY)
-    return path
-}
-
-/** Appends the smoothed segments of [points] to [path], which must already sit on its first point. */
-private fun appendSmoothed(path: Path, points: List<Offset>, bottomY: Float) {
-    if (points.size < 2) return
     if (points.size == 2) {
         path.lineTo(points[1].x, points[1].y)
-        return
+        return path
     }
     for (index in 0 until points.size - 1) {
         val p0 = points[(index - 1).coerceAtLeast(0)]
@@ -98,4 +90,5 @@ private fun appendSmoothed(path: Path, points: List<Offset>, bottomY: Float) {
         val c2 = Offset(p2.x - (p3.x - p1.x) / 6f, (p2.y - (p3.y - p1.y) / 6f).coerceIn(0f, bottomY))
         path.cubicTo(c1.x, c1.y, c2.x, c2.y, p2.x, p2.y)
     }
+    return path
 }

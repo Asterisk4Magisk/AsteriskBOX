@@ -152,7 +152,6 @@
     <string name="monitor_resource_cpu_average">CPU 平均</string>
     <string name="monitor_resource_cpu_peak">CPU 峰值</string>
     <string name="monitor_resource_details">采样详情</string>
-    <string name="monitor_resource_focus_memory">内存 %1$s</string>
     <string name="monitor_resource_interval">采样间隔</string>
     <string name="monitor_resource_memory_average">内存平均</string>
     <string name="monitor_resource_memory_peak">内存峰值</string>

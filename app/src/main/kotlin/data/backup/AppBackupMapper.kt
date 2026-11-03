@@ -9,6 +9,7 @@ import engine.singbox.normalizedEbpfLocalDataPlane
 
 import app.withCompatibleProxyAppListMode
 import app.AppState
+import app.modes.normalizeNetworkActivityStyle
 import app.withNormalizedConnectionTestSettings
 import features.resources.withInitializedBundledRuleSets
 import app.ServiceControlSchedule
@@ -298,7 +299,7 @@ private fun AppBackupData.toAppState(): AppState {
         colorMode = settings.colorMode,
         languageMode = settings.languageMode,
         seedIndex = settings.seedIndex,
-        networkActivityStyle = settings.networkActivityStyle,
+        networkActivityStyle = normalizeNetworkActivityStyle(settings.networkActivityStyle),
         hideRecentTasks = settings.hideRecentTasks,
         allowScreenshots = settings.allowScreenshots,
         hideLauncherIcon = settings.hideLauncherIcon,

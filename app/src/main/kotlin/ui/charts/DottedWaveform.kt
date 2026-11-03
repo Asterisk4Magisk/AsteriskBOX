@@ -19,15 +19,6 @@ import kotlin.math.roundToInt
 /** Radius of a single waveform dot; both the lattice pitch and the columns derive from it. */
 val DottedWaveformDotRadius: Dp = 1.6.dp
 
-/** Space between an axis label gutter and the plot; shared by every chart style here. */
-val ChartAxisLabelSpacing: Dp = 6.dp
-
-/**
- * Minimum gutter width. The label text changes size as the peak changes, and the plot is laid out
- * next to it, so a content-sized gutter would make the chart jump horizontally every update.
- */
-val ChartAxisLabelMinWidth: Dp = 58.dp
-
 private const val DottedWaveformRampSteps = 48
 private const val LightLowToneWeight = 0.10f
 private const val LightHighToneWeight = 0.18f
@@ -96,7 +87,6 @@ fun DrawScope.drawDottedWaveform(
     dotRadius: Float,
     direction: Float,
     ramp: DottedWaveformRamp,
-    anchorFraction: Float = 0.5f,
 ) {
     if (amplitudes.isEmpty() || slotCount < 2) return
     val slotWidth = (size.width - dotRadius * 2f) / (slotCount - 1)
@@ -105,7 +95,8 @@ fun DrawScope.drawDottedWaveform(
     // The first dot starts one pitch away from the anchor, which leaves an empty seam between two
     // opposing series (or above the baseline of a single one), and the last dot stays inside.
     val firstDotOffset = dotPitch
-    val anchorY = size.height * anchorFraction.coerceIn(0f, 1f)
+    // Both halves meet at the vertical middle of the canvas.
+    val anchorY = size.height / 2f
     // Callers pass -1f (grow up) or +1f (grow down); zero is treated as "up" on purpose.
     val extent = if (direction <= 0f) anchorY else size.height - anchorY
     val usableHeight = extent - dotRadius - firstDotOffset
