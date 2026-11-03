@@ -329,12 +329,13 @@ class SingBoxTrafficStatsNotificationService : Service() {
 
         internal fun stop(context: Context) {
             val appContext = context.applicationContext
-            requests.stop {
+            val stopRequested = requests.stop {
                 appContext.stopService(Intent(appContext, SingBoxTrafficStatsNotificationService::class.java).apply {
                     action = ActionStop
                 })
             }
-            appContext.getSystemService(NotificationManager::class.java).cancel(NotificationId)
+            // Without a start since the last stop, that stop already removed the notification.
+            if (stopRequested) appContext.getSystemService(NotificationManager::class.java).cancel(NotificationId)
         }
     }
 }
