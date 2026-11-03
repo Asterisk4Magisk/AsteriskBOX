@@ -213,7 +213,7 @@ internal fun OutboundGroupListPage(
     val subscriptionGroups = appState.outboundGroups.outboundSubscriptionGroups()
     val clipboard = LocalClipboard.current
     val shareCopiedMessage = stringResource(R.string.common_copied)
-    val shareEmptyMessage = stringResource(R.string.outbound_group_share_empty)
+    val shareEmptyMessage = stringResource(R.string.outbound_no_urls)
     val shareExportedMessage = stringResource(R.string.outbound_group_share_exported)
     val shareExportFailedMessage = stringResource(R.string.outbound_group_share_export_failed)
     // The subscription QR code is shown from the page, not the card, so it survives the menu
@@ -232,38 +232,33 @@ internal fun OutboundGroupListPage(
         }
     }
 
-    /**
-     * Outbound share links of the group, or null right after showing the empty tip. Copying and
-     * exporting both go through here so they can never disagree about what is shareable.
-     */
-    suspend fun groupOutboundShareLinks(group: OutboundGroupState): String? {
-        val links = withContext(Dispatchers.Default) {
-            outboundGroupShareLinks(group.id, stateStore.state.value.outbounds)
-        }
-        if (links.isBlank()) {
-            services.tipNotifier.show(shareEmptyMessage)
-            return null
-        }
-        return links
-    }
-
-    /**
-     * Copies every outbound link in the group, one per line. Outbounds without a standard
-     * share link are skipped, so this stays identical to the exported document.
-     */
+    /** Copies every outbound link in the group, the same way the outbound list's menu does. */
     fun copyGroupOutboundLinks(group: OutboundGroupState) {
+        val outbounds = stateStore.state.value.outbounds
         scope.launch {
-            val links = groupOutboundShareLinks(group) ?: return@launch
-            clipboard.setPlainText(links)
-            services.tipNotifier.show(shareCopiedMessage)
+            copyOutboundGroupShareLinks(
+                groupId = group.id,
+                outbounds = outbounds,
+                clipboard = clipboard,
+                tipNotifier = services.tipNotifier,
+                resources = resources,
+            )
         }
     }
 
-    /** Writes the group's outbound links to a `text/plain` document chosen by the user. */
+    /**
+     * Writes the group's outbound links to a `text/plain` document chosen by the user. The
+     * document holds exactly what [copyGroupOutboundLinks] would copy.
+     */
     fun exportGroupOutboundLinks(group: OutboundGroupState) {
         val appContext = context.applicationContext
+        val outbounds = stateStore.state.value.outbounds
         scope.launch {
-            val links = groupOutboundShareLinks(group) ?: return@launch
+            val links = withContext(Dispatchers.Default) { outboundGroupShareLinks(group.id, outbounds) }
+            if (links.isBlank()) {
+                services.tipNotifier.show(shareEmptyMessage)
+                return@launch
+            }
             val uri = try {
                 services.outboundShareFileCreator(outboundGroupShareFileName(group.name))
             } catch (error: CancellationException) {
@@ -1813,6 +1808,7 @@ internal fun OutboundGroupCard(
                                         leadingIcon = {
                                             Icon(Icons.Rounded.ContentCopy, contentDescription = null)
                                         },
+                                        enabled = !syncing,
                                         onClick = {
                                             dismissMenu()
                                             showUpdateInfo = false
@@ -1826,6 +1822,7 @@ internal fun OutboundGroupCard(
                                         leadingIcon = {
                                             Icon(Icons.Rounded.FileDownload, contentDescription = null)
                                         },
+                                        enabled = !syncing,
                                         onClick = {
                                             dismissMenu()
                                             showUpdateInfo = false

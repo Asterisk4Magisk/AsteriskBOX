@@ -311,6 +311,7 @@
     <string name="connection_test_url_invalid">Enter a valid HTTP or HTTPS URL</string>
 
     <!-- Outbound groups -->
+    <string name="error_outbound_group_share_file_creator_missing">Group export file creator is not registered</string>
     <string name="outbound_group_add">Add group</string>
     <string name="outbound_group_age_secret_key">Mihomo Age secret key</string>
     <plurals name="outbound_group_count">
@@ -350,7 +351,6 @@
     <string name="outbound_group_name_placeholder">Leave blank to auto-assign on first sync</string>
     <string name="outbound_group_required">Select a group</string>
     <string name="outbound_group_share">Share</string>
-    <string name="outbound_group_share_empty">This group has no shareable outbound links</string>
     <string name="outbound_group_share_export_failed">Unable to export the group</string>
     <string name="outbound_group_share_exported">Group exported</string>
     <string name="outbound_group_share_file">Export links to file</string>
@@ -394,7 +394,6 @@
     <string name="outbound_group_user_agent_v2rayng">v2rayNG</string>
 
     <!-- Outbound management -->
-    <string name="error_outbound_share_file_creator_missing">Outbound share file creator is not registered</string>
     <string name="import_result_details_title">Import complete with details</string>
     <string name="import_result_duplicates_title">No new items</string>
     <string name="import_result_entry_prefix">Entry %1$d: </string>
@@ -438,7 +437,7 @@
     <string name="outbound_no_duplicates">No duplicate proxy servers found</string>
     <string name="outbound_no_invalid">No invalid proxy servers found</string>
     <string name="outbound_no_proxy_servers_to_delete">No proxy servers to delete</string>
-    <string name="outbound_no_urls">No proxy server URLs available to copy</string>
+    <string name="outbound_no_urls">No shareable proxy server URLs</string>
     <string name="outbound_option_layout">Layout</string>
     <string name="outbound_option_layout_auto">Automatic</string>
     <string name="outbound_option_layout_double">Double</string>
