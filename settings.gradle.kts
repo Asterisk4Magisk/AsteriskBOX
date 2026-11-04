@@ -38,7 +38,10 @@ dependencyResolutionManagement {
             forRepository {
                 ivy {
                     name = "AndroidLibBoxLiteGitHubRelease"
-                    url = uri("https://github.com/Asterisk4Magisk/AndroidLibBoxLite/releases/download")
+                    // Temporary fork while the plugin support PR is open upstream
+                    // (Asterisk4Magisk/AndroidLibBoxLite#7). Flip back to the
+                    // upstream owner as soon as a release carries it.
+                    url = uri("https://github.com/grill-glitch/AndroidLibBoxLite/releases/download")
                     patternLayout {
                         artifact("[revision]/[artifact].[ext]")
                     }

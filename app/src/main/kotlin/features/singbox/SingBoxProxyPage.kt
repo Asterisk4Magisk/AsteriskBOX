@@ -98,6 +98,7 @@ import app.modes.SingBoxProxySortDelay
 import app.modes.SingBoxProxySortName
 import app.selectableManagedOutbounds
 import app.withSelectorSelection
+import engine.plugin.PluginOutbounds
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.runtime.SingBoxProxiesState
 import engine.singbox.runtime.SingBoxProxyGroup
@@ -154,6 +155,7 @@ fun SingBoxProxyPage(
     padding: PaddingValues,
 ) {
     val isWideScreen = LocalIsWideScreen.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val appState by LocalAppStateStore.current.collectAppState()
     val updateAppState = LocalUpdateAppState.current
     val services = LocalAppServices.current
@@ -193,6 +195,27 @@ fun SingBoxProxyPage(
     val globalGroupName = stringResource(R.string.routing_global)
     val unavailableLabel = stringResource(R.string.common_unavailable)
     val outboundChoices = selectableManagedOutbounds(appState)
+    // Plugin outbounds run as core `socks` outbounds; show the real protocol.
+    // Switchable protocols (hysteria2, naive) only count while the provider
+    // switch says "plugin", so the flows below drive recomposition.
+    val hysteria2Provider by engine.plugin.PluginProviderPreferences
+        .flow(context, engine.plugin.PluginProviderProtocols.Hysteria2)
+        .collectAsState()
+    val naiveProvider by engine.plugin.PluginProviderPreferences
+        .flow(context, engine.plugin.PluginProviderProtocols.Naive)
+        .collectAsState()
+    val pluginBackedTypes = remember(hysteria2Provider, naiveProvider) {
+        buildSet {
+            PluginOutbounds.pluginOnly.mapTo(this) { requirement -> requirement.outboundType }
+            if (hysteria2Provider == engine.plugin.ProtocolProvider.Plugin) add("hysteria2")
+            if (naiveProvider == engine.plugin.ProtocolProvider.Plugin) add("naive")
+        }
+    }
+    val outboundProtocolTypes = remember(appState.outbounds, pluginBackedTypes) {
+        appState.outbounds
+            .filter { outbound -> outbound.type in pluginBackedTypes }
+            .associate { outbound -> outbound.tag to outbound.type }
+    }
     val outboundDisplayNames = outboundChoices.associate { choice ->
         choice.tag to choice.localizedLabel()
     }
@@ -467,6 +490,7 @@ fun SingBoxProxyPage(
                                 query = keyword,
                                 sort = appState.singBoxProxySort,
                                 displayNamesForGroup = ::groupNodeDisplayNames,
+                                protocolTypes = outboundProtocolTypes,
                                 testingBaselines = runtimeState.delayTestingBaselines,
                                 failedNodes = runtimeState.delayFailedNodes,
                             )
@@ -585,6 +609,7 @@ fun SingBoxProxyPage(
                                             node = node,
                                             displayName = displayNames[node.name]
                                                 ?: node.name.visibleRuntimeName(unavailableLabel),
+                                            protocolType = outboundProtocolTypes[node.name] ?: node.type,
                                             selected = isSingBoxProxyNodeCurrent(group, node.name, pendingSelections),
                                             selectionEnabled = selectionBehavior.cardEnabled,
                                             delayTestEnabled = runtimeAvailable && testingTarget == null,
@@ -633,6 +658,7 @@ fun SingBoxProxyPage(
                                 displayNames = pageDisplayNames,
                                 testingBaselines = runtimeState.delayTestingBaselines,
                                 failedNodes = runtimeState.delayFailedNodes,
+                                protocolTypes = outboundProtocolTypes,
                             )
                         }
                         val selectedNodeName = (pendingSelections[group?.name] ?: group?.now).orEmpty().takeIf(String::isNotBlank)
@@ -712,6 +738,7 @@ fun SingBoxProxyPage(
                                             node = node,
                                             displayName = pageDisplayNames[node.name]
                                                 ?: node.name.visibleRuntimeName(unavailableLabel),
+                                            protocolType = outboundProtocolTypes[node.name] ?: node.type,
                                             selected = isSingBoxProxyNodeCurrent(
                                                 group = group,
                                                 nodeName = node.name,
@@ -1199,6 +1226,7 @@ private val SingBoxProxyOptionsMenuWidth = 224.dp
 private fun SingBoxProxyNodeCard(
     node: SingBoxProxyNode,
     displayName: String,
+    protocolType: String,
     selected: Boolean,
     selectionEnabled: Boolean,
     delayTestEnabled: Boolean,
@@ -1245,7 +1273,7 @@ private fun SingBoxProxyNodeCard(
                 }
             }
             ProtocolDelayLine(
-                protocol = node.type,
+                protocol = protocolType,
                 delay = node.delay,
                 delayStatus = delayStatus,
                 selected = selected,

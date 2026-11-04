@@ -87,6 +87,9 @@ internal object OutboundEditorRegistry {
         OutboundEditorDescriptor("anytls", "AnyTLS"),
         OutboundEditorDescriptor("snell", "Snell"),
         OutboundEditorDescriptor("ssh", "SSH"),
+        OutboundEditorDescriptor("mieru", "Mieru"),
+        OutboundEditorDescriptor("shadowquic", "ShadowQUIC"),
+        OutboundEditorDescriptor("juicity", "Juicity"),
     )
     private val schemaCache = mutableMapOf<String, OutboundEditorSchema>()
 
@@ -163,6 +166,9 @@ internal object OutboundEditorRegistry {
         )
         "anytls" -> schema(type, descriptor(type).title, anyTlsOutboundFields(), tls = true)
         "snell" -> schema(type, descriptor(type).title, snellOutboundFields())
+        "mieru" -> schema(type, descriptor(type).title, mieruOutboundFields())
+        "shadowquic" -> schema(type, descriptor(type).title, shadowQuicOutboundFields())
+        "juicity" -> schema(type, descriptor(type).title, juicityOutboundFields())
         "ssh" -> schema(type, descriptor(type).title, sshOutboundFields())
         else -> throw IllegalArgumentException("Unsupported outbound type: $type")
     }
@@ -598,11 +604,65 @@ internal val MandatoryTlsOutboundTypes = setOf(
     "anytls",
 )
 
+private fun mieruOutboundFields() = listOf(
+    outboundField("username", "Username"),
+    outboundField("password", "Password", required = true),
+    outboundSelect("protocol", "Mieru transport", listOf("TCP", "UDP")),
+    outboundField("mtu", "MTU", OutboundFieldKind.INTEGER),
+    outboundSelect("multiplexing", "Multiplexing level", listOf("", "LOW", "MEDIUM", "HIGH")),
+    outboundField("traffic_pattern", "Traffic pattern (JSON)", OutboundFieldKind.MULTILINE),
+)
+
+private fun shadowQuicOutboundFields() = listOf(
+    outboundSelect("sub_protocol", "Sub-protocol", listOf("shadowquic", "sunnyquic")),
+    outboundField("username", "Username"),
+    outboundField("password", "Password", required = true),
+    outboundField("server_name", "Server name"),
+    outboundField("alpn", "ALPN"),
+    outboundField("initial_mtu", "Initial MTU", OutboundFieldKind.INTEGER),
+    outboundField("min_mtu", "Min MTU", OutboundFieldKind.INTEGER),
+    outboundSelect("congestion_control", "Congestion control", listOf("bbr", "cubic", "brutal")),
+    outboundField("keep_alive_interval", "Keep-alive interval", OutboundFieldKind.INTEGER),
+    outboundField("gso", "GSO", OutboundFieldKind.BOOLEAN),
+    outboundField("udp_over_stream", "UDP over stream", OutboundFieldKind.BOOLEAN),
+    outboundField("zero_rtt", "Zero-RTT", OutboundFieldKind.BOOLEAN),
+    outboundField("mtu_discovery", "MTU discovery", OutboundFieldKind.BOOLEAN),
+    outboundField("blackhole_detection", "Blackhole detection", OutboundFieldKind.BOOLEAN),
+    outboundField("extra_paths", "Extra paths", OutboundFieldKind.MULTILINE),
+    outboundField("max_paths", "Max paths", OutboundFieldKind.INTEGER),
+    outboundField("certificates", "Certificates", OutboundFieldKind.MULTILINE),
+)
+
+private fun juicityOutboundFields() = listOf(
+    outboundField("uuid", "UUID", required = true),
+    outboundField("password", "Password", required = true),
+    outboundField("sni", "Server name"),
+    outboundField("allow_insecure", "Allow insecure", OutboundFieldKind.BOOLEAN),
+    outboundField("pin_sha256", "Pinned certificate SHA-256"),
+    outboundSelect("congestion_control", "Congestion control", listOf("bbr", "cubic")),
+)
+
 @StringRes
 internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "0-RTT handshake" -> R.string.outbound_field_zero_rtt_handshake
     "Allow insecure" -> R.string.outbound_field_allow_insecure
     "ALPN" -> R.string.outbound_field_alpn
+    "GSO" -> R.string.outbound_field_gso
+    "MTU" -> R.string.outbound_field_mtu
+    "Mieru transport" -> R.string.outbound_field_mieru_transport
+    "Multiplexing level" -> R.string.outbound_field_multiplexing_level
+    "Traffic pattern (JSON)" -> R.string.outbound_field_traffic_pattern
+    "Initial MTU" -> R.string.outbound_field_initial_mtu
+    "Blackhole detection" -> R.string.outbound_field_blackhole_detection
+    "Certificates" -> R.string.outbound_field_certificates
+    "Extra paths" -> R.string.outbound_field_extra_paths
+    "Keep-alive interval" -> R.string.outbound_field_keep_alive_interval
+    "Max paths" -> R.string.outbound_field_max_paths
+    "Min MTU" -> R.string.outbound_field_min_mtu
+    "MTU discovery" -> R.string.outbound_field_mtu_discovery
+    "Pinned certificate SHA-256" -> R.string.outbound_field_pinned_cert_sha256
+    "Sub-protocol" -> R.string.outbound_field_sub_protocol
+    "Zero-RTT" -> R.string.outbound_field_zero_rtt
     "Alter ID" -> R.string.outbound_field_alter_id
     "Authenticated length" -> R.string.outbound_field_authenticated_length
     "Authentication bytes" -> R.string.outbound_field_authentication_bytes

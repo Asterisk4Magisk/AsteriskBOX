@@ -21,5 +21,17 @@ internal fun validateSingBoxRuntimeConfiguration(
         customResourceFileOverrides = customResourceFileOverrides,
     )
     if (context.skipsBundledCoreConfigCheck(state.runMode)) return
-    SingBoxConfigChecker.check(encodeSingBoxJson(generated))
+    // Plugin-backed outbounds never reach the core as written: compile them into
+    // the SOCKS hand-off first, otherwise the core rejects their type.
+    val checked = compilePluginOutbounds(
+        root = generated,
+        useProtect = false,
+        protectPath = "",
+        workingDir = engine.plugin.pluginWorkingDir(context).absolutePath,
+        validationOnly = true,
+        // Validate exactly what will run: a protocol switched to its plugin has
+        // to be compiled into the SOCKS hand-off here as well.
+        pluginBacked = { type -> engine.plugin.PluginProviderPreferences.pluginBacked(context, type) },
+    ).root
+    SingBoxConfigChecker.check(encodeSingBoxJson(checked))
 }

@@ -698,6 +698,9 @@ private fun SettingsContent(
                     onOpenLogcatLogs = { navigator.push(Route.LogcatLogs) },
                 )
             }
+            item(key = "settings_plugins") {
+                SettingsPluginsSection(onOpenPlugins = { navigator.push(Route.Plugins) })
+            }
             item(key = "settings_about") {
                 SettingsAboutSection(
                     onOpenAbout = { navigator.push(Route.About) },

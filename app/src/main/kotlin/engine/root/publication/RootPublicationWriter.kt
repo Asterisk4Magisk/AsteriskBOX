@@ -6,9 +6,22 @@ package engine.root.publication
 import java.io.File
 
 internal object RootPublicationWriter {
-    fun write(layout: RootRuntimeLayout, coreConfigBytes: ByteArray, daemonConfigBytes: ByteArray) {
+    fun write(
+        layout: RootRuntimeLayout,
+        coreConfigBytes: ByteArray,
+        daemonConfigBytes: ByteArray,
+        pluginOptionsBytes: ByteArray,
+    ) {
         writeFile(File(layout.configPath), coreConfigBytes)
         writeFile(File(layout.asteriskdConfigPath), daemonConfigBytes)
+        // An empty envelope means "no plugins": remove the sidecar instead of
+        // leaving an empty file the core would have to parse.
+        val pluginOptionsFile = File(layout.pluginOptionsPath)
+        if (pluginOptionsBytes.isEmpty()) {
+            pluginOptionsFile.delete()
+        } else {
+            writeFile(pluginOptionsFile, pluginOptionsBytes)
+        }
     }
 
     private fun writeFile(file: File, content: ByteArray) {

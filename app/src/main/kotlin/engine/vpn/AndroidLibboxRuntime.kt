@@ -12,6 +12,7 @@ import io.nekohasekai.libbox.CommandServerHandler
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.OverrideOptions
 import io.nekohasekai.libbox.SetupOptions
+import engine.plugin.PluginEnvelopeFileName
 import io.nekohasekai.libbox.SystemProxyStatus
 import java.io.File
 import java.util.Locale
@@ -70,7 +71,7 @@ internal class AndroidLibboxServiceRuntime(
         val server = CommandServer(this, platformInterface)
         runCatching {
             server.start()
-            server.startOrReloadService(configContent, config.toOverrideOptions(platformInterface))
+            server.startOrReloadWithPlugins(config, configContent, config.toOverrideOptions(platformInterface))
         }.onFailure {
             runCatching { server.closeService() }
             runCatching { server.close() }
@@ -86,8 +87,10 @@ internal class AndroidLibboxServiceRuntime(
     fun reload() {
         val server = commandServer ?: error("AndroidLibBoxLite service is not running")
         val config = activeConfig ?: error("AndroidLibBoxLite configuration is unavailable")
+        // The config file was recompiled in the app process; the envelope beside
+        // it is rewritten too, so a reload picks up the same plugin set.
         val content = File(config.singBoxConfigPath).readText()
-        server.startOrReloadService(content, config.toOverrideOptions(platformInterface))
+        server.startOrReloadWithPlugins(config, content, config.toOverrideOptions(platformInterface))
     }
 
     @Synchronized
@@ -149,3 +152,23 @@ internal data class VpnApplicationOverride(
     val includePackages: List<String> = emptyList(),
     val excludePackages: List<String> = emptyList(),
 )
+
+/**
+ * Starts or reloads the core, carrying the plugin envelope the app published
+ * next to the config. A reload must use the same path: the recompiled config
+ * points plugin outbounds at new loopback ports, so the old plugin processes
+ * have to be replaced in the same call.
+ */
+private fun CommandServer.startOrReloadWithPlugins(
+    config: VpnServiceStartConfig,
+    content: String,
+    overrides: OverrideOptions,
+) {
+    val envelopeFile = File(File(config.singBoxConfigPath).parentFile, PluginEnvelopeFileName)
+    val pluginOptions = if (envelopeFile.isFile) envelopeFile.readText() else ""
+    if (pluginOptions.isEmpty()) {
+        startOrReloadService(content, overrides)
+    } else {
+        startOrReloadServiceWithPlugins(content, overrides, pluginOptions)
+    }
+}

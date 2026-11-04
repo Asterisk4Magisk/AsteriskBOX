@@ -63,6 +63,7 @@ import app.navigation.Route
 import app.navigation.rememberMainDestinationState
 import features.about.AboutPage
 import features.about.LicensePage
+import features.plugin.PluginPage
 import features.dns.DnsManagementPage
 import features.dns.DnsRuleEditorPage
 import features.endpoint.EndpointEditorPage
@@ -177,6 +178,9 @@ fun AppContent(
                 }
                 entry<Route.License> {
                     LicensePage(padding = padding)
+                }
+                entry<Route.Plugins> {
+                    PluginPage(padding = padding)
                 }
                 entry<Route.CoreLogs> {
                     CoreLogsPage(padding = padding)

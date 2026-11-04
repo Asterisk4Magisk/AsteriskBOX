@@ -26,6 +26,7 @@ internal fun encodeOutboundShareUrl(
     val url = encodeStandardOutboundShareUrl(type, outbound, remarks)
         ?: encodeV2RayOutboundShareUrl(type, outbound, remarks)
         ?: encodeQuicOutboundShareUrl(type, outbound, remarks)
+        ?: encodePluginShareUrl(type, outbound, remarks)
         ?: throw IllegalArgumentException("Outbound type does not have a share encoder")
     AvailableOutboundShareUrl(url)
 } catch (_: IllegalArgumentException) {

@@ -11,7 +11,10 @@ import engine.hevtun.HevSocks5TunnelConfigFileName
 import engine.hevtun.HevSocks5TunnelLogFileName
 import engine.hevtun.hevSocks5TunnelLogFile
 import engine.hevtun.hevSocks5TunnelSocksTargetAddress
-import engine.singbox.SingBoxConfigFactory
+import engine.plugin.buildPluginOptionsJson
+import engine.plugin.pluginProtectSocketPath
+import engine.plugin.publishPluginEnvelope
+import engine.singbox.config.SingBoxConfigCompiler
 import engine.singbox.sha256Hex
 import engine.proxy.LocalProxyOptions
 import engine.proxy.toLocalProxyOptions
@@ -60,12 +63,30 @@ internal object VpnSingBoxConfigFactory {
             VpnAppendHttpProxyOptions.Disabled
         }
         val configPath = File(resourceFilePaths.dataDir, "config.json").absolutePath
-        val configBytes = SingBoxConfigFactory.buildConfigBytes(context, appState, exposePorts = exposePorts)
+        val protectPath = pluginProtectSocketPath(context)
+        val compiled = SingBoxConfigCompiler.compileWithPlugins(
+            context = context,
+            appState = appState,
+            exposePorts = exposePorts,
+            protectPath = protectPath,
+        )
+        val configBytes = compiled.config.toByteArray(Charsets.UTF_8)
         val configSignature = configBytes.sha256Hex()
         val runtimeIpv6 = appState.enableIpv6
         writeAtomically(File(configPath)) { output ->
             output.write(configBytes)
         }
+        // Both run modes read the envelope from beside the config, so a reload
+        // or a ROOT restart always sees the same plugin set as the config.
+        publishPluginEnvelope(
+            File(configPath).parentFile ?: error("Missing config directory"),
+            buildPluginOptionsJson(
+                context = context,
+                plans = compiled.pluginPlans,
+                protectPath = protectPath,
+                verifyPeer = true,
+            ),
+        )
 
         return VpnServiceStartConfig(
             sessionName = "AsteriskBOX",

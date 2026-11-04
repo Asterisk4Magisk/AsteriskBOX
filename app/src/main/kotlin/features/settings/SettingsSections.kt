@@ -779,6 +779,22 @@ internal fun SettingsBackupRestoreSection(
 }
 
 @Composable
+internal fun SettingsPluginsSection(
+    onOpenPlugins: () -> Unit,
+) {
+    SmallTitle(text = stringResource(R.string.settings_plugins))
+    SettingsSectionCard {
+        ArrowPreference(
+            title = stringResource(R.string.settings_plugins),
+            summary = stringResource(R.string.settings_plugins_summary),
+            icon = Icons.Rounded.Widgets,
+            onClick = onOpenPlugins,
+            accent = IconAccent.MaskCyan,
+        )
+    }
+}
+
+@Composable
 internal fun SettingsAboutSection(
     onOpenAbout: () -> Unit,
     onOpenLicenses: () -> Unit,

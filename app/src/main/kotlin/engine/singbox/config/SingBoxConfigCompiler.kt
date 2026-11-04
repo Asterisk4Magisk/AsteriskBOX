@@ -90,6 +90,43 @@ internal object SingBoxConfigCompiler {
         checkWithBundledCore = !context.skipsBundledCoreConfigCheck(runMode),
     )
 
+    internal data class CompiledSingBoxConfig(
+        val config: String,
+        val pluginPlans: List<engine.plugin.PluginOutboundPlan>,
+    )
+
+    /**
+     * Compiles the config and every plugin-backed outbound in one pass: plugin
+     * ports and specs must come from the same compilation as the config that
+     * references them.
+     */
+    fun compileWithPlugins(
+        context: Context,
+        appState: AppState,
+        runMode: Int = appState.runMode,
+        exposePorts: Boolean = true,
+        protectPath: String = "",
+        customResourceFileOverrides: Map<Int, File> = emptyMap(),
+        pluginBacked: (String) -> Boolean = { protocol ->
+            engine.plugin.PluginProviderPreferences.pluginBacked(context, protocol)
+        },
+    ): CompiledSingBoxConfig {
+        val generated = generate(context, appState, runMode, exposePorts, customResourceFileOverrides)
+        val compiled = compilePluginOutbounds(
+            root = generated,
+            useProtect = protectPath.isNotBlank(),
+            protectPath = protectPath,
+            workingDir = engine.plugin.pluginWorkingDir(context).absolutePath,
+            pluginBacked = pluginBacked,
+        )
+        val config = finalizeConfig(
+            compiled.root,
+            appState,
+            checkWithBundledCore = !context.skipsBundledCoreConfigCheck(runMode),
+        )
+        return CompiledSingBoxConfig(config, compiled.plans)
+    }
+
     internal fun generate(
         context: Context,
         appState: AppState,

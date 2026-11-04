@@ -10,8 +10,15 @@ internal object RootBootConfigWriter {
         layout: RootRuntimeLayout,
         coreConfigBytes: ByteArray,
         encodedDaemonConfig: String,
+        pluginOptionsBytes: ByteArray,
     ) {
-        File(layout.configPath).writeBytes(coreConfigBytes)
-        File(layout.asteriskdConfigPath).writeBytes(encodedDaemonConfig.toByteArray(Charsets.UTF_8))
+        // Reuse the owner-only writer: the envelope next to the config carries
+        // plugin credentials in ROOT mode too.
+        RootPublicationWriter.write(
+            layout = layout,
+            coreConfigBytes = coreConfigBytes,
+            daemonConfigBytes = encodedDaemonConfig.toByteArray(Charsets.UTF_8),
+            pluginOptionsBytes = pluginOptionsBytes,
+        )
     }
 }
