@@ -10,6 +10,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +27,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -113,6 +115,7 @@ import ui.components.AsteriskExpansionIndicator
 import ui.components.AsteriskExpressiveCard
 import ui.components.AsteriskFilterChip
 import ui.components.AsteriskInfoChip
+import ui.components.AsteriskModalBottomSheet
 import ui.components.AsteriskScaffold
 import ui.components.AsteriskSearchTopAppBar
 import ui.components.AsteriskSelectionCard
@@ -424,7 +427,7 @@ fun SingBoxProxyPage(
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
-                    AsteriskTopBarControls {
+                    AsteriskTopBarControls(alignEndToAppBarActions = true) {
                         if (visibleProxies.groups.size > 1) {
                             ProxyGroupTabs(
                                 groups = visibleProxies.groups,
@@ -911,9 +914,28 @@ private fun ProxyGroupTabs(
 ) {
     if (groups.isEmpty()) return
     val tabScrollState = rememberScrollState()
+    var availableWidthPx by remember { mutableIntStateOf(0) }
+    var contentWidthPx by remember { mutableIntStateOf(0) }
     var viewportWidthPx by remember { mutableIntStateOf(0) }
     var tabBounds by remember { mutableStateOf<Map<String, ProxyGroupTabBounds>>(emptyMap()) }
+    var showGroupPicker by remember { mutableStateOf(false) }
+    // Compare with the full row, so reserving button space cannot keep it visible
+    // after the groups fit again (for example, after rotating or filtering).
+    val hasOverflow = availableWidthPx in 1..<contentWidthPx
     val selectedBounds = tabBounds[selectedGroupName]
+
+    LaunchedEffect(hasOverflow) {
+        if (!hasOverflow) showGroupPicker = false
+    }
+
+    fun selectGroup(group: SingBoxProxyGroup) {
+        showGroupPicker = false
+        if (group.name == selectedGroupName) {
+            onReselectCurrentGroup()
+        } else {
+            onSelectedGroupNameChange(group.name)
+        }
+    }
 
     LaunchedEffect(selectedGroupName, selectedBounds, viewportWidthPx, tabScrollState.maxValue) {
         if (selectedBounds == null || viewportWidthPx <= 0) return@LaunchedEffect
@@ -929,33 +951,80 @@ private fun ProxyGroupTabs(
         }
     }
 
-    Box(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .onSizeChanged { size -> viewportWidthPx = size.width }
-            .horizontalScroll(tabScrollState),
+            .onSizeChanged { size -> availableWidthPx = size.width },
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .onSizeChanged { size -> viewportWidthPx = size.width }
+                .horizontalScroll(tabScrollState),
+        ) {
+            Row(
+                modifier = Modifier.onSizeChanged { size -> contentWidthPx = size.width },
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                groups.forEach { group ->
+                    AsteriskFilterChip(
+                        selected = group.name == selectedGroupName,
+                        onClick = { selectGroup(group) },
+                        label = group.displayName,
+                        modifier = Modifier
+                            .semantics { selected = group.name == selectedGroupName }
+                            .onGloballyPositioned { coordinates ->
+                                val bounds = ProxyGroupTabBounds(
+                                    leftPx = coordinates.positionInParent().x.roundToInt(),
+                                    widthPx = coordinates.size.width,
+                                )
+                                if (tabBounds[group.name] != bounds) {
+                                    tabBounds = tabBounds + (group.name to bounds)
+                                }
+                            },
+                    )
+                }
+            }
+        }
+        if (hasOverflow) {
+            IconButton(
+                onClick = { showGroupPicker = true },
+                modifier = Modifier.size(48.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.ExpandMore,
+                    contentDescription = stringResource(R.string.sing_box_proxies_expand_groups),
+                )
+            }
+        }
+    }
+
+    AsteriskModalBottomSheet(
+        show = showGroupPicker && hasOverflow,
+        onDismissRequest = { showGroupPicker = false },
+        title = stringResource(R.string.sing_box_proxies_groups),
+        endAction = {
+            IconButton(onClick = { showGroupPicker = false }) {
+                Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.common_close))
+            }
+        },
+    ) {
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             groups.forEach { group ->
                 AsteriskFilterChip(
                     selected = group.name == selectedGroupName,
-                    onClick = {
-                        if (group.name == selectedGroupName) {
-                            onReselectCurrentGroup()
-                        } else {
-                            onSelectedGroupNameChange(group.name)
-                        }
-                    },
+                    onClick = { selectGroup(group) },
                     label = group.displayName,
-                    modifier = Modifier.onGloballyPositioned { coordinates ->
-                        val bounds = ProxyGroupTabBounds(
-                            leftPx = coordinates.positionInParent().x.roundToInt(),
-                            widthPx = coordinates.size.width,
-                        )
-                        if (tabBounds[group.name] != bounds) {
-                            tabBounds = tabBounds + (group.name to bounds)
-                        }
-                    },
+                    modifier = Modifier.semantics { selected = group.name == selectedGroupName },
                 )
             }
         }
