@@ -88,6 +88,7 @@ internal data class AppBackupSettings(
     val tunIpv6Cidr: String = BackupDefaults.tunIpv6Cidr,
     val enableConfigOverrideScript: Boolean = BackupDefaults.enableConfigOverrideScript,
     val configOverrideScript: String = BackupDefaults.configOverrideScript,
+    val pluginProtocols: List<String> = BackupDefaults.pluginProtocols,
     val coreLogLevel: String = BackupDefaults.coreLogLevel,
     val enableTrafficStatsNotification: Boolean = BackupDefaults.enableTrafficStatsNotification,
     val enableBroadcastControl: Boolean = BackupDefaults.enableBroadcastControl,

@@ -11,7 +11,9 @@ import engine.hevtun.HevSocks5TunnelConfigFileName
 import engine.hevtun.HevSocks5TunnelLogFileName
 import engine.hevtun.hevSocks5TunnelLogFile
 import engine.hevtun.hevSocks5TunnelSocksTargetAddress
-import engine.singbox.SingBoxConfigFactory
+import engine.singbox.config.SingBoxConfigCompiler
+import engine.singbox.plugin.buildPluginEnvelope
+import engine.singbox.plugin.publishPluginEnvelope
 import engine.singbox.sha256Hex
 import engine.proxy.LocalProxyOptions
 import engine.proxy.toLocalProxyOptions
@@ -60,12 +62,17 @@ internal object VpnSingBoxConfigFactory {
             VpnAppendHttpProxyOptions.Disabled
         }
         val configPath = File(resourceFilePaths.dataDir, "config.json").absolutePath
-        val configBytes = SingBoxConfigFactory.buildConfigBytes(context, appState, exposePorts = exposePorts)
+        val compiled = SingBoxConfigCompiler.compileForRuntime(context, appState, exposePorts = exposePorts)
+        // Built before anything is written: a missing plugin fails the start
+        // without leaving a config whose envelope does not match it.
+        val pluginEnvelope = context.buildPluginEnvelope(compiled.pluginPlans, compiled.pluginTarget)
+        val configBytes = compiled.config.toByteArray(Charsets.UTF_8)
         val configSignature = configBytes.sha256Hex()
         val runtimeIpv6 = appState.enableIpv6
         writeAtomically(File(configPath)) { output ->
             output.write(configBytes)
         }
+        publishPluginEnvelope(File(resourceFilePaths.dataDir), pluginEnvelope)
 
         return VpnServiceStartConfig(
             sessionName = "AsteriskBOX",

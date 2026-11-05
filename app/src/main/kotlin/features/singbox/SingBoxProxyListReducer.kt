@@ -67,16 +67,18 @@ internal fun reduceSingBoxProxyNodeNames(
     displayNames: Map<String, String> = emptyMap(),
     testingBaselines: Map<String, Long> = emptyMap(),
     failedNodes: Set<String> = emptySet(),
+    protocolTypes: Map<String, String> = emptyMap(),
 ): List<String> {
     val keyword = query.trim()
     return group?.all
         ?.filter { nodeName ->
             val node = proxies.node(nodeName)
-            val displayType = node.type.displaySingBoxProtocolName()
+            val protocolType = protocolTypes[nodeName] ?: node.type
+            val displayType = protocolType.displaySingBoxProtocolName()
             keyword.isEmpty() ||
                 node.name.contains(keyword, ignoreCase = true) ||
                 displayNames[nodeName]?.contains(keyword, ignoreCase = true) == true ||
-                node.type.contains(keyword, ignoreCase = true) ||
+                protocolType.contains(keyword, ignoreCase = true) ||
                 displayType.contains(keyword, ignoreCase = true)
         }
         ?.sortSingBoxProxyNodeNames(
@@ -101,6 +103,7 @@ internal fun reduceSingBoxProxyGroupSections(
     displayNamesForGroup: (SingBoxProxyGroup) -> Map<String, String>,
     testingBaselines: Map<String, Long>,
     failedNodes: Set<String>,
+    protocolTypes: Map<String, String> = emptyMap(),
 ): List<SingBoxProxyGroupSection> {
     val keyword = query.trim()
     return proxies.groups.mapNotNull { group ->
@@ -114,6 +117,7 @@ internal fun reduceSingBoxProxyGroupSections(
             displayNames = displayNamesForGroup(group),
             testingBaselines = testingBaselines,
             failedNodes = failedNodes,
+            protocolTypes = protocolTypes,
         )
         if (matchesGroup || nodes.isNotEmpty()) SingBoxProxyGroupSection(group, nodes) else null
     }

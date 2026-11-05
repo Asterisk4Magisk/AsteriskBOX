@@ -75,6 +75,7 @@ internal fun AppState.preferenceValues(): Map<String, AppPreferenceValue> = buil
     string(KeyTunIpv6Cidr, tunIpv6Cidr)
     boolean(KeyEnableConfigOverrideScript, enableConfigOverrideScript)
     string(KeyConfigOverrideScript, configOverrideScript)
+    stringList(KeyPluginProtocols, pluginProtocols)
     string(KeyCoreLogLevel, coreLogLevel)
     boolean(KeyEnableTrafficStatsNotification, enableTrafficStatsNotification)
     boolean(KeyEnableBroadcastControl, enableBroadcastControl)

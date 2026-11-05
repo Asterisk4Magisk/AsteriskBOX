@@ -6,6 +6,7 @@ package engine.vpn
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.os.Build
+import engine.singbox.plugin.PluginEnvelopeFileName
 import features.logs.AndroidAppLogger
 import io.nekohasekai.libbox.CommandServer
 import io.nekohasekai.libbox.CommandServerHandler
@@ -70,7 +71,11 @@ internal class AndroidLibboxServiceRuntime(
         val server = CommandServer(this, platformInterface)
         runCatching {
             server.start()
-            server.startOrReloadService(configContent, config.toOverrideOptions(platformInterface))
+            server.startOrReloadServiceWithPlugins(
+                configContent,
+                config.toOverrideOptions(platformInterface),
+                config.pluginEnvelope(),
+            )
         }.onFailure {
             runCatching { server.closeService() }
             runCatching { server.close() }
@@ -87,7 +92,12 @@ internal class AndroidLibboxServiceRuntime(
         val server = commandServer ?: error("AndroidLibBoxLite service is not running")
         val config = activeConfig ?: error("AndroidLibBoxLite configuration is unavailable")
         val content = File(config.singBoxConfigPath).readText()
-        server.startOrReloadService(content, config.toOverrideOptions(platformInterface))
+        // An empty envelope also stops the plugins the previous config ran.
+        server.startOrReloadServiceWithPlugins(
+            content,
+            config.toOverrideOptions(platformInterface),
+            config.pluginEnvelope(),
+        )
     }
 
     @Synchronized
@@ -149,3 +159,7 @@ internal data class VpnApplicationOverride(
     val includePackages: List<String> = emptyList(),
     val excludePackages: List<String> = emptyList(),
 )
+
+/** The plugin envelope the app process published beside the config, compiled with it. */
+private fun VpnServiceStartConfig.pluginEnvelope(): String =
+    File(File(singBoxConfigPath).parentFile, PluginEnvelopeFileName).takeIf(File::isFile)?.readText().orEmpty()

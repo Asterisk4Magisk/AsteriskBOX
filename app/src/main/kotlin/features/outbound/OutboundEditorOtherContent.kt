@@ -134,3 +134,11 @@ internal fun LazyListScope.snellOutboundEditor(state: OutboundEditorContentState
 internal fun LazyListScope.sshOutboundEditor(state: OutboundEditorContentState) {
     outboundEditorSections(state)
 }
+
+/**
+ * Plugin-backed outbounds (mieru, shadowquic, juicity) edit like any other:
+ * their descriptors already declare the sections and fields.
+ */
+internal fun LazyListScope.pluginOutboundEditor(state: OutboundEditorContentState) {
+    outboundEditorSections(state)
+}

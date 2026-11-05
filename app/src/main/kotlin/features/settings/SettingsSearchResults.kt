@@ -168,6 +168,11 @@ internal fun settingsTopLevelSearchItems(
         ),
         SettingsSearchItem(
             SettingsSectionId.Advanced,
+            stringResource(R.string.settings_plugins),
+            stringResource(R.string.settings_plugins_summary),
+        ),
+        SettingsSearchItem(
+            SettingsSectionId.Advanced,
             stringResource(R.string.singbox_override_script_title),
             stringResource(R.string.singbox_override_script_summary),
         ),

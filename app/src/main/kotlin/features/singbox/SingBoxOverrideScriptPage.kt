@@ -95,7 +95,7 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
                                 try {
                                     result = withContext(Dispatchers.Default) {
                                         debugSingBoxConfigOverride(
-                                            SingBoxConfigCompiler.generate(context, snapshot), script,
+                                            SingBoxConfigCompiler.generate(context, snapshot), script, snapshot.pluginProtocols,
                                         )
                                     }
                                 } catch (cancelled: CancellationException) {

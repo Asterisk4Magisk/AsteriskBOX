@@ -109,6 +109,8 @@ data class AppState(
 
     val enableConfigOverrideScript: Boolean = false,
     val configOverrideScript: String = "const main = (config) => {\n  return config\n}",
+    /** Protocols the core also implements that run through their plugin instead. */
+    val pluginProtocols: List<String> = emptyList(),
     val coreLogLevel: String = DefaultSingBoxLogLevel,
     val enableTrafficStatsNotification: Boolean = false,
     val enableBroadcastControl: Boolean = false,

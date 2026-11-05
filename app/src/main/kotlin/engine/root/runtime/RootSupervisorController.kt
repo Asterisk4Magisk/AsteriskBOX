@@ -180,7 +180,12 @@ internal class RootSupervisorController(
                 throw launchFailure(preparationResult)
             }
             stage = "config_write"
-            RootPublicationWriter.write(runtimeLayout, root.singBoxConfigBytes, daemonConfigBytes)
+            RootPublicationWriter.write(
+                runtimeLayout,
+                root.singBoxConfigBytes,
+                daemonConfigBytes,
+                root.pluginOptionsBytes,
+            )
             runCatching { AndroidAppLogger.info(LogTag, "root_start stage=config_write result=ok") }
             stage = "launch"
             val launchResult = shell.exec(
@@ -283,6 +288,7 @@ internal class RootSupervisorController(
             layout = runtimeLayout,
             coreConfigBytes = root.singBoxConfigBytes,
             encodedDaemonConfig = AsteriskdConfigEncoder.encode(config),
+            pluginOptionsBytes = root.pluginOptionsBytes,
         )
         val result = shell.exec(
             RootBootPublicationCommand.buildInstallation(runtimeLayout),

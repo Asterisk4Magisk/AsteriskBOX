@@ -99,6 +99,7 @@ import app.modes.SingBoxProxySortName
 import app.selectableManagedOutbounds
 import app.withSelectorSelection
 import engine.singbox.config.APP_GLOBAL_SELECTOR
+import engine.singbox.plugin.PluginOutbounds
 import engine.singbox.runtime.SingBoxProxiesState
 import engine.singbox.runtime.SingBoxProxyGroup
 import engine.singbox.runtime.SingBoxProxyNode
@@ -193,6 +194,12 @@ fun SingBoxProxyPage(
     val globalGroupName = stringResource(R.string.routing_global)
     val unavailableLabel = stringResource(R.string.common_unavailable)
     val outboundChoices = selectableManagedOutbounds(appState)
+    // Plugin outbounds run as core `socks` outbounds; show the protocol they carry.
+    val outboundProtocolTypes = remember(appState.outbounds, appState.pluginProtocols) {
+        appState.outbounds
+            .filter { outbound -> PluginOutbounds.requirementFor(outbound.type, appState.pluginProtocols) != null }
+            .associate { outbound -> outbound.tag to outbound.type }
+    }
     val outboundDisplayNames = outboundChoices.associate { choice ->
         choice.tag to choice.localizedLabel()
     }
@@ -467,6 +474,7 @@ fun SingBoxProxyPage(
                                 query = keyword,
                                 sort = appState.singBoxProxySort,
                                 displayNamesForGroup = ::groupNodeDisplayNames,
+                                protocolTypes = outboundProtocolTypes,
                                 testingBaselines = runtimeState.delayTestingBaselines,
                                 failedNodes = runtimeState.delayFailedNodes,
                             )
@@ -585,6 +593,7 @@ fun SingBoxProxyPage(
                                             node = node,
                                             displayName = displayNames[node.name]
                                                 ?: node.name.visibleRuntimeName(unavailableLabel),
+                                            protocolType = outboundProtocolTypes[node.name] ?: node.type,
                                             selected = isSingBoxProxyNodeCurrent(group, node.name, pendingSelections),
                                             selectionEnabled = selectionBehavior.cardEnabled,
                                             delayTestEnabled = runtimeAvailable && testingTarget == null,
@@ -633,6 +642,7 @@ fun SingBoxProxyPage(
                                 displayNames = pageDisplayNames,
                                 testingBaselines = runtimeState.delayTestingBaselines,
                                 failedNodes = runtimeState.delayFailedNodes,
+                                protocolTypes = outboundProtocolTypes,
                             )
                         }
                         val selectedNodeName = (pendingSelections[group?.name] ?: group?.now).orEmpty().takeIf(String::isNotBlank)
@@ -712,6 +722,7 @@ fun SingBoxProxyPage(
                                             node = node,
                                             displayName = pageDisplayNames[node.name]
                                                 ?: node.name.visibleRuntimeName(unavailableLabel),
+                                            protocolType = outboundProtocolTypes[node.name] ?: node.type,
                                             selected = isSingBoxProxyNodeCurrent(
                                                 group = group,
                                                 nodeName = node.name,
@@ -1199,6 +1210,7 @@ private val SingBoxProxyOptionsMenuWidth = 224.dp
 private fun SingBoxProxyNodeCard(
     node: SingBoxProxyNode,
     displayName: String,
+    protocolType: String,
     selected: Boolean,
     selectionEnabled: Boolean,
     delayTestEnabled: Boolean,
@@ -1245,7 +1257,7 @@ private fun SingBoxProxyNodeCard(
                 }
             }
             ProtocolDelayLine(
-                protocol = node.type,
+                protocol = protocolType,
                 delay = node.delay,
                 delayStatus = delayStatus,
                 selected = selected,

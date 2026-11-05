@@ -25,6 +25,10 @@ internal data class RootRuntimeLayout(
     val asteriskdConfigPath: String
         get() = dataDir.posixChild("asteriskd.json")
 
+    /** Plugin envelope the core reads next to its config file. */
+    val pluginOptionsPath: String
+        get() = dataDir.posixChild("plugin.json")
+
     val asteriskdStatePath: String
         get() = dataDir.posixChild("asteriskd.state")
 

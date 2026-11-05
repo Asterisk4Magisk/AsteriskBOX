@@ -4,6 +4,7 @@
 package engine.singbox.config
 
 import com.dokar.quickjs.quickJs
+import engine.singbox.plugin.compilePluginOutbounds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -76,11 +77,17 @@ internal fun runSingBoxConfigOverride(root: JsonObject, script: String): SingBox
     }
 }
 
-internal fun debugSingBoxConfigOverride(root: JsonObject, script: String): SingBoxScriptResult {
+internal fun debugSingBoxConfigOverride(
+    root: JsonObject,
+    script: String,
+    pluginProtocols: Collection<String>,
+): SingBoxScriptResult {
     val result = runSingBoxConfigOverride(root, script)
     if (!result.success) return result
     return try {
-        SingBoxConfigChecker.check(encodeSingBoxJson(checkNotNull(result.output)))
+        // Plugin outbounds are compiled after the script, as at runtime.
+        val output = compilePluginOutbounds(checkNotNull(result.output), pluginProtocols, target = null).root
+        SingBoxConfigChecker.check(encodeSingBoxJson(output))
         result
     } catch (cancelled: CancellationException) {
         throw cancelled
