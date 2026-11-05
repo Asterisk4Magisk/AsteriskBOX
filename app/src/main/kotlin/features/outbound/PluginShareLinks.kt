@@ -3,12 +3,11 @@
 
 package features.outbound
 
+import engine.singbox.plugin.decodeMieruTrafficPattern
+import engine.singbox.plugin.encodeMieruTrafficPatternBase64
+import engine.singbox.plugin.mieruMultiplexingLevel
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import java.net.URI
 import java.net.URLDecoder
@@ -49,12 +48,23 @@ internal fun parsePluginShareLink(link: String): JsonObject? {
             val tag = fragment.ifBlank { query["profile"].orEmpty() }
             if (tag.isNotBlank()) put("tag", tag)
             put("server", host)
-            put("server_port", port)
+            // Mieru links carry repeatable port=/protocol= pairs in the query; the
+            // first binding is used. Links without them keep the port in the authority.
+            val queryPairs = parsePluginQueryPairs(uri.rawQuery)
+            val ports = queryPairs.filter { (key, _) -> key == "port" }.map { (_, value) -> value }
+            val protocols = queryPairs.filter { (key, _) -> key == "protocol" }.map { (_, value) -> value }
+            put("server_port", ports.firstOrNull()?.let(::mieruBindingPort) ?: port)
+            protocols.firstOrNull()?.uppercase()?.takeIf { it == "TCP" || it == "UDP" }?.let { protocol ->
+                put("protocol", protocol)
+            }
             put("username", username)
             put("password", password)
             query["mtu"]?.toIntOrNull()?.takeIf { it > 0 }?.let { put("mtu", it) }
             query["multiplexing"]?.let { level -> put("multiplexing", mieruMuxLevel(level)) }
-            query["traffic-pattern"]?.let { pattern -> put("traffic_pattern", pattern) }
+            query["traffic-pattern"]?.takeIf(String::isNotBlank)?.let { pattern ->
+                // Stored as JSON for the editor; an undecodable value is kept so the start reports it.
+                put("traffic_pattern", decodeMieruTrafficPattern(pattern)?.toString() ?: pattern)
+            }
         }
 
         "sq" -> buildJsonObject {
@@ -104,6 +114,10 @@ internal fun encodePluginShareUrl(type: String, outbound: JsonObject, remarks: S
     val port = outbound.intValue("server_port").takeIf { it > 0 } ?: 443
     val hostPart = if (server.contains(':')) "[$server]" else server
     return when (type) {
+        // Official mieru simple link: port and protocol are query parameters,
+        // enum values use their protobuf names (mieru pkg/appctl/url.go). The
+        // port is repeated in the authority, which mieru ignores, for husi and
+        // older AsteriskBOX builds that only read it there.
         "mieru" -> buildString {
             append("mierus://")
             append(encode(outbound.stringValue("username")))
@@ -114,13 +128,15 @@ internal fun encodePluginShareUrl(type: String, outbound: JsonObject, remarks: S
             append(':')
             append(port)
             val params = buildList {
-                if (remarks.isNotBlank()) add("profile" to remarks)
                 outbound.intValue("mtu").takeIf { it > 0 }?.let { add("mtu" to it.toString()) }
-                outbound.stringValue("multiplexing").takeIf(String::isNotBlank)?.let {
-                    add("multiplexing" to it.uppercase())
+                mieruMultiplexingLevel(outbound.stringValue("multiplexing"))?.let { level ->
+                    add("multiplexing" to level)
                 }
-                outbound.stringValue("traffic_pattern").takeIf(String::isNotBlank)?.let {
-                    add("traffic-pattern" to it)
+                add("port" to port.toString())
+                add("profile" to remarks.ifBlank { "default" })
+                add("protocol" to outbound.stringValue("protocol").ifBlank { "TCP" }.uppercase())
+                outbound.stringValue("traffic_pattern").takeIf(String::isNotBlank)?.let { raw ->
+                    add("traffic-pattern" to (encodeMieruTrafficPatternBase64(raw) ?: raw))
                 }
             }
             appendQuery(params)
@@ -194,8 +210,11 @@ private fun StringBuilder.appendQuery(params: List<Pair<String, String>>) {
     append(params.joinToString("&") { (key, value) -> "$key=${encode(value)}" })
 }
 
-private fun parsePluginQuery(rawQuery: String?): Map<String, String> {
-    if (rawQuery.isNullOrBlank()) return emptyMap()
+private fun parsePluginQuery(rawQuery: String?): Map<String, String> = parsePluginQueryPairs(rawQuery).toMap()
+
+/** Query parameters in order, keeping repeated keys. */
+private fun parsePluginQueryPairs(rawQuery: String?): List<Pair<String, String>> {
+    if (rawQuery.isNullOrBlank()) return emptyList()
     return rawQuery.split('&')
         .mapNotNull { item ->
             if (item.isBlank()) return@mapNotNull null
@@ -203,17 +222,21 @@ private fun parsePluginQuery(rawQuery: String?): Map<String, String> {
             val value = decode(item.substringAfter('=', ""))
             key to value
         }
-        .toMap()
 }
+
+/** A mieru `port=` value: a port, or a `begin-end` range whose first port is used. */
+private fun mieruBindingPort(value: String): Int? =
+    value.trim().substringBefore('-').trim().toIntOrNull()?.takeIf { it in 1..65535 }
 
 private fun parseFlag(value: String): Boolean =
     value.isNotEmpty() && value != "0" && !value.equals("false", ignoreCase = true)
 
-private fun mieruMuxLevel(value: String): String = when (value.uppercase()) {
+/** Editor value for a link's multiplexing level; mieru calls the middle level MIDDLE. */
+private fun mieruMuxLevel(value: String): String = when (mieruMultiplexingLevel(value)) {
+    "MULTIPLEXING_OFF" -> "OFF"
     "MULTIPLEXING_LOW" -> "LOW"
-    "MULTIPLEXING_MEDIUM" -> "MEDIUM"
+    "MULTIPLEXING_MIDDLE" -> "MEDIUM"
     "MULTIPLEXING_HIGH" -> "HIGH"
-    "LOW", "MEDIUM", "HIGH" -> value.uppercase()
     else -> ""
 }
 

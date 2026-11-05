@@ -4,7 +4,6 @@
 package engine.singbox.plugin
 
 import engine.singbox.config.APP_DIRECT_OUTBOUND
-import engine.singbox.config.SingBoxJson
 import engine.singbox.config.encodeSingBoxJson
 import engine.singbox.config.updated
 import kotlinx.serialization.json.JsonArray
@@ -24,7 +23,6 @@ import java.io.File
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.URLEncoder
-import java.util.Base64
 
 /**
  * Where the compiled plugins run. A plugin that can protect its sockets dials
@@ -92,6 +90,10 @@ internal fun compilePluginOutbounds(
                     put("tag", tag)
                     put("server", PluginSocksHost)
                     put("server_port", socksPort)
+                    // A tcp- or udp-only outbound stays that way behind the plugin.
+                    outbound.stringValue("network").takeIf(String::isNotBlank)?.let { network ->
+                        put("network", network)
+                    }
                 },
             )
             if (target == null) return@forEach
@@ -143,8 +145,18 @@ internal fun compilePluginOutbounds(
 /** Options the plugin binary cannot honour fail the compile instead of being dropped. */
 private fun JsonObject.requireSupportedByPlugin(requirement: PluginRequirement, tag: String) {
     when (requirement) {
-        PluginOutbounds.hysteria2 -> require(this["server_ports"].isEmptyValue()) {
-            "Hysteria2 plugin outbound $tag does not support server_ports"
+        PluginOutbounds.hysteria2 -> {
+            require(this["server_ports"].isEmptyValue()) {
+                "Hysteria2 plugin outbound $tag does not support server_ports"
+            }
+            val obfsType = (this["obfs"] as? JsonObject)?.stringValue("type").orEmpty()
+            require(obfsType.isBlank() || obfsType.equals("salamander", ignoreCase = true)) {
+                "Hysteria2 plugin outbound $tag does not support $obfsType obfs"
+            }
+            // Hysteria pins the whole certificate, not its public key.
+            require((this["tls"] as? JsonObject)?.get("certificate_public_key_sha256").isEmptyValue()) {
+                "Hysteria2 plugin outbound $tag does not support certificate_public_key_sha256"
+            }
         }
         PluginOutbounds.naive -> require(booleanValue("quic") != true) {
             "NaiveProxy plugin outbound $tag does not support QUIC"
@@ -184,7 +196,7 @@ private fun buildPluginOutboundPlan(
                 commandArguments = listOf("run"),
                 files = listOf(PluginFile(fileName, buildMieruConfig(outbound, tag, dialAddress, socksPort))),
                 environment = buildMap {
-                    put("MIERU_CONFIG_JSON_FILE", "\${file:$fileName}")
+                    put("MIERU_CONFIG_JSON_FILE", $$"${file:$$fileName}")
                     if (protect.isNotEmpty()) {
                         put("MIERU_PROTECT_PATH", protect)
                     }
@@ -199,7 +211,7 @@ private fun buildPluginOutboundPlan(
                 tag = tag,
                 socksPort = socksPort,
                 mappingPort = mappingPort,
-                commandArguments = listOf("run", "-c", "\${file:$fileName}"),
+                commandArguments = listOf("run", "-c", $$"${file:$$fileName}"),
                 files = listOf(
                     PluginFile(
                         fileName,
@@ -212,18 +224,32 @@ private fun buildPluginOutboundPlan(
 
         PluginOutbounds.hysteria2.outboundType -> {
             val fileName = "hysteria2_$socksPort.json"
+            val files = mutableListOf<PluginFile>()
+            val tls = outbound["tls"] as? JsonObject ?: JsonObject(emptyMap())
+            // Inline PEM goes into its own file; a path option is used as given.
+            fun tlsFile(inlineKey: String, pathKey: String, suffix: String): String {
+                val inline = tls.pemValue(inlineKey)
+                if (inline.isBlank()) return tls.stringValue(pathKey)
+                val name = "hysteria2_${socksPort}_$suffix"
+                files += PluginFile(name, inline)
+                return File(workingDir, name).absolutePath
+            }
+            val certificates = Hysteria2TlsFiles(
+                ca = tlsFile("certificate", "certificate_path", "ca.pem"),
+                clientCertificate = tlsFile("client_certificate", "client_certificate_path", "client.pem"),
+                clientKey = tlsFile("client_key", "client_key_path", "client.key"),
+            )
+            files += PluginFile(
+                fileName,
+                buildHysteria2Config(outbound, tag, dialAddress, socksPort, protect, certificates),
+            )
             PluginOutboundPlan(
                 requirement = requirement,
                 tag = tag,
                 socksPort = socksPort,
                 mappingPort = mappingPort,
-                commandArguments = listOf("client", "--config", "\${file:$fileName}"),
-                files = listOf(
-                    PluginFile(
-                        fileName,
-                        buildHysteria2Config(outbound, tag, dialAddress, socksPort, protect),
-                    ),
-                ),
+                commandArguments = listOf("client", "--config", $$"${file:$$fileName}"),
+                files = files,
                 environment = buildMap {
                     put("HYSTERIA_DISABLE_UPDATE_CHECK", "1")
                 },
@@ -237,7 +263,7 @@ private fun buildPluginOutboundPlan(
                 tag = tag,
                 socksPort = socksPort,
                 mappingPort = mappingPort,
-                commandArguments = listOf("\${file:$fileName}"),
+                commandArguments = listOf($$"${file:$$fileName}"),
                 files = listOf(
                     PluginFile(
                         fileName,
@@ -273,7 +299,7 @@ private fun buildPluginOutboundPlan(
                 tag = tag,
                 socksPort = socksPort,
                 mappingPort = mappingPort,
-                commandArguments = listOf("-c", "\${file:$fileName}"),
+                commandArguments = listOf("-c", $$"${file:$$fileName}"),
                 files = files,
                 environment = emptyMap(),
             )
@@ -289,6 +315,7 @@ private fun buildMieruConfig(
 ): String {
     val username = outbound.stringValue("username")
     val password = outbound.stringValue("password")
+    require(username.isNotBlank()) { "Mieru outbound $tag needs a username" }
     require(password.isNotBlank()) { "Mieru outbound $tag needs a password" }
     val protocol = outbound.stringValue("protocol").ifBlank { "TCP" }.uppercase()
     val mtu = outbound.intValue("mtu") ?: 1400
@@ -317,13 +344,13 @@ private fun buildMieruConfig(
             }
         }
         put("mtu", mtu)
-        multiplexingLevel(outbound.stringValue("multiplexing"))?.let { level ->
+        mieruMultiplexingLevel(outbound.stringValue("multiplexing"))?.let { level ->
             putJsonObject("multiplexing") { put("level", level) }
         }
         // Mieru TCP mux plus no-wait handshake is a known upstream bug.
         put("handshakeMode", "HANDSHAKE_STANDARD")
         outbound.stringValue("traffic_pattern").takeIf(String::isNotBlank)?.let { raw ->
-            val pattern = mieruTrafficPattern(raw)
+            val pattern = decodeMieruTrafficPattern(raw)
                 ?: error("Mieru outbound $tag has an invalid traffic_pattern")
             put("trafficPattern", pattern)
         }
@@ -339,25 +366,6 @@ private fun buildMieruConfig(
     )
 }
 
-/**
- * Mieru share links carry the traffic pattern as base64-encoded JSON; the editor
- * also accepts raw JSON, so try both.
- */
-private fun mieruTrafficPattern(raw: String): JsonElement? {
-    if (raw.isBlank()) return null
-    val direct = runCatching { SingBoxJson.parseToJsonElement(raw) }.getOrNull()
-    if (direct is JsonObject) {
-        return direct["trafficPattern"] ?: direct
-    }
-    val decoded = runCatching {
-        val normalized = raw.replace('-', '+').replace('_', '/')
-        val padded = normalized + "=".repeat((4 - normalized.length % 4) % 4)
-        String(Base64.getDecoder().decode(padded), Charsets.UTF_8)
-    }.getOrNull() ?: return null
-    val parsed = runCatching { SingBoxJson.parseToJsonElement(decoded) }.getOrNull()
-    return (parsed as? JsonObject)?.let { obj -> obj["trafficPattern"] ?: obj }
-}
-
 private fun buildJuicityConfig(
     outbound: JsonObject,
     tag: String,
@@ -367,6 +375,7 @@ private fun buildJuicityConfig(
 ): String {
     val uuid = outbound.stringValue("uuid")
     val password = outbound.stringValue("password")
+    require(uuid.isNotBlank()) { "Juicity outbound $tag needs a uuid" }
     require(password.isNotBlank()) { "Juicity outbound $tag needs a password" }
     val sni = outbound.stringValue("sni")
     return encodeSingBoxJson(
@@ -454,6 +463,13 @@ private fun buildShadowQuicConfig(
 }
 
 
+/** Absolute paths of the TLS files a Hysteria2 plugin reads; blank when unset. */
+private data class Hysteria2TlsFiles(
+    val ca: String,
+    val clientCertificate: String,
+    val clientKey: String,
+)
+
 /** Hysteria2 plugin config: sing-box shaped outbound JSON in, hysteria2 JSON out. */
 private fun buildHysteria2Config(
     outbound: JsonObject,
@@ -461,6 +477,7 @@ private fun buildHysteria2Config(
     dialAddress: String,
     socksPort: Int,
     protectPath: String,
+    tlsFiles: Hysteria2TlsFiles,
 ): String {
     val password = outbound.stringValue("password")
     require(password.isNotBlank()) { "Hysteria2 outbound $tag needs a password" }
@@ -482,6 +499,9 @@ private fun buildHysteria2Config(
                 textList(tls ?: JsonObject(emptyMap()), "alpn").takeIf { it.isNotEmpty() }?.let { alpns ->
                     putJsonArray("alpn") { alpns.forEach { item -> add(item) } }
                 }
+                if (tlsFiles.ca.isNotBlank()) put("ca", tlsFiles.ca)
+                if (tlsFiles.clientCertificate.isNotBlank()) put("clientCertificate", tlsFiles.clientCertificate)
+                if (tlsFiles.clientKey.isNotBlank()) put("clientKey", tlsFiles.clientKey)
             }
             if (obfsType.equals("salamander", ignoreCase = true)) {
                 val obfsPassword = obfs?.stringValue("password").orEmpty()
@@ -504,7 +524,9 @@ private fun buildHysteria2Config(
                 }
             }
             if (protectPath.isNotBlank()) {
-                putJsonObject("quic") { put("fdControlUnixSocket", protectPath) }
+                putJsonObject("quic") {
+                    putJsonObject("sockopts") { put("fdControlUnixSocket", protectPath) }
+                }
             }
             put("logLevel", "error")
         },
@@ -523,21 +545,38 @@ private fun buildNaiveConfig(
     val password = outbound.stringValue("password")
     val proxyHost = tls?.stringValue("server_name").orEmpty()
         .ifBlank { outbound.stringValue("server") }
+        .removeSurrounding("[", "]")
     val dialHost = dialAddress.substringBeforeLast(':').removeSurrounding("[", "]")
     val dialPort = dialAddress.substringAfterLast(':').toIntOrNull() ?: 443
-    val credentials = if (username.isBlank()) {
+    val credentials = if (username.isBlank() && password.isBlank()) {
         ""
     } else {
         "${encodeUserInfo(username)}:${encodeUserInfo(password)}@"
     }
+    val urlHost = if (proxyHost.contains(':')) "[$proxyHost]" else proxyHost
+    val extraHeaders = (outbound["extra_headers"] as? JsonObject).orEmpty()
+        .mapNotNull { (name, value) ->
+            val text = when (value) {
+                // sing-box accepts a header value as a string or a list of strings.
+                is JsonArray -> value.mapNotNull { item -> (item as? JsonPrimitive)?.contentOrNull }
+                    .joinToString(", ")
+                is JsonPrimitive -> value.contentOrNull.orEmpty()
+                else -> ""
+            }
+            "$name: $text".takeIf { name.isNotBlank() }
+        }
     return encodeSingBoxJson(
         buildJsonObject {
             put("listen", "socks://$PluginSocksHost:$socksPort")
-            put("proxy", "https://$credentials$proxyHost:$dialPort")
+            put("proxy", "https://$credentials$urlHost:$dialPort")
             if (!useProtect) {
                 // Keep TLS verification on the domain while dialing the mapping port.
                 put("host-resolver-rules", "MAP $proxyHost $dialHost")
             }
+            outbound.intValue("insecure_concurrency")?.takeIf { it > 1 }?.let { concurrency ->
+                put("insecure-concurrency", concurrency)
+            }
+            if (extraHeaders.isNotEmpty()) put("extra-headers", extraHeaders.joinToString("\r\n"))
         },
     )
 }
@@ -548,10 +587,15 @@ private fun bandwidthValue(outbound: JsonObject, key: String): Int? =
         ?: outbound.intValue(key)
 
 
-private fun multiplexingLevel(value: String): String? = when (value.trim().uppercase()) {
-    "LOW" -> "MULTIPLEXING_LOW"
-    "MEDIUM" -> "MULTIPLEXING_MEDIUM"
-    "HIGH" -> "MULTIPLEXING_HIGH"
+/**
+ * Mieru's MultiplexingLevel enum names; its middle level is MIDDLE. husi links
+ * write MULTIPLEXING_MEDIUM, which is accepted as the same level.
+ */
+internal fun mieruMultiplexingLevel(value: String): String? = when (value.trim().uppercase()) {
+    "OFF", "MULTIPLEXING_OFF" -> "MULTIPLEXING_OFF"
+    "LOW", "MULTIPLEXING_LOW" -> "MULTIPLEXING_LOW"
+    "MEDIUM", "MIDDLE", "MULTIPLEXING_MIDDLE", "MULTIPLEXING_MEDIUM" -> "MULTIPLEXING_MIDDLE"
+    "HIGH", "MULTIPLEXING_HIGH" -> "MULTIPLEXING_HIGH"
     else -> null
 }
 
@@ -590,6 +634,13 @@ private fun JsonObject.withLeadingRouteRules(rules: List<JsonObject>): JsonObjec
 
 private fun JsonObject.stringValue(key: String): String =
     (this[key] as? JsonPrimitive)?.contentOrNull.orEmpty()
+
+/** A sing-box listable PEM option: one string, or an array of its lines. */
+private fun JsonObject.pemValue(key: String): String = when (val element = this[key]) {
+    is JsonArray -> element.mapNotNull { line -> (line as? JsonPrimitive)?.contentOrNull }.joinToString("\n")
+    is JsonPrimitive -> element.contentOrNull.orEmpty()
+    else -> ""
+}.trim()
 
 private fun JsonObject.intValue(key: String): Int? =
     (this[key] as? JsonPrimitive)?.intOrNull

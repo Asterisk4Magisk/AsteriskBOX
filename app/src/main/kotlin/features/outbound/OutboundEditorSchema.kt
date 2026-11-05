@@ -609,7 +609,7 @@ private fun mieruOutboundFields() = listOf(
     outboundField("password", "Password", required = true),
     outboundSelect("protocol", "Mieru transport", listOf("TCP", "UDP")),
     outboundField("mtu", "MTU", OutboundFieldKind.INTEGER),
-    outboundSelect("multiplexing", "Multiplexing level", listOf("", "LOW", "MEDIUM", "HIGH")),
+    outboundSelect("multiplexing", "Multiplexing level", listOf("", "OFF", "LOW", "MEDIUM", "HIGH")),
     outboundField("traffic_pattern", "Traffic pattern (JSON)", OutboundFieldKind.MULTILINE),
 )
 
