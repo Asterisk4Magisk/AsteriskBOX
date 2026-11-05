@@ -46,7 +46,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import ui.components.AsteriskScaffold
 import ui.components.AsteriskTopAppBar
-import ui.components.IconAccent
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.icons.AsteriskIcons as Icons
@@ -131,7 +130,6 @@ internal fun SingBoxPluginPage(padding: PaddingValues) {
                                     )
                                 }
                             },
-                            accent = IconAccent.MaskCyan,
                         )
                     }
                 }
@@ -163,7 +161,6 @@ private fun PluginPackageRow(
         },
         onClick = { if (plugin != null) onOpenDetails(plugin) else onOpenDownload() },
         enabled = scanned,
-        accent = if (plugin != null) IconAccent.MaskGreen else IconAccent.MaskGrey,
     )
 }
 

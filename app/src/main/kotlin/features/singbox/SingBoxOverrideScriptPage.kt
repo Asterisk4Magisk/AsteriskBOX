@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import features.settings.SettingsSectionCard
 import features.settings.SettingsSwitchRow
-import ui.components.IconAccent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -140,7 +139,6 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
                         icon = Icons.Rounded.Code,
                         checked = scriptEnabled,
                         onCheckedChange = { scriptEnabled = it },
-                        accent = IconAccent.MaskPurple,
                     )
                 }
             }
