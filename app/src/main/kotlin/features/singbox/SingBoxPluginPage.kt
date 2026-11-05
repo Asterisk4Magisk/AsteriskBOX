@@ -117,7 +117,7 @@ internal fun SingBoxPluginPage(padding: PaddingValues) {
                         SwitchPreference(
                             title = stringResource(R.string.plugin_use_plugin, requirement.displayName),
                             summary = stringResource(requirement.implementationSummary()),
-                            icon = Icons.Rounded.Extension,
+                            icon = Icons.Rounded.Tune,
                             checked = enabled,
                             onCheckedChange = { checked ->
                                 updateAppState { state ->
