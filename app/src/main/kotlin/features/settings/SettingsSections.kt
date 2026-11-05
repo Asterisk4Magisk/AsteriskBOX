@@ -348,7 +348,7 @@ internal fun SettingsAdvancedSection(
         }
         ArrowPreference(
             title = stringResource(R.string.settings_plugins),
-            icon = Icons.Rounded.Widgets,
+            icon = Icons.Rounded.Extension,
             summary = stringResource(R.string.settings_plugins_summary),
             onClick = onOpenPlugins,
             accent = IconAccent.MaskCyan,

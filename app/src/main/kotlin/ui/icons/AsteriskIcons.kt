@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Extension
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material.icons.rounded.FilterAlt
@@ -141,6 +142,7 @@ internal object AsteriskIcons {
         val ErrorOutline: ImageVector = MaterialIcons.Rounded.ErrorOutline
         val ExpandLess: ImageVector = MaterialIcons.Rounded.ExpandLess
         val ExpandMore: ImageVector = MaterialIcons.Rounded.ExpandMore
+        val Extension: ImageVector = MaterialIcons.Rounded.Extension
         val FileDownload: ImageVector = MaterialIcons.Rounded.FileDownload
         val FileUpload: ImageVector = MaterialIcons.Rounded.FileUpload
         val FilterAlt: ImageVector = MaterialIcons.Rounded.FilterAlt

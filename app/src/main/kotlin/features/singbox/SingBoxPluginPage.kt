@@ -118,7 +118,7 @@ internal fun SingBoxPluginPage(padding: PaddingValues) {
                         SwitchPreference(
                             title = stringResource(R.string.plugin_use_plugin, requirement.displayName),
                             summary = stringResource(requirement.implementationSummary()),
-                            icon = Icons.Rounded.Widgets,
+                            icon = Icons.Rounded.Extension,
                             checked = enabled,
                             onCheckedChange = { checked ->
                                 updateAppState { state ->
@@ -150,7 +150,7 @@ private fun PluginPackageRow(
 ) {
     SettingsActionRow(
         title = requirement.displayName,
-        icon = Icons.Rounded.Widgets,
+        icon = Icons.Rounded.Extension,
         summary = when {
             plugin != null -> stringResource(R.string.plugin_installed_summary, plugin.versionName, plugin.publisher)
             scanned -> stringResource(R.string.plugin_missing_summary)
