@@ -10,8 +10,12 @@ internal object RootBootConfigWriter {
         layout: RootRuntimeLayout,
         coreConfigBytes: ByteArray,
         encodedDaemonConfig: String,
+        pluginOptionsBytes: ByteArray,
     ) {
         File(layout.configPath).writeBytes(coreConfigBytes)
         File(layout.asteriskdConfigPath).writeBytes(encodedDaemonConfig.toByteArray(Charsets.UTF_8))
+        File(layout.pluginOptionsPath).let { file ->
+            if (pluginOptionsBytes.isEmpty()) file.delete() else file.writeBytes(pluginOptionsBytes)
+        }
     }
 }

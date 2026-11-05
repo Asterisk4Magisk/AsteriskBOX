@@ -23,6 +23,9 @@ sealed interface Route : NavKey {
     data object License : Route
 
     @Serializable
+    data object Plugins : Route
+
+    @Serializable
     data object CoreLogs : Route
 
     @Serializable

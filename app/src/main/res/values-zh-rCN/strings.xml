@@ -488,6 +488,22 @@
     <string name="outbound_editor_value">值</string>
     <string name="outbound_field_allow_insecure">允许不安全连接</string>
     <string name="outbound_field_alpn">ALPN 协议</string>
+    <string name="outbound_field_gso">GSO</string>
+    <string name="outbound_field_blackhole_detection">黑洞检测</string>
+    <string name="outbound_field_certificates">证书</string>
+    <string name="outbound_field_extra_paths">额外路径</string>
+    <string name="outbound_field_keep_alive_interval">保活间隔</string>
+    <string name="outbound_field_max_paths">最大路径数</string>
+    <string name="outbound_field_min_mtu">最小 MTU</string>
+    <string name="outbound_field_mtu_discovery">MTU 探测</string>
+    <string name="outbound_field_pinned_cert_sha256">证书链 SHA-256 固定值</string>
+    <string name="outbound_field_sub_protocol">子协议</string>
+    <string name="outbound_field_zero_rtt">Zero-RTT</string>
+    <string name="outbound_field_initial_mtu">初始 MTU</string>
+    <string name="outbound_field_mieru_transport">Mieru 传输协议</string>
+    <string name="outbound_field_mtu">MTU</string>
+    <string name="outbound_field_multiplexing_level">多路复用级别</string>
+    <string name="outbound_field_traffic_pattern">流量特征（JSON）</string>
     <string name="outbound_field_alter_id">Alter ID</string>
     <string name="outbound_field_authenticated_length">认证长度</string>
     <string name="outbound_field_authentication_bytes">认证字节</string>
@@ -1594,4 +1610,19 @@
     <string name="license_title">第三方开源许可</string>
     <string name="settings_about_project">关于项目</string>
     <string name="settings_open_source_licenses">开源许可</string>
+
+    <!-- Protocol plugins -->
+    <string name="settings_plugins">插件</string>
+    <string name="settings_plugins_summary">运行以独立 APK 分发的协议</string>
+    <string name="plugin_packages_title">协议插件</string>
+    <string name="plugin_installed">已安装</string>
+    <string name="plugin_not_installed">未安装</string>
+    <string name="plugin_installed_summary">%1$s · %2$s</string>
+    <string name="plugin_missing_summary">点按前往下载</string>
+    <string name="plugin_trust_note">插件作为内核的子进程运行，仅识别由 husi、SagerNet、Exclave 或 Matsuri 签名的插件。</string>
+    <string name="plugin_implementations_title">协议实现</string>
+    <string name="plugin_use_plugin">使用 %1$s 插件</string>
+    <string name="plugin_use_hysteria2_summary">替代内置实现，不支持端口跳跃</string>
+    <string name="plugin_use_naive_summary">替代内置实现，不支持 QUIC</string>
+    <string name="plugin_missing_message">未安装 %1$s 插件（%2$s），请在 高级设置 → 插件 中安装后重试</string>
 </resources>

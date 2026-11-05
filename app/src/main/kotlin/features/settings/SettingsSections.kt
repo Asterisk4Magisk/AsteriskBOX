@@ -305,6 +305,7 @@ internal fun SettingsAdvancedSection(
     enableBroadcastControl: Boolean,
     enableIpv6: Boolean,
     enableIpv6Prefer: Boolean,
+    onOpenPlugins: () -> Unit,
     onOpenConfigOverrideScript: () -> Unit,
     runModeOptions: List<String>,
     selectedRunModeIndex: Int,
@@ -345,6 +346,13 @@ internal fun SettingsAdvancedSection(
                 accent = IconAccent.MaskGreen,
             )
         }
+        ArrowPreference(
+            title = stringResource(R.string.settings_plugins),
+            icon = Icons.Rounded.Widgets,
+            summary = stringResource(R.string.settings_plugins_summary),
+            onClick = onOpenPlugins,
+            accent = IconAccent.MaskCyan,
+        )
         ArrowPreference(
             title = stringResource(R.string.singbox_override_script_title),
             icon = Icons.Rounded.Code,

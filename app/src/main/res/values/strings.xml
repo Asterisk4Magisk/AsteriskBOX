@@ -496,6 +496,22 @@
     <string name="outbound_editor_value">Value</string>
     <string name="outbound_field_allow_insecure">Allow insecure</string>
     <string name="outbound_field_alpn">ALPN</string>
+    <string name="outbound_field_gso">GSO</string>
+    <string name="outbound_field_blackhole_detection">Blackhole detection</string>
+    <string name="outbound_field_certificates">Certificates</string>
+    <string name="outbound_field_extra_paths">Extra paths</string>
+    <string name="outbound_field_keep_alive_interval">Keep-alive interval</string>
+    <string name="outbound_field_max_paths">Max paths</string>
+    <string name="outbound_field_min_mtu">Min MTU</string>
+    <string name="outbound_field_mtu_discovery">MTU discovery</string>
+    <string name="outbound_field_pinned_cert_sha256">Pinned certificate SHA-256</string>
+    <string name="outbound_field_sub_protocol">Sub-protocol</string>
+    <string name="outbound_field_zero_rtt">Zero-RTT</string>
+    <string name="outbound_field_initial_mtu">Initial MTU</string>
+    <string name="outbound_field_mieru_transport">Mieru transport</string>
+    <string name="outbound_field_mtu">MTU</string>
+    <string name="outbound_field_multiplexing_level">Multiplexing level</string>
+    <string name="outbound_field_traffic_pattern">Traffic pattern (JSON)</string>
     <string name="outbound_field_alter_id">Alter ID</string>
     <string name="outbound_field_authenticated_length">Authenticated length</string>
     <string name="outbound_field_authentication_bytes">Authentication bytes</string>
@@ -1615,4 +1631,19 @@
     <string name="license_title">Third Party Licenses</string>
     <string name="settings_about_project">About project</string>
     <string name="settings_open_source_licenses">Open source licenses</string>
+
+    <!-- Protocol plugins -->
+    <string name="settings_plugins">Plugins</string>
+    <string name="settings_plugins_summary">Run protocols shipped as separate APKs</string>
+    <string name="plugin_packages_title">Protocol plugins</string>
+    <string name="plugin_installed">Installed</string>
+    <string name="plugin_not_installed">Not installed</string>
+    <string name="plugin_installed_summary">%1$s · %2$s</string>
+    <string name="plugin_missing_summary">Tap to download</string>
+    <string name="plugin_trust_note">Plugins run as child processes of the core. Only plugins signed by husi, SagerNet, Exclave or Matsuri are recognized.</string>
+    <string name="plugin_implementations_title">Protocol implementations</string>
+    <string name="plugin_use_plugin">Use the %1$s plugin</string>
+    <string name="plugin_use_hysteria2_summary">Replaces the built-in implementation; port hopping is not supported</string>
+    <string name="plugin_use_naive_summary">Replaces the built-in implementation; QUIC is not supported</string>
+    <string name="plugin_missing_message">The %1$s plugin (%2$s) is not installed. Install it from Advanced settings → Plugins and try again.</string>
 </resources>
