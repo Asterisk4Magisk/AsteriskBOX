@@ -1333,7 +1333,7 @@ private fun SingBoxProxyNodeCard(
         }
     }
     val cardModifier = modifier
-        .height(SingBoxProxyNodeCardHeight)
+        .height(if (compact) SingBoxProxyNodeCompactCardHeight else SingBoxProxyNodeCardHeight)
         .semantics { this.selected = selected }
     AsteriskSelectionCard(
         selected = selected,
@@ -1605,6 +1605,9 @@ private fun delayColor(
 }
 
 private val SingBoxProxyNodeCardHeight = 112.dp
+
+// Compact (multi-column) cards fit a two-line title, a 2dp gap and the 28dp protocol/delay line.
+private val SingBoxProxyNodeCompactCardHeight = 90.dp
 private val SingBoxProxyNodeCardPadding = PaddingValues(start = 10.dp, top = 14.dp, end = 10.dp, bottom = 10.dp)
 private val SingBoxProxyNodeGridSpacing = 12.dp
 private val SingBoxFloatingToolbarBottomSpacing = 16.dp

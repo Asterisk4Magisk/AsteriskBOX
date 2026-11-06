@@ -1114,7 +1114,7 @@ private fun OutboundCard(
         onClick = onEdit,
         modifier = modifier
             .fillMaxWidth()
-            .height(OutboundCardHeight)
+            .height(if (compact) OutboundCompactCardHeight else OutboundCardHeight)
             .zIndex(if (isDragging) 1f else 0f)
             .graphicsLayer {
                 scaleX = scale
@@ -1649,6 +1649,9 @@ private val OutboundOptionsMenuWidth = 224.dp
 private val OutboundCardMenuWidth = 224.dp
 private val OutboundGridSpacing = OutboundGridSpacingDp.dp
 private val OutboundCardHeight = OutboundCardHeightDp.dp
+
+// Compact (multi-column) cards fit a two-line title; the title row is held at the 48dp menu touch target.
+private val OutboundCompactCardHeight = 100.dp
 private val OutboundCardPadding =
     PaddingValues(start = 10.dp, top = 14.dp, end = 10.dp, bottom = 10.dp)
 private val OutboundCardMenuIconOffset = outboundCardMenuIconOffsetDp(
