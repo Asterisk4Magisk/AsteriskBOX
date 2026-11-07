@@ -209,10 +209,12 @@ internal class AndroidProxyEngine(
             rootResumeChecked = true
         }
         SingBoxTrafficStatsNotificationService.reconcile(appContext, null)
+        // A known active engine may still hold the controller port until it is replaced below.
+        val ownRuntimeMayHoldPorts = activeEngine != null
         val resolvedRequest = request.copy(
             appState = request.appState
                 .withResolvedDynamicLocalProxyPort()
-                .withResolvedSingBoxControlPort(),
+                .withResolvedSingBoxControlPort(verifyAvailability = !ownRuntimeMayHoldPorts),
         )
         val nextEngine = resolvedRequest.appState.runMode.engine()
         val currentEngine = activeEngine ?: findEngineToStop(resolvedRequest.appState.runMode)

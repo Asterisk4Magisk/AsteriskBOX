@@ -39,13 +39,19 @@ internal fun AppState.singBoxControlConfig(): SingBoxControlConfig {
     )
 }
 
-internal fun AppState.withResolvedSingBoxControlPort(): AppState {
+/**
+ * Keeps the configured controller port unless it collides with another configured port or, when
+ * [verifyAvailability] is set, is held by another process. Callers whose own core may still be
+ * listening on it must pass `verifyAvailability = false`; otherwise the port held by that core
+ * would be replaced with a random one and written back to the settings.
+ */
+internal fun AppState.withResolvedSingBoxControlPort(verifyAvailability: Boolean): AppState {
     val configuredPort = singBoxControlPort.toPortOrNull()
     val excludedPorts = singBoxControlExcludedPorts()
     val resolvedPort = when {
         configuredPort != null &&
             configuredPort !in excludedPorts &&
-            isTcpPortAvailable(SingBoxControlHost, configuredPort) -> configuredPort
+            (!verifyAvailability || isTcpPortAvailable(SingBoxControlHost, configuredPort)) -> configuredPort
 
         else -> availableSingBoxControlPort(excludedPorts) ?: configuredPort ?: DefaultSingBoxControlPort
     }
