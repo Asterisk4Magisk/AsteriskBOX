@@ -54,7 +54,7 @@ The traffic statistics service (`engine.stats.SingBoxTrafficStatsNotificationSer
 
 ## Repository Structure and Product Boundaries
 
-- Application ID: `org.asterisk.zcc.abox`.
+- Application ID: `org.asterisk.zcc.abox`. Debug builds append `.debug` and take the DEV-badged launcher icon from `app/src/debug/res`, so a debug build installs next to a release build.
 - Core: sing-box; ROOT owner/core: `asteriskbox` / `sing-box`.
 - ROOT modes: TPROXY, TUN, TUN2SOCKS, BPF2SOCKS, and eBPF.
 - `app/`: Android application, Compose UI, data layer, VPN/ROOT orchestration, and core adapters.
