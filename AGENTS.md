@@ -55,6 +55,7 @@ The traffic statistics service (`engine.stats.SingBoxTrafficStatsNotificationSer
 ## Repository Structure and Product Boundaries
 
 - Application ID: `org.asterisk.zcc.abox`. Debug builds append `.debug` and take the DEV-badged launcher icon from `app/src/debug/res`, so a debug build installs next to a release build.
+  - Known and accepted: the debug and release builds share the ROOT owner `asteriskbox` and the boot script `/data/adb/service.d/asteriskbox_start.sh`. With both installed, neither reports the other as a foreign owner, so either can stop the other's ROOT session, and turning start-on-boot on or off in one overwrites or removes the other's script. They also share the app label, the deep-link schemes, and the secret dial code, so a deep link offers two identical entries and the dial code reaches both.
 - Core: sing-box; ROOT owner/core: `asteriskbox` / `sing-box`.
 - ROOT modes: TPROXY, TUN, TUN2SOCKS, BPF2SOCKS, and eBPF.
 - `app/`: Android application, Compose UI, data layer, VPN/ROOT orchestration, and core adapters.
