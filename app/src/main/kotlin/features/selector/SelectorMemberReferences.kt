@@ -1,7 +1,12 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-package app
+package features.selector
+
+import app.AppState
+import app.OutboundGroupState
+import app.OutboundState
+import app.managedOutboundGroupSelectorTag
 
 internal fun AppState.selectorGroupMembersByReference(): Map<String, List<String>> = buildMap {
     outboundGroups

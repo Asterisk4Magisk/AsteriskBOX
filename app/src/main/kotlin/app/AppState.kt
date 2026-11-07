@@ -33,6 +33,8 @@ import engine.singbox.DefaultSingBoxSnifferTimeout
 import engine.root.RootModeEngine
 import engine.vpn.VpnDefaults
 import features.resources.ResourceFileSourceDefault
+import features.settings.servicecontrol.ServiceControlSettings
+import features.dns.withIpv4FakeIpSettings
 
 data class AppState(
     val colorMode: Int = ColorModeSystem,

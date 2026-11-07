@@ -83,7 +83,6 @@ import app.SingBoxSelectorTypeUrlTest
 import app.SupportedSingBoxSelectorTypes
 import app.collectAppState
 import app.selectableManagedOutbounds
-import app.selectorGroupLockedOutboundTags
 import app.withRemovedManagedOutboundTags
 import engine.singbox.SingBoxUnsigned16Max
 import engine.singbox.config.APP_DIRECT_OUTBOUND

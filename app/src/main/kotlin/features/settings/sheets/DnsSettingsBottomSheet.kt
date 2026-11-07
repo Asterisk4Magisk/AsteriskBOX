@@ -6,7 +6,7 @@ package features.settings.sheets
 import features.dns.DnsConfigurationMatchEditor
 import engine.singbox.config.DnsConfigurationMatchFields
 import engine.singbox.config.DnsConfigurationServerTypes
-import app.hasValidDnsConfigurationMatchers
+import features.dns.hasValidDnsConfigurationMatchers
 
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent

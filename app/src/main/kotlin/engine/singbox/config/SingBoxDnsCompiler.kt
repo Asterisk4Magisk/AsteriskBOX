@@ -3,9 +3,9 @@
 
 package engine.singbox.config
 
-import app.ManagedFakeIpDnsTag
+import features.dns.ManagedFakeIpDnsTag
 import app.effectiveFakeIpEnabled
-import app.withIpv4FakeIpSettings
+import features.dns.withIpv4FakeIpSettings
 import engine.network.normalizedFakeIpIpv4Pool
 import app.withPrunedDnsEvaluationReferences
 

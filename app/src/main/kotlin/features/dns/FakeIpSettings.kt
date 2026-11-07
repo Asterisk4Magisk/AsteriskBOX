@@ -1,11 +1,13 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-package app
+package features.dns
 
 import engine.network.DefaultFakeIpIpv4Pool
 import engine.network.withoutIpv6FakeIpPool
 import engine.singbox.DefaultSingBoxDnsServers
+import app.AppState
+import app.withReplacedManagedTag
 
 internal const val ManagedFakeIpDnsTag = "dns_fakeip"
 

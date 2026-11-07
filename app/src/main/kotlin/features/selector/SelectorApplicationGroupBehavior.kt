@@ -6,9 +6,6 @@ package features.selector
 import app.AppState
 import app.ManagedOutboundChoice
 import app.ManagedOutboundChoiceKind
-import app.expandSelectorMemberReferences
-import app.selectorGroupLockedOutboundTags
-import app.selectorGroupMembersByReference
 
 internal fun selectorEffectiveMemberTags(
     state: AppState,

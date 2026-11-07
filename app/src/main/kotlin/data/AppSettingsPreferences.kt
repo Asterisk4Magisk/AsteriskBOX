@@ -10,11 +10,11 @@ import androidx.core.content.edit
 import app.AppState
 import app.modes.normalizeNetworkActivityStyle
 import app.withNormalizedConnectionTestSettings
-import app.ServiceControlSchedule
-import app.ServiceControlKeyguard
-import app.ServiceControlSettings
-import app.ServiceControlWifi
-import app.ServiceControlWifiRule
+import features.settings.servicecontrol.ServiceControlSchedule
+import features.settings.servicecontrol.ServiceControlKeyguard
+import features.settings.servicecontrol.ServiceControlSettings
+import features.settings.servicecontrol.ServiceControlWifi
+import features.settings.servicecontrol.ServiceControlWifiRule
 import features.settings.servicecontrol.normalizeServiceControlSettings
 import engine.singbox.normalizedEbpfLocalDataPlane
 import java.util.UUID

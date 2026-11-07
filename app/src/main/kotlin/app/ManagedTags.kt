@@ -5,6 +5,7 @@ package app
 
 import java.text.Normalizer
 import features.resources.BundledRuleSet
+import features.dns.ManagedFakeIpDnsTag
 
 internal const val LegacyManagedSingBoxTagPrefix = "__asteriskbox_"
 

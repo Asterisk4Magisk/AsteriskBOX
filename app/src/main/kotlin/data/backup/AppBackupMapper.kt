@@ -12,12 +12,12 @@ import app.AppState
 import app.modes.normalizeNetworkActivityStyle
 import app.withNormalizedConnectionTestSettings
 import features.resources.withInitializedBundledRuleSets
-import app.ServiceControlSchedule
-import app.ServiceControlKeyguard
+import features.settings.servicecontrol.ServiceControlSchedule
+import features.settings.servicecontrol.ServiceControlKeyguard
 import features.settings.servicecontrol.normalizeServiceControlSettings
-import app.ServiceControlSettings
-import app.ServiceControlWifi
-import app.ServiceControlWifiRule
+import features.settings.servicecontrol.ServiceControlSettings
+import features.settings.servicecontrol.ServiceControlWifi
+import features.settings.servicecontrol.ServiceControlWifiRule
 import app.CustomResourceFileState
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
@@ -514,7 +514,7 @@ private fun AppState.restoreWarnings(): List<AppBackupWarning> {
     val missingOutboundCount = outboundReferences.countMissingManagedReferences(availableOutbounds)
 
     val availableDnsServers = dnsServers.mapTo(mutableSetOf()) { server -> server.tag }
-        .apply { if (enableFakeIp) add(app.ManagedFakeIpDnsTag) }
+        .apply { if (enableFakeIp) add(features.dns.ManagedFakeIpDnsTag) }
     val dnsReferences = buildList {
         add(dnsFinal)
         add(routeDefaultDomainResolver)

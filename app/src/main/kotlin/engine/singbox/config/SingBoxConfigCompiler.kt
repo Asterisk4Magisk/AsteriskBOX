@@ -23,7 +23,7 @@ import app.SingBoxRouteRuleState
 import app.SingBoxRouteRuleTypeLogical
 import app.SingBoxSelectorTypeSelector
 import app.SingBoxSelectorTypeUrlTest
-import app.expandSelectorMemberReferences
+import features.selector.expandSelectorMemberReferences
 import app.isManagedSingBoxTag
 import app.managedOutboundGroupSelectorTag
 import app.managedRuleSetChoices

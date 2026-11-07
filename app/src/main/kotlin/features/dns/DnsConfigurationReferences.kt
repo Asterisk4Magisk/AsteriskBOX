@@ -1,11 +1,15 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-package app
+package features.dns
 
 import engine.singbox.config.DnsConfigurationMatchFields
 import engine.singbox.config.dnsConfigurationEntryTag
 import engine.singbox.config.isDnsConfigurationEntry
+import app.SingBoxDnsRuleState
+import app.SingBoxDnsRuleTypeLogical
+import app.SingBoxRouteRuleState
+import app.SingBoxRouteRuleTypeLogical
 
 internal fun SingBoxRouteRuleState.hasValidDnsConfigurationMatchers(tags: Set<String>): Boolean =
     if (type == SingBoxRouteRuleTypeLogical) {

@@ -8,7 +8,7 @@ import features.dns.DnsConfigurationMatchEditor
 import engine.singbox.config.DnsConfigurationMatchFields
 import engine.singbox.config.mapDnsConfigurationTags
 import engine.singbox.config.DnsConfigurationServerTypes
-import app.hasValidDnsConfigurationMatchers
+import features.dns.hasValidDnsConfigurationMatchers
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
