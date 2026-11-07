@@ -16,6 +16,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import utils.requireSecondsDuration
 
 internal object OpenVpnEndpointParser {
     fun parseOutcomeOrNull(content: String): RecognizedEndpointImport? {
@@ -276,15 +277,15 @@ private fun parseOpenVpn(content: String): ImportOutcome<ImportedSingBoxEndpoint
         if (pullFilters.isNotEmpty()) put("pull_filters", JsonArray(pullFilters))
         directive("keepalive")?.let { item ->
             require(item.arguments.size == 2) { "OpenVPN keepalive is malformed" }
-            put("ping_interval", item.arguments[0].secondsDuration())
-            put("ping_restart", item.arguments[1].secondsDuration())
+            put("ping_interval", item.arguments[0].requireSecondsDuration("OpenVPN duration"))
+            put("ping_restart", item.arguments[1].requireSecondsDuration("OpenVPN duration"))
         }
         directive("ping")?.arguments?.firstOrNull()
-            ?.let { put("ping_interval", it.secondsDuration()) }
+            ?.let { put("ping_interval", it.requireSecondsDuration("OpenVPN duration")) }
         directive("ping-restart")?.arguments?.firstOrNull()
-            ?.let { put("ping_restart", it.secondsDuration()) }
+            ?.let { put("ping_restart", it.requireSecondsDuration("OpenVPN duration")) }
         directive("reneg-sec")?.arguments?.firstOrNull()
-            ?.let { put("renegotiate_interval", it.secondsDuration()) }
+            ?.let { put("renegotiate_interval", it.requireSecondsDuration("OpenVPN duration")) }
         directive("explicit-exit-notify")?.let { item ->
             require(item.arguments.size <= 1) {
                 "OpenVPN explicit-exit-notify is malformed"
@@ -379,11 +380,6 @@ private fun normalizeOpenVpnKeyDirection(value: String): String = when (value.lo
     "0", "server" -> "server"
     "1", "client" -> "client"
     else -> error("OpenVPN key direction is invalid")
-}
-
-private fun String.secondsDuration(): String {
-    require(toLongOrNull()?.let { it >= 0 } == true) { "OpenVPN duration is invalid" }
-    return "${this}s"
 }
 
 private fun OpenVpnDirective.singleArgument(label: String): String {

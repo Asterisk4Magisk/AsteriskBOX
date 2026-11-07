@@ -22,7 +22,10 @@ import kotlinx.serialization.json.putJsonObject
 import java.io.File
 import java.net.InetAddress
 import java.net.ServerSocket
-import java.net.URLEncoder
+import utils.booleanOrNull
+import utils.encodeUrlComponent
+import utils.intOrNull
+import utils.stringOrEmpty
 
 /**
  * Where the compiled plugins run. A plugin that can protect its sockets dials
@@ -75,11 +78,11 @@ internal fun compilePluginOutbounds(
                 add(element)
                 return@forEach
             }
-            val tag = outbound.stringValue("tag")
+            val tag = outbound.stringOrEmpty("tag")
             require(tag.isNotBlank()) { "Plugin outbound needs a tag" }
             outbound.requireSupportedByPlugin(requirement, tag)
-            val server = outbound.stringValue("server")
-            val serverPort = outbound.intValue("server_port") ?: 0
+            val server = outbound.stringOrEmpty("server")
+            val serverPort = outbound.intOrNull("server_port") ?: 0
             require(server.isNotBlank() && serverPort in 1..65535) {
                 "Plugin outbound $tag needs a valid server and server_port"
             }
@@ -91,7 +94,7 @@ internal fun compilePluginOutbounds(
                     put("server", PluginSocksHost)
                     put("server_port", socksPort)
                     // A tcp- or udp-only outbound stays that way behind the plugin.
-                    outbound.stringValue("network").takeIf(String::isNotBlank)?.let { network ->
+                    outbound.stringOrEmpty("network").takeIf(String::isNotBlank)?.let { network ->
                         put("network", network)
                     }
                 },
@@ -149,7 +152,7 @@ private fun JsonObject.requireSupportedByPlugin(requirement: PluginRequirement, 
             require(this["server_ports"].isEmptyValue()) {
                 "Hysteria2 plugin outbound $tag does not support server_ports"
             }
-            val obfsType = (this["obfs"] as? JsonObject)?.stringValue("type").orEmpty()
+            val obfsType = (this["obfs"] as? JsonObject)?.stringOrEmpty("type").orEmpty()
             require(obfsType.isBlank() || obfsType.equals("salamander", ignoreCase = true)) {
                 "Hysteria2 plugin outbound $tag does not support $obfsType obfs"
             }
@@ -158,7 +161,7 @@ private fun JsonObject.requireSupportedByPlugin(requirement: PluginRequirement, 
                 "Hysteria2 plugin outbound $tag does not support certificate_public_key_sha256"
             }
         }
-        PluginOutbounds.naive -> require(booleanValue("quic") != true) {
+        PluginOutbounds.naive -> require(booleanOrNull("quic") != true) {
             "NaiveProxy plugin outbound $tag does not support QUIC"
         }
     }
@@ -229,7 +232,7 @@ private fun buildPluginOutboundPlan(
             // Inline PEM goes into its own file; a path option is used as given.
             fun tlsFile(inlineKey: String, pathKey: String, suffix: String): String {
                 val inline = tls.pemValue(inlineKey)
-                if (inline.isBlank()) return tls.stringValue(pathKey)
+                if (inline.isBlank()) return tls.stringOrEmpty(pathKey)
                 val name = "hysteria2_${socksPort}_$suffix"
                 files += PluginFile(name, inline)
                 return File(workingDir, name).absolutePath
@@ -277,8 +280,8 @@ private fun buildPluginOutboundPlan(
         else -> {
             val fileName = "shadowquic_$socksPort.yaml"
             val files = mutableListOf<PluginFile>()
-            val certificates = outbound.stringValue("certificates")
-            val isSunny = outbound.stringValue("sub_protocol").equals("sunnyquic", ignoreCase = true)
+            val certificates = outbound.stringOrEmpty("certificates")
+            val isSunny = outbound.stringOrEmpty("sub_protocol").equals("sunnyquic", ignoreCase = true)
             val certFileName = "shadowquic_${socksPort}_cert.pem"
             if (isSunny && certificates.isNotBlank()) {
                 files += PluginFile(certFileName, certificates)
@@ -313,12 +316,12 @@ private fun buildMieruConfig(
     dialAddress: String,
     socksPort: Int,
 ): String {
-    val username = outbound.stringValue("username")
-    val password = outbound.stringValue("password")
+    val username = outbound.stringOrEmpty("username")
+    val password = outbound.stringOrEmpty("password")
     require(username.isNotBlank()) { "Mieru outbound $tag needs a username" }
     require(password.isNotBlank()) { "Mieru outbound $tag needs a password" }
-    val protocol = outbound.stringValue("protocol").ifBlank { "TCP" }.uppercase()
-    val mtu = outbound.intValue("mtu") ?: 1400
+    val protocol = outbound.stringOrEmpty("protocol").ifBlank { "TCP" }.uppercase()
+    val mtu = outbound.intOrNull("mtu") ?: 1400
     val host = dialAddress.substringBeforeLast(':').removeSurrounding("[", "]")
     val port = dialAddress.substringAfterLast(':').toIntOrNull() ?: 0
     val profile = buildJsonObject {
@@ -344,12 +347,12 @@ private fun buildMieruConfig(
             }
         }
         put("mtu", mtu)
-        mieruMultiplexingLevel(outbound.stringValue("multiplexing"))?.let { level ->
+        mieruMultiplexingLevel(outbound.stringOrEmpty("multiplexing"))?.let { level ->
             putJsonObject("multiplexing") { put("level", level) }
         }
         // Mieru TCP mux plus no-wait handshake is a known upstream bug.
         put("handshakeMode", "HANDSHAKE_STANDARD")
-        outbound.stringValue("traffic_pattern").takeIf(String::isNotBlank)?.let { raw ->
+        outbound.stringOrEmpty("traffic_pattern").takeIf(String::isNotBlank)?.let { raw ->
             val pattern = decodeMieruTrafficPattern(raw)
                 ?: error("Mieru outbound $tag has an invalid traffic_pattern")
             put("trafficPattern", pattern)
@@ -373,23 +376,23 @@ private fun buildJuicityConfig(
     socksPort: Int,
     protectPath: String,
 ): String {
-    val uuid = outbound.stringValue("uuid")
-    val password = outbound.stringValue("password")
+    val uuid = outbound.stringOrEmpty("uuid")
+    val password = outbound.stringOrEmpty("password")
     require(uuid.isNotBlank()) { "Juicity outbound $tag needs a uuid" }
     require(password.isNotBlank()) { "Juicity outbound $tag needs a password" }
-    val sni = outbound.stringValue("sni")
+    val sni = outbound.stringOrEmpty("sni")
     return encodeSingBoxJson(
         buildJsonObject {
             put("listen", "$PluginSocksHost:$socksPort")
             put("server", dialAddress)
             put("uuid", uuid)
             put("password", password)
-            put("sni", sni.ifBlank { outbound.stringValue("server") })
-            if (outbound.booleanValue("allow_insecure") == true) {
+            put("sni", sni.ifBlank { outbound.stringOrEmpty("server") })
+            if (outbound.booleanOrNull("allow_insecure") == true) {
                 put("allow_insecure", true)
             }
-            put("congestion_control", outbound.stringValue("congestion_control").ifBlank { "bbr" })
-            outbound.stringValue("pin_sha256").takeIf(String::isNotBlank)?.let { pin ->
+            put("congestion_control", outbound.stringOrEmpty("congestion_control").ifBlank { "bbr" })
+            outbound.stringOrEmpty("pin_sha256").takeIf(String::isNotBlank)?.let { pin ->
                 put("pinned_certchain_sha256", pin)
             }
             if (protectPath.isNotBlank()) {
@@ -408,15 +411,15 @@ private fun buildShadowQuicConfig(
     protectPath: String,
     certPath: String,
 ): String {
-    val username = outbound.stringValue("username")
-    val password = outbound.stringValue("password")
+    val username = outbound.stringOrEmpty("username")
+    val password = outbound.stringOrEmpty("password")
     require(password.isNotBlank()) { "ShadowQUIC outbound $tag needs a password" }
-    val isSunny = outbound.stringValue("sub_protocol").equals("sunnyquic", ignoreCase = true)
-    val serverName = outbound.stringValue("server_name").ifBlank { outbound.stringValue("sni") }
-    val initialMtu = outbound.intValue("initial_mtu") ?: 1300
-    val minimumMtu = outbound.intValue("min_mtu") ?: 0
-    val keepAlive = outbound.intValue("keep_alive_interval") ?: 0
-    val maxPaths = outbound.intValue("max_paths") ?: 0
+    val isSunny = outbound.stringOrEmpty("sub_protocol").equals("sunnyquic", ignoreCase = true)
+    val serverName = outbound.stringOrEmpty("server_name").ifBlank { outbound.stringOrEmpty("sni") }
+    val initialMtu = outbound.intOrNull("initial_mtu") ?: 1300
+    val minimumMtu = outbound.intOrNull("min_mtu") ?: 0
+    val keepAlive = outbound.intOrNull("keep_alive_interval") ?: 0
+    val maxPaths = outbound.intOrNull("max_paths") ?: 0
     return encodeSingBoxJson(
         buildJsonObject {
             putJsonObject("inbound") {
@@ -428,13 +431,13 @@ private fun buildShadowQuicConfig(
                 put("addr", dialAddress)
                 put("username", username)
                 put("password", password)
-                put("server-name", serverName.ifBlank { outbound.stringValue("server") })
+                put("server-name", serverName.ifBlank { outbound.stringOrEmpty("server") })
                 textList(outbound, "alpn").takeIf { it.isNotEmpty() }?.let { alpns ->
                     putJsonArray("alpn") { alpns.forEach { item -> add(item) } }
                 }
                 put("initial-mtu", initialMtu)
                 if (minimumMtu > 0) put("min-mtu", minimumMtu)
-                put("congestion-control", outbound.stringValue("congestion_control").ifBlank { "bbr" })
+                put("congestion-control", outbound.stringOrEmpty("congestion_control").ifBlank { "bbr" })
                 if (keepAlive > 0) put("keep-alive-interval", keepAlive)
                 if (isSunny) {
                     val paths = textList(outbound, "extra_paths")
@@ -446,12 +449,12 @@ private fun buildShadowQuicConfig(
                     }
                     if (certPath.isNotBlank()) put("cert-path", certPath)
                 }
-                put("gso", outbound.booleanValue("gso") ?: false)
-                if (outbound.booleanValue("zero_rtt") == true) put("zero-rtt", true)
-                if (outbound.booleanValue("udp_over_stream") == true) put("over-stream", true)
-                if (outbound.booleanValue("mtu_discovery") == true) {
+                put("gso", outbound.booleanOrNull("gso") ?: false)
+                if (outbound.booleanOrNull("zero_rtt") == true) put("zero-rtt", true)
+                if (outbound.booleanOrNull("udp_over_stream") == true) put("over-stream", true)
+                if (outbound.booleanOrNull("mtu_discovery") == true) {
                     put("mtu-discovery", true)
-                    if (!isSunny && outbound.booleanValue("blackhole_detection") == true) {
+                    if (!isSunny && outbound.booleanOrNull("blackhole_detection") == true) {
                         put("blackhole-detection", true)
                     }
                 }
@@ -479,13 +482,13 @@ private fun buildHysteria2Config(
     protectPath: String,
     tlsFiles: Hysteria2TlsFiles,
 ): String {
-    val password = outbound.stringValue("password")
+    val password = outbound.stringOrEmpty("password")
     require(password.isNotBlank()) { "Hysteria2 outbound $tag needs a password" }
     val tls = outbound["tls"] as? JsonObject
     val obfs = outbound["obfs"] as? JsonObject
-    val obfsType = obfs?.stringValue("type").orEmpty()
-    val serverName = tls?.stringValue("server_name").orEmpty()
-        .ifBlank { outbound.stringValue("server") }
+    val obfsType = obfs?.stringOrEmpty("type").orEmpty()
+    val serverName = tls?.stringOrEmpty("server_name").orEmpty()
+        .ifBlank { outbound.stringOrEmpty("server") }
     return encodeSingBoxJson(
         buildJsonObject {
             put("server", dialAddress)
@@ -495,7 +498,7 @@ private fun buildHysteria2Config(
             putJsonObject("socks5") { put("listen", "$PluginSocksHost:$socksPort") }
             putJsonObject("tls") {
                 put("sni", serverName)
-                put("insecure", tls?.booleanValue("insecure") ?: false)
+                put("insecure", tls?.booleanOrNull("insecure") ?: false)
                 textList(tls ?: JsonObject(emptyMap()), "alpn").takeIf { it.isNotEmpty() }?.let { alpns ->
                     putJsonArray("alpn") { alpns.forEach { item -> add(item) } }
                 }
@@ -504,7 +507,7 @@ private fun buildHysteria2Config(
                 if (tlsFiles.clientKey.isNotBlank()) put("clientKey", tlsFiles.clientKey)
             }
             if (obfsType.equals("salamander", ignoreCase = true)) {
-                val obfsPassword = obfs?.stringValue("password").orEmpty()
+                val obfsPassword = obfs?.stringOrEmpty("password").orEmpty()
                 require(obfsPassword.isNotBlank()) {
                     "Hysteria2 outbound $tag uses salamander obfs without a password"
                 }
@@ -541,17 +544,17 @@ private fun buildNaiveConfig(
     useProtect: Boolean,
 ): String {
     val tls = outbound["tls"] as? JsonObject
-    val username = outbound.stringValue("username")
-    val password = outbound.stringValue("password")
-    val proxyHost = tls?.stringValue("server_name").orEmpty()
-        .ifBlank { outbound.stringValue("server") }
+    val username = outbound.stringOrEmpty("username")
+    val password = outbound.stringOrEmpty("password")
+    val proxyHost = tls?.stringOrEmpty("server_name").orEmpty()
+        .ifBlank { outbound.stringOrEmpty("server") }
         .removeSurrounding("[", "]")
     val dialHost = dialAddress.substringBeforeLast(':').removeSurrounding("[", "]")
     val dialPort = dialAddress.substringAfterLast(':').toIntOrNull() ?: 443
     val credentials = if (username.isBlank() && password.isBlank()) {
         ""
     } else {
-        "${encodeUserInfo(username)}:${encodeUserInfo(password)}@"
+        "${username.encodeUrlComponent()}:${password.encodeUrlComponent()}@"
     }
     val urlHost = if (proxyHost.contains(':')) "[$proxyHost]" else proxyHost
     val extraHeaders = (outbound["extra_headers"] as? JsonObject).orEmpty()
@@ -573,7 +576,7 @@ private fun buildNaiveConfig(
                 // Keep TLS verification on the domain while dialing the mapping port.
                 put("host-resolver-rules", "MAP $proxyHost $dialHost")
             }
-            outbound.intValue("insecure_concurrency")?.takeIf { it > 1 }?.let { concurrency ->
+            outbound.intOrNull("insecure_concurrency")?.takeIf { it > 1 }?.let { concurrency ->
                 put("insecure-concurrency", concurrency)
             }
             if (extraHeaders.isNotEmpty()) put("extra-headers", extraHeaders.joinToString("\r\n"))
@@ -584,7 +587,7 @@ private fun buildNaiveConfig(
 private fun bandwidthValue(outbound: JsonObject, key: String): Int? =
     (outbound[key] as? JsonPrimitive)?.intOrNull
         ?: (outbound[key] as? JsonPrimitive)?.contentOrNull?.toIntOrNull()
-        ?: outbound.intValue(key)
+        ?: outbound.intOrNull(key)
 
 
 /**
@@ -618,10 +621,6 @@ private fun joinAddress(host: String, port: Int): String = when {
     else -> "$host:$port"
 }
 
-/** Percent-encode one URL userinfo component; '+' must not survive as a space. */
-private fun encodeUserInfo(value: String): String =
-    URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
-
 private fun JsonObject.withLeadingRouteRules(rules: List<JsonObject>): JsonObject {
     val route = (this["route"] as? JsonObject) ?: buildJsonObject { putJsonArray("rules") {} }
     val existing = (route["rules"] as? JsonArray) ?: JsonArray(emptyList())
@@ -632,21 +631,12 @@ private fun JsonObject.withLeadingRouteRules(rules: List<JsonObject>): JsonObjec
     return this.updated("route", JsonObject(route.toMutableMap().apply { put("rules", updated) }))
 }
 
-private fun JsonObject.stringValue(key: String): String =
-    (this[key] as? JsonPrimitive)?.contentOrNull.orEmpty()
-
 /** A sing-box listable PEM option: one string, or an array of its lines. */
 private fun JsonObject.pemValue(key: String): String = when (val element = this[key]) {
     is JsonArray -> element.mapNotNull { line -> (line as? JsonPrimitive)?.contentOrNull }.joinToString("\n")
     is JsonPrimitive -> element.contentOrNull.orEmpty()
     else -> ""
 }.trim()
-
-private fun JsonObject.intValue(key: String): Int? =
-    (this[key] as? JsonPrimitive)?.intOrNull
-
-private fun JsonObject.booleanValue(key: String): Boolean? =
-    (this[key] as? JsonPrimitive)?.contentOrNull?.toBooleanStrictOrNull()
 
 private fun JsonArray?.orEmptyArray(): JsonArray = this ?: JsonArray(emptyList())
 

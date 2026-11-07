@@ -6,6 +6,11 @@ package features.outbound
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import utils.booleanOrFalse
+import utils.intOrZero
+import utils.objectValue
+import utils.stringListValue
+import utils.stringOrEmpty
 
 internal fun encodeStandardOutboundShareUrl(
     type: String,
@@ -32,8 +37,8 @@ private fun JsonObject.encodeHttpShareUrl(remarks: String): String {
     return buildOutboundShareUri(
         scheme = if (tls.enabled) "https" else "http",
         endpoint = endpoint,
-        encodedUserInfo = encodeShareCredentials(stringValue("username"), stringValue("password")),
-        path = stringValue("path"),
+        encodedUserInfo = encodeShareCredentials(stringOrEmpty("username"), stringOrEmpty("password")),
+        path = stringOrEmpty("path"),
         parameters = tls.parameters,
         remarks = remarks,
     )
@@ -41,9 +46,9 @@ private fun JsonObject.encodeHttpShareUrl(remarks: String): String {
 
 private fun JsonObject.encodeSocksShareUrl(remarks: String): String {
     requireOnlyShareFields("version", "username", "password", "network", "udp_over_tcp")
-    require(stringValue("network").isBlank()) { "SOCKS network cannot be shared" }
+    require(stringOrEmpty("network").isBlank()) { "SOCKS network cannot be shared" }
     require(!get("udp_over_tcp").isMeaningfulShareValue()) { "SOCKS UDP over TCP cannot be shared" }
-    val scheme = when (stringValue("version").ifBlank { "5" }) {
+    val scheme = when (stringOrEmpty("version").ifBlank { "5" }) {
         "4" -> "socks4"
         "4a" -> "socks4a"
         "5" -> "socks5"
@@ -52,7 +57,7 @@ private fun JsonObject.encodeSocksShareUrl(remarks: String): String {
     return buildOutboundShareUri(
         scheme = scheme,
         endpoint = requireShareEndpoint(),
-        encodedUserInfo = encodeShareCredentials(stringValue("username"), stringValue("password")),
+        encodedUserInfo = encodeShareCredentials(stringOrEmpty("username"), stringOrEmpty("password")),
         remarks = remarks,
     )
 }
@@ -69,11 +74,11 @@ private fun JsonObject.encodeNaiveShareUrl(remarks: String): String {
         "tls",
     )
     val tls = readNaiveShareTls()
-    val quic = booleanValue("quic")
-    val congestionControl = stringValue("quic_congestion_control")
+    val quic = booleanOrFalse("quic")
+    val congestionControl = stringOrEmpty("quic_congestion_control")
     require(quic || congestionControl.isBlank()) { "Naive QUIC options require QUIC" }
     val parameters = mutableListOf<Pair<String, String>>()
-    intValue("insecure_concurrency").takeIf { it > 0 }?.let {
+    intOrZero("insecure_concurrency").takeIf { it > 0 }?.let {
         parameters += "insecure-concurrency" to it.toString()
     }
     objectValue("extra_headers")?.let { headers ->
@@ -86,8 +91,8 @@ private fun JsonObject.encodeNaiveShareUrl(remarks: String): String {
     }
     objectValue("udp_over_tcp")?.let { udpOverTcp ->
         udpOverTcp.requireOnlyNestedShareFields("enabled", "version")
-        val enabled = udpOverTcp.booleanValue("enabled")
-        val version = udpOverTcp.intValue("version")
+        val enabled = udpOverTcp.booleanOrFalse("enabled")
+        val version = udpOverTcp.intOrZero("version")
         require(enabled || version == 0) { "Naive UDP over TCP version requires UDP over TCP" }
         if (enabled) {
             parameters += "udp-over-tcp" to "1"
@@ -104,7 +109,7 @@ private fun JsonObject.encodeNaiveShareUrl(remarks: String): String {
     return buildOutboundShareUri(
         scheme = if (quic) "naive+quic" else "naive",
         endpoint = requireShareEndpoint(),
-        encodedUserInfo = encodeShareCredentials(stringValue("username"), stringValue("password")),
+        encodedUserInfo = encodeShareCredentials(stringOrEmpty("username"), stringOrEmpty("password")),
         parameters = parameters,
         remarks = remarks,
     )
@@ -113,12 +118,12 @@ private fun JsonObject.encodeNaiveShareUrl(remarks: String): String {
 private fun JsonObject.readNaiveShareTls(): List<Pair<String, String>> {
     val tls = requireNotNull(objectValue("tls")) { "Naive TLS is required" }
     tls.requireOnlyNestedShareFields("enabled", "server_name", "ech")
-    require(tls.booleanValue("enabled")) { "Naive TLS is required" }
+    require(tls.booleanOrFalse("enabled")) { "Naive TLS is required" }
     return buildList {
-        tls.stringValue("server_name").takeIf(String::isNotBlank)?.let { add("sni" to it) }
+        tls.stringOrEmpty("server_name").takeIf(String::isNotBlank)?.let { add("sni" to it) }
         tls.objectValue("ech")?.let { ech ->
             ech.requireOnlyNestedShareFields("enabled", "config")
-            val enabled = ech.booleanValue("enabled")
+            val enabled = ech.booleanOrFalse("enabled")
             val configs = ech.stringListValue("config")
             require(enabled || configs.isEmpty()) { "Disabled ECH contains connection options" }
             if (enabled) {
@@ -139,27 +144,27 @@ private fun JsonObject.encodeShadowsocksShareUrl(remarks: String): String {
         "udp_over_tcp",
         "multiplex",
     )
-    require(stringValue("network").isBlank()) { "Shadowsocks network cannot be shared" }
+    require(stringOrEmpty("network").isBlank()) { "Shadowsocks network cannot be shared" }
     require(!get("udp_over_tcp").isMeaningfulShareValue()) {
         "Shadowsocks UDP over TCP cannot be shared"
     }
     require(!get("multiplex").isMeaningfulShareValue()) { "Shadowsocks multiplex cannot be shared" }
-    val method = stringValue("method")
-    val password = stringValue("password")
+    val method = stringOrEmpty("method")
+    val password = stringOrEmpty("password")
     require(method.isNotBlank() && password.isNotBlank()) { "Shadowsocks credentials are required" }
     val userInfo = if (method.startsWith("2022-")) {
         encodeShareComponent(method) + ":" + encodeShareComponent(password)
     } else {
         encodeShareBase64Url("$method:$password")
     }
-    val plugin = stringValue("plugin")
+    val plugin = stringOrEmpty("plugin")
     require(plugin.isBlank() || plugin in setOf("obfs-local", "v2ray-plugin")) {
         "Unsupported Shadowsocks plugin"
     }
     val parameters = if (plugin.isBlank()) {
         emptyList()
     } else {
-        val options = stringValue("plugin_opts")
+        val options = stringOrEmpty("plugin_opts")
         listOf("plugin" to if (options.isBlank()) plugin else "$plugin;$options")
     }
     return buildOutboundShareUri(
@@ -180,7 +185,7 @@ private fun JsonObject.encodeAnyTlsShareUrl(remarks: String): String {
         "client_metadata",
         "tls",
     )
-    val password = stringValue("password")
+    val password = stringOrEmpty("password")
     require(password.isNotBlank()) { "AnyTLS password is required" }
     listOf(
         "idle_session_check_interval",
@@ -194,7 +199,7 @@ private fun JsonObject.encodeAnyTlsShareUrl(remarks: String): String {
     val tls = readShareTls(required = true)
         .requireOnlyShareParameters("AnyTLS", "sni", "insecure")
     val parameters = buildList {
-        stringValue("client_metadata").takeIf(String::isNotBlank)?.let {
+        stringOrEmpty("client_metadata").takeIf(String::isNotBlank)?.let {
             add("client-metadata" to it)
         }
         addAll(tls.parameters)
@@ -210,9 +215,9 @@ private fun JsonObject.encodeAnyTlsShareUrl(remarks: String): String {
 
 private fun JsonObject.encodeShadowTlsShareUrl(remarks: String): String {
     requireOnlyShareFields("version", "password", "tls")
-    val version = intValue("version")
+    val version = intOrZero("version")
     require(version in 1..3) { "Unsupported ShadowTLS version" }
-    val password = stringValue("password")
+    val password = stringOrEmpty("password")
     require(version == 1 || password.isNotBlank()) { "ShadowTLS password is required" }
     val tls = readShareTls(required = true)
         .requireOnlyShareParameters("ShadowTLS", "sni", "insecure", "fp")
@@ -236,19 +241,19 @@ private fun JsonObject.encodeSnellShareUrl(remarks: String): String {
         "obfs_host",
         "mode",
     )
-    require(intValue("version") == 4) { "Only Snell 4 has a supported share URL" }
-    require(stringValue("userkey").isBlank()) { "Snell user key cannot be shared" }
-    require(!booleanValue("reuse")) { "Snell reuse cannot be shared" }
-    require(stringValue("network").isBlank()) { "Snell network cannot be shared" }
-    require(stringValue("mode").isBlank()) { "Snell shaping mode cannot be shared" }
-    val psk = stringValue("psk")
+    require(intOrZero("version") == 4) { "Only Snell 4 has a supported share URL" }
+    require(stringOrEmpty("userkey").isBlank()) { "Snell user key cannot be shared" }
+    require(!booleanOrFalse("reuse")) { "Snell reuse cannot be shared" }
+    require(stringOrEmpty("network").isBlank()) { "Snell network cannot be shared" }
+    require(stringOrEmpty("mode").isBlank()) { "Snell shaping mode cannot be shared" }
+    val psk = stringOrEmpty("psk")
     require(psk.isNotBlank()) { "Snell PSK is required" }
-    val obfsMode = stringValue("obfs_mode")
+    val obfsMode = stringOrEmpty("obfs_mode")
     require(obfsMode.isBlank() || obfsMode in setOf("none", "http")) { "Unsupported Snell obfuscation" }
     val parameters = buildList {
         add("version" to "4")
         obfsMode.takeIf { it.isNotBlank() && it != "none" }?.let { add("obfs" to it) }
-        stringValue("obfs_host").takeIf(String::isNotBlank)?.let { add("obfs-host" to it) }
+        stringOrEmpty("obfs_host").takeIf(String::isNotBlank)?.let { add("obfs-host" to it) }
     }
     return buildOutboundShareUri(
         scheme = "snell",
@@ -289,7 +294,7 @@ private fun JsonObject.encodeSshShareUrl(remarks: String): String {
     return buildOutboundShareUri(
         scheme = "ssh",
         endpoint = requireShareEndpoint(),
-        encodedUserInfo = encodeShareCredentials(stringValue("user"), stringValue("password")),
+        encodedUserInfo = encodeShareCredentials(stringOrEmpty("user"), stringOrEmpty("password")),
         remarks = remarks,
     )
 }

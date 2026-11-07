@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -46,6 +45,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import ui.components.AsteriskCancelButton
+import ui.components.AsteriskSaveButton
 import ui.components.AsteriskScaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -62,7 +63,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
@@ -76,7 +76,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import app.DefaultOutboundSubscriptionUserAgent
 import app.AppState
 import app.selectableGroupDetourOutbounds
@@ -129,8 +128,9 @@ import ui.components.AsteriskActionButton
 import ui.components.AsteriskConfigApplyBanner
 import ui.components.AsteriskModalBottomSheet
 import ui.components.WarningConfirmDialog
+import ui.components.animateDraggedCardLift
+import ui.components.draggedCardLift
 import ui.components.localizedLabel
-import ui.components.draggedCardShadow
 import ui.components.rememberReorderPreview
 import ui.components.longPressReorderDragHandle
 import ui.components.rememberAsteriskReorderableLazyListState
@@ -1303,9 +1303,7 @@ private fun OutboundGroupBatchProgressDialog(
             }
         },
         confirmButton = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
+            AsteriskCancelButton(
                 enabled = !cancelling,
                 onClick = onCancel,
             )
@@ -1528,16 +1526,7 @@ internal fun OutboundGroupCard(
         animationSpec = AsteriskMotion.effects(),
         label = "outbound-group-card-color",
     )
-    val scale by animateFloatAsState(
-        targetValue = if (isDragging) 1.025f else 1f,
-        animationSpec = AsteriskMotion.fastSpatial(),
-        label = "outbound-group-card-scale",
-    )
-    val shadowAlpha by animateFloatAsState(
-        targetValue = if (isDragging) 1f else 0f,
-        animationSpec = AsteriskMotion.fastEffects(),
-        label = "outbound-group-card-shadow",
-    )
+    val lift = animateDraggedCardLift(isDragging, label = "outbound-group-card")
     var showUpdateInfo by remember(group.id) { mutableStateOf(false) }
     var menuExpanded by remember(group.id) { mutableStateOf(false) }
     var menuLevel by remember(group.id) { mutableStateOf(OutboundGroupCardMenuLevel.MAIN) }
@@ -1554,16 +1543,7 @@ internal fun OutboundGroupCard(
         enabled = !enabledChangeBusy,
         modifier = modifier
             .fillMaxWidth()
-            .zIndex(if (isDragging) 1f else 0f)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .draggedCardShadow(
-                alpha = shadowAlpha,
-                color = MaterialTheme.colorScheme.primary,
-                cornerRadius = AsteriskShapeTokens.ListCardRadius,
-            )
+            .draggedCardLift(lift, cornerRadius = AsteriskShapeTokens.ListCardRadius)
             .animateContentSize(animationSpec = AsteriskMotion.contentSize()),
         shape = AsteriskShapeTokens.ListCard,
         colors = CardDefaults.cardColors(containerColor = containerColor),
@@ -1945,17 +1925,13 @@ private fun OutboundGroupEditorSheet(
         dismissEnabled = !busy,
         onDismissRequest = onDismissRequest,
         startAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
+            AsteriskCancelButton(
                 onClick = onDismissRequest,
                 enabled = !busy,
             )
         },
         endAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_save),
-                icon = Icons.Rounded.Save,
+            AsteriskSaveButton(
                 enabled = canSave && !busy,
                 loading = busy,
                 onClick = {
@@ -2232,16 +2208,12 @@ private fun CustomSubscriptionUserAgentDialog(
             )
         },
         dismissButton = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
+            AsteriskCancelButton(
                 onClick = onDismissRequest,
             )
         },
         confirmButton = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_save),
-                icon = Icons.Rounded.Save,
+            AsteriskSaveButton(
                 onClick = onSave,
             )
         },

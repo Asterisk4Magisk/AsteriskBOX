@@ -24,9 +24,11 @@ internal fun String.decodeBase64StringOrNull(): String? {
 }
 
 internal fun String.decodePaddedBase64OrNull(): ByteArray? {
-    val compact = trim().filterNot(Char::isWhitespace)
-    val padded = compact + "=".repeat((4 - compact.length % 4) % 4)
+    val padded = trim().filterNot(Char::isWhitespace).withBase64Padding()
     return sequenceOf(Base64.UrlSafe, Base64.Default).firstNotNullOfOrNull { decoder ->
         runCatching { decoder.decode(padded) }.getOrNull()
     }
 }
+
+/** Append the `=` padding a strict decoder needs; the alphabet is left untouched. */
+internal fun String.withBase64Padding(): String = this + "=".repeat((4 - length % 4) % 4)

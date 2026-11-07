@@ -22,6 +22,7 @@ import features.importing.ImportMutation
 import features.importing.ImportMutationCode
 import features.importing.ImportOutcome
 import features.importing.ImportStage
+import features.importing.importParseError
 import features.importing.requireImportCandidateCount
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -29,6 +30,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import utils.hasNonBlankString
+import utils.stringOrNull
 
 internal data class ImportedSingBoxOutbound(
     val sourceIndex: Int? = null,
@@ -96,16 +99,16 @@ internal object SingBoxOutboundImporter {
         val accepted = outbounds.mapIndexedNotNull { index, item ->
             val outbound = item as? JsonObject
             if (outbound == null) {
-                issues += rejectedJsonOutbound(
+                issues += importParseError(
                     reason = ImportIssueReason.INVALID_ENTRY,
                     sourceIndex = index,
                     message = "Outbound entry must be a JSON object",
                 )
                 return@mapIndexedNotNull null
             }
-            val type = outbound.stringField("type")
+            val type = outbound.stringOrNull("type")
             if (type.isNullOrBlank()) {
-                issues += rejectedJsonOutbound(
+                issues += importParseError(
                     reason = ImportIssueReason.INVALID_FIELD,
                     sourceIndex = index,
                     message = "Outbound entry has no type",
@@ -117,7 +120,7 @@ internal object SingBoxOutboundImporter {
                 return@mapIndexedNotNull null
             }
             if (type !in SupportedSingBoxProxyOutboundTypes) {
-                issues += rejectedJsonOutbound(
+                issues += importParseError(
                     reason = ImportIssueReason.UNSUPPORTED_TYPE,
                     sourceIndex = index,
                     detectedType = type,
@@ -130,7 +133,7 @@ internal object SingBoxOutboundImporter {
                     .single()
                     .copy(sourceIndex = index)
             }.getOrElse {
-                issues += rejectedJsonOutbound(
+                issues += importParseError(
                     reason = ImportIssueReason.INVALID_ENTRY,
                     sourceIndex = index,
                     detectedType = type,
@@ -209,12 +212,12 @@ internal object SingBoxOutboundImporter {
                 ?: throw IllegalArgumentException(
                     "Formatted outbound at index $sourceIndex must be a JSON object",
                 )
-            val type = outbound.stringField("type")
+            val type = outbound.stringOrNull("type")
                 ?: throw IllegalArgumentException(
                     "Formatted outbound at index $sourceIndex has no type",
                 )
             if (type !in SupportedSingBoxProxyOutboundTypes) return@mapIndexedNotNull null
-            val tag = outbound.stringField("tag").orEmpty()
+            val tag = outbound.stringOrNull("tag").orEmpty()
             val remarks = tag
                 .takeUnless(::isManagedSingBoxTag)
                 ?.takeIf(String::isNotBlank)
@@ -241,7 +244,7 @@ internal object SingBoxOutboundImporter {
         val candidates = outbounds.mapIndexedNotNull { index, element ->
             val outbound = element as? JsonObject
                 ?: throw IllegalArgumentException("Outbound at index $index must be a JSON object")
-            val type = outbound.stringField("type")
+            val type = outbound.stringOrNull("type")
                 ?: throw IllegalArgumentException("Outbound at index $index has no type")
             // Applied before formatting, which drops an explicit false.
             outbound
@@ -254,20 +257,6 @@ internal object SingBoxOutboundImporter {
         return candidates
     }
 }
-
-private fun rejectedJsonOutbound(
-    reason: ImportIssueReason,
-    sourceIndex: Int,
-    message: String,
-    detectedType: String? = null,
-): ImportIssue = ImportIssue(
-    reason = reason,
-    severity = ImportIssueSeverity.ERROR,
-    stage = ImportStage.PARSE,
-    sourceIndex = sourceIndex,
-    detectedType = detectedType,
-    message = message,
-)
 
 internal fun outboundJsonWithoutManagedIdentity(json: String): String {
     val outbound = SingBoxJson.parseToJsonElement(json) as? JsonObject
@@ -524,19 +513,13 @@ private fun removedManagedReferenceMutations(
 // certificate_server_name and client certificates, so new nodes turn it off unless
 // the source states a value.
 internal fun JsonObject.withHysteria2ChromeParrotDefault(): JsonObject =
-    if (stringField("type") != "hysteria2" || HYSTERIA2_DISABLE_CHROME_PARROT in this) {
+    if (stringOrNull("type") != "hysteria2" || HYSTERIA2_DISABLE_CHROME_PARROT in this) {
         this
     } else {
         JsonObject(this + (HYSTERIA2_DISABLE_CHROME_PARROT to JsonPrimitive(true)))
     }
 
 internal const val HYSTERIA2_DISABLE_CHROME_PARROT = "disable_chrome_parrot"
-
-private fun JsonObject.hasNonBlankString(name: String): Boolean =
-    (get(name) as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true
-
-private fun JsonObject.stringField(name: String): String? =
-    (get(name) as? JsonPrimitive)?.contentOrNull
 
 internal val SupportedSingBoxProxyOutboundTypes = linkedSetOf(
     "socks",

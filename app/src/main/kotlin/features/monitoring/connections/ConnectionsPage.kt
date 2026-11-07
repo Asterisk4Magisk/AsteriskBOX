@@ -70,6 +70,7 @@ import features.monitoring.reduceConnections
 import features.monitoring.resolveDisplayedConnections
 import kotlinx.coroutines.launch
 import app.R
+import ui.components.AsteriskCancelButton
 import ui.components.AsteriskTopBarControls
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskDropdownAnchor
@@ -335,9 +336,7 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
                 )
             },
             dismissButton = {
-                AsteriskActionButton(
-                    text = stringResource(R.string.common_cancel),
-                    icon = Icons.Rounded.Close,
+                AsteriskCancelButton(
                     onClick = { showCloseAllConfirmation = false },
                 )
             },

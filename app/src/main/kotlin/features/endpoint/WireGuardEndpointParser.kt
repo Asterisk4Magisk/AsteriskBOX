@@ -16,7 +16,10 @@ import features.importing.MaxImportBytes
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.URI
+import utils.decodePaddedBase64OrNull
 import utils.decodeUrlComponentPreservingPlusStrict
+import utils.toCsvValues
+import utils.withBase64Padding
 import kotlin.io.encoding.Base64
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -95,9 +98,9 @@ internal object WireGuardEndpointParser {
             "peerpub",
         )
         val addresses = query.values("address", "ip")
-            .flatMap(::splitCommaValues)
+            .flatMap(String::toCsvValues)
         val allowedIps = query.values("allowedips", "localaddress")
-            .flatMap(::splitCommaValues)
+            .flatMap(String::toCsvValues)
             .ifEmpty { DefaultAllowedIps }
         val host = uri.host
             ?.removeSurrounding("[", "]")
@@ -199,7 +202,7 @@ internal object WireGuardEndpointParser {
         require(interfaceCount == 1) { "WireGuard Interface section is required" }
         val privateKey = interfaceValues.singleValue("privatekey", "WireGuard private key")
         requireWireGuardKey(privateKey, "WireGuard private key")
-        val addresses = interfaceValues["address"].orEmpty().flatMap(::splitCommaValues)
+        val addresses = interfaceValues["address"].orEmpty().flatMap(String::toCsvValues)
         require(addresses.isNotEmpty()) { "WireGuard interface address is required" }
         addresses.forEach(::requireCidr)
         require(peerValues.isNotEmpty()) { "At least one WireGuard Peer is required" }
@@ -209,7 +212,7 @@ internal object WireGuardEndpointParser {
             )
             val publicKey = values.singleValue("publickey", "WireGuard peer public key")
             requireWireGuardKey(publicKey, "WireGuard peer public key")
-            val allowedIps = values["allowedips"].orEmpty().flatMap(::splitCommaValues)
+            val allowedIps = values["allowedips"].orEmpty().flatMap(String::toCsvValues)
             require(allowedIps.isNotEmpty()) { "WireGuard peer allowed IPs are required" }
             allowedIps.forEach(::requireCidr)
             val psk = values.optionalSingleValue("presharedkey")
@@ -331,10 +334,7 @@ private fun decodeWrappedUrlOrSelf(content: String): String? {
             message = "Decoded WireGuard URL exceeds the allowed size",
         )
     }
-    val padded = compact + "=".repeat((4 - compact.length % 4) % 4)
-    return runCatching {
-        Base64.UrlSafe.decode(padded).decodeToString()
-    }.getOrNull()?.takeIf {
+    return compact.decodePaddedBase64OrNull()?.decodeToString()?.takeIf {
         it.substringBefore(':').lowercase() in RecognizedWireGuardSchemes
     }
 }
@@ -362,12 +362,9 @@ private fun Map<String, List<String>>.values(vararg names: String): List<String>
 private fun String.normalizedOption(): String =
     lowercase().replace("_", "").replace("-", "")
 
-private fun splitCommaValues(value: String): List<String> =
-    value.split(',').map(String::trim).filter(String::isNotBlank)
-
 private fun requireWireGuardKey(value: String?, label: String) {
     require(!value.isNullOrBlank()) { "$label is required" }
-    val padded = value + "=".repeat((4 - value.length % 4) % 4)
+    val padded = value.withBase64Padding()
     val decoded = sequenceOf(
         Base64.Default,
         Base64.UrlSafe
@@ -413,7 +410,7 @@ private fun Int.requirePort(label: String): Int {
 }
 
 private fun parseReservedBytes(value: String): List<Int> {
-    val values = splitCommaValues(value).mapNotNull(String::toIntOrNull)
+    val values = value.toCsvValues().mapNotNull(String::toIntOrNull)
     require(values.size == 3 && values.all { it in 0..255 }) {
         "WireGuard reserved must contain exactly three bytes"
     }

@@ -4,6 +4,7 @@
 package utils
 
 import java.net.URLDecoder
+import java.net.URLEncoder
 
 internal fun String.decodeUrlComponentPreservingPlus(): String {
     return runCatching {
@@ -14,3 +15,7 @@ internal fun String.decodeUrlComponentPreservingPlus(): String {
 /** Decode a URL component once; malformed percent escapes remain an error to strict importers. */
 internal fun String.decodeUrlComponentPreservingPlusStrict(): String =
     URLDecoder.decode(replace("+", "%2B"), Charsets.UTF_8.name())
+
+/** Percent-encode one URL component; a space becomes `%20`, never `+`. */
+internal fun String.encodeUrlComponent(): String =
+    URLEncoder.encode(this, Charsets.UTF_8.name()).replace("+", "%20")

@@ -7,7 +7,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,8 +30,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -50,7 +47,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -62,7 +58,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import app.AppState
 import app.DefaultSingBoxUrlTestIdleTimeout
 import app.DefaultSingBoxUrlTestInterval
@@ -100,9 +95,11 @@ import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskInfoChip
 import ui.components.AsteriskScaffold
 import ui.components.AsteriskSearchTopAppBar
+import ui.components.EditDeleteDropdownMenu
 import ui.components.EditorPageScaffold
 import ui.components.WarningConfirmDialog
-import ui.components.draggedCardShadow
+import ui.components.animateDraggedCardLift
+import ui.components.draggedCardLift
 import ui.components.longPressReorderDragHandle
 import ui.components.rememberAsteriskReorderableLazyGridState
 import ui.components.rememberReorderPreview
@@ -475,27 +472,13 @@ private fun CustomSelectorCard(
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(Icons.Rounded.MoreVert, stringResource(R.string.common_more))
                 }
-                DropdownMenu(
+                EditDeleteDropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.common_edit)) },
-                        leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onEdit()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.common_delete)) },
-                        leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onDelete()
-                        },
-                    )
-                }
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                    showDividerBeforeDelete = false,
+                )
             }
         },
     )
@@ -522,27 +505,9 @@ private fun SelectorCard(
         animationSpec = AsteriskMotion.effects(),
         label = "selector-card-color",
     )
-    val scale by animateFloatAsState(
-        targetValue = if (isDragging) 1.025f else 1f,
-        animationSpec = AsteriskMotion.fastSpatial(),
-        label = "selector-card-scale",
-    )
-    val shadowAlpha by animateFloatAsState(
-        targetValue = if (isDragging) 1f else 0f,
-        animationSpec = AsteriskMotion.fastEffects(),
-        label = "selector-card-shadow",
-    )
+    val lift = animateDraggedCardLift(isDragging, label = "selector-card")
     val cardModifier = modifier
-        .zIndex(if (isDragging) 1f else 0f)
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
-        .draggedCardShadow(
-            alpha = shadowAlpha,
-            color = MaterialTheme.colorScheme.primary,
-            cornerRadius = AsteriskShapeTokens.InnerContainerRadius,
-        )
+        .draggedCardLift(lift, cornerRadius = AsteriskShapeTokens.InnerContainerRadius)
     val cardColors = CardDefaults.cardColors(containerColor = containerColor)
     val content: @Composable () -> Unit = {
         Box(Modifier.fillMaxWidth()) {

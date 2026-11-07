@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.R
+import ui.components.AsteriskCancelButton
+import ui.components.AsteriskSaveButton
 import ui.components.ReferenceSelectionCard
 import ui.icons.AsteriskIcons as Icons
 import ui.text.formatTemplate
@@ -58,17 +60,13 @@ internal fun TunBypassRuleSetBottomSheet(
         dismissEnabled = !saving,
         title = stringResource(R.string.settings_root_ebpf_bypass_direct_cidrs),
         startAction = {
-            TextButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
+            AsteriskCancelButton(
                 onClick = onDismissRequest,
                 enabled = !saving,
             )
         },
         endAction = {
-            TextButton(
-                text = stringResource(R.string.common_save),
-                icon = Icons.Rounded.Save,
+            AsteriskSaveButton(
                 onClick = { onSave(selected) },
                 enabled = !saving,
             )

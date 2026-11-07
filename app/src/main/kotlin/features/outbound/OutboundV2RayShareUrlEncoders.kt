@@ -13,7 +13,12 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
-import kotlin.io.encoding.Base64
+import utils.booleanOrFalse
+import utils.encodeBase64
+import utils.intOrZero
+import utils.objectValue
+import utils.stringListValue
+import utils.stringOrEmpty
 
 internal fun encodeV2RayOutboundShareUrl(
     type: String,
@@ -36,16 +41,16 @@ private fun JsonObject.encodeVlessShareUrl(remarks: String): String {
         "transport",
         "multiplex",
     )
-    require(stringValue("network").isBlank()) { "VLESS network cannot be shared" }
+    require(stringOrEmpty("network").isBlank()) { "VLESS network cannot be shared" }
     require(!get("multiplex").isMeaningfulShareValue()) { "VLESS multiplex cannot be shared" }
-    val uuid = stringValue("uuid")
+    val uuid = stringOrEmpty("uuid")
     require(uuid.isNotBlank()) { "VLESS UUID is required" }
     val transport = readV2RayShareTransport()
     val tls = readShareTls(required = false)
     val parameters = buildList {
         add("encryption" to "none")
-        stringValue("flow").takeIf(String::isNotBlank)?.let { add("flow" to it) }
-        stringValue("packet_encoding").takeIf(String::isNotBlank)?.let {
+        stringOrEmpty("flow").takeIf(String::isNotBlank)?.let { add("flow" to it) }
+        stringOrEmpty("packet_encoding").takeIf(String::isNotBlank)?.let {
             add("packetEncoding" to it)
         }
         addAll(transport.parameters)
@@ -62,9 +67,9 @@ private fun JsonObject.encodeVlessShareUrl(remarks: String): String {
 
 private fun JsonObject.encodeTrojanShareUrl(remarks: String): String {
     requireOnlyShareFields("password", "network", "tls", "transport", "multiplex")
-    require(stringValue("network").isBlank()) { "Trojan network cannot be shared" }
+    require(stringOrEmpty("network").isBlank()) { "Trojan network cannot be shared" }
     require(!get("multiplex").isMeaningfulShareValue()) { "Trojan multiplex cannot be shared" }
-    val password = stringValue("password")
+    val password = stringOrEmpty("password")
     require(password.isNotBlank()) { "Trojan password is required" }
     val transport = readV2RayShareTransport()
     val tls = readShareTls(required = true)
@@ -90,12 +95,12 @@ private fun JsonObject.encodeVmessShareUrl(remarks: String): String {
         "transport",
         "multiplex",
     )
-    require(!booleanValue("global_padding")) { "VMess global padding cannot be shared" }
-    require(!booleanValue("authenticated_length")) { "VMess authenticated length cannot be shared" }
-    require(stringValue("network").isBlank()) { "VMess network cannot be shared" }
-    require(stringValue("packet_encoding").isBlank()) { "VMess packet encoding cannot be shared" }
+    require(!booleanOrFalse("global_padding")) { "VMess global padding cannot be shared" }
+    require(!booleanOrFalse("authenticated_length")) { "VMess authenticated length cannot be shared" }
+    require(stringOrEmpty("network").isBlank()) { "VMess network cannot be shared" }
+    require(stringOrEmpty("packet_encoding").isBlank()) { "VMess packet encoding cannot be shared" }
     require(!get("multiplex").isMeaningfulShareValue()) { "VMess multiplex cannot be shared" }
-    val uuid = stringValue("uuid")
+    val uuid = stringOrEmpty("uuid")
     require(uuid.isNotBlank()) { "VMess UUID is required" }
     val alterId = requireVmessAlterId()
     return if (alterId == 0) {
@@ -109,7 +114,7 @@ private fun JsonObject.encodeVmessAeadShareUrl(
     uuid: String,
     remarks: String,
 ): String {
-    val encryption = stringValue("security").ifBlank { "auto" }
+    val encryption = stringOrEmpty("security").ifBlank { "auto" }
     require(encryption in VmessAeadEncryptionMethods) {
         "Unsupported VMess AEAD encryption"
     }
@@ -146,16 +151,16 @@ private fun JsonObject.encodeVmessAeadShareUrl(
 
 private fun JsonObject.requireVmessAeadTransportRepresentable() {
     val transport = objectValue("transport") ?: return
-    when (transport.stringValue("type").lowercase()) {
+    when (transport.stringOrEmpty("type").lowercase()) {
         "quic" -> throw IllegalArgumentException(
             "VMessAEAD URL does not support sing-box QUIC transport",
         )
-        "http" -> require(transport.stringValue("method").isBlank()) {
+        "http" -> require(transport.stringOrEmpty("method").isBlank()) {
             "VMessAEAD URL cannot represent HTTP method"
         }
         "ws" -> {
-            val earlyData = transport.intValue("max_early_data")
-            val earlyDataHeader = transport.stringValue("early_data_header_name")
+            val earlyData = transport.intOrZero("max_early_data")
+            val earlyDataHeader = transport.stringOrEmpty("early_data_header_name")
             require(earlyData >= 0) { "WebSocket early data cannot be negative" }
             if (earlyDataHeader.isNotBlank()) {
                 require(earlyData > 0) {
@@ -196,7 +201,7 @@ private fun JsonObject.encodeLegacyVmessShareUrl(
         put("port", endpoint.port.toString())
         put("id", uuid)
         put("aid", alterId.toString())
-        put("scy", stringValue("security").ifBlank { "auto" })
+        put("scy", stringOrEmpty("security").ifBlank { "auto" })
         put("net", transport.type)
         put("type", transport.legacyHeaderType)
         put("host", transport.legacyHost)
@@ -213,9 +218,7 @@ private fun JsonObject.encodeLegacyVmessShareUrl(
         put("sid", tlsParameters["sid"].orEmpty())
         put("insecure", tlsParameters["insecure"].orEmpty())
     }
-    val encoded = Base64.Default.encode(
-        SingBoxJson.encodeToString(JsonElement.serializer(), payload).encodeToByteArray(),
-    )
+    val encoded = SingBoxJson.encodeToString(JsonElement.serializer(), payload).encodeBase64()
     return buildString {
         append("vmess://")
         append(encoded)
@@ -260,7 +263,7 @@ private fun JsonObject.readV2RayShareTransport(): V2RayShareTransport {
         "ping_timeout",
         "permit_without_stream",
     )
-    val type = transport.stringValue("type").lowercase()
+    val type = transport.stringOrEmpty("type").lowercase()
     if (type.isBlank() || type in setOf("tcp", "raw")) {
         require(!transport.hasMeaningfulTransportFieldBesides("type")) {
             "Raw transport contains unsupported options"
@@ -274,8 +277,8 @@ private fun JsonObject.readV2RayShareTransport(): V2RayShareTransport {
             }
             requireTransportFieldsEmpty(transport, "max_early_data", "early_data_header_name", "service_name", "idle_timeout", "ping_timeout", "permit_without_stream")
             val hosts = transport.stringListValue("host")
-            val path = transport.stringValue("path")
-            val method = transport.stringValue("method")
+            val path = transport.stringOrEmpty("path")
+            val method = transport.stringOrEmpty("method")
             V2RayShareTransport(
                 type = "http",
                 parameters = buildList {
@@ -291,9 +294,9 @@ private fun JsonObject.readV2RayShareTransport(): V2RayShareTransport {
         "ws" -> {
             requireTransportFieldsEmpty(transport, "host", "method", "service_name", "idle_timeout", "ping_timeout", "permit_without_stream")
             val host = transport.singleWebSocketHost()
-            val path = transport.stringValue("path")
-            val earlyData = transport.intValue("max_early_data")
-            val earlyDataHeader = transport.stringValue("early_data_header_name")
+            val path = transport.stringOrEmpty("path")
+            val earlyData = transport.intOrZero("max_early_data")
+            val earlyDataHeader = transport.stringOrEmpty("early_data_header_name")
             V2RayShareTransport(
                 type = "ws",
                 parameters = buildList {
@@ -315,7 +318,7 @@ private fun JsonObject.readV2RayShareTransport(): V2RayShareTransport {
         }
         "grpc" -> {
             requireTransportFieldsEmpty(transport, "host", "path", "method", "headers", "max_early_data", "early_data_header_name", "idle_timeout", "ping_timeout", "permit_without_stream")
-            val serviceName = transport.stringValue("service_name")
+            val serviceName = transport.stringOrEmpty("service_name")
             V2RayShareTransport(
                 type = "grpc",
                 parameters = buildList {
@@ -327,8 +330,8 @@ private fun JsonObject.readV2RayShareTransport(): V2RayShareTransport {
         }
         "httpupgrade" -> {
             requireTransportFieldsEmpty(transport, "method", "headers", "max_early_data", "early_data_header_name", "service_name", "idle_timeout", "ping_timeout", "permit_without_stream")
-            val host = transport.stringValue("host")
-            val path = transport.stringValue("path")
+            val host = transport.stringOrEmpty("host")
+            val path = transport.stringOrEmpty("path")
             V2RayShareTransport(
                 type = "httpupgrade",
                 parameters = buildList {
@@ -346,13 +349,13 @@ private fun JsonObject.readV2RayShareTransport(): V2RayShareTransport {
 
 private fun JsonObject.requireLegacyVmessTransportRepresentable() {
     val transport = objectValue("transport") ?: return
-    when (transport.stringValue("type").lowercase()) {
-        "http" -> require(transport.stringValue("method").isBlank()) {
+    when (transport.stringOrEmpty("type").lowercase()) {
+        "http" -> require(transport.stringOrEmpty("method").isBlank()) {
             "VMess legacy URL cannot represent HTTP method"
         }
         "ws" -> require(
-            transport.intValue("max_early_data") == 0 &&
-                transport.stringValue("early_data_header_name").isBlank(),
+            transport.intOrZero("max_early_data") == 0 &&
+                transport.stringOrEmpty("early_data_header_name").isBlank(),
         ) { "VMess legacy URL cannot represent WebSocket early data" }
     }
 }

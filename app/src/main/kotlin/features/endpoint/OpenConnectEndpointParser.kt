@@ -16,6 +16,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import utils.requireSecondsDuration
 
 internal object OpenConnectEndpointParser {
     fun parseOutcomeOrNull(content: String): RecognizedEndpointImport? {
@@ -112,7 +113,7 @@ private fun parseOpenConnect(content: String): ImportOutcome<ImportedSingBoxEndp
         last("os")?.let { put("reported_os", it) }
         last("useragent")?.let { put("user_agent", it) }
         if (present("no-dtls", "no-udp")) put("no_udp", true)
-        last("dtls-local-port")?.toPortOrNull("OpenConnect DTLS port")
+        last("dtls-local-port")?.requirePort("OpenConnect DTLS port")
             ?.let { put("dtls_local_port", it) }
         if (present("no-http-keepalive")) put("http_keepalive_disabled", true)
         if (present("no-xmlpost")) put("xml_post_disabled", true)
@@ -125,9 +126,9 @@ private fun parseOpenConnect(content: String): ImportOutcome<ImportedSingBoxEndp
         last("mtu")?.requireIntIn("OpenConnect MTU", 1, 65_535)?.let { put("mtu", it) }
         last("base-mtu")?.requireIntIn("OpenConnect base MTU", 1, 65_535)
             ?.let { put("base_mtu", it) }
-        last("dpd")?.secondsDuration("OpenConnect DPD")
+        last("dpd")?.requireSecondsDuration("OpenConnect DPD")
             ?.let { put("dpd_interval", it) }
-        last("reconnect-timeout")?.secondsDuration("OpenConnect reconnect timeout")
+        last("reconnect-timeout")?.requireSecondsDuration("OpenConnect reconnect timeout")
             ?.let { put("reconnect_timeout", it) }
         if (tls.isNotEmpty()) put("tls", tls)
         if (formEntries.isNotEmpty()) put("form_entries", JsonArray(formEntries))
@@ -223,13 +224,7 @@ private fun String.requireHexFingerprint(prefix: String, maximumLength: Int): St
 private fun String?.toBooleanOption(): Boolean =
     isNullOrBlank() || lowercase() in setOf("1", "true", "yes", "on")
 
-private fun String.toPortOrNull(label: String): Int = requireIntIn(label, 1, 65_535)
-
-private fun String.secondsDuration(label: String): String {
-    val seconds = toLongOrNull()
-    require(seconds != null && seconds >= 0) { "$label is invalid" }
-    return "${seconds}s"
-}
+private fun String.requirePort(label: String): Int = requireIntIn(label, 1, 65_535)
 
 private val OpenConnectFlavors = setOf("anyconnect", "gp", "fortinet", "f5", "pulse", "nc")
 private val HexFingerprintPattern = Regex("[0-9a-f]+")

@@ -3,6 +3,7 @@
 
 package features.resources
 
+import ui.components.AsteriskCancelButton
 import ui.components.AsteriskDropdownAnchor
 import ui.components.AsteriskDropdownMenuItem
 import androidx.compose.animation.AnimatedContent
@@ -55,10 +56,10 @@ import app.CustomResourceFileState
 import app.CustomResourceFileStatus
 import app.R
 import app.ResourceFileStatus
-import ui.components.AsteriskActionButton
 import ui.components.AsteriskChipTone
 import ui.components.AsteriskInfoChip
 import ui.components.AsteriskModalBottomSheet
+import ui.components.AsteriskSaveButton
 import ui.components.AsteriskStatusCard
 import ui.components.AsteriskTonalButton
 import ui.text.formatTemplate
@@ -226,16 +227,12 @@ internal fun CustomResourceSourceEditorSheet(
         onDismissRequest = onDismissRequest,
         title = stringResource(R.string.settings_resource_files_source_custom_title),
         startAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
+            AsteriskCancelButton(
                 onClick = onDismissRequest,
             )
         },
         endAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_save),
-                icon = Icons.Rounded.Save,
+            AsteriskSaveButton(
                 enabled = sourceUrlsValid,
                 onClick = onSave,
             )
@@ -559,16 +556,12 @@ internal fun CustomResourceFileEditorSheet(
         onDismissRequest = onDismissRequest,
         title = stringResource(R.string.settings_resource_files_custom_file),
         startAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
+            AsteriskCancelButton(
                 onClick = onDismissRequest,
             )
         },
         endAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_save),
-                icon = Icons.Rounded.Save,
+            AsteriskSaveButton(
                 onClick = {
                     val validation = validateCustomResourceDraft(
                         name = nameState.text.toString(),

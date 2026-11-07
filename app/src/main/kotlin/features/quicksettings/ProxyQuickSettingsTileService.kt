@@ -18,13 +18,12 @@ import app.MainActivity
 import app.R
 import app.modes.RunModeVpnService
 import data.AndroidAppStateStore
-import data.AppSettingsPreferences
 import engine.proxy.ProxyServiceResult
 import engine.proxy.ProxyServiceUseCase
 import features.logs.AndroidAppLogger
 import features.logs.FailureLogContext
 import features.logs.reportFailure
-import features.settings.locale.localizedAppContext
+import features.settings.locale.localizedFromSavedLanguage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -53,8 +52,7 @@ class ProxyQuickSettingsTileService : TileService() {
     }
 
     override fun attachBaseContext(newBase: Context) {
-        val languageMode = AppSettingsPreferences(newBase).load().languageMode
-        super.attachBaseContext(newBase.localizedAppContext(languageMode))
+        super.attachBaseContext(newBase.localizedFromSavedLanguage())
     }
 
     override fun onTileAdded() {

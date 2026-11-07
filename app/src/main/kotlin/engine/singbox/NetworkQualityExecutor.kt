@@ -12,6 +12,7 @@ import io.nekohasekai.libbox.NetworkQualityTest
 import io.nekohasekai.libbox.NetworkQualityTestHandler
 import io.nekohasekai.libbox.NetworkQualityTestSession
 import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -62,44 +63,7 @@ internal class ServiceNetworkQualityExecutor(
         http3: Boolean,
     ): Flow<NetworkQualityProgress> = callbackFlow {
         val client = repository.activeCommandClient(appState)
-        val latestProgress = AtomicReference(LibboxNetworkQualityProgress())
-        val handler = object : NetworkQualityTestHandler {
-            override fun onProgress(progress: LibboxNetworkQualityProgress) {
-                latestProgress.set(progress)
-                trySend(progress.toModel())
-            }
-
-            override fun onError(message: String) {
-                trySend(
-                    NetworkQualityProgress(
-                        elapsedMs = latestProgress.get().elapsedMs,
-                        error = message,
-                        finished = true,
-                    ),
-                )
-                close()
-            }
-
-            override fun onResult(result: LibboxNetworkQualityResult) {
-                trySend(
-                    NetworkQualityProgress(
-                        phase = NetworkQualityPhase.Done,
-                        downloadCapacityBitsPerSecond = result.downloadCapacity,
-                        uploadCapacityBitsPerSecond = result.uploadCapacity,
-                        downloadRpm = result.downloadRPM,
-                        uploadRpm = result.uploadRPM,
-                        idleLatencyMs = result.idleLatencyMs,
-                        elapsedMs = latestProgress.get().elapsedMs,
-                        downloadCapacityAccuracy = result.downloadCapacityAccuracy,
-                        uploadCapacityAccuracy = result.uploadCapacityAccuracy,
-                        downloadRpmAccuracy = result.downloadRPMAccuracy,
-                        uploadRpmAccuracy = result.uploadRPMAccuracy,
-                        finished = true,
-                    ),
-                )
-                close()
-            }
-        }
+        val handler = networkQualityHandler()
         val session = client.startNetworkQualityTest(
             configURL = configUrl,
             outboundTag = outboundTag,
@@ -135,44 +99,7 @@ internal class StandaloneNetworkQualityExecutor : NetworkQualityExecutor {
         @Suppress("UNUSED_PARAMETER")
         val ignored = outboundTag
         val test = Libbox.newNetworkQualityTest()
-        val latestProgress = AtomicReference(LibboxNetworkQualityProgress())
-        val handler = object : NetworkQualityTestHandler {
-            override fun onProgress(progress: LibboxNetworkQualityProgress) {
-                latestProgress.set(progress)
-                trySend(progress.toModel())
-            }
-
-            override fun onError(message: String) {
-                trySend(
-                    NetworkQualityProgress(
-                        elapsedMs = latestProgress.get().elapsedMs,
-                        error = message,
-                        finished = true,
-                    ),
-                )
-                close()
-            }
-
-            override fun onResult(result: LibboxNetworkQualityResult) {
-                trySend(
-                    NetworkQualityProgress(
-                        phase = NetworkQualityPhase.Done,
-                        downloadCapacityBitsPerSecond = result.downloadCapacity,
-                        uploadCapacityBitsPerSecond = result.uploadCapacity,
-                        downloadRpm = result.downloadRPM,
-                        uploadRpm = result.uploadRPM,
-                        idleLatencyMs = result.idleLatencyMs,
-                        elapsedMs = latestProgress.get().elapsedMs,
-                        downloadCapacityAccuracy = result.downloadCapacityAccuracy,
-                        uploadCapacityAccuracy = result.uploadCapacityAccuracy,
-                        downloadRpmAccuracy = result.downloadRPMAccuracy,
-                        uploadRpmAccuracy = result.uploadRPMAccuracy,
-                        finished = true,
-                    ),
-                )
-                close()
-            }
-        }
+        val handler = networkQualityHandler()
         testRef.set(test)
         test.start(configUrl, serial, maxRuntimeSeconds, http3, handler)
         awaitClose {
@@ -199,3 +126,45 @@ private fun LibboxNetworkQualityProgress.toModel(): NetworkQualityProgress = Net
     downloadRpmAccuracy = downloadRPMAccuracy,
     uploadRpmAccuracy = uploadRPMAccuracy,
 )
+
+/** Forward libbox callbacks into this flow; an error or a result is the terminal emission. */
+private fun ProducerScope<NetworkQualityProgress>.networkQualityHandler(): NetworkQualityTestHandler {
+    val latestProgress = AtomicReference(LibboxNetworkQualityProgress())
+    return object : NetworkQualityTestHandler {
+        override fun onProgress(progress: LibboxNetworkQualityProgress) {
+            latestProgress.set(progress)
+            trySend(progress.toModel())
+        }
+
+        override fun onError(message: String) {
+            trySend(
+                NetworkQualityProgress(
+                    elapsedMs = latestProgress.get().elapsedMs,
+                    error = message,
+                    finished = true,
+                ),
+            )
+            close()
+        }
+
+        override fun onResult(result: LibboxNetworkQualityResult) {
+            trySend(
+                NetworkQualityProgress(
+                    phase = NetworkQualityPhase.Done,
+                    downloadCapacityBitsPerSecond = result.downloadCapacity,
+                    uploadCapacityBitsPerSecond = result.uploadCapacity,
+                    downloadRpm = result.downloadRPM,
+                    uploadRpm = result.uploadRPM,
+                    idleLatencyMs = result.idleLatencyMs,
+                    elapsedMs = latestProgress.get().elapsedMs,
+                    downloadCapacityAccuracy = result.downloadCapacityAccuracy,
+                    uploadCapacityAccuracy = result.uploadCapacityAccuracy,
+                    downloadRpmAccuracy = result.downloadRPMAccuracy,
+                    uploadRpmAccuracy = result.uploadRPMAccuracy,
+                    finished = true,
+                ),
+            )
+            close()
+        }
+    }
+}

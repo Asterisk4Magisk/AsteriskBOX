@@ -18,8 +18,7 @@ import app.R
 import system.AndroidLauncherIcon
 import ui.components.WarningConfirmDialog
 import ui.text.formatTemplate
-import java.text.DateFormat
-import java.util.Date
+import utils.toReadableDateTimeOrDash
 
 @Composable
 internal fun SettingsRestoreConfirmDialog(
@@ -29,7 +28,7 @@ internal fun SettingsRestoreConfirmDialog(
     onRestore: () -> Unit,
 ) {
     val backup = preview?.backup
-    val creationTime = backup?.createdAtMillis?.let(::formatBackupCreationTime).orEmpty()
+    val creationTime = backup?.createdAtMillis?.toReadableDateTimeOrDash().orEmpty()
     WarningConfirmDialog(
         show = preview != null,
         title = stringResource(R.string.settings_restore_confirm_title),
@@ -110,6 +109,3 @@ private fun AppBackupWarning.localizedMessage(): String =
                 .formatTemplate("count" to count)
         }
     }
-
-private fun formatBackupCreationTime(createdAtMillis: Long): String =
-    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(createdAtMillis))

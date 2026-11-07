@@ -13,7 +13,6 @@ import features.dns.hasValidDnsConfigurationMatchers
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import ui.components.EditDeleteDropdownMenu
 import ui.components.SectionedLazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -35,9 +35,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,14 +53,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import app.AppState
 import app.LocalAppServices
 import app.LocalAppStateStore
@@ -98,7 +93,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import app.R
 import sh.calvin.reorderable.ReorderableItem
-import ui.components.AsteriskExpressiveCard
 import ui.components.AsteriskInfoChip
 import ui.components.EditorPageScaffold
 import ui.components.ReferenceSelectionCard
@@ -110,14 +104,14 @@ import ui.components.RuleEditorSwitchCard
 import ui.components.RuleEditorTextField
 import ui.components.StringListEditor
 import ui.components.WarningConfirmDialog
-import ui.components.draggedCardShadow
+import ui.components.animateDraggedCardLift
+import ui.components.draggedCardLift
 import ui.components.localizedLabel
 import ui.components.rememberReorderPreview
 import ui.components.reorderByIds
 import ui.components.longPressReorderDragHandle
 import ui.components.managedInboundChoices
 import ui.components.rememberAsteriskReorderableLazyGridState
-import ui.components.ruleEditorAnimatedListContentKey
 import ui.components.singBoxOptionLabel
 import ui.components.singBoxProtocolChoices
 import ui.components.verticalReorderScrollThresholdPadding
@@ -526,30 +520,12 @@ private fun RouteRuleCard(
         animationSpec = AsteriskMotion.effects(),
         label = "routing-card-color",
     )
-    val scale by animateFloatAsState(
-        targetValue = if (isDragging) 1.025f else 1f,
-        animationSpec = AsteriskMotion.fastSpatial(),
-        label = "routing-card-scale",
-    )
-    val shadowAlpha by animateFloatAsState(
-        targetValue = if (isDragging) 1f else 0f,
-        animationSpec = AsteriskMotion.fastEffects(),
-        label = "routing-card-shadow",
-    )
+    val lift = animateDraggedCardLift(isDragging, label = "routing-card")
     Card(
         onClick = onEdit,
         modifier = modifier
             .heightIn(min = 120.dp)
-            .zIndex(if (isDragging) 1f else 0f)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .draggedCardShadow(
-                alpha = shadowAlpha,
-                color = MaterialTheme.colorScheme.primary,
-                cornerRadius = AsteriskShapeTokens.ListCardRadius,
-            )
+            .draggedCardLift(lift, cornerRadius = AsteriskShapeTokens.ListCardRadius)
             .alpha(if (displayedEnabled) 1f else 0.68f),
         shape = AsteriskShapeTokens.ListCard,
         colors = CardDefaults.cardColors(containerColor = containerColor),
@@ -613,28 +589,12 @@ private fun RouteRuleCard(
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(Icons.Rounded.MoreVert, stringResource(R.string.common_more))
                 }
-                DropdownMenu(
+                EditDeleteDropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.common_edit)) },
-                        leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onEdit()
-                        },
-                    )
-                    HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.common_delete)) },
-                        leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onDelete()
-                        },
-                    )
-                }
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                )
             }
         }
     }
@@ -1391,160 +1351,19 @@ private fun RouteLogicalChildrenCard(
     onEnabledChange: (SingBoxRouteRuleState, Boolean) -> Unit,
     onDelete: (SingBoxRouteRuleState) -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
-                    Text(
-                        text = stringResource(R.string.routing_conditions),
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    Text(
-                        text = pluralStringResource(
-                            R.plurals.routing_condition_count,
-                            rules.size,
-                            rules.size,
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(onClick = onAdd) {
-                    Icon(
-                        imageVector = Icons.Rounded.Add,
-                        contentDescription = stringResource(R.string.routing_add_condition),
-                    )
-                }
-            }
-
-            val listMotion = AsteriskMotion.effects<Float>()
-            AnimatedContent(
-                targetState = rules,
-                transitionSpec = AsteriskMotion.fadeThrough(listMotion),
-                contentKey = { visibleRules ->
-                    ruleEditorAnimatedListContentKey(visibleRules, SingBoxRouteRuleState::id)
-                },
-                label = "routing-logical-conditions",
-            ) { visibleRules ->
-                if (visibleRules.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.routing_conditions_empty),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 12.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        visibleRules.forEachIndexed { index, child ->
-                            RouteLogicalChildCard(
-                                rule = child,
-                                fallbackName = stringResource(
-                                    R.string.routing_condition_number,
-                                    index + 1,
-                                ),
-                                onEdit = { onEdit(child) },
-                                onEnabledChange = { enabled ->
-                                    onEnabledChange(child, enabled)
-                                },
-                                onDelete = { onDelete(child) },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RouteLogicalChildCard(
-    rule: SingBoxRouteRuleState,
-    fallbackName: String,
-    onEdit: () -> Unit,
-    onEnabledChange: (Boolean) -> Unit,
-    onDelete: () -> Unit,
-) {
-    var menuExpanded by remember { mutableStateOf(false) }
-    AsteriskExpressiveCard(
-        onClick = onEdit,
-        modifier = Modifier.fillMaxWidth().alpha(if (rule.enabled) 1f else 0.68f),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = if (rule.type == SingBoxRouteRuleTypeLogical) {
-                    Icons.Rounded.AccountTree
-                } else {
-                    Icons.Rounded.FilterAlt
-                },
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-            )
-            Column(
-                modifier = Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                Text(
-                    text = rule.remarks.takeIf(String::isNotBlank) ?: fallbackName,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = routeRuleMatchSummary(rule),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Switch(
-                checked = rule.enabled,
-                onCheckedChange = onEnabledChange,
-            )
-            Box {
-                IconButton(onClick = { menuExpanded = true }) {
-                    Icon(Icons.Rounded.MoreVert, stringResource(R.string.common_more))
-                }
-                DropdownMenu(
-                    expanded = menuExpanded,
-                    onDismissRequest = { menuExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.common_edit)) },
-                        leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onEdit()
-                        },
-                    )
-                    HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.common_delete)) },
-                        leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onDelete()
-                        },
-                    )
-                }
-            }
-        }
-    }
+    LogicalRuleConditionsCard(
+        rules = rules,
+        stableId = SingBoxRouteRuleState::id,
+        animationLabel = "routing-logical-conditions",
+        isEnabled = SingBoxRouteRuleState::enabled,
+        isLogical = { rule -> rule.type == SingBoxRouteRuleTypeLogical },
+        remarks = SingBoxRouteRuleState::remarks,
+        summary = { rule -> routeRuleMatchSummary(rule) },
+        onAdd = onAdd,
+        onEdit = onEdit,
+        onEnabledChange = onEnabledChange,
+        onDelete = onDelete,
+    )
 }
 
 @Composable

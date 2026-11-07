@@ -12,7 +12,8 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import java.io.ByteArrayOutputStream
-import java.util.Base64
+import utils.decodePaddedBase64OrNull
+import utils.encodeBase64
 
 /**
  * Mieru traffic pattern codec. Share links carry `traffic-pattern` as standard
@@ -30,12 +31,9 @@ internal fun decodeMieruTrafficPattern(raw: String): JsonObject? {
             ?: return null
         return (parsed["trafficPattern"] as? JsonObject) ?: parsed
     }
-    val bytes = runCatching {
-        // A '+' turns into a space when a link is query-decoded without escaping.
-        val normalized = text.replace(' ', '+').replace('-', '+').replace('_', '/')
-        val padded = normalized + "=".repeat((4 - normalized.length % 4) % 4)
-        Base64.getDecoder().decode(padded)
-    }.getOrNull() ?: return null
+    // A '+' turns into a space when a link is query-decoded without escaping.
+    val bytes = text.replace(' ', '+').replace('-', '+').replace('_', '/')
+        .decodePaddedBase64OrNull() ?: return null
     return runCatching { ProtoReader(bytes).readMessage(TrafficPatternSchema) }.getOrNull()
 }
 
@@ -43,7 +41,7 @@ internal fun decodeMieruTrafficPattern(raw: String): JsonObject? {
 internal fun encodeMieruTrafficPatternBase64(raw: String): String? {
     val pattern = decodeMieruTrafficPattern(raw) ?: return null
     val bytes = runCatching { encodeMessage(pattern, TrafficPatternSchema) }.getOrNull() ?: return null
-    return Base64.getEncoder().encodeToString(bytes)
+    return bytes.encodeBase64()
 }
 
 private sealed interface ProtoKind {

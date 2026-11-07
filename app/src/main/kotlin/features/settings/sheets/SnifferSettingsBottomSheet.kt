@@ -17,16 +17,16 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.R
 import engine.singbox.SingBoxSnifferProtocols
 import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.sanitizedSnifferProtocols
 import engine.singbox.sanitizedSnifferTimeout
 import features.settings.SnifferSettingsDraft
+import ui.components.AsteriskCancelButton
 import ui.components.AsteriskFilterChip
+import ui.components.AsteriskSaveButton
 import ui.components.singBoxOptionLabel
 import ui.theme.AsteriskMotion
 import ui.icons.AsteriskIcons as Icons
@@ -77,17 +77,13 @@ internal fun SnifferSettingsBottomSheet(
         show = show,
         title = stringResource(R.string.settings_sniffer),
         startAction = {
-            TextButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
+            AsteriskCancelButton(
                 enabled = !saving,
                 onClick = onDismissRequest,
             )
         },
         endAction = {
-            TextButton(
-                text = stringResource(R.string.common_save),
-                icon = Icons.Rounded.Save,
+            AsteriskSaveButton(
                 enabled = canSave && !saving,
                 onClick = {
                     if (canSave) onSave(draft.sanitized())
@@ -98,7 +94,7 @@ internal fun SnifferSettingsBottomSheet(
     ) {
         key(show) {
             SettingsSheetContent {
-                SnifferSheetSection(title = stringResource(R.string.settings_sniffer_section_behavior)) {
+                SettingsSheetSection(title = stringResource(R.string.settings_sniffer_section_behavior)) {
                     SwitchPreference(
                         title = stringResource(R.string.settings_sniffer_enable),
                         icon = Icons.Rounded.TravelExplore,
@@ -117,7 +113,7 @@ internal fun SnifferSettingsBottomSheet(
                     label = "sniffer-options",
                 ) {
                     Column {
-                        SnifferSheetSection(
+                        SettingsSheetSection(
                             title = stringResource(R.string.settings_sniffer_section_protocols),
                         ) {
                             Text(
@@ -172,7 +168,7 @@ internal fun SnifferSettingsBottomSheet(
                             }
                         }
 
-                        SnifferSheetSection(
+                        SettingsSheetSection(
                             title = stringResource(R.string.settings_sniffer_section_timing),
                         ) {
                             Text(
@@ -208,26 +204,6 @@ internal fun SnifferSettingsBottomSheet(
                 }
             }
         }
-    }
-}
-
-@Composable
-internal fun SnifferSheetSection(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth(),
-    ) {
-        Text(
-            text = title,
-            color = MaterialTheme.colorScheme.primary,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-        content()
     }
 }
 

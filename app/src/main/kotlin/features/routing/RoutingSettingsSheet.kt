@@ -33,9 +33,10 @@ import features.settings.SettingsSwitchRow
 import features.settings.sheets.SettingsSheetContent
 import features.settings.sheets.SettingsTextField
 import app.R
-import ui.components.AsteriskActionButton
+import ui.components.AsteriskCancelButton
 import ui.components.AsteriskFilterChip
 import ui.components.AsteriskModalBottomSheet
+import ui.components.AsteriskSaveButton
 import ui.components.singBoxOptionLabel
 import ui.icons.AsteriskIcons as Icons
 import ui.theme.AsteriskMotion
@@ -77,17 +78,13 @@ internal fun RoutingSettingsSheet(
         onDismissRequest = onDismiss,
         title = stringResource(R.string.routing_settings_title),
         startAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
+            AsteriskCancelButton(
                 enabled = !saving,
                 onClick = onDismiss,
             )
         },
         endAction = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_save),
-                icon = Icons.Rounded.Save,
+            AsteriskSaveButton(
                 enabled = fallbackDelayValid && !saving,
                 onClick = { onSave(draft.sanitized()) },
             )

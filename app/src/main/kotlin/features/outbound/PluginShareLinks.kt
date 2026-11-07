@@ -10,8 +10,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.net.URI
-import java.net.URLDecoder
-import java.net.URLEncoder
+import utils.booleanOrFalse
+import utils.decodeUrlComponentPreservingPlus
+import utils.encodeUrlComponent
+import utils.intOrZero
+import utils.stringOrEmpty
 
 /**
  * Share links of the plugin-backed protocols. Formats follow husi:
@@ -32,15 +35,15 @@ internal fun parsePluginShareLink(link: String): JsonObject? {
     // Split on ':' before decoding: ':' inside a credential is percent-encoded
     // by the encoder, so decoding first would split at the wrong place.
     val rawUserInfo = uri.rawUserInfo.orEmpty()
-    val username = decode(rawUserInfo.substringBefore(':', ""))
-    val password = decode(rawUserInfo.substringAfter(':', ""))
+    val username = rawUserInfo.substringBefore(':', "").decodeUrlComponentPreservingPlus()
+    val password = rawUserInfo.substringAfter(':', "").decodeUrlComponentPreservingPlus()
     val port = if (uri.port == -1) {
         443
     } else {
         require(uri.port in 1..65535) { "invalid port" }
         uri.port
     }
-    val fragment = decode(uri.rawFragment.orEmpty())
+    val fragment = uri.rawFragment.orEmpty().decodeUrlComponentPreservingPlus()
     return when (scheme) {
         "mierus" -> buildJsonObject {
             put("type", "mieru")
@@ -109,9 +112,9 @@ internal fun parsePluginShareLink(link: String): JsonObject? {
 }
 
 internal fun encodePluginShareUrl(type: String, outbound: JsonObject, remarks: String): String? {
-    val server = outbound.stringValue("server").removeSurrounding("[", "]")
+    val server = outbound.stringOrEmpty("server").removeSurrounding("[", "]")
     if (server.isBlank()) return null
-    val port = outbound.intValue("server_port").takeIf { it > 0 } ?: 443
+    val port = outbound.intOrZero("server_port").takeIf { it > 0 } ?: 443
     val hostPart = if (server.contains(':')) "[$server]" else server
     return when (type) {
         // Official mieru simple link: port and protocol are query parameters,
@@ -120,22 +123,22 @@ internal fun encodePluginShareUrl(type: String, outbound: JsonObject, remarks: S
         // older AsteriskBOX builds that only read it there.
         "mieru" -> buildString {
             append("mierus://")
-            append(encode(outbound.stringValue("username")))
+            append(outbound.stringOrEmpty("username").encodeUrlComponent())
             append(':')
-            append(encode(outbound.stringValue("password")))
+            append(outbound.stringOrEmpty("password").encodeUrlComponent())
             append('@')
             append(hostPart)
             append(':')
             append(port)
             val params = buildList {
-                outbound.intValue("mtu").takeIf { it > 0 }?.let { add("mtu" to it.toString()) }
-                mieruMultiplexingLevel(outbound.stringValue("multiplexing"))?.let { level ->
+                outbound.intOrZero("mtu").takeIf { it > 0 }?.let { add("mtu" to it.toString()) }
+                mieruMultiplexingLevel(outbound.stringOrEmpty("multiplexing"))?.let { level ->
                     add("multiplexing" to level)
                 }
                 add("port" to port.toString())
                 add("profile" to remarks.ifBlank { "default" })
-                add("protocol" to outbound.stringValue("protocol").ifBlank { "TCP" }.uppercase())
-                outbound.stringValue("traffic_pattern").takeIf(String::isNotBlank)?.let { raw ->
+                add("protocol" to outbound.stringOrEmpty("protocol").ifBlank { "TCP" }.uppercase())
+                outbound.stringOrEmpty("traffic_pattern").takeIf(String::isNotBlank)?.let { raw ->
                     add("traffic-pattern" to (encodeMieruTrafficPatternBase64(raw) ?: raw))
                 }
             }
@@ -143,61 +146,61 @@ internal fun encodePluginShareUrl(type: String, outbound: JsonObject, remarks: S
         }
 
         "shadowquic" -> {
-            if (outbound.stringValue("sub_protocol").equals("sunnyquic", ignoreCase = true)) {
+            if (outbound.stringOrEmpty("sub_protocol").equals("sunnyquic", ignoreCase = true)) {
                 return null
             }
             buildString {
                 append("sq://")
-                append(encode(outbound.stringValue("username")))
+                append(outbound.stringOrEmpty("username").encodeUrlComponent())
                 append(':')
-                append(encode(outbound.stringValue("password")))
+                append(outbound.stringOrEmpty("password").encodeUrlComponent())
                 append('@')
                 append(hostPart)
                 append(':')
                 append(port)
-                val mtu = outbound.intValue("initial_mtu").takeIf { it > 0 } ?: 1280
+                val mtu = outbound.intOrZero("initial_mtu").takeIf { it > 0 } ?: 1280
                 val params = buildList {
-                    add("sni" to outbound.stringValue("server_name").ifBlank { server })
+                    add("sni" to outbound.stringOrEmpty("server_name").ifBlank { server })
                     add(
-                        "udp_mode" to if (outbound.booleanValue("udp_over_stream")) {
+                        "udp_mode" to if (outbound.booleanOrFalse("udp_over_stream")) {
                             "stream"
                         } else {
                             "datagram"
                         },
                     )
-                    if (outbound.booleanValue("zero_rtt")) add("zero_rtt" to "true")
-                    outbound.stringValue("congestion_control")
+                    if (outbound.booleanOrFalse("zero_rtt")) add("zero_rtt" to "true")
+                    outbound.stringOrEmpty("congestion_control")
                         .takeIf { it.isNotBlank() && it != "brutal" }
                         ?.let { add("congestion" to it) }
                     add("mtu" to mtu.toString())
-                    outbound.stringValue("alpn").takeIf(String::isNotBlank)?.let { add("alpn" to it) }
+                    outbound.stringOrEmpty("alpn").takeIf(String::isNotBlank)?.let { add("alpn" to it) }
                 }
                 appendQuery(params)
-                if (remarks.isNotBlank()) append('#').append(encode(remarks))
+                if (remarks.isNotBlank()) append('#').append(remarks.encodeUrlComponent())
             }
         }
 
         "juicity" -> buildString {
             append("juicity://")
-            append(encode(outbound.stringValue("uuid")))
+            append(outbound.stringOrEmpty("uuid").encodeUrlComponent())
             append(':')
-            append(encode(outbound.stringValue("password")))
+            append(outbound.stringOrEmpty("password").encodeUrlComponent())
             append('@')
             append(hostPart)
             append(':')
             append(port)
             val params = buildList {
-                outbound.stringValue("sni").takeIf(String::isNotBlank)?.let { add("sni" to it) }
-                if (outbound.booleanValue("allow_insecure")) add("allow_insecure" to "1")
-                outbound.stringValue("pin_sha256").takeIf(String::isNotBlank)?.let {
+                outbound.stringOrEmpty("sni").takeIf(String::isNotBlank)?.let { add("sni" to it) }
+                if (outbound.booleanOrFalse("allow_insecure")) add("allow_insecure" to "1")
+                outbound.stringOrEmpty("pin_sha256").takeIf(String::isNotBlank)?.let {
                     add("pinned_certchain_sha256" to it)
                 }
-                outbound.stringValue("congestion_control").takeIf(String::isNotBlank)?.let {
+                outbound.stringOrEmpty("congestion_control").takeIf(String::isNotBlank)?.let {
                     add("congestion_control" to it)
                 }
             }
             appendQuery(params)
-            if (remarks.isNotBlank()) append('#').append(encode(remarks))
+            if (remarks.isNotBlank()) append('#').append(remarks.encodeUrlComponent())
         }
 
         else -> null
@@ -207,7 +210,7 @@ internal fun encodePluginShareUrl(type: String, outbound: JsonObject, remarks: S
 private fun StringBuilder.appendQuery(params: List<Pair<String, String>>) {
     if (params.isEmpty()) return
     append('?')
-    append(params.joinToString("&") { (key, value) -> "$key=${encode(value)}" })
+    append(params.joinToString("&") { (key, value) -> "$key=${value.encodeUrlComponent()}" })
 }
 
 private fun parsePluginQuery(rawQuery: String?): Map<String, String> = parsePluginQueryPairs(rawQuery).toMap()
@@ -218,8 +221,8 @@ private fun parsePluginQueryPairs(rawQuery: String?): List<Pair<String, String>>
     return rawQuery.split('&')
         .mapNotNull { item ->
             if (item.isBlank()) return@mapNotNull null
-            val key = decode(item.substringBefore('='))
-            val value = decode(item.substringAfter('=', ""))
+            val key = item.substringBefore('=').decodeUrlComponentPreservingPlus()
+            val value = item.substringAfter('=', "").decodeUrlComponentPreservingPlus()
             key to value
         }
 }
@@ -239,9 +242,3 @@ private fun mieruMuxLevel(value: String): String = when (mieruMultiplexingLevel(
     "MULTIPLEXING_HIGH" -> "HIGH"
     else -> ""
 }
-
-private fun encode(value: String): String =
-    URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
-
-private fun decode(value: String): String =
-    runCatching { URLDecoder.decode(value, Charsets.UTF_8.name()) }.getOrDefault(value)

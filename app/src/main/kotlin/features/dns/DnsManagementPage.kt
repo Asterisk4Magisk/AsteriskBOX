@@ -7,7 +7,6 @@ import engine.singbox.config.DnsConfigurationServerTypes
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,9 +25,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,14 +41,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import app.AppState
 import app.LocalAppServices
 import app.LocalAppStateStore
@@ -88,8 +82,10 @@ import kotlinx.coroutines.withContext
 import app.R
 import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskInfoChip
+import ui.components.EditDeleteDropdownMenu
 import ui.components.WarningConfirmDialog
-import ui.components.draggedCardShadow
+import ui.components.animateDraggedCardLift
+import ui.components.draggedCardLift
 import ui.components.rememberReorderPreview
 import ui.components.reorderByIds
 import ui.components.longPressReorderDragHandle
@@ -534,30 +530,12 @@ private fun DnsRuleCard(
         animationSpec = AsteriskMotion.effects(),
         label = "dns-rule-card-color",
     )
-    val scale by animateFloatAsState(
-        targetValue = if (isDragging) 1.025f else 1f,
-        animationSpec = AsteriskMotion.fastSpatial(),
-        label = "dns-rule-card-scale",
-    )
-    val shadowAlpha by animateFloatAsState(
-        targetValue = if (isDragging) 1f else 0f,
-        animationSpec = AsteriskMotion.fastEffects(),
-        label = "dns-rule-card-shadow",
-    )
+    val lift = animateDraggedCardLift(isDragging, label = "dns-rule-card")
     Card(
         onClick = onEdit,
         modifier = modifier
             .heightIn(min = 120.dp)
-            .zIndex(if (isDragging) 1f else 0f)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .draggedCardShadow(
-                alpha = shadowAlpha,
-                color = MaterialTheme.colorScheme.primary,
-                cornerRadius = AsteriskShapeTokens.ListCardRadius,
-            )
+            .draggedCardLift(lift, cornerRadius = AsteriskShapeTokens.ListCardRadius)
             .alpha(if (displayedEnabled) 1f else 0.68f),
         shape = AsteriskShapeTokens.ListCard,
         colors = CardDefaults.cardColors(containerColor = containerColor),
@@ -616,28 +594,12 @@ private fun DnsRuleCard(
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(Icons.Rounded.MoreVert, stringResource(R.string.common_more))
                 }
-                DropdownMenu(
+                EditDeleteDropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.common_edit)) },
-                        leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onEdit()
-                        },
-                    )
-                    HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.common_delete)) },
-                        leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onDelete()
-                        },
-                    )
-                }
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                )
             }
         }
     }

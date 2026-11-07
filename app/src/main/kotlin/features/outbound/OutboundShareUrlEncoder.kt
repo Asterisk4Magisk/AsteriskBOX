@@ -13,6 +13,11 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlin.io.encoding.Base64
+import utils.booleanOrFalse
+import utils.intOrZero
+import utils.objectValue
+import utils.stringListValue
+import utils.stringOrEmpty
 
 internal fun encodeOutboundShareUrl(
     json: String,
@@ -21,7 +26,7 @@ internal fun encodeOutboundShareUrl(
     val outbound = requireNotNull(SingBoxJson.parseToJsonElement(json) as? JsonObject) {
         "Outbound must be a JSON object"
     }
-    val type = outbound.stringValue("type")
+    val type = outbound.stringOrEmpty("type")
     require(type.isNotBlank()) { "Outbound type is required" }
     val url = encodeStandardOutboundShareUrl(type, outbound, remarks)
         ?: encodeV2RayOutboundShareUrl(type, outbound, remarks)
@@ -57,8 +62,8 @@ internal fun OutboundShareTls.requireOnlyShareParameters(
 }
 
 internal fun JsonObject.requireShareEndpoint(): OutboundShareEndpoint {
-    val host = stringValue("server").removeSurrounding("[", "]")
-    val port = intValue("server_port")
+    val host = stringOrEmpty("server").removeSurrounding("[", "]")
+    val port = intOrZero("server_port")
     require(host.isNotBlank()) { "Outbound server is required" }
     require(port in 1..65535) { "Outbound server port is invalid" }
     return OutboundShareEndpoint(host, port)
@@ -78,31 +83,6 @@ internal fun JsonObject.requireOnlyNestedShareFields(vararg allowed: String) {
         name !in accepted && value.isMeaningfulShareValue()
     }
     require(unsupported == null) { "Unsupported nested outbound field: ${unsupported?.key}" }
-}
-
-internal fun JsonObject.stringValue(name: String): String =
-    (get(name) as? JsonPrimitive)?.contentOrNull.orEmpty()
-
-internal fun JsonObject.intValue(name: String): Int {
-    val primitive = get(name) as? JsonPrimitive ?: return 0
-    return primitive.intOrNull ?: primitive.contentOrNull?.toIntOrNull() ?: 0
-}
-
-internal fun JsonObject.booleanValue(name: String): Boolean {
-    val primitive = get(name) as? JsonPrimitive ?: return false
-    return primitive.booleanOrNull ?: primitive.contentOrNull.let { value ->
-        value == "1" || value.equals("true", ignoreCase = true)
-    }
-}
-
-internal fun JsonObject.objectValue(name: String): JsonObject? = get(name) as? JsonObject
-
-internal fun JsonObject.stringListValue(name: String): List<String> = when (val value = get(name)) {
-    is JsonArray -> value.mapNotNull { item ->
-        (item as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
-    }
-    is JsonPrimitive -> value.contentOrNull?.takeIf(String::isNotBlank)?.let(::listOf).orEmpty()
-    else -> emptyList()
 }
 
 internal fun JsonElement?.isMeaningfulShareValue(): Boolean = when (this) {
@@ -132,7 +112,7 @@ internal fun JsonObject.readShareTls(required: Boolean): OutboundShareTls {
         "reality",
         "ech",
     )
-    val enabled = tls.booleanValue("enabled")
+    val enabled = tls.booleanOrFalse("enabled")
     require(enabled || !tls.hasMeaningfulFieldBesides("enabled")) {
         "Disabled TLS contains connection options"
     }
@@ -140,35 +120,35 @@ internal fun JsonObject.readShareTls(required: Boolean): OutboundShareTls {
     if (!enabled) return OutboundShareTls(false, false, emptyList())
 
     val parameters = mutableListOf<Pair<String, String>>()
-    tls.stringValue("server_name").takeIf(String::isNotBlank)?.let { parameters += "sni" to it }
-    if (tls.booleanValue("insecure")) parameters += "insecure" to "1"
+    tls.stringOrEmpty("server_name").takeIf(String::isNotBlank)?.let { parameters += "sni" to it }
+    if (tls.booleanOrFalse("insecure")) parameters += "insecure" to "1"
     tls.stringListValue("alpn").takeIf(List<String>::isNotEmpty)?.let { values ->
         parameters += "alpn" to values.joinToString(",")
     }
 
     tls.objectValue("utls")?.let { utls ->
         utls.requireOnlyNestedShareFields("enabled", "fingerprint")
-        val utlsEnabled = utls.booleanValue("enabled")
+        val utlsEnabled = utls.booleanOrFalse("enabled")
         require(utlsEnabled || !utls.hasMeaningfulFieldBesides("enabled")) {
             "Disabled uTLS contains connection options"
         }
         if (utlsEnabled) {
-            parameters += "fp" to utls.stringValue("fingerprint").ifBlank { "chrome" }
+            parameters += "fp" to utls.stringOrEmpty("fingerprint").ifBlank { "chrome" }
         }
     }
 
     var realityEnabled = false
     tls.objectValue("reality")?.let { reality ->
         reality.requireOnlyNestedShareFields("enabled", "public_key", "short_id")
-        realityEnabled = reality.booleanValue("enabled")
+        realityEnabled = reality.booleanOrFalse("enabled")
         require(realityEnabled || !reality.hasMeaningfulFieldBesides("enabled")) {
             "Disabled REALITY contains connection options"
         }
         if (realityEnabled) {
-            val publicKey = reality.stringValue("public_key")
+            val publicKey = reality.stringOrEmpty("public_key")
             require(publicKey.isNotBlank()) { "REALITY public key is required" }
             parameters += "pbk" to publicKey
-            reality.stringValue("short_id").takeIf(String::isNotBlank)?.let {
+            reality.stringOrEmpty("short_id").takeIf(String::isNotBlank)?.let {
                 parameters += "sid" to it
             }
         }
@@ -176,7 +156,7 @@ internal fun JsonObject.readShareTls(required: Boolean): OutboundShareTls {
 
     tls.objectValue("ech")?.let { ech ->
         ech.requireOnlyNestedShareFields("enabled", "config")
-        val echEnabled = ech.booleanValue("enabled")
+        val echEnabled = ech.booleanOrFalse("enabled")
         require(echEnabled || !ech.hasMeaningfulFieldBesides("enabled")) {
             "Disabled ECH contains connection options"
         }

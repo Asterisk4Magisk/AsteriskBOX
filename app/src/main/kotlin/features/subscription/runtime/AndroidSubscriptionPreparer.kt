@@ -18,6 +18,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import utils.decodeContentDispositionFilename
+import utils.encodeBase64
 import utils.runCancellableHttpRequest
 import java.net.HttpURLConnection
 import java.net.URI
@@ -25,7 +26,6 @@ import java.nio.charset.StandardCharsets
 import kage.Age
 import kage.crypto.x25519.X25519Identity
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.io.encoding.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -292,8 +292,7 @@ internal fun applySubscriptionRequestHeaders(
 
 private fun AndroidSubscriptionProxy.basicAuthorizationOrNull(): String? {
     if (username.isBlank() && password.isBlank()) return null
-    val credentials = "$username:$password".toByteArray(StandardCharsets.UTF_8)
-    return "Basic ${Base64.Default.encode(credentials)}"
+    return "Basic ${"$username:$password".encodeBase64()}"
 }
 
 private fun String?.toSubscriptionInfo(): SubscriptionInfo {

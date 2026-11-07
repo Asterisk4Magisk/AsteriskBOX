@@ -49,6 +49,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import app.R
 import ui.clipboard.setPlainText
+import ui.components.AsteriskCancelButton
 import ui.components.AsteriskSearchTopAppBar
 import ui.components.AsteriskTopBarControls
 import ui.components.AsteriskActionButton
@@ -289,9 +290,7 @@ private fun LogViewerPage(
                 title = { Text(stringResource(R.string.logs_clear_title)) },
                 text = { Text(stringResource(R.string.logs_clear_message)) },
                 dismissButton = {
-                    AsteriskActionButton(
-                        text = stringResource(R.string.common_cancel),
-                        icon = Icons.Rounded.Close,
+                    AsteriskCancelButton(
                         onClick = { confirmClear = false },
                     )
                 },

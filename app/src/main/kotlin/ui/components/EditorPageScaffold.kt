@@ -64,9 +64,7 @@ internal fun EditorPageScaffold(
             }
             val editorActions: @Composable RowScope.() -> Unit = {
                 actions()
-                AsteriskActionButton(
-                    text = stringResource(R.string.common_save),
-                    icon = Icons.Rounded.Save,
+                AsteriskSaveButton(
                     onClick = onSave,
                     enabled = state.saveEnabled,
                     loading = saving,

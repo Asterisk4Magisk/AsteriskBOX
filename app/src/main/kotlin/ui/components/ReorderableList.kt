@@ -119,25 +119,7 @@ internal fun Modifier.longPressReorderDragHandle(
     state: AsteriskReorderableLazyGridState,
     onDragStarted: () -> Unit = {},
     onDragStopped: () -> Unit = {},
-): Modifier {
-    val gesture = remember { ReorderGesture() }
-    val currentStart by rememberUpdatedState(onDragStarted)
-    val currentStop by rememberUpdatedState(onDragStopped)
-    return with(scope) {
-        this@longPressReorderDragHandle.consumeReorderRelease(gesture, enabled).longPressDraggableHandle(
-            enabled = enabled,
-            onDragStarted = {
-                gesture.started = true
-                state.hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                currentStart()
-            },
-            onDragStopped = {
-                state.hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureEnd)
-                currentStop()
-            },
-        )
-    }
-}
+): Modifier = longPressReorderDragHandle(scope, enabled, state.hapticFeedback, onDragStarted, onDragStopped)
 
 @Composable
 internal fun Modifier.longPressReorderDragHandle(
@@ -146,6 +128,15 @@ internal fun Modifier.longPressReorderDragHandle(
     state: AsteriskReorderableLazyListState,
     onDragStarted: () -> Unit = {},
     onDragStopped: () -> Unit = {},
+): Modifier = longPressReorderDragHandle(scope, enabled, state.hapticFeedback, onDragStarted, onDragStopped)
+
+@Composable
+private fun Modifier.longPressReorderDragHandle(
+    scope: ReorderableCollectionItemScope,
+    enabled: Boolean,
+    hapticFeedback: HapticFeedback,
+    onDragStarted: () -> Unit,
+    onDragStopped: () -> Unit,
 ): Modifier {
     val gesture = remember { ReorderGesture() }
     val currentStart by rememberUpdatedState(onDragStarted)
@@ -155,11 +146,11 @@ internal fun Modifier.longPressReorderDragHandle(
             enabled = enabled,
             onDragStarted = {
                 gesture.started = true
-                state.hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                 currentStart()
             },
             onDragStopped = {
-                state.hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureEnd)
+                hapticFeedback.performHapticFeedback(HapticFeedbackType.GestureEnd)
                 currentStop()
             },
         )

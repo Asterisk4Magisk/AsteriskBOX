@@ -19,6 +19,8 @@ import app.R
 import engine.singbox.EbpfDnsModes
 import engine.singbox.EbpfSharedDataPlanes
 import features.settings.SettingsSearchProvider
+import ui.components.AsteriskCancelButton
+import ui.components.AsteriskSaveButton
 import ui.components.StringListEditor
 import ui.icons.AsteriskIcons as Icons
 import ui.text.formatTemplate
@@ -61,16 +63,12 @@ internal fun TunSharedNetworkBottomSheet(
         show = show,
         title = stringResource(R.string.settings_tun_shared_network),
         startAction = {
-            TextButton(
-                text = stringResource(R.string.common_cancel),
-                icon = Icons.Rounded.Close,
+            AsteriskCancelButton(
                 onClick = onDismissRequest,
             )
         },
         endAction = {
-            TextButton(
-                text = stringResource(R.string.common_save),
-                icon = Icons.Rounded.Save,
+            AsteriskSaveButton(
                 onClick = { onSave(normalizedInterfaces, ebpfSharedDataPlane, ebpfSharedDnsMode) },
                 enabled = canSave,
             )

@@ -4,16 +4,12 @@
 package engine.singbox.config
 
 import android.content.Context
-import android.os.Process
 import app.AppState
 import app.withCompatibleProxyAppListMode
 import app.modes.ProxyAppListModeBlacklist
 import app.modes.ProxyAppListModeGlobal
 import app.modes.ProxyAppListModeWhitelist
-import system.ANDROID_USER_UID_RANGE
-import system.getApplicationInfoCompat
-import system.toAndroidAppId
-import system.toAndroidUserId
+import engine.root.config.resolveRootProxyApplicationUids
 import utils.toTrimmedNonEmptyDistinctList
 
 internal const val SingBoxTunDevice = "asterisk0"
@@ -46,7 +42,7 @@ internal fun Context.resolveRootInboundUidPolicy(appState: AppState): RootInboun
     val resolvedUids = if (mode == ProxyAppListModeGlobal) {
         emptyList()
     } else {
-        resolveApplicationUids(selectedAppKeys)
+        resolveRootProxyApplicationUids(selectedAppKeys)
     }
     return buildRootInboundUidPolicy(mode, resolvedUids)
 }
@@ -59,21 +55,6 @@ private fun Int.toSupportedProxyAppListMode(): Int = when (this) {
     ProxyAppListModeGlobal,
     -> this
     else -> ProxyAppListModeGlobal
-}
-
-private fun Context.resolveApplicationUids(packageKeys: List<String>): List<Int> {
-    val defaultUserId = Process.myUid().toAndroidUserId()
-    val appIds = mutableMapOf<String, Int?>()
-    return packageKeys.mapNotNull { key ->
-        val separator = key.indexOf(':')
-        val packageName = key.substring(separator + 1).trim().takeIf(String::isNotEmpty) ?: return@mapNotNull null
-        val userId = if (separator < 0) defaultUserId else key.substring(0, separator).toIntOrNull()
-            ?: return@mapNotNull null
-        val appId = appIds.getOrPut(packageName) {
-            runCatching { packageManager.getApplicationInfoCompat(packageName).uid.toAndroidAppId() }.getOrNull()
-        } ?: return@mapNotNull null
-        userId * ANDROID_USER_UID_RANGE + appId
-    }.distinct()
 }
 
 internal fun isSingBoxSharedNetworkInterface(value: String): Boolean =

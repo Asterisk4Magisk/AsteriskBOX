@@ -78,6 +78,7 @@ import kotlinx.coroutines.withContext
 import app.R
 import ui.clipboard.getPlainText
 import ui.clipboard.setPlainText
+import ui.components.EditDeleteDropdownMenu
 import ui.components.WarningConfirmDialog
 import ui.components.singBoxOptionLabel
 import ui.layout.pageContentPaddingWithCutout
@@ -469,32 +470,19 @@ private fun EndpointCard(
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(Icons.Rounded.MoreVert, stringResource(R.string.common_more))
                 }
-                DropdownMenu(
+                EditDeleteDropdownMenu(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false },
+                    onEdit = onEdit,
+                    onDelete = onDelete,
+                    showDividerBeforeDelete = false,
                 ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.common_edit)) },
-                        leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onEdit()
-                        },
-                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.common_copy)) },
                         leadingIcon = { Icon(Icons.Rounded.ContentCopy, contentDescription = null) },
                         onClick = {
                             menuExpanded = false
                             onCopy()
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.common_delete)) },
-                        leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
-                        onClick = {
-                            menuExpanded = false
-                            onDelete()
                         },
                     )
                 }

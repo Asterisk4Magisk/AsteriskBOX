@@ -10,7 +10,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,7 +61,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -79,7 +77,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import app.LocalAppServices
 import app.LocalAppStateStore
 import app.LocalIsWideScreen
@@ -122,12 +119,13 @@ import app.R
 import sh.calvin.reorderable.ReorderableItem
 import ui.clipboard.getPlainText
 import ui.clipboard.setPlainText
+import ui.components.animateDraggedCardLift
+import ui.components.draggedCardLift
 import ui.isInDarkTheme
 import ui.components.AsteriskExpressiveCard
 import ui.components.AsteriskFilterChip
 import ui.components.AsteriskInfoChip
 import ui.components.WarningConfirmDialog
-import ui.components.draggedCardShadow
 import ui.components.rememberReorderPreview
 import ui.components.longPressReorderDragHandle
 import ui.components.rememberAsteriskReorderableLazyGridState
@@ -1100,31 +1098,13 @@ private fun OutboundCard(
         animationSpec = AsteriskMotion.effects(),
         label = "outbound-card-color",
     )
-    val scale by animateFloatAsState(
-        targetValue = if (isDragging) 1.025f else 1f,
-        animationSpec = AsteriskMotion.fastSpatial(),
-        label = "outbound-drag-scale",
-    )
-    val shadowAlpha by animateFloatAsState(
-        targetValue = if (isDragging) 1f else 0f,
-        animationSpec = AsteriskMotion.fastEffects(),
-        label = "outbound-drag-shadow",
-    )
+    val lift = animateDraggedCardLift(isDragging, label = "outbound-drag")
     AsteriskExpressiveCard(
         onClick = onEdit,
         modifier = modifier
             .fillMaxWidth()
             .height(if (compact) OutboundCompactCardHeight else OutboundCardHeight)
-            .zIndex(if (isDragging) 1f else 0f)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .draggedCardShadow(
-                alpha = shadowAlpha,
-                color = MaterialTheme.colorScheme.primary,
-                cornerRadius = AsteriskShapeTokens.PageCardRadius,
-            ),
+            .draggedCardLift(lift, cornerRadius = AsteriskShapeTokens.PageCardRadius),
         containerColor = containerColor,
     ) {
         Column(

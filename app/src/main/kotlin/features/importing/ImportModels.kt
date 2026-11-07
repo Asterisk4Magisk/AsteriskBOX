@@ -39,6 +39,21 @@ internal data class ImportIssue(
     val message: String,
 )
 
+/** An [ImportIssueSeverity.ERROR] found while parsing one import candidate. */
+internal fun importParseError(
+    reason: ImportIssueReason,
+    sourceIndex: Int?,
+    message: String,
+    detectedType: String? = null,
+): ImportIssue = ImportIssue(
+    reason = reason,
+    severity = ImportIssueSeverity.ERROR,
+    stage = ImportStage.PARSE,
+    sourceIndex = sourceIndex,
+    detectedType = detectedType,
+    message = message,
+)
+
 internal enum class ImportMutationCode {
     DUPLICATE_SKIPPED,
     IGNORED_FIELD,

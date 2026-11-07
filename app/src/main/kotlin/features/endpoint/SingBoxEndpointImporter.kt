@@ -24,6 +24,7 @@ import features.importing.ImportStage
 import features.importing.IndexedImportCandidate
 import features.importing.deduplicateImportCandidates
 import features.importing.importFingerprint
+import features.importing.importParseError
 import features.importing.requireImportCandidateCount
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -31,6 +32,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import utils.hasNonBlankString
+import utils.stringOrNull
 
 internal data class ImportedSingBoxEndpoint(
     val sourceIndex: Int? = null,
@@ -112,28 +115,28 @@ internal object SingBoxEndpointImporter {
         val imported = endpoints.mapIndexedNotNull { index, item ->
             val endpoint = item as? JsonObject
             if (endpoint == null) {
-                issues += endpointIssue(
-                    index,
-                    ImportIssueReason.INVALID_ENTRY,
-                    "Endpoint entry must be a JSON object",
+                issues += importParseError(
+                    reason = ImportIssueReason.INVALID_ENTRY,
+                    sourceIndex = index,
+                    message = "Endpoint entry must be a JSON object",
                 )
                 return@mapIndexedNotNull null
             }
-            val type = endpoint.stringField("type")
+            val type = endpoint.stringOrNull("type")
             if (type.isNullOrBlank()) {
-                issues += endpointIssue(
-                    index,
-                    ImportIssueReason.INVALID_FIELD,
-                    "Endpoint entry has no type",
+                issues += importParseError(
+                    reason = ImportIssueReason.INVALID_FIELD,
+                    sourceIndex = index,
+                    message = "Endpoint entry has no type",
                 )
                 return@mapIndexedNotNull null
             }
             if (type !in SupportedSingBoxEndpointTypes) {
-                issues += endpointIssue(
-                    index,
-                    ImportIssueReason.UNSUPPORTED_TYPE,
-                    "Endpoint type is not supported",
-                    type,
+                issues += importParseError(
+                    reason = ImportIssueReason.UNSUPPORTED_TYPE,
+                    sourceIndex = index,
+                    message = "Endpoint type is not supported",
+                    detectedType = type,
                 )
                 return@mapIndexedNotNull null
             }
@@ -142,14 +145,14 @@ internal object SingBoxEndpointImporter {
                     buildJsonObject { put("endpoints", JsonArray(listOf(endpoint))) },
                 )
             }.onFailure {
-                issues += endpointIssue(
-                    index,
-                    ImportIssueReason.UNSUPPORTED_OPTION,
-                    "Endpoint entry uses deprecated or unsupported options",
-                    type,
+                issues += importParseError(
+                    reason = ImportIssueReason.UNSUPPORTED_OPTION,
+                    sourceIndex = index,
+                    message = "Endpoint entry uses deprecated or unsupported options",
+                    detectedType = type,
                 )
             }.getOrNull() ?: return@mapIndexedNotNull null
-            val sourceTag = endpoint.stringField("tag")?.trim().orEmpty()
+            val sourceTag = endpoint.stringOrNull("tag")?.trim().orEmpty()
             val remarks = sourceTag
                 .takeUnless(::isManagedSingBoxTag)
                 ?.takeIf(String::isNotBlank)
@@ -179,20 +182,6 @@ internal object SingBoxEndpointImporter {
         )
     }
 }
-
-private fun endpointIssue(
-    sourceIndex: Int,
-    reason: ImportIssueReason,
-    message: String,
-    detectedType: String? = null,
-) = ImportIssue(
-    reason = reason,
-    severity = ImportIssueSeverity.ERROR,
-    stage = ImportStage.PARSE,
-    sourceIndex = sourceIndex,
-    detectedType = detectedType,
-    message = message,
-)
 
 internal fun AppState.withImportedEndpoints(
     imported: List<ImportedSingBoxEndpoint>,
@@ -298,7 +287,7 @@ internal fun AppState.planEndpointImport(
         val targetJson = SingBoxJson.parseToJsonElement(target.json) as? JsonObject
             ?: return@flatMap emptyList()
         buildList {
-            if (sourceJson.nonBlankString("detour") && !targetJson.nonBlankString("detour")) {
+            if (sourceJson.hasNonBlankString("detour") && !targetJson.hasNonBlankString("detour")) {
                 add(
                     ImportMutation(
                         code = ImportMutationCode.REMOVED_DETOUR,
@@ -308,8 +297,8 @@ internal fun AppState.planEndpointImport(
                 )
             }
             if (
-                sourceJson.nonBlankString("domain_resolver") &&
-                !targetJson.nonBlankString("domain_resolver")
+                sourceJson.hasNonBlankString("domain_resolver") &&
+                !targetJson.hasNonBlankString("domain_resolver")
             ) {
                 add(
                     ImportMutation(
@@ -336,9 +325,6 @@ internal fun AppState.planEndpointImport(
     )
 }
 
-private fun JsonObject.nonBlankString(field: String): Boolean =
-    (get(field) as? JsonPrimitive)?.contentOrNull?.isNotBlank() == true
-
 private fun MutableMap<String, JsonElement>.rewriteManagedReference(
     field: String,
     importedTagMap: Map<String, String>,
@@ -353,5 +339,3 @@ private fun MutableMap<String, JsonElement>.rewriteManagedReference(
     }
 }
 
-private fun JsonObject.stringField(name: String): String? =
-    (get(name) as? JsonPrimitive)?.contentOrNull
