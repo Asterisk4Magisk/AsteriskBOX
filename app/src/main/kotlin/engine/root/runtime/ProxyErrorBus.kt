@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * suggested actions, and is empty unless the error matched a rule confirmed on real hardware.
  *
  * Produced by [RootEbpfFailureAnalyzer]; UI hosts consume [ProxyErrorBus] and render the
- * explanation via [features.singbox.ProxyErrorDialog].
+ * explanation via [features.proxy.ProxyErrorDialog].
  */
 internal data class ProxyErrorExplanation(
     val mode: String,

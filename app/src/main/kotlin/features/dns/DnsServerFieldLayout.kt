@@ -1,7 +1,7 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-package features.settings.sheets
+package features.dns
 
 internal enum class DnsServerFieldKind {
     None,

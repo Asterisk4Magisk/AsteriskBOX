@@ -1,7 +1,7 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-package features.settings.sheets
+package features.dns
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.pluralStringResource
@@ -10,7 +10,6 @@ import app.SingBoxDnsRuleLogicalModeOr
 import app.SingBoxDnsRuleState
 import app.SingBoxDnsRuleTypeLogical
 import engine.singbox.config.hasValidDnsRuleStructure
-import features.dns.dnsMatcherCount
 import app.R
 import features.routing.LogicalRuleConditionsCard
 

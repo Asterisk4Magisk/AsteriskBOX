@@ -26,7 +26,7 @@ import engine.vpn.AndroidVpnPermissionRequester
 import features.logs.AndroidLogFileCreator
 import features.resources.runtime.AndroidResourceFilePicker
 import features.settings.locale.localizedAppContext
-import features.singbox.qr.AndroidQrCodeScanRequester
+import features.qr.AndroidQrCodeScanRequester
 import features.importing.ImportOperation
 import features.importing.ImportSource
 import features.importing.ImportStage

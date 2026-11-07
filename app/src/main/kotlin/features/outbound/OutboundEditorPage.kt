@@ -51,7 +51,7 @@ import features.settings.SettingsDropdownRow
 import features.settings.SettingsSectionCard
 import features.settings.SettingsSectionTitle
 import features.settings.SettingsSwitchRow
-import features.settings.sheets.dnsServerTypeLabel
+import features.dns.dnsServerTypeLabel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import app.R

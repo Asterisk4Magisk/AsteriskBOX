@@ -91,7 +91,7 @@
         </activity-alias>
 
         <activity
-            android:name="features.singbox.qr.PortraitQrCaptureActivity"
+            android:name="features.qr.PortraitQrCaptureActivity"
             android:clearTaskOnLaunch="true"
             android:exported="false"
             android:screenOrientation="portrait"

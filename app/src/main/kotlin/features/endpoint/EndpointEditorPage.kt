@@ -48,7 +48,7 @@ import features.logs.FailureLogContext
 import features.logs.reportFailure
 import features.outbound.EditorSectionCard
 import features.settings.SettingsDropdownRow
-import features.settings.sheets.dnsServerTypeLabel
+import features.dns.dnsServerTypeLabel
 import features.singbox.JsonCodeEditor
 import features.singbox.SingBoxCodeEditorState
 import kotlinx.coroutines.CancellationException

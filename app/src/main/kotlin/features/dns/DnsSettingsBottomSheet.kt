@@ -1,12 +1,10 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-package features.settings.sheets
+package features.dns
 
-import features.dns.DnsConfigurationMatchEditor
 import engine.singbox.config.DnsConfigurationMatchFields
 import engine.singbox.config.DnsConfigurationServerTypes
-import features.dns.hasValidDnsConfigurationMatchers
 
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
@@ -75,13 +73,13 @@ import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.isSingBoxDnsRCode
 import engine.singbox.isSingBoxUnsigned32
 import engine.singbox.singBoxRuleMatcherValueError
-import features.dns.DnsMatchResponseChoice
-import features.dns.DnsRuleMatcherGroups
-import features.dns.dnsPendingMatchersBlockSave
-import features.dns.nextLogicalDnsRuleId
-import features.dns.withDnsRuleMatchValues
 import features.settings.DnsSettingsDraft
-import features.settings.withDnsServerTagReplacement
+import features.settings.sheets.SettingsModalBottomSheet
+import features.settings.sheets.SettingsSheetContent
+import features.settings.sheets.SettingsSheetSection
+import features.settings.sheets.SettingsTextField
+import features.settings.sheets.SwitchPreference
+import features.settings.sheets.WindowDropdownPreference
 import app.R
 import ui.components.AsteriskCancelButton
 import ui.components.AsteriskInfoChip

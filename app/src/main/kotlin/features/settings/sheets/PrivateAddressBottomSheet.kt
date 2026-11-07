@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.R
+import features.dns.sanitized
 import ui.components.AsteriskCancelButton
 import ui.components.AsteriskSaveButton
 import ui.icons.AsteriskIcons as Icons

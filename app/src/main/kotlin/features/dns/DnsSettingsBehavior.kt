@@ -1,7 +1,7 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-package features.settings
+package features.dns
 
 import app.SingBoxDnsRuleState
 import app.updateManagedMatchReferences

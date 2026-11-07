@@ -8,8 +8,6 @@ import app.withCompatibleProxyAppListMode
 import app.withPrunedDnsServerReferences
 import app.withCanonicalManagedTagReferences
 import features.settings.DnsSettingsDraft
-import features.settings.replaceDnsPreferredByTagReferences
-import features.settings.replaceDnsServerTagReferences
 
 internal fun AppState.withDnsSettings(draft: DnsSettingsDraft): AppState {
     return copy(

@@ -321,7 +321,7 @@ fun AppContent(
             // Global error dialog — visible across every nav destination so the user sees the
             // diagnostic immediately on the home page after a failed proxy start, regardless of
             // which tab they are on.
-            features.singbox.ProxyErrorHost()
+            features.proxy.ProxyErrorHost()
         }
     }
 }

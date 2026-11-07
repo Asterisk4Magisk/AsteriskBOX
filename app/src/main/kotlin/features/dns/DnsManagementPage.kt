@@ -69,11 +69,6 @@ import features.logs.reportFailure
 import features.resources.runtime.singBoxRuleSetFiles
 import features.settings.SettingsActionRow
 import features.settings.SettingsSectionCard
-import features.settings.sheets.DnsSettingsBottomSheet
-import features.settings.sheets.dnsRuleActionLabel
-import features.settings.sheets.dnsRuleMatchSummary
-import features.settings.sheets.dnsRuleSummary
-import features.settings.sheets.dnsServerTypeLabel
 import features.settings.toDnsSettingsDraft
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers

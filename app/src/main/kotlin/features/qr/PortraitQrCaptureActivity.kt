@@ -1,7 +1,7 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-package features.singbox.qr
+package features.qr
 
 import android.Manifest
 import android.content.Context

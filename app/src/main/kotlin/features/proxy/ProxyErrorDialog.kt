@@ -1,7 +1,7 @@
 // Copyright 2026, AsteriskBOX contributors
 // SPDX-License-Identifier: GPL-3.0
 
-package features.singbox
+package features.proxy
 
 import android.content.ClipData
 import android.content.ClipboardManager
