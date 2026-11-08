@@ -1119,6 +1119,7 @@
     <string name="proxy_error_ebpf_tc_unsupported_fallback">If cgroup also fails to start, open Settings → Advanced settings and select TUN (ROOT) in Run mode instead.</string>
     <string name="proxy_error_ebpf_tc_unsupported_report">When reporting this, include the error text above and the asteriskd / sing-box section of logcat.</string>
     <string name="proxy_error_ebpf_tc_unsupported_switch">Workaround: open Settings → Advanced settings, confirm eBPF (ROOT) is selected in Run mode, then under Proxy settings (eBPF) change Data plane from socket_assign to cgroup and retry.</string>
+    <string name="proxy_service_auto_apply_failed">Unable to apply the update to the running service</string>
     <string name="proxy_service_started">Proxy service started</string>
     <string name="proxy_service_stopped">Proxy service stopped</string>
     <string name="settings_proxy_bpf2socks">Proxy settings (BPF2SOCKS)</string>

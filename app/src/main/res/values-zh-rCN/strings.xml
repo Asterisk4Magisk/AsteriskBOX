@@ -1103,6 +1103,7 @@
     <string name="proxy_error_ebpf_tc_unsupported_fallback">若 cgroup 也无法启动：进入 设置 → 高级设置，在 运行模式 中改选 TUN（ROOT）作为备用方案。</string>
     <string name="proxy_error_ebpf_tc_unsupported_report">上报时请附上上方错误原文，以及 logcat 中 asteriskd / sing-box 相关段落。</string>
     <string name="proxy_error_ebpf_tc_unsupported_switch">临时方案：进入 设置 → 高级设置，在 运行模式 中确认已选择 eBPF（ROOT）；再在 代理设置（eBPF） 中把 数据面 从 socket_assign 改为 cgroup，然后重试。</string>
+    <string name="proxy_service_auto_apply_failed">更新内容未能应用到运行中的服务</string>
     <string name="proxy_service_started">代理服务已启动</string>
     <string name="proxy_service_stopped">代理服务已停止</string>
     <string name="settings_proxy_bpf2socks">代理设置（BPF2SOCKS）</string>

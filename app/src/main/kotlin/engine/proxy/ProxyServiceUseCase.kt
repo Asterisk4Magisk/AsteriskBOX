@@ -37,7 +37,9 @@ internal class ProxyServiceUseCase(
         }
     }
 
-    suspend fun restart(state: AppState): ProxyServiceResult {
+    suspend fun restart(state: AppState): ProxyServiceResult = restart(state, onlyIfRunning = false)
+
+    private suspend fun restart(state: AppState, onlyIfRunning: Boolean): ProxyServiceResult {
         val live = try {
             proxyEngine.status(state.runMode, state)
         } catch (error: Throwable) {
@@ -48,7 +50,12 @@ internal class ProxyServiceUseCase(
             live,
         )?.let { conflict -> return conflict.toProxyServiceFailure(RootRequestedAction.RestartSameOwner) }
         return runCatching {
-            proxyEngine.restart(ProxyEngineStartRequest(state), requestVpnPermission)
+            val request = ProxyEngineStartRequest(state)
+            if (onlyIfRunning) {
+                proxyEngine.restartIfRunning(request, requestVpnPermission)
+            } else {
+                proxyEngine.restart(request, requestVpnPermission)
+            }
         }.fold(
             onSuccess = { status -> ProxyServiceResult.Success(proxyRunning = status.running, appState = status.appState) },
             onFailure = { error -> error.toProxyServiceFailure(RootRequestedAction.RestartSameOwner) },
@@ -58,13 +65,14 @@ internal class ProxyServiceUseCase(
     /**
      * Applies changed configuration to the running core. VPN reloads in place (see
      * [AndroidProxyEngine.reloadVpnOrRestart]), which is cheaper on a phone than stopping and
-     * relaunching the VpnService; ROOT modes have no hot API and take a supervised [restart].
+     * relaunching the VpnService; ROOT modes have no hot API and take a supervised restart, which
+     * is skipped when the core stopped in the meantime.
      */
     suspend fun applyConfiguration(
         state: AppState,
         reloadVpn: suspend (AppState) -> Unit,
     ): ProxyServiceResult {
-        if (state.runMode != RunModeVpnService) return restart(state)
+        if (state.runMode != RunModeVpnService) return restart(state, onlyIfRunning = true)
         return runCatching {
             proxyEngine.reloadVpnOrRestart(ProxyEngineStartRequest(state), requestVpnPermission) {
                 reloadVpn(state)
