@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -1290,6 +1291,14 @@ private fun SingBoxProxyNodeCard(
             modifier = Modifier.fillMaxSize().padding(SingBoxProxyNodeCardPadding),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
+            val titleStyle = if (compact) {
+                MaterialTheme.typography.titleSmall.copy(
+                    fontSize = 13.sp,
+                    lineHeight = 17.sp,
+                )
+            } else {
+                MaterialTheme.typography.titleMedium
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top,
@@ -1298,26 +1307,28 @@ private fun SingBoxProxyNodeCard(
                 Text(
                     text = displayName,
                     modifier = Modifier.weight(1f),
-                    style = if (compact) {
-                        MaterialTheme.typography.titleSmall.copy(
-                            fontSize = 13.sp,
-                            lineHeight = 17.sp,
-                        )
-                    } else {
-                        MaterialTheme.typography.titleMedium
-                    },
+                    style = titleStyle,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (selected) {
-                    Icon(
-                        imageVector = Icons.Rounded.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
+                    val titleLineHeight = with(LocalDensity.current) { titleStyle.lineHeight.toDp() }
+                    // Center the icon on the title's first line.
+                    Box(
+                        modifier = Modifier
+                            .padding(end = singBoxProxyNodeSelectedIconEndInset(titleLineHeight))
+                            .height(titleLineHeight),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.requiredSize(SingBoxProxyNodeSelectedIconSize),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 }
             }
             ProtocolDelayLine(
@@ -1608,6 +1619,20 @@ private val SingBoxProxyNodeCardHeight = 112.dp
 
 // Compact (multi-column) cards fit a two-line title, a 2dp gap and the 28dp protocol/delay line.
 private val SingBoxProxyNodeCompactCardHeight = 90.dp
-private val SingBoxProxyNodeCardPadding = PaddingValues(start = 10.dp, top = 14.dp, end = 10.dp, bottom = 10.dp)
+private val SingBoxProxyNodeCardTopPadding = 14.dp
+private val SingBoxProxyNodeCardHorizontalPadding = 10.dp
+private val SingBoxProxyNodeCardPadding = PaddingValues(
+    start = SingBoxProxyNodeCardHorizontalPadding,
+    top = SingBoxProxyNodeCardTopPadding,
+    end = SingBoxProxyNodeCardHorizontalPadding,
+    bottom = 10.dp,
+)
+private val SingBoxProxyNodeSelectedIconSize = 20.dp
+
+// The selected icon is centered on the title's first line; this end inset keeps it
+// as far from the card's end edge as from its top edge.
+private fun singBoxProxyNodeSelectedIconEndInset(titleLineHeight: Dp): Dp =
+    (SingBoxProxyNodeCardTopPadding - SingBoxProxyNodeCardHorizontalPadding +
+        (titleLineHeight - SingBoxProxyNodeSelectedIconSize) / 2).coerceAtLeast(0.dp)
 private val SingBoxProxyNodeGridSpacing = 12.dp
 private val SingBoxFloatingToolbarBottomSpacing = 16.dp
