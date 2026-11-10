@@ -58,6 +58,7 @@ import app.R
 import ui.clipboard.setPlainText
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskFilterChip
+import ui.components.AsteriskNoWrapTextField
 import ui.components.EditorPageScaffold
 import ui.components.localizedLabel
 import ui.components.singBoxOptionLabel
@@ -342,7 +343,8 @@ internal fun OutboundEditorField(
             onDocumentChange = onDocumentChange,
         )
         OutboundFieldKind.KEY_VALUE -> OutboundKeyValueField(field, document, onDocumentChange)
-        else -> OutlinedTextField(
+        // Certificates, keys and lists are line-oriented, so their lines scroll instead of wrapping.
+        OutboundFieldKind.MULTILINE, OutboundFieldKind.TEXT_LIST -> AsteriskNoWrapTextField(
             value = document.text(field.path),
             onValueChange = { value -> onDocumentChange(document.setText(field.path, value)) },
             label = { Text(field.localizedLabel()) },
@@ -353,8 +355,18 @@ internal fun OutboundEditorField(
                 else -> null
             },
             isError = error != null,
-            singleLine = field.kind !in setOf(OutboundFieldKind.MULTILINE, OutboundFieldKind.TEXT_LIST),
             minLines = if (field.kind == OutboundFieldKind.MULTILINE) 3 else 1,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+        )
+        else -> OutlinedTextField(
+            value = document.text(field.path),
+            onValueChange = { value -> onDocumentChange(document.setText(field.path, value)) },
+            label = { Text(field.localizedLabel()) },
+            supportingText = errorText?.let { message -> ({ Text(message) }) },
+            isError = error != null,
+            singleLine = true,
             keyboardOptions = KeyboardOptions(
                 keyboardType = if (field.kind == OutboundFieldKind.INTEGER) {
                     KeyboardType.Number
