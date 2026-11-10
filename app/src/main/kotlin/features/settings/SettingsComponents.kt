@@ -153,6 +153,8 @@ internal fun SettingsActionRow(
     value: String = "",
     enabled: Boolean = true,
     accent: IconAccent = IconAccent.Surface,
+    horizontalPadding: Dp = 16.dp,
+    showNavigationIcon: Boolean = true,
 ) {
     if (!settingsRowMatchesQuery(title, summary, value)) return
     val rowAlpha by animateFloatAsState(
@@ -165,15 +167,20 @@ internal fun SettingsActionRow(
         icon = icon,
         summary = summary,
         value = value,
+        horizontalPadding = horizontalPadding,
         modifier = modifier
             .graphicsLayer { alpha = rowAlpha }
             .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
-        trailing = {
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        trailing = if (showNavigationIcon) {
+            {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            null
         },
         accent = accent,
     )
