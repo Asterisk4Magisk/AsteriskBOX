@@ -228,7 +228,7 @@
     <string name="monitor_network_quality_download_responsiveness_explanation">How many small downloads the link can finish per minute while busy. 500 RPM or more stays responsive under load; under 200 RPM means interactions queue up.</string>
     <string name="monitor_network_quality_elapsed_time">Elapsed time</string>
     <string name="monitor_network_quality_elapsed_time_explanation">Total time the test ran, rounded down to seconds. Pure artefact of the test — not a property of the link.</string>
-    <string name="monitor_network_quality_endpoint_summary">Apple NetworkQuality config URL. Use the default unless you operate a custom mensura mirror.</string>
+    <string name="monitor_network_quality_endpoint_summary">Apple networkQuality config URL. Use the default unless you operate a custom mensura mirror.</string>
     <string name="monitor_network_quality_error_title">Network quality test failed</string>
     <string name="monitor_network_quality_explanation_title">About these numbers</string>
     <string name="monitor_network_quality_fab_start">Start</string>
@@ -793,7 +793,7 @@
     <string name="singbox_override_script_debug_failed">Failed</string>
     <string name="singbox_override_script_debug_logs">Console</string>
     <string name="singbox_override_script_debug_no_logs">No console output</string>
-    <string name="singbox_override_script_debug_no_output">No output YAML</string>
+    <string name="singbox_override_script_debug_no_output">No output JSON</string>
     <string name="singbox_override_script_debug_output">Output JSON</string>
     <string name="singbox_override_script_debug_run">Debug</string>
     <string name="singbox_override_script_debug_running">Debugging…</string>
