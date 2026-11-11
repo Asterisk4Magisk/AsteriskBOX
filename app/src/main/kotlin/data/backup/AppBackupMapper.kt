@@ -10,6 +10,7 @@ import engine.singbox.normalizedEbpfLocalDataPlane
 import app.withCompatibleProxyAppListMode
 import app.AppState
 import app.modes.normalizeNetworkActivityStyle
+import app.modes.normalizeNavigationBarStyle
 import app.withNormalizedConnectionTestSettings
 import features.resources.withInitializedBundledRuleSets
 import features.settings.servicecontrol.ServiceControlSchedule
@@ -81,6 +82,7 @@ private fun AppState.toBackupSettings(): AppBackupSettings =
         allowScreenshots = allowScreenshots,
         hideLauncherIcon = hideLauncherIcon,
         autoHideNavigationBar = autoHideNavigationBar,
+        navigationBarStyle = navigationBarStyle,
         outboundListLayout = outboundListLayout,
         outboundListSort = outboundListSort,
         selectorSelections = selectorSelections,
@@ -305,6 +307,7 @@ private fun AppBackupData.toAppState(): AppState {
         allowScreenshots = settings.allowScreenshots,
         hideLauncherIcon = settings.hideLauncherIcon,
         autoHideNavigationBar = settings.autoHideNavigationBar,
+        navigationBarStyle = normalizeNavigationBarStyle(settings.navigationBarStyle),
         outboundGroups = restoredOutboundGroups,
         nextOutboundGroupId = nextId(
             defaults.nextOutboundGroupId,

@@ -25,9 +25,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +54,8 @@ import ui.components.AsteriskCheckbox
 import ui.components.AsteriskChipTone
 import ui.components.AsteriskFilterChip
 import ui.components.AsteriskInfoChip
+import ui.components.AsteriskSegmentItem
+import ui.components.AsteriskSegmentedControl
 import ui.components.AsteriskSelectionCard
 import ui.text.formatTemplate
 import ui.theme.AsteriskMotion
@@ -188,24 +187,19 @@ internal fun ProxyAppListModeSegmentedRow(
     modifier: Modifier = Modifier,
 ) {
     val safeIndex = if (selectedIndex in modes.indices) selectedIndex else 0
-    SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
-        modes.forEachIndexed { index, mode ->
-            SegmentedButton(
-                selected = safeIndex == index,
-                onClick = { onSelectedIndexChange(index) },
+    AsteriskSegmentedControl(
+        items = modes.mapIndexed { index, mode ->
+            AsteriskSegmentItem(
+                value = index,
+                label = mode,
                 // Keep unavailable modes tappable so an attempt can show a brief tip.
-                modifier = Modifier.graphicsLayer {
-                    alpha = if (requiresGlobalProxyAppMode && index != ProxyAppListModeGlobal) 0.38f else 1f
-                },
-                shape = SegmentedButtonDefaults.itemShape(
-                    index = index,
-                    count = modes.size,
-                ),
-            ) {
-                Text(mode)
-            }
-        }
-    }
+                muted = requiresGlobalProxyAppMode && index != ProxyAppListModeGlobal,
+            )
+        },
+        selectedValue = safeIndex,
+        onSelected = onSelectedIndexChange,
+        modifier = modifier,
+    )
 }
 
 @Composable
