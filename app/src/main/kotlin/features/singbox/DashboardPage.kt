@@ -10,18 +10,18 @@ package features.singbox
 import android.os.SystemClock
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -33,6 +33,7 @@ import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Icon
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -52,6 +53,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -277,7 +279,7 @@ fun SingBoxDashboardPage(
             }
             item("monitoring_row_one") {
                 Row(
-                    modifier = HomeContentModifier,
+                    modifier = HomeContentModifier.height(IntrinsicSize.Max),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     MonitoringEntryCard(
@@ -334,7 +336,7 @@ fun SingBoxDashboardPage(
             }
             item("monitoring_row_two") {
                 Row(
-                    modifier = HomeContentModifier,
+                    modifier = HomeContentModifier.height(IntrinsicSize.Max),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     MonitoringEntryCard(
@@ -357,18 +359,20 @@ fun SingBoxDashboardPage(
                         Spacer(Modifier.weight(1f))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             TrafficMetric(
                                 icon = Icons.Rounded.Upload,
                                 label = stringResource(R.string.home_accumulated_upload),
                                 value = formatHomeRuntimeBytes(networkActivityState.accumulatedUploadBytes),
+                                modifier = Modifier.weight(1f),
                             )
                             TrafficMetric(
                                 icon = Icons.Rounded.Download,
                                 label = stringResource(R.string.home_accumulated_download),
                                 value = formatHomeRuntimeBytes(networkActivityState.accumulatedDownloadBytes),
+                                modifier = Modifier.weight(1f),
                             )
                         }
                     }
@@ -489,8 +493,11 @@ private fun HomeControllerCard(
                 // Monospace keeps the --:--:-- placeholder exactly as wide as the
                 // running clock, so the card never resizes when the service starts.
                 summaryStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                summaryContentDescription = uptime?.let { stringResource(R.string.home_service_uptime, it) }
-            ?: stringResource(R.string.home_service_disabled),
+                summaryContentDescription = uptime
+            ?.let { value -> stringResource(R.string.home_service_uptime, value) }
+            ?: stringResource(
+                if (serviceEnabled) R.string.home_service_enabled else R.string.home_service_disabled,
+            ),
                 stateIcon = if (serviceEnabled) Icons.Rounded.VpnLock else Icons.Rounded.PublicOff,
                 // The inner card is the accent one, matching the accent colour
                 // picked in Settings > Personalization.
@@ -550,7 +557,12 @@ private fun HomeControllerCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (currentOutbound != null) {
+                if (
+                    serviceEnabled &&
+                    currentOutbound != null &&
+                    currentOutbound != APP_DIRECT_OUTBOUND &&
+                    currentOutbound != APP_GLOBAL_SELECTOR
+                ) {
                     NodeDelayChip(
                         delayMs = currentNodeDelay,
                         testing = delayTesting,
@@ -710,7 +722,7 @@ private fun NetworkActivityAxisLabel(
     if (scaleBytes <= 0L) return
     Text(
         text = formatHomeSpeed(scaleBytes),
-        modifier = modifier.height(NetworkActivityAxisLabelHeight),
+        modifier = modifier.heightIn(min = NetworkActivityAxisLabelHeight),
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.Medium,
         lineHeight = 14.sp,
@@ -771,8 +783,9 @@ private fun NodeDelayChip(
     }
     Row(
         modifier = Modifier
+            .minimumInteractiveComponentSize()
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 6.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -845,6 +858,7 @@ private fun NetworkActivityChart(
                 dotRadius = dotRadius,
                 direction = NetworkActivityDownloadDirection,
                 ramp = downloadRamp,
+                verticalDotPitch = dotRadius * NetworkActivityVerticalPitchScale,
             )
             drawDottedWaveform(
                 amplitudes = waveform.upload,
@@ -852,6 +866,7 @@ private fun NetworkActivityChart(
                 dotRadius = dotRadius,
                 direction = NetworkActivityUploadDirection,
                 ramp = uploadRamp,
+                verticalDotPitch = dotRadius * NetworkActivityVerticalPitchScale,
             )
         }
         // The far edge of each half owns its own scale, so a slow upload never
@@ -874,7 +889,7 @@ private fun MonitoringEntryCard(
 ) {
     AsteriskExpressiveCard(
         onClick = onClick,
-        modifier = modifier.height(HomeMonitoringTileHeight),
+        modifier = modifier.heightIn(min = HomeMonitoringTileHeight),
         role = if (prominent) ExpressiveShapeRole.GroupLarge else ExpressiveShapeRole.ContentCard,
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
@@ -954,9 +969,10 @@ private fun TrafficMetric(
     icon: ImageVector,
     label: String,
     value: String,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier.semantics(mergeDescendants = true) {
+        modifier = modifier.semantics(mergeDescendants = true) {
             contentDescription = "$label $value"
         },
         verticalAlignment = Alignment.CenterVertically,
@@ -965,7 +981,7 @@ private fun TrafficMetric(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(13.dp),
+            modifier = Modifier.size(12.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
@@ -974,7 +990,9 @@ private fun TrafficMetric(
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+            autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 11.sp),
         )
     }
 }
@@ -1130,7 +1148,7 @@ private fun ServiceModeChip(
     containerColor: Color,
     contentColor: Color,
 ) {
-    // Same secondaryContainer pairing KernelSU-Next gives its GKI/non-GKI tag.
+    // Muted chip: secondaryContainer on onSecondaryContainer.
     Surface(
         shape = RoundedCornerShape(6.dp),
         color = containerColor,
