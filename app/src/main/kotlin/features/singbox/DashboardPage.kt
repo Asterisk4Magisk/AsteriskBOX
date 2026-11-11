@@ -10,6 +10,7 @@ package features.singbox
 import android.os.SystemClock
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,13 +45,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.AppServices
 import app.LocalMainDestinationState
 import app.navigation.MainDestination
@@ -71,6 +71,8 @@ import app.modes.RunModeVpnService
 import app.modes.SingBoxModeDirect
 import app.modes.SingBoxModeGlobal
 import app.modes.SingBoxModeRule
+import engine.singbox.config.APP_DIRECT_OUTBOUND
+import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.runtime.SingBoxProxiesState
 import engine.singbox.runtime.SingBoxTrafficSample
 import engine.singbox.runtime.SingBoxTrafficState
@@ -105,8 +107,6 @@ import ui.components.AsteriskSegmentItem
 import ui.components.AsteriskSegmentedControl
 import ui.components.AsteriskTopAppBar
 import ui.charts.DottedWaveformDotRadius
-import ui.charts.ChartAxisLabelMinWidth
-import ui.charts.ChartAxisLabelSpacing
 import ui.charts.drawDottedWaveform
 import ui.charts.drawSmoothAreaLine
 import ui.charts.rememberDottedWaveformRamp
@@ -347,27 +347,38 @@ private fun HomeControllerCard(
 ) {
     val uptime = rememberServiceUptimeText()
     val singBoxRuntime = LocalAppServices.current.singBoxRuntime
-    val runtimeState by singBoxRuntime.state.collectAsState()
-    val currentOutbound = remember(runtimeState.proxies, controllerState.singBoxMode) {
+    // Only the proxy snapshot matters here; the unsampled flow pushes a
+    // traffic sample every second and would recompose the whole hero card.
+    val runtimeProxies by remember(singBoxRuntime) {
+        singBoxRuntime.state
+            .map { state -> state.proxies }
+            .distinctUntilChanged()
+    }.collectAsState(initial = SingBoxProxiesState())
+    val currentOutbound = remember(runtimeProxies, controllerState.singBoxMode) {
         if (controllerState.singBoxMode == SingBoxModeDirect) {
             null
         } else {
-            activeSingBoxNode(runtimeState.proxies)
+            activeSingBoxNodeTag(runtimeProxies)
         }
     }
     val appState by LocalAppStateStore.current.collectAppState()
     // The runtime reports managed tags (outbound_7_...), so map the active one
     // back to the alias the user gave the node.
-    val currentOutboundAlias = remember(currentOutbound, appState.outbounds) {
-        currentOutbound?.let { tag ->
-            appState.outbounds.firstOrNull { outbound -> outbound.tag == tag }?.remarks
+    val currentOutboundAlias = remember(currentOutbound, appState) {
+        when (currentOutbound) {
+            APP_DIRECT_OUTBOUND -> null
+            APP_GLOBAL_SELECTOR -> null
+            else -> managedOutboundAlias(appState, currentOutbound)
         }
     }
+    val directLabel = stringResource(R.string.routing_direct)
+    val globalLabel = stringResource(R.string.routing_global)
     val outboundLabel = when {
         controllerState.singBoxMode == SingBoxModeDirect ->
             stringResource(R.string.sing_box_mode_direct)
+        currentOutbound == APP_DIRECT_OUTBOUND -> directLabel
+        currentOutbound == APP_GLOBAL_SELECTOR -> globalLabel
         !currentOutboundAlias.isNullOrBlank() -> currentOutboundAlias
-        currentOutbound != null -> currentOutbound
         else -> stringResource(R.string.home_current_outbound_none)
     }
     // The runtime line keeps its slot when the service is down, so the status
@@ -413,7 +424,8 @@ private fun HomeControllerCard(
                 // Monospace keeps the --:--:-- placeholder exactly as wide as the
                 // running clock, so the card never resizes when the service starts.
                 summaryStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                summaryContentDescription = uptime?.let { stringResource(R.string.home_service_uptime, it) },
+                summaryContentDescription = uptime?.let { stringResource(R.string.home_service_uptime, it) }
+            ?: stringResource(R.string.home_service_disabled),
                 stateIcon = if (serviceEnabled) Icons.Rounded.VpnLock else Icons.Rounded.PublicOff,
                 // The inner card is the accent one, matching the accent colour
                 // picked in Settings > Personalization.
@@ -529,36 +541,38 @@ private fun NetworkActivityCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
-            Text(
-                text = stringResource(R.string.home_network_activity),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            // Live speeds are the headline of this card, so they sit on the left at heading size
-            // instead of being a caption in the header row.
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                NetworkSpeedValue(
-                    icon = Icons.Rounded.ArrowUpward,
-                    iconDescription = stringResource(R.string.monitor_connections_upload),
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    value = formatHomeSpeed(networkActivityState.uploadBytesPerSecond),
-                    // Reserve the row's space but stay content-sized, so the two rates stay adjacent
-                    // and a long value can only ellipsize inside its own half.
-                    modifier = Modifier.weight(1f, fill = false),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Text(
+                    text = stringResource(R.string.home_network_activity),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
                 )
-                Spacer(Modifier.width(NetworkSpeedPairSpacing))
-                NetworkSpeedValue(
-                    icon = Icons.Rounded.ArrowDownward,
-                    iconDescription = stringResource(R.string.monitor_connections_download),
-                    tint = MaterialTheme.colorScheme.primary,
-                    value = formatHomeSpeed(networkActivityState.downloadBytesPerSecond),
-                    modifier = Modifier.weight(1f, fill = false),
-                )
+                Spacer(Modifier.width(12.dp))
+                // Live speeds keep their heading size and sit side by side in the
+                // card's top-right corner; the plot below spans the full width.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    NetworkSpeedValue(
+                        icon = Icons.Rounded.ArrowUpward,
+                        iconDescription = stringResource(R.string.monitor_connections_upload),
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        value = formatHomeSpeed(networkActivityState.uploadBytesPerSecond),
+                    )
+                    Spacer(Modifier.width(NetworkSpeedPairSpacing))
+                    NetworkSpeedValue(
+                        icon = Icons.Rounded.ArrowDownward,
+                        iconDescription = stringResource(R.string.monitor_connections_download),
+                        tint = MaterialTheme.colorScheme.primary,
+                        value = formatHomeSpeed(networkActivityState.downloadBytesPerSecond),
+                    )
+                }
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
             if (networkActivityState.hasNetworkSamples) {
                 val chartModifier = Modifier
                     .fillMaxWidth()
@@ -592,6 +606,23 @@ private fun NetworkActivityCard(
     }
 }
 
+@Composable
+private fun NetworkActivityAxisLabel(
+    scaleBytes: Long,
+    modifier: Modifier = Modifier,
+) {
+    if (scaleBytes <= 0L) return
+    Text(
+        text = formatHomeSpeed(scaleBytes),
+        modifier = modifier.height(NetworkActivityAxisLabelHeight),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Medium,
+        lineHeight = 14.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+    )
+}
+
 /**
  * Line variant of the network activity chart: download and upload are drawn as two smooth curves on
  * one shared scale (each taller than the other by exactly their ratio, since both are bytes per
@@ -606,26 +637,22 @@ private fun NetworkActivityLineChart(
     val bands = remember(samples) { buildNetworkActivityLineBands(samples, NetworkActivitySlotCount) }
     val downloadColor = MaterialTheme.colorScheme.primary
     val uploadColor = MaterialTheme.colorScheme.tertiary
-    Row(modifier = modifier) {
+    Column(modifier = modifier) {
+        // Both curves share one scale, so the axis carries one label: the top of that scale.
+        // It gets a thin row of its own so the plot keeps the full card width.
+        NetworkActivityAxisLabel(
+            scaleBytes = bands.scaleBytes,
+            modifier = Modifier.align(Alignment.End),
+        )
         Canvas(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight(),
+                .fillMaxWidth(),
         ) {
             if (bands.sampleCount == 0) return@Canvas
             val strokeWidth = NetworkActivityAreaStrokeWidth.toPx()
             drawSmoothAreaLine(values = bands.downloadEdge, color = downloadColor, strokeWidth = strokeWidth)
             drawSmoothAreaLine(values = bands.uploadEdge, color = uploadColor, strokeWidth = strokeWidth)
-        }
-        // Both curves share one scale, so the axis carries one label: the top of that scale.
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(start = ChartAxisLabelSpacing)
-                .widthIn(min = ChartAxisLabelMinWidth),
-            contentAlignment = Alignment.TopEnd,
-        ) {
-            NetworkActivityAxisLabel(bands.scaleBytes)
         }
     }
 }
@@ -651,7 +678,7 @@ private fun NetworkSpeedValue(
         Spacer(Modifier.width(4.dp))
         Text(
             text = value,
-            style = MaterialTheme.typography.headlineSmall,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -668,11 +695,15 @@ private fun NetworkActivityChart(
     val waveform = remember(samples) { buildNetworkActivityWaveform(samples, NetworkActivitySlotCount) }
     val downloadRamp = rememberDottedWaveformRamp(MaterialTheme.colorScheme.primary)
     val uploadRamp = rememberDottedWaveformRamp(MaterialTheme.colorScheme.tertiary)
-    Row(modifier = modifier) {
+    Column(modifier = modifier) {
+        NetworkActivityAxisLabel(
+            scaleBytes = waveform.downloadScaleBytes,
+            modifier = Modifier.align(Alignment.End),
+        )
         Canvas(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight(),
+                .fillMaxWidth(),
         ) {
             if (waveform.sampleCount == 0) return@Canvas
             val dotRadius = DottedWaveformDotRadius.toPx()
@@ -691,41 +722,13 @@ private fun NetworkActivityChart(
                 ramp = uploadRamp,
             )
         }
-        // Y axis: only the far edge of each half, pinned to its corner. Each direction uses its own
-        // scale, so a slow upload never inherits the download range.
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(start = ChartAxisLabelSpacing)
-                .widthIn(min = ChartAxisLabelMinWidth),
-            horizontalAlignment = Alignment.End,
-        ) {
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.TopEnd,
-            ) {
-                NetworkActivityAxisLabel(waveform.downloadScaleBytes)
-            }
-            Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.BottomEnd,
-            ) {
-                NetworkActivityAxisLabel(waveform.uploadScaleBytes)
-            }
-        }
+        // The far edge of each half owns its own scale, so a slow upload never
+        // inherits the download range.
+        NetworkActivityAxisLabel(
+            scaleBytes = waveform.uploadScaleBytes,
+            modifier = Modifier.align(Alignment.End),
+        )
     }
-}
-
-@Composable
-private fun NetworkActivityAxisLabel(scaleBytes: Long) {
-    if (scaleBytes <= 0L) return
-    Text(
-        text = formatHomeSpeed(scaleBytes),
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-    )
 }
 
 @Composable
@@ -790,7 +793,7 @@ private fun TrafficMetric(
 ) {
     Row(
         modifier = Modifier.semantics(mergeDescendants = true) {
-            contentDescription = "${'$'}label ${'$'}value"
+            contentDescription = "$label $value"
         },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp),
@@ -887,12 +890,19 @@ private const val HomeServiceUptimePlaceholder = "--:--:--"
 
 // The x axis keeps this many fixed columns no matter how many samples are buffered; the newest
 // sample sits in the rightmost column. It mirrors the sample limit of the home traffic state.
+// The lattice pitch doubles as the vertical step, so a wide card would only get a few rows; this
+// keeps rows at 2.6 dot diameters instead, which is fine enough to read a burst.
+private const val NetworkActivityVerticalPitchScale = 2.6f
+
 private const val NetworkActivitySlotCount = HomeNetworkSampleLimit
 
-private val NetworkActivityChartHeight = 108.dp
-private val NetworkSpeedIconSize = 20.dp
-private val NetworkActivityAreaStrokeWidth = 2.dp
+private val NetworkActivityChartHeight = 120.dp
+
+/** One thin row per axis label; the plot keeps everything else. */
+private val NetworkActivityAxisLabelHeight = 14.dp
+private val NetworkSpeedIconSize = 18.dp
 private val NetworkSpeedPairSpacing = 14.dp
+private val NetworkActivityAreaStrokeWidth = 2.dp
 
 // Download grows upwards from the middle, upload grows downwards; both share the same x positions.
 private const val NetworkActivityDownloadDirection = -1f
@@ -938,25 +948,6 @@ private fun rememberServiceUptimeText(): String? {
     }
     if (!appState.proxyRunning) return null
     return formatHomeServiceUptime(uptimeMillis)
-}
-
-/**
- * Follows the global selector down through any nested groups to the node that
- * actually carries traffic, so the chin shows e.g. "🇸🇬新加坡·电信1" rather
- * than the name of the selector that picked it.
- */
-private fun activeSingBoxNode(proxies: SingBoxProxiesState): String? {
-    val groupsByName = proxies.groups.associateBy { group -> group.name }
-    val start = prioritizeGlobalSingBoxProxyGroup(proxies).groups.firstOrNull()?.now
-    var name = start?.takeIf { it.isNotBlank() }
-    val visited = mutableSetOf<String>()
-    while (name != null && visited.add(name)) {
-        val group = groupsByName[name] ?: return name
-        val next = group.now.takeIf { it.isNotBlank() }
-        if (next == null || next == name) return name
-        name = next
-    }
-    return name
 }
 
 @Composable
