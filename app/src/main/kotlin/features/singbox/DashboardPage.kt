@@ -14,6 +14,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Icon
@@ -37,6 +39,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -278,21 +282,54 @@ fun SingBoxDashboardPage(
                 ) {
                     MonitoringEntryCard(
                         title = stringResource(R.string.home_monitor_resource),
-                        summary = homeResourceSummary(monitoringOverviewState),
                         icon = Icons.Rounded.Memory,
                         prominent = true,
                         onClick = { navigator.push(AppRoute.ResourceMonitor) },
                         modifier = Modifier.weight(1f),
-                    )
+                    ) {
+                        TileInlineMetric(
+                            label = stringResource(R.string.home_resource_cpu_label),
+                            value = homeResourceCpuText(monitoringOverviewState),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        TileInlineMetric(
+                            label = stringResource(R.string.home_resource_memory_label),
+                            value = homeResourceMemoryText(monitoringOverviewState),
+                        )
+                    }
                     MonitoringEntryCard(
                         title = stringResource(R.string.home_monitor_connections),
-                        summary = monitoringOverviewState.activeConnectionCount?.let { count ->
-                            pluralStringResource(R.plurals.home_connections_summary, count, count)
-                        } ?: stringResource(R.string.home_value_unavailable),
                         icon = Icons.Rounded.Lan,
                         onClick = { navigator.push(AppRoute.ConnectionsMonitor) },
                         modifier = Modifier.weight(1f),
-                    )
+                    ) {
+                        val count = monitoringOverviewState.activeConnectionCount
+                        if (count == null) {
+                            Text(
+                                text = stringResource(R.string.home_value_unavailable),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else {
+                            Row(verticalAlignment = Alignment.Bottom) {
+                                Text(
+                                    text = count.toString(),
+                                    style = MaterialTheme.typography.headlineSmall.copy(
+                                        fontFeatureSettings = "tnum",
+                                    ),
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    text = pluralStringResource(R.plurals.home_connections_unit, count),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 5.dp),
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                    }
                 }
             }
             item("monitoring_row_two") {
@@ -302,15 +339,27 @@ fun SingBoxDashboardPage(
                 ) {
                     MonitoringEntryCard(
                         title = stringResource(R.string.home_monitor_traffic),
-                        summary = stringResource(
-                            R.string.home_traffic_summary,
-                            monitoringOverviewState.todayTrafficBytes.toReadableBytes(),
-                        ),
                         icon = Icons.Rounded.DataUsage,
                         onClick = { navigator.push(AppRoute.TrafficMonitor) },
                         modifier = Modifier.weight(1f),
-                        summaryMaxLines = 1,
-                        metrics = {
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.home_traffic_summary,
+                                monitoringOverviewState.todayTrafficBytes.toReadableBytes(),
+                            ),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontFeatureSettings = "tnum",
+                            ),
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             TrafficMetric(
                                 icon = Icons.Rounded.Upload,
                                 label = stringResource(R.string.home_accumulated_upload),
@@ -321,16 +370,20 @@ fun SingBoxDashboardPage(
                                 label = stringResource(R.string.home_accumulated_download),
                                 value = formatHomeRuntimeBytes(networkActivityState.accumulatedDownloadBytes),
                             )
-                        },
-                    )
+                        }
+                    }
                     MonitoringEntryCard(
                         title = stringResource(R.string.home_monitor_network),
-                        summary = homeNetworkSummary(monitoringOverviewState),
                         icon = Icons.Rounded.Public,
                         prominent = true,
                         onClick = { navigator.push(AppRoute.NetworkMonitor) },
                         modifier = Modifier.weight(1f),
-                    )
+                    ) {
+                        val (ipv4, ipv6) = homeNetworkValues(monitoringOverviewState)
+                        TileStackedMetric(label = HomeIpv4Label, value = ipv4)
+                        Spacer(Modifier.height(4.dp))
+                        TileStackedMetric(label = HomeIpv6Label, value = ipv6)
+                    }
                 }
             }
         }
@@ -362,6 +415,18 @@ private fun HomeControllerCard(
         }
     }
     val appState by LocalAppStateStore.current.collectAppState()
+    val appScope = LocalAppServices.current.appScope
+    val latestAppState = rememberUpdatedState(appState)
+    var delayTesting by remember { mutableStateOf(false) }
+    // The core reports the last measured delay on every node snapshot, so the hero can show the
+    // active node's latency without extra work; a tap re-tests just that node.
+    val currentNodeDelay = remember(runtimeProxies, currentOutbound) {
+        currentOutbound?.let { tag ->
+            runtimeProxies.nodeByName[tag]
+                ?.delay
+                ?.takeIf { delay -> delay >= 0 }
+        }
+    }
     // The runtime reports managed tags (outbound_7_...), so map the active one
     // back to the alias the user gave the node.
     val currentOutboundAlias = remember(currentOutbound, appState) {
@@ -485,6 +550,25 @@ private fun HomeControllerCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                if (currentOutbound != null) {
+                    NodeDelayChip(
+                        delayMs = currentNodeDelay,
+                        testing = delayTesting,
+                        onClick = {
+                            val target = currentOutbound
+                            if (target != null && !delayTesting) {
+                                delayTesting = true
+                                appScope.launch {
+                                    runCatching {
+                                        singBoxRuntime.testProxyDelay(latestAppState.value, target)
+                                    }
+                                    delayTesting = false
+                                }
+                            }
+                        },
+                    )
+                    Spacer(Modifier.width(6.dp))
+                }
                 Icon(
                     imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                     contentDescription = null,
@@ -552,16 +636,27 @@ private fun NetworkActivityCard(
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
+                    // Never let the caption stack one glyph per line when the rates get wide.
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.width(12.dp))
                 // Live speeds keep their heading size and sit side by side in the
-                // card's top-right corner; the plot below spans the full width.
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // card's top-right corner; the plot below spans the full width. The group may
+                // take more room than the caption, and the values shrink to fit instead of
+                // ellipsizing or pushing the caption into a single-glyph column.
+                Row(
+                    modifier = Modifier.weight(1.6f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                ) {
                     NetworkSpeedValue(
                         icon = Icons.Rounded.ArrowUpward,
                         iconDescription = stringResource(R.string.monitor_connections_upload),
                         tint = MaterialTheme.colorScheme.tertiary,
                         value = formatHomeSpeed(networkActivityState.uploadBytesPerSecond),
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                     Spacer(Modifier.width(NetworkSpeedPairSpacing))
                     NetworkSpeedValue(
@@ -569,6 +664,7 @@ private fun NetworkActivityCard(
                         iconDescription = stringResource(R.string.monitor_connections_download),
                         tint = MaterialTheme.colorScheme.primary,
                         value = formatHomeSpeed(networkActivityState.downloadBytesPerSecond),
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                 }
             }
@@ -657,6 +753,39 @@ private fun NetworkActivityLineChart(
     }
 }
 
+/**
+ * Latency readout for the active node: tap re-tests it. `null` means "never measured", which the
+ * core reports as a missing delay rather than a zero.
+ */
+@Composable
+private fun NodeDelayChip(
+    delayMs: Int?,
+    testing: Boolean,
+    onClick: () -> Unit,
+) {
+    val tint = if (testing) MaterialTheme.colorScheme.onSurfaceVariant else singBoxDelayTint(delayMs)
+    val text = when {
+        testing -> stringResource(R.string.home_node_delay_testing)
+        delayMs == null -> stringResource(R.string.home_node_delay_unknown)
+        else -> stringResource(R.string.home_node_delay_value, delayMs)
+    }
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = text,
+            fontWeight = FontWeight.Medium,
+            color = tint,
+            maxLines = 1,
+            style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+        )
+    }
+}
+
 @Composable
 private fun NetworkSpeedValue(
     icon: ImageVector,
@@ -678,10 +807,13 @@ private fun NetworkSpeedValue(
         Spacer(Modifier.width(4.dp))
         Text(
             text = value,
-            style = MaterialTheme.typography.titleLarge,
+            // Tabular figures keep the two rates from jittering as digits change.
+            style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            overflow = TextOverflow.Clip,
+            softWrap = false,
+            autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 22.sp),
         )
     }
 }
@@ -734,17 +866,15 @@ private fun NetworkActivityChart(
 @Composable
 private fun MonitoringEntryCard(
     title: String,
-    summary: String,
     icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     prominent: Boolean = false,
-    summaryMaxLines: Int = 2,
-    metrics: (@Composable RowScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     AsteriskExpressiveCard(
         onClick = onClick,
-        modifier = modifier.height(148.dp),
+        modifier = modifier.height(HomeMonitoringTileHeight),
         role = if (prominent) ExpressiveShapeRole.GroupLarge else ExpressiveShapeRole.ContentCard,
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
@@ -752,36 +882,70 @@ private fun MonitoringEntryCard(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Surface(
-                modifier = Modifier.size(42.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                shape = AsteriskShapeTokens.SmallContainer,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            // Caption-sized title next to its glyph: the numbers below are what the tile is for.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.width(6.dp))
                 Text(
-                    text = summary,
-                    style = MaterialTheme.typography.bodySmall,
+                    text = title,
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = summaryMaxLines,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (metrics != null) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        content = metrics,
-                    )
-                }
             }
+            Spacer(Modifier.height(10.dp))
+            content()
         }
+    }
+}
+
+/** Label above its value, e.g. the two addresses on the network tile. */
+@Composable
+private fun TileStackedMetric(label: String, value: String) {
+    Column {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** Label beside its value, e.g. CPU and memory on the resource tile. */
+@Composable
+private fun TileInlineMetric(label: String, value: String) {
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -806,8 +970,9 @@ private fun TrafficMetric(
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -829,19 +994,23 @@ private fun runModeLabel(runMode: Int): String {
 }
 
 @Composable
-private fun homeResourceSummary(monitoringState: HomeMonitoringOverviewState): String {
+private fun homeResourceCpuText(monitoringState: HomeMonitoringOverviewState): String {
     if (!monitoringState.serviceRunning) return stringResource(R.string.home_value_unavailable)
-    val cpu = monitoringState.resourceCpuPercent
-        ?.let { value -> "%.1f%%".format(value) }
+    return monitoringState.resourceCpuPercent
+        ?.let { value -> "%.0f%%".format(value) }
         ?: stringResource(R.string.home_value_unavailable)
-    val memory = monitoringState.resourceMemoryBytes
-        ?.toReadableBytes()
-        ?: stringResource(R.string.home_value_unavailable)
-    return stringResource(R.string.home_resource_summary, cpu, memory)
 }
 
 @Composable
-private fun homeNetworkSummary(homeState: HomeMonitoringOverviewState): String {
+private fun homeResourceMemoryText(monitoringState: HomeMonitoringOverviewState): String {
+    if (!monitoringState.serviceRunning) return stringResource(R.string.home_value_unavailable)
+    return monitoringState.resourceMemoryBytes
+        ?.toReadableBytes()
+        ?: stringResource(R.string.home_value_unavailable)
+}
+
+@Composable
+private fun homeNetworkValues(homeState: HomeMonitoringOverviewState): Pair<String, String> {
     val unavailable = stringResource(R.string.home_value_unavailable)
     val ipv4 = homeState.networkRows
         .firstOrNull { row -> row.kind == HomeNetworkRowKind.Ipv4 }
@@ -849,7 +1018,7 @@ private fun homeNetworkSummary(homeState: HomeMonitoringOverviewState): String {
     val ipv6 = homeState.networkRows
         .firstOrNull { row -> row.kind == HomeNetworkRowKind.Ipv6 }
         ?.value ?: unavailable
-    return stringResource(R.string.home_network_summary, ipv4, ipv6)
+    return ipv4 to ipv6
 }
 
 @Composable
@@ -895,6 +1064,11 @@ private const val HomeServiceUptimePlaceholder = "--:--:--"
 private const val NetworkActivityVerticalPitchScale = 2.6f
 
 private const val NetworkActivitySlotCount = HomeNetworkSampleLimit
+
+private val HomeMonitoringTileHeight = 132.dp
+
+private const val HomeIpv4Label = "IPv4"
+private const val HomeIpv6Label = "IPv6"
 
 private val NetworkActivityChartHeight = 120.dp
 
