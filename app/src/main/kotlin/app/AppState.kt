@@ -5,6 +5,7 @@ package app
 
 import app.modes.ColorModeSystem
 import app.modes.LanguageModeSystem
+import app.modes.NavigationBarStyleClassic
 import app.modes.NetworkActivityStyleDotted
 import app.modes.OutboundListLayoutAuto
 import app.modes.OutboundListSortDefault
@@ -45,6 +46,7 @@ data class AppState(
     val allowScreenshots: Boolean = false,
     val hideLauncherIcon: Boolean = false,
     val autoHideNavigationBar: Boolean = false,
+    val navigationBarStyle: Int = NavigationBarStyleClassic,
 
     val outboundGroups: List<OutboundGroupState> = emptyList(),
     val nextOutboundGroupId: Int = 1,

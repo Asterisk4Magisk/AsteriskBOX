@@ -3,39 +3,54 @@
 
 package ui.components
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ui.theme.AsteriskMotion
-import ui.theme.AsteriskShapeTokens
 
 @Immutable
 internal data class AsteriskSegmentItem<T>(
     val value: T,
     val label: String,
     val icon: ImageVector? = null,
+    /** Dims the segment without disabling it, for modes that only show a tip when tapped. */
+    val muted: Boolean = false,
 )
 
+/**
+ * Connected segmented switch: a Material 3 expressive
+ * [ButtonGroup] of [ToggleButton]s whose corners round only on the group's
+ * outer edges. The selected segment is filled with `primaryContainer` and its
+ * label goes bold; unselected segments stay on `surfaceVariant`. Pressing a
+ * segment morphs its shape through [ButtonGroupDefaults]' press shapes, and
+ * the width animates through the group's `animateWidth` scope.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun <T> AsteriskSegmentedControl(
     items: List<AsteriskSegmentItem<T>>,
@@ -43,67 +58,84 @@ internal fun <T> AsteriskSegmentedControl(
     onSelected: (T) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    checkedContainerColor: Color = MaterialTheme.colorScheme.primaryContainer,
+    checkedContentColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+    textStyle: TextStyle = MaterialTheme.typography.labelLarge,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = AsteriskShapeTokens.Pill,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .selectableGroup()
-                .asteriskPillIndicator(
-                    selectedIndex = items.indexOfFirst { it.value == selectedValue },
-                    itemCount = items.size,
-                    enabled = enabled,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            items.forEach { item ->
-                val selected = item.value == selectedValue
-                val targetContentColor = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                }
-                val contentColor by animateColorAsState(
-                    targetValue = targetContentColor.copy(alpha = if (enabled) 1f else 0.38f),
-                    animationSpec = AsteriskMotion.effects(),
-                    label = "segment-content-color",
-                )
+    if (items.isEmpty()) return
+    val interactionSources = remember(items.size) {
+        List(items.size) { MutableInteractionSource() }
+    }
 
-                Surface(
-                    onClick = { onSelected(item.value) },
-                    enabled = enabled,
-                    modifier = Modifier
-                        .weight(1f)
-                        .heightIn(min = 48.dp)
-                        .semantics {
-                            role = Role.RadioButton
-                            this.selected = selected
-                        },
-                    shape = AsteriskShapeTokens.Pill,
-                    color = Color.Transparent,
-                    contentColor = contentColor,
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (item.icon != null) Icon(item.icon, contentDescription = null)
-                        Text(
-                            text = item.label,
-                            modifier = Modifier.padding(start = if (item.icon == null) 0.dp else 6.dp),
-                            maxLines = 1,
-                        )
+    ButtonGroup(
+        overflowIndicator = {},
+        modifier = modifier.fillMaxWidth().selectableGroup(),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+    ) {
+        items.forEachIndexed { index, item ->
+            val selected = item.value == selectedValue
+            val interactionSource = interactionSources[index]
+
+            customItem(
+                buttonGroupContent = {
+                    val shapes = when {
+                        items.size == 1 -> {
+                            val pill = RoundedCornerShape(percent = 50)
+                            ToggleButtonShapes(shape = pill, pressedShape = pill, checkedShape = pill)
+                        }
+                        index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        index == items.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                     }
-                }
-            }
+                    ToggleButton(
+                        checked = selected,
+                        onCheckedChange = { onSelected(item.value) },
+                        enabled = enabled,
+                        modifier = Modifier
+                            // Equal-width segments: the expressive press-width
+                            // animation cannot play under weight(1f), so it is
+                            // deliberately not applied here.
+                            .weight(1f)
+                            .alpha(if (item.muted) 0.38f else 1f),
+                        shapes = shapes,
+                        colors = ToggleButtonDefaults.colors(
+                            containerColor = containerColor,
+                            contentColor = contentColor,
+                            checkedContainerColor = checkedContainerColor,
+                            checkedContentColor = checkedContentColor,
+                            disabledContainerColor = containerColor.copy(alpha = 0.3f),
+                            disabledContentColor = contentColor.copy(alpha = 0.38f),
+                        ),
+                        contentPadding = contentPadding,
+                        interactionSource = interactionSource,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            if (item.icon != null) {
+                                Icon(
+                                    imageVector = item.icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                            Text(
+                                text = item.label,
+                                style = textStyle,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                },
+                menuContent = {},
+            )
         }
     }
 }

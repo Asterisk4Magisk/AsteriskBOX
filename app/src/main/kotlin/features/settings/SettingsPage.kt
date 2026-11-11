@@ -319,11 +319,8 @@ private fun SettingsContent(
         enableLocalDns = appState.enableLocalDns,
         useTunSharedNetwork = (appState.runMode == RunModeEbpf || appState.runMode == RunModeTun),
         colorModeOptions = colorModeOptions,
-        colorMode = appState.colorMode,
         keyColorOptions = keyColorOptions,
-        seedIndex = appState.seedIndex,
         chartStyleOptions = chartStyleOptions,
-        networkActivityStyle = appState.networkActivityStyle,
         languageOptions = languageOptions,
         languageMode = appState.languageMode,
         coreLogLevel = appState.coreLogLevel,
@@ -623,26 +620,11 @@ private fun SettingsContent(
                 SettingsAppSection(
                     languageOptions = languageOptions,
                     languageMode = appState.languageMode,
-                    colorModeOptions = listOf(
-                        stringResource(R.string.option_follow_system),
-                        stringResource(R.string.option_light),
-                        stringResource(R.string.option_dark),
-                    ),
-                    colorMode = appState.colorMode,
+                    colorModeOptions = colorModeOptions,
                     keyColorOptions = keyColorOptions,
-                    seedIndex = appState.seedIndex,
                     chartStyleOptions = chartStyleOptions,
-                    networkActivityStyle = appState.networkActivityStyle,
-                    onColorModeChange = { index -> updateAppState { state -> state.copy(colorMode = index) } },
-                    onSeedIndexChange = { index -> updateAppState { state -> state.copy(seedIndex = index) } },
-                    onNetworkActivityStyleChange = { index ->
-                        updateAppState { state -> state.copy(networkActivityStyle = index) }
-                    },
                     onLanguageModeChange = { index -> updateAppState { state -> state.copy(languageMode = index) } },
-                    autoHideNavigationBar = appState.autoHideNavigationBar,
-                    onAutoHideNavigationBarChange = { enabled ->
-                        updateAppState { state -> state.copy(autoHideNavigationBar = enabled) }
-                    },
+                    onOpenPersonalization = { sheetState.showPersonalizationSettings = true },
                 )
             }
             item(key = "settings_tools") {
@@ -716,6 +698,9 @@ private fun SettingsContent(
             appState = appState,
             sheetState = sheetState,
             tunBypassRuleSetChoices = tunBypassRuleSetChoices,
+            colorModeOptions = colorModeOptions,
+            keyColorOptions = keyColorOptions,
+            chartStyleOptions = chartStyleOptions,
             updateAppState = updateAppState,
         )
         SettingsRestoreConfirmDialog(

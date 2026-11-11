@@ -9,6 +9,7 @@ import android.content.SharedPreferences
 import androidx.core.content.edit
 import app.AppState
 import app.modes.normalizeNetworkActivityStyle
+import app.modes.normalizeNavigationBarStyle
 import app.withNormalizedConnectionTestSettings
 import features.settings.servicecontrol.ServiceControlSchedule
 import features.settings.servicecontrol.ServiceControlKeyguard
@@ -63,6 +64,9 @@ internal class AppSettingsPreferences(
             autoHideNavigationBar = preferences.getBoolean(
                 KeyAutoHideNavigationBar,
                 defaults.autoHideNavigationBar,
+            ),
+            navigationBarStyle = normalizeNavigationBarStyle(
+                preferences.getInt(KeyNavigationBarStyle, defaults.navigationBarStyle),
             ),
             outboundListLayout = preferences.getInt(
                 KeyOutboundListLayout,
@@ -457,6 +461,7 @@ internal const val KeyHideRecentTasks = "hide_recent_tasks"
 internal const val KeyAllowScreenshots = "allow_screenshots"
 internal const val KeyHideLauncherIcon = "hide_launcher_icon"
 internal const val KeyAutoHideNavigationBar = "auto_hide_navigation_bar"
+internal const val KeyNavigationBarStyle = "navigation_bar_style"
 private const val KeySubscriptionHwid = "subscription_hwid"
 internal const val KeyOutboundListLayout = "outbound_list_layout"
 internal const val KeyOutboundListSort = "outbound_list_sort"
