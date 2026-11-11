@@ -22,11 +22,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -46,6 +46,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -105,7 +106,6 @@ import ui.icons.AsteriskIcons as Icons
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import engine.proxy.ProxyServiceResult
@@ -638,31 +638,35 @@ private fun HomeServicePowerButton(
         stateDescription = status
     }
     if (compact) {
-        // Compact navigation pairs the tabs with a filled FAB:
-        // a 56dp button with the stock M3 large corner (16dp) rather than
-        // this app's 24dp `shapes.large` card radius, which would read as a
-        // circle next to the pill.
-        FloatingActionButton(
-            onClick = { if (!control.busy) control.toggleService() },
-            modifier = semanticsModifier
-                .size(56.dp)
-                .then(if (control.busy) Modifier.semantics { disabled() } else Modifier),
+        // Compact navigation pairs the tabs with a filled FAB-sized button:
+        // 56dp with the stock M3 large corner (16dp) rather than this app's
+        // 24dp `shapes.large` card radius, which would read as a circle next
+        // to the pill. A Surface rather than FloatingActionButton, which has no
+        // disabled state: while busy the button must not ripple or announce
+        // itself as actionable.
+        Surface(
+            onClick = control.toggleService,
+            enabled = !control.busy,
+            modifier = semanticsModifier.size(56.dp),
             shape = RoundedCornerShape(16.dp),
-            containerColor = MaterialTheme.colorScheme.primary,
+            color = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
+            shadowElevation = 6.dp,
         ) {
-            if (control.serviceOperationInProgress) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 3.dp,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                )
-            } else {
-                Icon(
-                    imageVector = if (appState.proxyRunning) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(26.dp),
-                )
+            Box(contentAlignment = Alignment.Center) {
+                if (control.serviceOperationInProgress) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 3.dp,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                } else {
+                    Icon(
+                        imageVector = if (appState.proxyRunning) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
             }
         }
         return

@@ -5,7 +5,9 @@ package engine.singbox.runtime
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -48,21 +50,63 @@ internal data class SingBoxDelayAwaitResult(
     val freshDelays: Map<String, Int>,
 )
 
+/**
+ * One delay test runs at a time. A background probe only takes a free gate and yields it: a user
+ * test that finds a probe running cancels it and waits for its cleanup instead of failing, while a
+ * second user test still fails fast as before.
+ */
 internal class SingBoxDelayTestRunGate {
     private val lock = Any()
     private var owner: Any? = null
+    private var preemptibleOwner: Job? = null
 
-    fun acquire(): SingBoxDelayTestRunLease = synchronized(lock) {
-        check(owner == null) { "sing-box delay test is already running" }
+    suspend fun acquire(): SingBoxDelayTestRunLease {
+        while (true) {
+            val probe = synchronized(lock) {
+                if (owner == null) return take(preemptible = null)
+                checkNotNull(preemptibleOwner) { "sing-box delay test is already running" }
+            }
+            probe.cancelAndJoin()
+        }
+    }
+
+    /** Takes the gate for [probe] only when it is free; the probe never waits or preempts. */
+    fun tryAcquirePreemptible(probe: Job): SingBoxDelayTestRunLease? = synchronized(lock) {
+        if (owner != null) null else take(preemptible = probe)
+    }
+
+    private fun take(preemptible: Job?): SingBoxDelayTestRunLease {
         val token = Any()
         owner = token
-        SingBoxDelayTestRunLease(this, token)
+        preemptibleOwner = preemptible
+        return SingBoxDelayTestRunLease(this, token)
     }
 
     internal fun release(token: Any) {
         synchronized(lock) {
-            if (owner === token) owner = null
+            if (owner === token) {
+                owner = null
+                preemptibleOwner = null
+            }
         }
+    }
+}
+
+/**
+ * Rate limit for background probes, per target: the same tag is probed at most once per
+ * [intervalMillis], while a different tag is always let through. Lives with the runtime, not the
+ * UI, so recreating the activity does not reset it.
+ */
+internal class SingBoxDelayProbeThrottle(private val intervalMillis: Long) {
+    private val lock = Any()
+    private var lastTarget: String? = null
+    private var lastAtMillis = 0L
+
+    fun take(target: String, nowMillis: Long): Boolean = synchronized(lock) {
+        if (target == lastTarget && nowMillis - lastAtMillis < intervalMillis) return false
+        lastTarget = target
+        lastAtMillis = nowMillis
+        true
     }
 }
 

@@ -77,7 +77,7 @@ internal fun AsteriskCompactNavigationBar(
         contentAlignment = Alignment.Center,
     ) {
         // `maxWidth` is already the content width (outer padding removed), so
-        // compare against a content threshold, not a device width. 330dp of
+        // compare against a content threshold, not a device width. 320dp of
         // content means a ~360dp device keeps the roomy spacing.
         val dense = maxWidth < 320.dp
         // 24dp icon + 2 × 12dp keeps the 48dp minimum touch target.

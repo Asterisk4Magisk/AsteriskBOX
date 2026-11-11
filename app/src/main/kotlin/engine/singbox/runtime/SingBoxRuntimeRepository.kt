@@ -5,7 +5,6 @@ package engine.singbox.runtime
 
 import engine.root.dns.withRootDnsMutation
 import android.content.Context
-import androidx.core.content.edit
 import app.AppState
 import app.effects.SingBoxRuntimeLifecycleTarget
 import app.DefaultConnectionTestUrl
@@ -21,6 +20,8 @@ import io.nekohasekai.libbox.StatusMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,12 +43,12 @@ internal class SingBoxRuntimeRepository(
     context: Context,
 ) : SingBoxRuntimeLifecycleTarget {
     private val appContext = context.applicationContext
-    private var lastActiveNodeTag: String? = null
     private val mutableState = MutableStateFlow(SingBoxRuntimeState())
     private val trafficHistory = SingBoxTrafficHistoryBuffer(TrafficHistoryCapacity)
     private val trafficHistoryLock = Any()
     private val sessionLock = Any()
     private val delayTestRunGate = SingBoxDelayTestRunGate()
+    private val delayProbeThrottle = SingBoxDelayProbeThrottle(DelayProbeThrottleMillis)
     @Volatile
     private var session: SingBoxCommandClient? = null
     private var sessionTarget: SingBoxCommandTarget? = null
@@ -241,6 +242,31 @@ internal class SingBoxRuntimeRepository(
         buildPlan = { proxies -> buildSingBoxProxyDelayTestPlan(proxies, proxyName) },
     )
 
+    /**
+     * Background latency refresh for the node carrying traffic. It never competes with the user:
+     * it is skipped while any test runs, and a user test started meanwhile preempts it. A tag
+     * probed within [DelayProbeThrottleMillis] is skipped, so a start followed by a resume, or
+     * a quick back-and-forth between apps, tests once; switching to another node always probes.
+     */
+    suspend fun probeProxyDelay(
+        appState: AppState,
+        proxyName: String,
+        nowMillis: Long,
+    ) {
+        if (!delayProbeThrottle.take(proxyName, nowMillis)) return
+        // A child job, so that preempting the probe cancels only the probe, never the caller.
+        coroutineScope {
+            launch {
+                runDelayTest(
+                    appState = appState,
+                    target = proxyName,
+                    preemptible = true,
+                    buildPlan = { proxies -> buildSingBoxProxyDelayTestPlan(proxies, proxyName) },
+                )
+            }
+        }
+    }
+
     suspend fun refreshMemoryNow(appState: AppState): Long? {
         return runCatching {
             requireActiveSession(appState)
@@ -407,13 +433,8 @@ internal class SingBoxRuntimeRepository(
             }
 
             override fun onProxies(proxies: SingBoxProxiesState) {
-                // One lock pass: writing the snapshot and remembering the tag must not straddle a
-                // session replacement, or the tile keeps a stale node.
-                val applied = updateIfCurrent(listenerGeneration) { current ->
+                updateIfCurrent(listenerGeneration) { current ->
                     current.withProxySnapshot(proxies)
-                }
-                if (applied) {
-                    rememberActiveNodeTag(proxies)
                 }
             }
 
@@ -486,9 +507,15 @@ internal class SingBoxRuntimeRepository(
     private suspend fun runDelayTest(
         appState: AppState,
         target: String,
+        preemptible: Boolean = false,
         buildPlan: (SingBoxProxiesState) -> SingBoxDelayTestPlan,
     ): Result<SingBoxDelayResult> = runDelayTestCatching {
-        val lease = delayTestRunGate.acquire()
+        val lease = if (preemptible) {
+            delayTestRunGate.tryAcquirePreemptible(currentCoroutineContext()[Job]!!)
+                ?: error("sing-box delay test is already running")
+        } else {
+            delayTestRunGate.acquire()
+        }
         try {
             val active = requireActiveSession(appState)
             val runGeneration = synchronized(sessionLock) {
@@ -504,6 +531,7 @@ internal class SingBoxRuntimeRepository(
                 updateDelayTestIfGenerationCurrent(runGeneration) { current ->
                     current.startingDelayTest(
                         target = target,
+                        automatic = preemptible,
                         baselines = baselineTimes,
                         targetNames = plan.targetNames,
                         totalCount = plan.leafTargetNames.size,
@@ -603,21 +631,6 @@ internal class SingBoxRuntimeRepository(
         }
     }
 
-    /**
-     * The quick-settings tile cannot resolve the active node on its own (a
-     * fresh API connection sees only its own session), so the app leaves the
-     * last resolved tag behind whenever it has the proxy snapshots.
-     */
-    private fun rememberActiveNodeTag(proxies: SingBoxProxiesState) {
-        val tag = features.singbox.activeSingBoxNodeTag(proxies) ?: return
-        if (tag == lastActiveNodeTag) return
-        lastActiveNodeTag = tag
-        runCatching {
-            appContext.getSharedPreferences(TileStatePreferences, Context.MODE_PRIVATE)
-                .edit { putString(TileStateActiveNodeKey, tag) }
-        }
-    }
-
     private fun AppState.commandTarget(): SingBoxCommandTarget {
         val local = runMode == RunModeVpnService
         return SingBoxCommandTarget(local = local, control = singBoxControlConfig())
@@ -661,13 +674,15 @@ internal class SingBoxRuntimeRepository(
     private fun updateIfCurrent(
         expectedGeneration: Long,
         transform: (SingBoxRuntimeState) -> SingBoxRuntimeState,
-    ): Boolean = updateStateIfGenerationCurrent(
-        lock = sessionLock,
-        expectedGeneration = expectedGeneration,
-        currentGeneration = { generation },
-        state = mutableState,
-        transform = transform,
-    )
+    ) {
+        updateStateIfGenerationCurrent(
+            lock = sessionLock,
+            expectedGeneration = expectedGeneration,
+            currentGeneration = { generation },
+            state = mutableState,
+            transform = transform,
+        )
+    }
 
     private companion object {
         const val ConnectAttempts = 3
@@ -676,6 +691,7 @@ internal class SingBoxRuntimeRepository(
         const val SessionWaitMillis = 8_000L
         const val DelayTestTimestampBoundaryWaitMillis = 1_100L
         const val DelayTestNoProgressTimeoutMillis = 5_000L
+        const val DelayProbeThrottleMillis = 30_000L
         const val LogTag = "SingBoxRuntime"
     }
 }
@@ -706,11 +722,13 @@ internal fun SingBoxRuntimeState.withProxySnapshot(
 
 internal fun SingBoxRuntimeState.startingDelayTest(
     target: String,
+    automatic: Boolean,
     baselines: Map<String, Long>,
     targetNames: Set<String>,
     totalCount: Int,
 ): SingBoxRuntimeState = copy(
     delayTestingTarget = target,
+    delayTestingAutomatic = automatic,
     delayTestingCompleted = 0,
     delayTestingTotal = totalCount.coerceAtLeast(0),
     delayTestingBaselines = baselines,
@@ -734,6 +752,3 @@ internal fun SingBoxRuntimeState.finishingDelayTest(
         ),
     )
 }
-
-internal const val TileStatePreferences = "tile_state"
-internal const val TileStateActiveNodeKey = "active_node_tag"

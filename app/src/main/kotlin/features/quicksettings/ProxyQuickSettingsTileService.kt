@@ -17,7 +17,6 @@ import app.AsteriskApplication
 import app.MainActivity
 import app.R
 import app.modes.RunModeVpnService
-import app.modes.SingBoxModeDirect
 import data.AndroidAppStateStore
 import engine.proxy.ProxyServiceResult
 import engine.proxy.ProxyServiceUseCase
@@ -34,8 +33,6 @@ import kotlinx.coroutines.launch
 import ui.feedback.rootOperationTipMessageOrNull
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.config.APP_DIRECT_OUTBOUND
-import engine.singbox.runtime.TileStateActiveNodeKey
-import engine.singbox.runtime.TileStatePreferences
 import features.singbox.managedOutboundAlias
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
@@ -47,6 +44,7 @@ class ProxyQuickSettingsTileService : TileService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val stateStore by lazy { AndroidAppStateStore.get(applicationContext) }
     private val proxyEngine by lazy { (application as AsteriskApplication).proxyEngine }
+    private val singBoxRuntime by lazy { (application as AsteriskApplication).singBoxRuntime }
     private val proxyServiceUseCase by lazy {
         ProxyServiceUseCase(
             proxyEngine = proxyEngine,
@@ -197,7 +195,9 @@ class ProxyQuickSettingsTileService : TileService() {
      */
     private fun updateShownState(transform: (AppState) -> AppState) {
         if (activeService?.get() === this) {
-            markQuickSettingsTileShowing(transform(stateStore.state.value).quickSettingsTileState())
+            markQuickSettingsTileShowing(
+                transform(stateStore.state.value).quickSettingsTileState(singBoxRuntime.state.value),
+            )
         }
         stateStore.update(transform)
     }
@@ -229,14 +229,7 @@ class ProxyQuickSettingsTileService : TileService() {
 
     /** Managed tags are internal (`outbound_7_...`); show the configured alias. */
     private fun currentOutboundAlias(state: AppState): String? {
-        // Direct mode routes nothing through a node; keep the app label.
-        if (state.singBoxMode == SingBoxModeDirect) return null
-        val cached = getSharedPreferences(TileStatePreferences, MODE_PRIVATE)
-            .getString(TileStateActiveNodeKey, null)
-            ?.takeIf { tag -> tag.isNotBlank() }
-        val tag = cached
-            ?: state.selectorSelections[APP_GLOBAL_SELECTOR]?.takeIf { it.isNotBlank() }
-            ?: return null
+        val tag = quickSettingsActiveNodeTag(state, singBoxRuntime.state.value) ?: return null
         return when (tag) {
             APP_DIRECT_OUTBOUND -> getString(R.string.routing_direct)
             APP_GLOBAL_SELECTOR -> getString(R.string.routing_global)

@@ -104,6 +104,7 @@ import app.withSelectorSelection
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.plugin.PluginOutbounds
 import engine.singbox.runtime.SingBoxProxiesState
+import engine.singbox.runtime.canStartUserDelayTest
 import engine.singbox.runtime.SingBoxProxyGroup
 import engine.singbox.runtime.SingBoxProxyNode
 import engine.singbox.runtime.SingBoxRuntimeState
@@ -133,6 +134,7 @@ private data class SingBoxProxyPageRuntimeState(
     val proxies: SingBoxProxiesState,
     val proxiesRefreshing: Boolean,
     val delayTestingTarget: String?,
+    val userDelayTestAllowed: Boolean,
     val delayTestingCompleted: Int,
     val delayTestingTotal: Int,
     val delayTestingBaselines: Map<String, Long>,
@@ -144,6 +146,7 @@ private fun SingBoxRuntimeState.toProxyPageRuntimeState() = SingBoxProxyPageRunt
     proxies = proxies,
     proxiesRefreshing = proxiesRefreshing,
     delayTestingTarget = delayTestingTarget,
+    userDelayTestAllowed = canStartUserDelayTest,
     delayTestingCompleted = delayTestingCompleted,
     delayTestingTotal = delayTestingTotal,
     delayTestingBaselines = delayTestingBaselines,
@@ -358,7 +361,7 @@ fun SingBoxProxyPage(
     }
 
     fun testGroup(group: SingBoxProxyGroup) {
-        if (!requireRuntime() || testingTarget != null) return
+        if (!requireRuntime() || !runtimeState.userDelayTestAllowed) return
         val stateSnapshot = appState
         val groupName = group.name
         services.appScope.launch {
@@ -369,7 +372,7 @@ fun SingBoxProxyPage(
     }
 
     fun testProxy(node: SingBoxProxyNode) {
-        if (!requireRuntime() || testingTarget != null) return
+        if (!requireRuntime() || !runtimeState.userDelayTestAllowed) return
         val stateSnapshot = appState
         val proxyName = node.name
         services.appScope.launch {
@@ -543,7 +546,7 @@ fun SingBoxProxyPage(
                                         testing = testingTarget == group.name,
                                         testingCompleted = runtimeState.delayTestingCompleted,
                                         testingTotal = runtimeState.delayTestingTotal,
-                                        delayTestEnabled = runtimeAvailable && testingTarget == null,
+                                        delayTestEnabled = runtimeAvailable && runtimeState.userDelayTestAllowed,
                                         canLocate = currentName in nodes,
                                         onToggle = {
                                             selectedGroupName = group.name
@@ -600,7 +603,7 @@ fun SingBoxProxyPage(
                                             protocolType = outboundProtocolTypes[node.name] ?: node.type,
                                             selected = isSingBoxProxyNodeCurrent(group, node.name, pendingSelections),
                                             selectionEnabled = selectionBehavior.cardEnabled,
-                                            delayTestEnabled = runtimeAvailable && testingTarget == null,
+                                            delayTestEnabled = runtimeAvailable && runtimeState.userDelayTestAllowed,
                                             compact = columns > 1,
                                             delayStatus = resolveSingBoxProxyDelayStatus(
                                                 nodeName = node.name,
@@ -733,7 +736,7 @@ fun SingBoxProxyPage(
                                                 pendingSelections = pendingSelections,
                                             ),
                                             selectionEnabled = selectionBehavior.cardEnabled,
-                                            delayTestEnabled = runtimeAvailable && testingTarget == null,
+                                            delayTestEnabled = runtimeAvailable && runtimeState.userDelayTestAllowed,
                                             compact = columns > 1,
                                             delayStatus = resolveSingBoxProxyDelayStatus(
                                                 nodeName = node.name,

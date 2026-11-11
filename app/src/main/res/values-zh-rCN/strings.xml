@@ -72,10 +72,11 @@
     <string name="home_monitor_resource">资源</string>
     <string name="home_monitor_traffic">流量</string>
     <string name="home_network_activity">网络活动</string>
-    <string name="home_node_delay_unknown">测速</string>
-    <string name="home_node_delay_testing">测速中…</string>
-    <string name="home_node_delay_value">%1$d ms</string>
     <string name="home_no_network_activity">暂无活动</string>
+    <string name="home_node_delay_failed">超时</string>
+    <string name="home_node_delay_testing">测速中…</string>
+    <string name="home_node_delay_unknown">测速</string>
+    <string name="home_node_delay_value">%1$d ms</string>
     <string name="home_resource_cpu_label">CPU</string>
     <string name="home_resource_memory_label">内存</string>
     <string name="home_service_disabled">服务未启用</string>

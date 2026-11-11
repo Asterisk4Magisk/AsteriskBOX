@@ -3,35 +3,39 @@
 
 package ui.components
 
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonGroup
-import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.ToggleButtonDefaults
-import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ui.theme.AsteriskMotion
 
 @Immutable
 internal data class AsteriskSegmentItem<T>(
@@ -43,14 +47,15 @@ internal data class AsteriskSegmentItem<T>(
 )
 
 /**
- * Connected segmented switch: a Material 3 expressive
- * [ButtonGroup] of [ToggleButton]s whose corners round only on the group's
- * outer edges. The selected segment is filled with `primaryContainer` and its
- * label goes bold; unselected segments stay on `surfaceVariant`. Pressing a
- * segment morphs its shape through [ButtonGroupDefaults]' press shapes, and
- * the width animates through the group's `animateWidth` scope.
+ * Connected segmented switch: equal-width segments 2dp apart whose corners round only on the
+ * group's outer edges, the selected one turning into a full pill filled with
+ * `checkedContainerColor` and a bold label.
+ *
+ * Built from plain selectable surfaces rather than the expressive `ButtonGroup`/`ToggleButton`:
+ * those expose checkbox semantics (a screen reader would announce a one-of-many choice as
+ * independent toggles) and measure through the group's overflow machinery on every pass. Each
+ * segment here is a radio button inside a selectable group and keeps the 48dp touch target.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun <T> AsteriskSegmentedControl(
     items: List<AsteriskSegmentItem<T>>,
@@ -66,76 +71,85 @@ internal fun <T> AsteriskSegmentedControl(
     textStyle: TextStyle = MaterialTheme.typography.labelLarge,
 ) {
     if (items.isEmpty()) return
-    val interactionSources = remember(items.size) {
-        List(items.size) { MutableInteractionSource() }
-    }
-
-    ButtonGroup(
-        overflowIndicator = {},
+    Row(
         modifier = modifier.fillMaxWidth().selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        horizontalArrangement = Arrangement.spacedBy(SegmentSpacing),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         items.forEachIndexed { index, item ->
             val selected = item.value == selectedValue
-            val interactionSource = interactionSources[index]
-
-            customItem(
-                buttonGroupContent = {
-                    val shapes = when {
-                        items.size == 1 -> {
-                            val pill = RoundedCornerShape(percent = 50)
-                            ToggleButtonShapes(shape = pill, pressedShape = pill, checkedShape = pill)
-                        }
-                        index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                        index == items.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                    }
-                    ToggleButton(
-                        checked = selected,
-                        onCheckedChange = { onSelected(item.value) },
-                        enabled = enabled,
-                        modifier = Modifier
-                            // Equal-width segments: the expressive press-width
-                            // animation cannot play under weight(1f), so it is
-                            // deliberately not applied here.
-                            .weight(1f)
-                            .alpha(if (item.muted) 0.38f else 1f),
-                        shapes = shapes,
-                        colors = ToggleButtonDefaults.colors(
-                            containerColor = containerColor,
-                            contentColor = contentColor,
-                            checkedContainerColor = checkedContainerColor,
-                            checkedContentColor = checkedContentColor,
-                            disabledContainerColor = containerColor.copy(alpha = 0.3f),
-                            disabledContentColor = contentColor.copy(alpha = 0.38f),
-                        ),
-                        contentPadding = contentPadding,
-                        interactionSource = interactionSource,
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            if (item.icon != null) {
-                                Icon(
-                                    imageVector = item.icon,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
-                            Text(
-                                text = item.label,
-                                style = textStyle,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                },
-                menuContent = {},
+            val targetContainer = if (selected) checkedContainerColor else containerColor
+            val targetContent = if (selected) checkedContentColor else contentColor
+            val segmentContainer by animateColorAsState(
+                targetValue = if (enabled) targetContainer else targetContainer.copy(alpha = 0.3f),
+                animationSpec = AsteriskMotion.fastEffects(),
+                label = "segment-container-color",
             )
+            val segmentContent by animateColorAsState(
+                targetValue = if (enabled) targetContent else targetContent.copy(alpha = 0.38f),
+                animationSpec = AsteriskMotion.fastEffects(),
+                label = "segment-content-color",
+            )
+            Surface(
+                selected = selected,
+                onClick = { onSelected(item.value) },
+                enabled = enabled,
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = SegmentMinHeight)
+                    .alpha(if (item.muted) 0.38f else 1f)
+                    .semantics { role = Role.RadioButton },
+                shape = segmentShape(selected, index, items.lastIndex),
+                color = segmentContainer,
+                contentColor = segmentContent,
+            ) {
+                Row(
+                    modifier = Modifier.padding(contentPadding),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (item.icon != null) {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    Text(
+                        text = item.label,
+                        style = textStyle,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }
+
+private fun segmentShape(selected: Boolean, index: Int, lastIndex: Int): Shape = when {
+    selected || lastIndex == 0 -> CircleShape
+    index == 0 -> SegmentLeadingShape
+    index == lastIndex -> SegmentTrailingShape
+    else -> SegmentMiddleShape
+}
+
+private val SegmentSpacing = 2.dp
+private val SegmentMinHeight = 40.dp
+private val SegmentOuterCorner = CornerSize(50)
+private val SegmentInnerCorner = CornerSize(8.dp)
+private val SegmentLeadingShape = RoundedCornerShape(
+    topStart = SegmentOuterCorner,
+    topEnd = SegmentInnerCorner,
+    bottomEnd = SegmentInnerCorner,
+    bottomStart = SegmentOuterCorner,
+)
+private val SegmentMiddleShape = RoundedCornerShape(SegmentInnerCorner)
+private val SegmentTrailingShape = RoundedCornerShape(
+    topStart = SegmentInnerCorner,
+    topEnd = SegmentOuterCorner,
+    bottomEnd = SegmentOuterCorner,
+    bottomStart = SegmentInnerCorner,
+)

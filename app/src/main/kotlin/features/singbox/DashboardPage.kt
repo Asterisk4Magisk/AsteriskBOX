@@ -40,8 +40,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -80,6 +78,9 @@ import app.modes.SingBoxModeRule
 import engine.singbox.config.APP_DIRECT_OUTBOUND
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.runtime.SingBoxProxiesState
+import engine.singbox.runtime.SingBoxRuntimeRepository
+import engine.singbox.runtime.SingBoxRuntimeState
+import engine.singbox.runtime.canStartUserDelayTest
 import engine.singbox.runtime.SingBoxTrafficSample
 import engine.singbox.runtime.SingBoxTrafficState
 import features.home.HomeControllerState
@@ -384,9 +385,9 @@ fun SingBoxDashboardPage(
                         modifier = Modifier.weight(1f),
                     ) {
                         val (ipv4, ipv6) = homeNetworkValues(monitoringOverviewState)
-                        TileStackedMetric(label = HomeIpv4Label, value = ipv4)
+                        TileStackedMetric(label = stringResource(R.string.common_ipv4), value = ipv4)
                         Spacer(Modifier.height(4.dp))
-                        TileStackedMetric(label = HomeIpv6Label, value = ipv6)
+                        TileStackedMetric(label = stringResource(R.string.common_ipv6), value = ipv6)
                     }
                 }
             }
@@ -403,53 +404,6 @@ private fun HomeControllerCard(
     onOpenProxies: () -> Unit,
 ) {
     val uptime = rememberServiceUptimeText()
-    val singBoxRuntime = LocalAppServices.current.singBoxRuntime
-    // Only the proxy snapshot matters here; the unsampled flow pushes a
-    // traffic sample every second and would recompose the whole hero card.
-    val runtimeProxies by remember(singBoxRuntime) {
-        singBoxRuntime.state
-            .map { state -> state.proxies }
-            .distinctUntilChanged()
-    }.collectAsState(initial = SingBoxProxiesState())
-    val currentOutbound = remember(runtimeProxies, controllerState.singBoxMode) {
-        if (controllerState.singBoxMode == SingBoxModeDirect) {
-            null
-        } else {
-            activeSingBoxNodeTag(runtimeProxies)
-        }
-    }
-    val appState by LocalAppStateStore.current.collectAppState()
-    val appScope = LocalAppServices.current.appScope
-    val latestAppState = rememberUpdatedState(appState)
-    var delayTesting by remember { mutableStateOf(false) }
-    // The core reports the last measured delay on every node snapshot, so the hero can show the
-    // active node's latency without extra work; a tap re-tests just that node.
-    val currentNodeDelay = remember(runtimeProxies, currentOutbound) {
-        currentOutbound?.let { tag ->
-            runtimeProxies.nodeByName[tag]
-                ?.delay
-                ?.takeIf { delay -> delay >= 0 }
-        }
-    }
-    // The runtime reports managed tags (outbound_7_...), so map the active one
-    // back to the alias the user gave the node.
-    val currentOutboundAlias = remember(currentOutbound, appState) {
-        when (currentOutbound) {
-            APP_DIRECT_OUTBOUND -> null
-            APP_GLOBAL_SELECTOR -> null
-            else -> managedOutboundAlias(appState, currentOutbound)
-        }
-    }
-    val directLabel = stringResource(R.string.routing_direct)
-    val globalLabel = stringResource(R.string.routing_global)
-    val outboundLabel = when {
-        controllerState.singBoxMode == SingBoxModeDirect ->
-            stringResource(R.string.sing_box_mode_direct)
-        currentOutbound == APP_DIRECT_OUTBOUND -> directLabel
-        currentOutbound == APP_GLOBAL_SELECTOR -> globalLabel
-        !currentOutboundAlias.isNullOrBlank() -> currentOutboundAlias
-        else -> stringResource(R.string.home_current_outbound_none)
-    }
     // The runtime line keeps its slot when the service is down, so the status
     // card never changes height between running and stopped states.
     val runtimeText = uptime ?: HomeServiceUptimePlaceholder
@@ -494,10 +448,10 @@ private fun HomeControllerCard(
                 // running clock, so the card never resizes when the service starts.
                 summaryStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                 summaryContentDescription = uptime
-            ?.let { value -> stringResource(R.string.home_service_uptime, value) }
-            ?: stringResource(
-                if (serviceEnabled) R.string.home_service_enabled else R.string.home_service_disabled,
-            ),
+                    ?.let { value -> stringResource(R.string.home_service_uptime, value) }
+                    ?: stringResource(
+                        if (serviceEnabled) R.string.home_service_enabled else R.string.home_service_disabled,
+                    ),
                 stateIcon = if (serviceEnabled) Icons.Rounded.VpnLock else Icons.Rounded.PublicOff,
                 // The inner card is the accent one, matching the accent colour
                 // picked in Settings > Personalization.
@@ -527,67 +481,11 @@ private fun HomeControllerCard(
                 },
                 forcePrimaryActionStacked = shouldStackHomeServiceRuntimeSummary(),
             )
-            // Current node: caption + alias, no surface of its own.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable(onClick = onOpenProxies)
-                    .padding(horizontal = 4.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Dns,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.home_current_node_title),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                    Text(
-                        text = outboundLabel,
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (
-                    serviceEnabled &&
-                    currentOutbound != null &&
-                    currentOutbound != APP_DIRECT_OUTBOUND &&
-                    currentOutbound != APP_GLOBAL_SELECTOR
-                ) {
-                    NodeDelayChip(
-                        delayMs = currentNodeDelay,
-                        testing = delayTesting,
-                        onClick = {
-                            val target = currentOutbound
-                            if (target != null && !delayTesting) {
-                                delayTesting = true
-                                appScope.launch {
-                                    runCatching {
-                                        singBoxRuntime.testProxyDelay(latestAppState.value, target)
-                                    }
-                                    delayTesting = false
-                                }
-                            }
-                        },
-                    )
-                    Spacer(Modifier.width(6.dp))
-                }
-                Icon(
-                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            HomeCurrentNodeRow(
+                singBoxMode = controllerState.singBoxMode,
+                serviceEnabled = serviceEnabled,
+                onOpenProxies = onOpenProxies,
+            )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -616,6 +514,131 @@ private fun HomeControllerCard(
                 )
             }
         }
+    }
+}
+
+/** The slice of the runtime the current-node row reads; it changes only with the proxy snapshot or a test. */
+private data class HomeNodeRuntime(
+    val running: Boolean = false,
+    val proxies: SingBoxProxiesState = SingBoxProxiesState(),
+    val delayTestingTarget: String? = null,
+    val delayTestingBaselines: Map<String, Long> = emptyMap(),
+    val delayFailedNodes: Set<String> = emptySet(),
+)
+
+private fun SingBoxRuntimeRepository.homeNodeRuntimeSnapshot() = state.value.toHomeNodeRuntime()
+
+private fun SingBoxRuntimeState.toHomeNodeRuntime() = HomeNodeRuntime(
+    running = running,
+    proxies = proxies,
+    delayTestingTarget = delayTestingTarget,
+    delayTestingBaselines = delayTestingBaselines,
+    delayFailedNodes = delayFailureBaselines.keys,
+)
+
+/**
+ * Current node: caption + alias, no surface of its own, opening the proxy tab. Kept apart from the
+ * hero so a proxy snapshot or a delay test recomposes only this row. In Global mode the global
+ * selector carries all traffic; in Rule mode it carries only what the rules send to it, so the
+ * caption names the selector instead of claiming the node is current.
+ */
+@Composable
+private fun HomeCurrentNodeRow(
+    singBoxMode: Int,
+    serviceEnabled: Boolean,
+    onOpenProxies: () -> Unit,
+) {
+    val services = LocalAppServices.current
+    val singBoxRuntime = services.singBoxRuntime
+    // The unsampled flow pushes a traffic sample every second; map it down first.
+    val runtime by remember(singBoxRuntime) {
+        singBoxRuntime.state
+            .map { state -> state.toHomeNodeRuntime() }
+            .distinctUntilChanged()
+    }.collectAsState(initial = singBoxRuntime.homeNodeRuntimeSnapshot())
+    val appState by LocalAppStateStore.current.collectAppState()
+    val latestAppState = rememberUpdatedState(appState)
+    val directMode = singBoxMode == SingBoxModeDirect
+    val currentOutbound = remember(runtime.proxies, directMode) {
+        if (directMode) null else activeSingBoxNodeTag(runtime.proxies)
+    }
+    // The runtime reports managed tags (outbound_7_...), so map the active one
+    // back to the alias the user gave the node.
+    val currentOutboundAlias = remember(currentOutbound, appState) {
+        managedOutboundAlias(appState, currentOutbound)
+    }
+    val outboundLabel = when {
+        directMode -> stringResource(R.string.sing_box_mode_direct)
+        currentOutbound == APP_DIRECT_OUTBOUND -> stringResource(R.string.routing_direct)
+        currentOutbound == APP_GLOBAL_SELECTOR -> stringResource(R.string.routing_global)
+        !currentOutboundAlias.isNullOrBlank() -> currentOutboundAlias
+        else -> stringResource(R.string.home_current_outbound_none)
+    }
+    val title = stringResource(
+        if (singBoxMode == SingBoxModeRule) R.string.routing_global else R.string.home_current_node_title,
+    )
+    val testableNode = currentOutbound?.takeIf { tag ->
+        serviceEnabled && runtime.running && tag != APP_DIRECT_OUTBOUND && tag != APP_GLOBAL_SELECTOR
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onOpenProxies)
+            .padding(horizontal = 4.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Dns,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+            Text(
+                text = outboundLabel,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (testableNode != null) {
+            val node = runtime.proxies.nodeByName[testableNode]
+            // Same resolution as the proxy list, so both show one status for the node.
+            val status = resolveSingBoxProxyDelayStatus(
+                nodeName = testableNode,
+                delay = node?.delay,
+                delayUpdatedAtEpochSeconds = node?.delayUpdatedAtEpochSeconds,
+                testingBaselines = if (runtime.delayTestingTarget != null) runtime.delayTestingBaselines else emptyMap(),
+                failedNodes = runtime.delayFailedNodes,
+            )
+            NodeDelayChip(
+                status = status,
+                delayMs = node?.delay,
+                onClick = {
+                    // A user test preempts a background probe; it never stacks on another user test.
+                    if (singBoxRuntime.state.value.canStartUserDelayTest) {
+                        services.appScope.launch {
+                            singBoxRuntime.testProxyDelay(latestAppState.value, testableNode)
+                        }
+                    }
+                },
+            )
+            Spacer(Modifier.width(6.dp))
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -765,21 +788,23 @@ private fun NetworkActivityLineChart(
     }
 }
 
-/**
- * Latency readout for the active node: tap re-tests it. `null` means "never measured", which the
- * core reports as a missing delay rather than a zero.
- */
+/** Latency readout for the active node: tap re-tests it. */
 @Composable
 private fun NodeDelayChip(
+    status: SingBoxProxyDelayStatus,
     delayMs: Int?,
-    testing: Boolean,
     onClick: () -> Unit,
 ) {
-    val tint = if (testing) MaterialTheme.colorScheme.onSurfaceVariant else singBoxDelayTint(delayMs)
-    val text = when {
-        testing -> stringResource(R.string.home_node_delay_testing)
-        delayMs == null -> stringResource(R.string.home_node_delay_unknown)
-        else -> stringResource(R.string.home_node_delay_value, delayMs)
+    val text = when (status) {
+        SingBoxProxyDelayStatus.Testing -> stringResource(R.string.home_node_delay_testing)
+        SingBoxProxyDelayStatus.NotTested -> stringResource(R.string.home_node_delay_unknown)
+        SingBoxProxyDelayStatus.Failed -> stringResource(R.string.home_node_delay_failed)
+        SingBoxProxyDelayStatus.Measured -> stringResource(R.string.home_node_delay_value, delayMs ?: 0)
+    }
+    val tint = when (status) {
+        SingBoxProxyDelayStatus.Testing, SingBoxProxyDelayStatus.NotTested -> MaterialTheme.colorScheme.onSurfaceVariant
+        SingBoxProxyDelayStatus.Failed -> singBoxDelayTint(-1)
+        SingBoxProxyDelayStatus.Measured -> singBoxDelayTint(delayMs)
     }
     Row(
         modifier = Modifier
@@ -1015,7 +1040,7 @@ private fun runModeLabel(runMode: Int): String {
 private fun homeResourceCpuText(monitoringState: HomeMonitoringOverviewState): String {
     if (!monitoringState.serviceRunning) return stringResource(R.string.home_value_unavailable)
     return monitoringState.resourceCpuPercent
-        ?.let { value -> "%.0f%%".format(value) }
+        ?.let { value -> "%.1f%%".format(value) }
         ?: stringResource(R.string.home_value_unavailable)
 }
 
@@ -1084,9 +1109,6 @@ private const val NetworkActivityVerticalPitchScale = 2.6f
 private const val NetworkActivitySlotCount = HomeNetworkSampleLimit
 
 private val HomeMonitoringTileHeight = 132.dp
-
-private const val HomeIpv4Label = "IPv4"
-private const val HomeIpv6Label = "IPv6"
 
 private val NetworkActivityChartHeight = 120.dp
 

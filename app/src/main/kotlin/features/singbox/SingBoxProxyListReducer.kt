@@ -73,17 +73,14 @@ internal fun managedOutboundAlias(state: AppState, tag: String?): String? {
  * actually carries traffic. The runtime names nodes by their managed tag.
  */
 internal fun activeSingBoxNodeTag(proxies: SingBoxProxiesState): String? {
-    val groupsByName = proxies.groups.associateBy { group -> group.name }
-    var name = prioritizeGlobalSingBoxProxyGroup(proxies)
-        .groups
-        .firstOrNull()
-        ?.now
-        ?.takeIf { it.isNotBlank() }
-    val visited = mutableSetOf<String>()
-    while (name != null && visited.add(name)) {
-        val group = groupsByName[name] ?: return name
-        val next = group.now.takeIf { it.isNotBlank() }
-        if (next == null || next == name) return name
+    val groups = proxies.groups
+    val root = groups.firstOrNull { group -> group.name == APP_GLOBAL_SELECTOR } ?: groups.firstOrNull()
+    var name = root?.now?.takeIf { it.isNotBlank() } ?: return null
+    // Nesting is shallow, so a linear lookup per level beats building a map on every snapshot;
+    // the hop limit stops a selector cycle.
+    repeat(groups.size) {
+        val group = groups.firstOrNull { candidate -> candidate.name == name } ?: return name
+        val next = group.now.takeIf { it.isNotBlank() && it != name } ?: return name
         name = next
     }
     return name

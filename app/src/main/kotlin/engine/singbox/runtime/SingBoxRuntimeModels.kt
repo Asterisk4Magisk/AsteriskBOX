@@ -78,6 +78,9 @@ internal data class SingBoxRuntimeState(
     val proxies: SingBoxProxiesState = SingBoxProxiesState(),
     val proxiesRefreshing: Boolean = false,
     val delayTestingTarget: String? = null,
+    // The running test is a background probe a user test may preempt; only meaningful while
+    // [delayTestingTarget] is set, so the resets that clear the target need not clear it.
+    val delayTestingAutomatic: Boolean = false,
     val delayTestingCompleted: Int = 0,
     val delayTestingTotal: Int = 0,
     val delayTestingBaselines: Map<String, Long> = emptyMap(),
@@ -97,3 +100,7 @@ internal data class SingBoxDelayResult(
     val firstDelay: Int?
         get() = delays.values.firstOrNull()
 }
+
+/** True when a user-started delay test may begin now (nothing runs, or only a background probe). */
+internal val SingBoxRuntimeState.canStartUserDelayTest: Boolean
+    get() = delayTestingTarget == null || delayTestingAutomatic

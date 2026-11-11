@@ -46,6 +46,7 @@ import coil3.SingletonImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -329,13 +330,17 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
     /**
      * Asks SystemUI to rebind the quick settings tile whenever a state source in this process
      * changes it; the first collection is the refresh at process start. The language is included
-     * because opening the panel no longer refreshes an active tile. A `proxyRunning` the tile
-     * writes back itself is skipped, since the tile shows it without reading the status again.
+     * because opening the panel no longer refreshes an active tile, and so is the active node the
+     * tile names. A `proxyRunning` the tile writes back itself is skipped, since the tile shows it
+     * without reading the status again.
      */
     private fun refreshQuickSettingsTileOnProxyStateChange() {
         appScope.launch {
-            stateStore.state
-                .map { state -> state.quickSettingsTileState() }
+            // The runtime ticks every second for traffic; only a new proxy snapshot can move the node.
+            val runtimeNodes = singBoxRuntime.state.distinctUntilChanged { old, new ->
+                old.running == new.running && old.proxies === new.proxies
+            }
+            combine(stateStore.state, runtimeNodes) { state, runtime -> state.quickSettingsTileState(runtime) }
                 .distinctUntilChanged()
                 .collect { tileState -> refreshQuickSettingsTileUnlessShowing(applicationContext, tileState) }
         }
