@@ -6,6 +6,7 @@ package features.outbound
 import engine.singbox.plugin.decodeMieruTrafficPattern
 import engine.singbox.plugin.encodeMieruTrafficPatternBase64
 import engine.singbox.plugin.mieruMultiplexingLevel
+import engine.singbox.plugin.textList
 import engine.singbox.config.SingBoxJson
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
@@ -13,6 +14,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import java.net.URI
+import java.net.URLDecoder
 import kotlin.io.encoding.Base64
 import utils.booleanOrFalse
 import utils.decodeUrlComponentPreservingPlus
@@ -24,10 +26,11 @@ import utils.stringOrEmpty
 
 /**
  * Share links of the plugin-backed protocols. Formats follow husi:
- * `mierus://` (Mieru), `sq://` (ShadowQUIC, official format) and
- * `juicity://`; `sudoku://` is the Sudoku short link (see [parseSudokuShareLink]).
+ * `mierus://` (Mieru), `sq://` or `shadowquic://` (ShadowQUIC, community
+ * format of RealBikiniBottom/QuicProxy discussion 2) and `juicity://`;
+ * `sudoku://` is the Sudoku short link (see [parseSudokuShareLink]).
  */
-internal val PluginShareLinkSchemes = setOf("mierus", "sq", "juicity", "sudoku")
+internal val PluginShareLinkSchemes = setOf("mierus", "sq", "shadowquic", "juicity", "sudoku")
 
 internal fun parsePluginShareLink(link: String): JsonObject? {
     val scheme = link.substringBefore("://").lowercase()
@@ -55,7 +58,13 @@ internal fun parsePluginShareLink(link: String): JsonObject? {
         "mierus" -> buildJsonObject {
             put("type", "mieru")
             // husi writes the name into `profile`; older links use the fragment.
-            val tag = fragment.ifBlank { query["profile"].orEmpty() }
+            // mieru encodes its query as a form (url.Values), where '+' is a space.
+            val profile = uri.rawQuery.orEmpty().split('&')
+                .firstOrNull { item -> item.substringBefore('=') == "profile" }
+                ?.substringAfter('=', "")
+                ?.let { value -> runCatching { URLDecoder.decode(value, Charsets.UTF_8.name()) }.getOrDefault(value) }
+                .orEmpty()
+            val tag = fragment.ifBlank { profile }
             if (tag.isNotBlank()) put("tag", tag)
             put("server", host)
             // Mieru links carry repeatable port=/protocol= pairs in the query; the
@@ -77,20 +86,20 @@ internal fun parsePluginShareLink(link: String): JsonObject? {
             }
         }
 
-        "sq" -> buildJsonObject {
+        "sq", "shadowquic" -> buildJsonObject {
             put("type", "shadowquic")
             put("server", host)
             put("server_port", port)
             put("username", username)
             put("password", password)
             query["sni"]?.takeIf(String::isNotBlank)?.let { put("server_name", it) }
+            // The format defaults udp_mode to stream and turns 0-RTT on whenever
+            // zero_rtt is present, whatever its value.
             val udpMode = query["udp_mode"] ?: query["udp_mod"]
-            if (udpMode != null) put("udp_over_stream", udpMode == "stream")
-            query["zero_rtt"]?.let { value ->
-                // Presence means on unless the value explicitly says otherwise.
-                if (value.isEmpty() || parseFlag(value)) put("zero_rtt", true)
-            }
-            query["congestion"]?.takeIf { it != "copa" }?.let { put("congestion_control", it) }
+            put("udp_over_stream", udpMode == null || udpMode == "stream")
+            if (query.containsKey("zero_rtt")) put("zero_rtt", true)
+            // Links carry no Brutal bandwidth, so Brutal falls back to the default like copa.
+            query["congestion"]?.takeIf { it != "copa" && it != "brutal" }?.let { put("congestion_control", it) }
             val mtu = query["mtu"]?.toIntOrNull() ?: 1280
             put("initial_mtu", mtu)
             put("min_mtu", mtu)
@@ -180,7 +189,9 @@ internal fun encodePluginShareUrl(type: String, outbound: JsonObject, remarks: S
                         .takeIf { it.isNotBlank() && it != "brutal" }
                         ?.let { add("congestion" to it) }
                     add("mtu" to mtu.toString())
-                    outbound.stringOrEmpty("alpn").takeIf(String::isNotBlank)?.let { add("alpn" to it) }
+                    textList(outbound, "alpn").takeIf { it.isNotEmpty() }?.let { alpns ->
+                        add("alpn" to alpns.joinToString(","))
+                    }
                 }
                 appendQuery(params)
                 if (remarks.isNotBlank()) append('#').append(remarks.encodeUrlComponent())

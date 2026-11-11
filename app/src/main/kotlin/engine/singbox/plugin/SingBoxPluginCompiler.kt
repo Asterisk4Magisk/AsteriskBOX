@@ -24,6 +24,7 @@ import java.io.File
 import java.net.InetAddress
 import java.net.ServerSocket
 import utils.booleanOrNull
+import utils.decodePaddedBase64OrNull
 import utils.encodeUrlComponent
 import utils.intOrNull
 import utils.stringOrEmpty
@@ -512,7 +513,19 @@ private fun buildShadowQuicConfig(
                 }
                 put("initial-mtu", initialMtu)
                 if (minimumMtu > 0) put("min-mtu", minimumMtu)
-                put("congestion-control", outbound.stringOrEmpty("congestion_control").ifBlank { "bbr" })
+                val congestion = outbound.stringOrEmpty("congestion_control").ifBlank { "bbr" }
+                if (congestion.equals("brutal", ignoreCase = true)) {
+                    // Brutal takes the upload bandwidth in bit/s; its 10 Mbit/s default is never assumed.
+                    val upMbps = bandwidthValue(outbound, "brutal_up_mbps")
+                    require(upMbps != null && upMbps > 0) {
+                        "ShadowQUIC outbound $tag uses Brutal without an upload bandwidth"
+                    }
+                    putJsonObject("congestion-control") {
+                        putJsonObject("brutal") { put("bandwidth", upMbps * 1_000_000L) }
+                    }
+                } else {
+                    put("congestion-control", congestion)
+                }
                 if (keepAlive > 0) put("keep-alive-interval", keepAlive)
                 if (isSunny) {
                     val paths = textList(outbound, "extra_paths")
@@ -525,10 +538,12 @@ private fun buildShadowQuicConfig(
                     if (certPath.isNotBlank()) put("cert-path", certPath)
                 }
                 put("gso", outbound.booleanOrNull("gso") ?: false)
-                if (outbound.booleanOrNull("zero_rtt") == true) put("zero-rtt", true)
+                // Explicit: shadowquic turns zero-rtt and mtu-discovery on when they are absent.
+                put("zero-rtt", outbound.booleanOrNull("zero_rtt") ?: false)
                 if (outbound.booleanOrNull("udp_over_stream") == true) put("over-stream", true)
-                if (outbound.booleanOrNull("mtu_discovery") == true) {
-                    put("mtu-discovery", true)
+                val mtuDiscovery = outbound.booleanOrNull("mtu_discovery") ?: false
+                put("mtu-discovery", mtuDiscovery)
+                if (mtuDiscovery) {
                     if (!isSunny && outbound.booleanOrNull("blackhole_detection") == true) {
                         put("blackhole-detection", true)
                     }
@@ -577,6 +592,7 @@ private fun buildHysteria2Config(
                 textList(tls ?: JsonObject(emptyMap()), "alpn").takeIf { it.isNotEmpty() }?.let { alpns ->
                     putJsonArray("alpn") { alpns.forEach { item -> add(item) } }
                 }
+                hysteria2PinSha256(tls, tag)?.let { pin -> put("pinSHA256", pin) }
                 if (tlsFiles.ca.isNotBlank()) put("ca", tlsFiles.ca)
                 if (tlsFiles.clientCertificate.isNotBlank()) put("clientCertificate", tlsFiles.clientCertificate)
                 if (tlsFiles.clientKey.isNotBlank()) put("clientKey", tlsFiles.clientKey)
@@ -733,6 +749,20 @@ private fun buildNaiveConfig(
     )
 }
 
+/**
+ * `tls.certificate_sha256` (base64 SHA-256 of the whole certificate, as a
+ * link's pinSHA256 imports it) in hysteria's hex form. Hysteria pins one
+ * certificate, so several pins fail instead of losing the others.
+ */
+private fun hysteria2PinSha256(tls: JsonObject?, tag: String): String? {
+    val pins = tls?.let { textList(it, "certificate_sha256") }.orEmpty()
+    if (pins.isEmpty()) return null
+    require(pins.size == 1) { "Hysteria2 plugin outbound $tag supports one certificate_sha256" }
+    val digest = pins.single().decodePaddedBase64OrNull()
+    require(digest != null && digest.size == 32) { "Hysteria2 outbound $tag has an invalid certificate_sha256" }
+    return digest.joinToString("") { byte -> "%02x".format(byte) }
+}
+
 private fun bandwidthValue(outbound: JsonObject, key: String): Int? =
     (outbound[key] as? JsonPrimitive)?.intOrNull
         ?: (outbound[key] as? JsonPrimitive)?.contentOrNull?.toIntOrNull()
@@ -752,7 +782,7 @@ internal fun mieruMultiplexingLevel(value: String): String? = when (value.trim()
 }
 
 /** Accepts a JSON array (imported config) or a comma/space/newline separated string (editor). */
-private fun textList(outbound: JsonObject, key: String): List<String> {
+internal fun textList(outbound: JsonObject, key: String): List<String> {
     val element = outbound[key]
     if (element is JsonArray) {
         return element.mapNotNull { item -> (item as? JsonPrimitive)?.contentOrNull }

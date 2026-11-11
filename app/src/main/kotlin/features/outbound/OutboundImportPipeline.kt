@@ -840,7 +840,7 @@ internal object MihomoYamlOutboundParser {
 
 private object ProxyUrlOutboundParser {
     private val urlPattern = Regex(
-        """(?i)(?:socks(?:4a?|5h?)?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2(?:\+realm(?:\+http)?)?|hy2|anytls|snell|ssh|tor|naive(?:\+(?:https|quic))?|wg|wireguard|awg|warp|mierus|sq|juicity|sudoku)://[^\s<>"']+""",
+        """(?i)(?:socks(?:4a?|5h?)?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2(?:\+realm(?:\+http)?)?|hy2|anytls|snell|ssh|tor|naive(?:\+(?:https|quic))?|wg|wireguard|awg|warp|mierus|sq|shadowquic|juicity|sudoku)://[^\s<>"']+""",
     )
 
     fun parseOutcomeOrNull(content: String): ImportOutcome<ImportedSingBoxOutbound>? {

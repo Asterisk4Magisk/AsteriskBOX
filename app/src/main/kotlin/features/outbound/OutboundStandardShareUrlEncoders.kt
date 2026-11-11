@@ -107,7 +107,7 @@ private fun JsonObject.encodeNaiveShareUrl(remarks: String): String {
     }
     parameters += tls
     return buildOutboundShareUri(
-        scheme = if (quic) "naive+quic" else "naive",
+        scheme = if (quic) "naive+quic" else "naive+https",
         endpoint = requireShareEndpoint(),
         encodedUserInfo = encodeShareCredentials(stringOrEmpty("username"), stringOrEmpty("password")),
         parameters = parameters,

@@ -700,6 +700,13 @@ private fun shadowQuicOutboundFields() = listOf(
     outboundField("initial_mtu", "Initial MTU", OutboundFieldKind.INTEGER),
     outboundField("min_mtu", "Min MTU", OutboundFieldKind.INTEGER),
     outboundSelect("congestion_control", "Congestion control", listOf("bbr", "cubic", "brutal")),
+    // ShadowQUIC's Brutal bandwidth is the upload bandwidth.
+    outboundField(
+        "brutal_up_mbps",
+        "Brutal upload (Mbps)",
+        OutboundFieldKind.INTEGER,
+        conditions = listOf(OutboundFieldCondition("congestion_control", setOf("brutal"))),
+    ),
     outboundField("keep_alive_interval", "Keep-alive interval", OutboundFieldKind.INTEGER),
     outboundField("gso", "GSO", OutboundFieldKind.BOOLEAN),
     outboundField("udp_over_stream", "UDP over stream", OutboundFieldKind.BOOLEAN),
