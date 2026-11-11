@@ -9,11 +9,13 @@ package features.singbox
 
 import android.os.SystemClock
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Icon
@@ -37,8 +40,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +52,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.AppServices
+import app.LocalMainDestinationState
+import app.navigation.MainDestination
 import app.LocalAppServices
 import app.LocalAppStateStore
 import app.LocalIsWideScreen
@@ -63,6 +71,7 @@ import app.modes.RunModeVpnService
 import app.modes.SingBoxModeDirect
 import app.modes.SingBoxModeGlobal
 import app.modes.SingBoxModeRule
+import engine.singbox.runtime.SingBoxProxiesState
 import engine.singbox.runtime.SingBoxTrafficSample
 import engine.singbox.runtime.SingBoxTrafficState
 import features.home.HomeControllerState
@@ -181,6 +190,7 @@ fun SingBoxDashboardPage(
     val latestAppState = rememberUpdatedState(appState)
 
     val modeFailedMessage = stringResource(R.string.home_mode_change_failed)
+    val mainDestinationState = LocalMainDestinationState.current
 
     fun changeMode(mode: Int) {
         if (serviceControl.busy) return
@@ -247,10 +257,12 @@ fun SingBoxDashboardPage(
             item("controller") {
                 HomeControllerCard(
                     controllerState = controllerState,
-                    networkActivityState = networkActivityState,
                     serviceOperationInProgress = serviceOperationInProgress,
                     modeOperationInProgress = modeOperationInProgress,
                     onModeSelected = ::changeMode,
+                    onOpenProxies = {
+                        mainDestinationState?.select(MainDestination.Proxies)
+                    },
                 )
             }
             item("network_activity") {
@@ -297,6 +309,19 @@ fun SingBoxDashboardPage(
                         icon = Icons.Rounded.DataUsage,
                         onClick = { navigator.push(AppRoute.TrafficMonitor) },
                         modifier = Modifier.weight(1f),
+                        summaryMaxLines = 1,
+                        metrics = {
+                            TrafficMetric(
+                                icon = Icons.Rounded.Upload,
+                                label = stringResource(R.string.home_accumulated_upload),
+                                value = formatHomeRuntimeBytes(networkActivityState.accumulatedUploadBytes),
+                            )
+                            TrafficMetric(
+                                icon = Icons.Rounded.Download,
+                                label = stringResource(R.string.home_accumulated_download),
+                                value = formatHomeRuntimeBytes(networkActivityState.accumulatedDownloadBytes),
+                            )
+                        },
                     )
                     MonitoringEntryCard(
                         title = stringResource(R.string.home_monitor_network),
@@ -315,114 +340,183 @@ fun SingBoxDashboardPage(
 @Composable
 private fun HomeControllerCard(
     controllerState: HomeControllerState,
-    networkActivityState: HomeNetworkActivityState,
     serviceOperationInProgress: Boolean,
     modeOperationInProgress: Boolean,
     onModeSelected: (Int) -> Unit,
+    onOpenProxies: () -> Unit,
 ) {
-    AsteriskFocusSurface(
-        title = if (controllerState.serviceStatus == HomeServiceStatus.Enabled) {
-            stringResource(R.string.home_service_enabled)
+    val uptime = rememberServiceUptimeText()
+    val singBoxRuntime = LocalAppServices.current.singBoxRuntime
+    val runtimeState by singBoxRuntime.state.collectAsState()
+    val currentOutbound = remember(runtimeState.proxies, controllerState.singBoxMode) {
+        if (controllerState.singBoxMode == SingBoxModeDirect) {
+            null
         } else {
-            stringResource(R.string.home_service_disabled)
-        },
-        modifier = HomeContentModifier,
-        density = FocusDensity.Large,
-        tone = homeFocusTone(controllerState.serviceStatus),
-        summary = runModeLabel(controllerState.runMode),
-        stateIcon = Icons.Rounded.PowerSettingsNew,
-        metrics = {
-            HomeFocusMetric(
-                icon = Icons.Rounded.Upload,
-                label = stringResource(R.string.home_accumulated_upload),
-                value = formatHomeRuntimeBytes(networkActivityState.accumulatedUploadBytes),
-                modifier = Modifier.weight(1f),
-            )
-            HomeFocusMetric(
-                icon = Icons.Rounded.Download,
-                label = stringResource(R.string.home_accumulated_download),
-                value = formatHomeRuntimeBytes(networkActivityState.accumulatedDownloadBytes),
-                modifier = Modifier.weight(1f),
-            )
-        },
-        primaryAction = { HomeServiceRuntimeSummary() },
-        forcePrimaryActionStacked = shouldStackHomeServiceRuntimeSummary(),
-    ) {
-        Box(modifier = Modifier.offset(y = HomeModeControlOffset)) {
-            AsteriskSegmentedControl(
-                items = homeModeOptions().map { option ->
-                    AsteriskSegmentItem(value = option.mode, label = option.label)
-                },
-                selectedValue = controllerState.singBoxMode,
-                onSelected = onModeSelected,
-                enabled = !serviceOperationInProgress && !modeOperationInProgress,
-            )
+            activeSingBoxNode(runtimeState.proxies)
         }
     }
-}
-
-@Composable
-private fun HomeFocusMetric(
-    icon: ImageVector,
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-) {
-    HomeControllerItemContent(
-        modifier = modifier.offset(y = HomeAccumulatedTrafficOffset),
-        icon = icon,
-        iconSize = HomeControllerTrafficIconSize,
-        iconOffsetY = HomeControllerTrafficIconOffsetY,
-        label = label,
-        value = value,
-    )
-}
-
-@Composable
-private fun HomeControllerItemContent(
-    icon: ImageVector,
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    iconSize: Dp = HomeControllerItemIconSize,
-    iconOffsetY: Dp = 0.dp,
-) {
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier.size(HomeControllerItemIconSlotSize),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(iconSize).offset(y = iconOffsetY),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    val appState by LocalAppStateStore.current.collectAppState()
+    // The runtime reports managed tags (outbound_7_...), so map the active one
+    // back to the alias the user gave the node.
+    val currentOutboundAlias = remember(currentOutbound, appState.outbounds) {
+        currentOutbound?.let { tag ->
+            appState.outbounds.firstOrNull { outbound -> outbound.tag == tag }?.remarks
         }
+    }
+    val outboundLabel = when {
+        controllerState.singBoxMode == SingBoxModeDirect ->
+            stringResource(R.string.sing_box_mode_direct)
+        !currentOutboundAlias.isNullOrBlank() -> currentOutboundAlias
+        currentOutbound != null -> currentOutbound
+        else -> stringResource(R.string.home_current_outbound_none)
+    }
+    // The runtime line keeps its slot when the service is down, so the status
+    // card never changes height between running and stopped states.
+    val runtimeText = uptime ?: HomeServiceUptimePlaceholder
+    val serviceEnabled = controllerState.serviceStatus == HomeServiceStatus.Enabled
+    // Stopped uses the error scheme so the hero reads as "needs attention".
+    val heroContainer = if (serviceEnabled) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.error
+    }
+    val heroContent = if (serviceEnabled) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onError
+    }
+    // The secondary layer is the base card: the accent card sits inside it and
+    // the strip below that inner card is the "chin" holding the mode switch.
+    Surface(
+        modifier = HomeContentModifier,
+        shape = RoundedCornerShape(HomeChinOuterRadius),
+        color = homeChinBaseColor(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
         Column(
             modifier = Modifier
-                .weight(1f)
-                .padding(start = HomeControllerItemTextSpacing),
+                .fillMaxWidth()
+                .padding(HomeChinInset),
         ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            AsteriskFocusSurface(
+                title = if (controllerState.serviceStatus == HomeServiceStatus.Enabled) {
+                    stringResource(R.string.home_service_enabled)
+                } else {
+                    stringResource(R.string.home_service_disabled)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                density = FocusDensity.Large,
+                tone = homeFocusTone(controllerState.serviceStatus),
+                // The runtime now sits where the mode label used to be: right under
+                // the service status line.
+                summary = runtimeText,
+                // Monospace keeps the --:--:-- placeholder exactly as wide as the
+                // running clock, so the card never resizes when the service starts.
+                summaryStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                summaryContentDescription = uptime?.let { stringResource(R.string.home_service_uptime, it) },
+                stateIcon = if (serviceEnabled) Icons.Rounded.VpnLock else Icons.Rounded.PublicOff,
+                // The inner card is the accent one, matching the accent colour
+                // picked in Settings > Personalization.
+                containerColor = heroContainer,
+                contentColor = heroContent,
+                stateIconTint = heroContent,
+                // Inset by exactly the radius difference, so the gap to the
+                // base card stays even along the straight edges and around the
+                // corner arcs alike.
+                shapeOverride = RoundedCornerShape(HomeChinInnerRadius),
+                primaryAction = {
+                    ServiceModeChip(
+                        modeLabel = runModeLabel(controllerState.runMode),
+                        // On the error card a translucent chip washes out, so the
+                        // tag inverts instead: onError fill, error-coloured text.
+                        containerColor = if (serviceEnabled) {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onError
+                        },
+                        contentColor = if (serviceEnabled) {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                    )
+                },
+                forcePrimaryActionStacked = shouldStackHomeServiceRuntimeSummary(),
             )
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // Current node: caption + alias, no surface of its own.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(onClick = onOpenProxies)
+                    .padding(horizontal = 4.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Dns,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.home_current_node_title),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                    Text(
+                        text = outboundLabel,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Same side edges as the accent card, so every layer lines
+                    // up; the strip only adds the vertical breathing room.
+                    .padding(
+                        start = 0.dp,
+                        end = 0.dp,
+                        top = HomeChinStripPadding,
+                        bottom = 0.dp,
+                    ),
+            ) {
+                AsteriskSegmentedControl(
+                    items = homeModeOptions().map { option ->
+                        AsteriskSegmentItem(value = option.mode, label = option.label)
+                    },
+                    selectedValue = controllerState.singBoxMode,
+                    onSelected = onModeSelected,
+                    enabled = !serviceOperationInProgress && !modeOperationInProgress,
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    checkedContainerColor = MaterialTheme.colorScheme.primary,
+                    checkedContentColor = MaterialTheme.colorScheme.onPrimary,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
+                    textStyle = MaterialTheme.typography.labelMedium,
+                )
+            }
         }
     }
 }
+
+@Composable
+private fun homeChinBaseColor(): Color = lerp(
+    MaterialTheme.colorScheme.secondaryContainer,
+    MaterialTheme.colorScheme.surface,
+    0.55f,
+)
 
 @Composable
 private fun NetworkActivityCard(
@@ -642,12 +736,14 @@ private fun MonitoringEntryCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     prominent: Boolean = false,
+    summaryMaxLines: Int = 2,
+    metrics: (@Composable RowScope.() -> Unit)? = null,
 ) {
     AsteriskExpressiveCard(
         onClick = onClick,
         modifier = modifier.height(148.dp),
         role = if (prominent) ExpressiveShapeRole.GroupLarge else ExpressiveShapeRole.ContentCard,
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Column(
             modifier = Modifier
@@ -657,7 +753,7 @@ private fun MonitoringEntryCard(
         ) {
             Surface(
                 modifier = Modifier.size(42.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
                 shape = AsteriskShapeTokens.SmallContainer,
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -670,11 +766,48 @@ private fun MonitoringEntryCard(
                     text = summary,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = summaryMaxLines,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (metrics != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        content = metrics,
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun TrafficMetric(
+    icon: ImageVector,
+    label: String,
+    value: String,
+) {
+    Row(
+        modifier = Modifier.semantics(mergeDescendants = true) {
+            contentDescription = "${'$'}label ${'$'}value"
+        },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(13.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -750,6 +883,8 @@ private data class HomeModeOption(
 
 private const val HomeUiSampleIntervalMillis = 1_000L
 
+private const val HomeServiceUptimePlaceholder = "--:--:--"
+
 // The x axis keeps this many fixed columns no matter how many samples are buffered; the newest
 // sample sits in the rightmost column. It mirrors the sample limit of the home traffic state.
 private const val NetworkActivitySlotCount = HomeNetworkSampleLimit
@@ -767,20 +902,21 @@ private val HomeContentModifier = Modifier
     .fillMaxWidth()
     .widthIn(max = 840.dp)
 
-private val HomeControllerItemIconSlotSize = 28.dp
-private val HomeControllerItemIconSize = 24.dp
-private val HomeControllerTrafficIconSize = 28.dp
-private val HomeControllerTrafficIconOffsetY = 0.5.dp
-private val HomeAccumulatedTrafficOffset = 6.dp
-private val HomeModeControlOffset = 10.dp
-private val HomeControllerItemTextSpacing = 14.dp
+// The secondary base card, the accent card nested inside it, and the inset
+// that leaves the chin strip visible below the inner card.
+private val HomeChinOuterRadius = 28.dp
+private val HomeChinInnerRadius = 22.dp
+// Equal to outer - inner radius, so the ring between the two cards is even
+// along the edges and around the rounded corners.
+private val HomeChinInset = 6.dp
+private val HomeChinStripPadding = 6.dp
 
 @Composable
 private fun shouldStackHomeServiceRuntimeSummary(): Boolean =
     LocalWindowInfo.current.containerSize.width / LocalDensity.current.density < 360f
 
 @Composable
-private fun HomeServiceRuntimeSummary() {
+private fun rememberServiceUptimeText(): String? {
     val appState by LocalAppStateStore.current.collectAppState()
     val services = LocalAppServices.current
     val uptimeMillis by produceState<Long?>(null, appState.proxyRunning, appState.runMode) {
@@ -800,15 +936,45 @@ private fun HomeServiceRuntimeSummary() {
             delay(1_000L.milliseconds)
         }
     }
-    val uptime = formatHomeServiceUptime(uptimeMillis)
-    if (appState.proxyRunning && uptime != null) {
-        val description = stringResource(R.string.home_service_uptime, uptime)
+    if (!appState.proxyRunning) return null
+    return formatHomeServiceUptime(uptimeMillis)
+}
+
+/**
+ * Follows the global selector down through any nested groups to the node that
+ * actually carries traffic, so the chin shows e.g. "🇸🇬新加坡·电信1" rather
+ * than the name of the selector that picked it.
+ */
+private fun activeSingBoxNode(proxies: SingBoxProxiesState): String? {
+    val groupsByName = proxies.groups.associateBy { group -> group.name }
+    val start = prioritizeGlobalSingBoxProxyGroup(proxies).groups.firstOrNull()?.now
+    var name = start?.takeIf { it.isNotBlank() }
+    val visited = mutableSetOf<String>()
+    while (name != null && visited.add(name)) {
+        val group = groupsByName[name] ?: return name
+        val next = group.now.takeIf { it.isNotBlank() }
+        if (next == null || next == name) return name
+        name = next
+    }
+    return name
+}
+
+@Composable
+private fun ServiceModeChip(
+    modeLabel: String,
+    containerColor: Color,
+    contentColor: Color,
+) {
+    // Same secondaryContainer pairing KernelSU-Next gives its GKI/non-GKI tag.
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = containerColor,
+        contentColor = contentColor,
+    ) {
         Text(
-            text = uptime,
-            modifier = Modifier.semantics { contentDescription = description },
-            style = MaterialTheme.typography.bodyMedium,
-            fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = modeLabel,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
             maxLines = 1,
         )
     }
