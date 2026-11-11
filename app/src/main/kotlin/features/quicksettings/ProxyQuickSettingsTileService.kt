@@ -17,6 +17,7 @@ import app.AsteriskApplication
 import app.MainActivity
 import app.R
 import app.modes.RunModeVpnService
+import app.modes.SingBoxModeDirect
 import data.AndroidAppStateStore
 import engine.proxy.ProxyServiceResult
 import engine.proxy.ProxyServiceUseCase
@@ -31,6 +32,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ui.feedback.rootOperationTipMessageOrNull
+import engine.singbox.config.APP_GLOBAL_SELECTOR
+import engine.singbox.config.APP_DIRECT_OUTBOUND
+import engine.singbox.runtime.TileStateActiveNodeKey
+import engine.singbox.runtime.TileStatePreferences
+import features.singbox.managedOutboundAlias
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -205,7 +211,11 @@ class ProxyQuickSettingsTileService : TileService() {
         processing: Boolean = false,
     ) {
         val tile = qsTile ?: return
-        tile.label = getString(R.string.quick_settings_tile_label)
+        val state = stateStore.state.value
+        // While the proxy runs the tile leads with the node it is using; the
+        // app name is only the resting label.
+        val activeAlias = if (running) currentOutboundAlias(state) else null
+        tile.label = activeAlias ?: getString(R.string.quick_settings_tile_label)
         tile.state = if (running) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             tile.subtitle = when {
@@ -215,6 +225,24 @@ class ProxyQuickSettingsTileService : TileService() {
             }
         }
         tile.updateTile()
+    }
+
+    /** Managed tags are internal (`outbound_7_...`); show the configured alias. */
+    private fun currentOutboundAlias(state: AppState): String? {
+        // Direct mode routes nothing through a node; keep the app label.
+        if (state.singBoxMode == SingBoxModeDirect) return null
+        val cached = getSharedPreferences(TileStatePreferences, MODE_PRIVATE)
+            .getString(TileStateActiveNodeKey, null)
+            ?.takeIf { tag -> tag.isNotBlank() }
+        val tag = cached
+            ?: state.selectorSelections[APP_GLOBAL_SELECTOR]?.takeIf { it.isNotBlank() }
+            ?: return null
+        return when (tag) {
+            APP_DIRECT_OUTBOUND -> getString(R.string.routing_direct)
+            APP_GLOBAL_SELECTOR -> getString(R.string.routing_global)
+            // Never surface an internal managed tag as the label.
+            else -> managedOutboundAlias(state, tag)
+        }
     }
 
     @SuppressLint("StartActivityAndCollapseDeprecated")
