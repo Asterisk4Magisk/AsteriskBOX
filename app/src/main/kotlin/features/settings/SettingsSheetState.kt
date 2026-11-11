@@ -59,6 +59,8 @@ internal class SettingsSheetState(
 
     var showNetworkQualityTest by mutableStateOf(false)
 
+    var showPersonalizationSettings by mutableStateOf(false)
+
     fun openLocalProxySettings(appState: AppState) {
         localProxySettingsDraft = appState.toLocalProxySettingsDraft()
         showLocalProxySettings = true

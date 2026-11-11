@@ -18,6 +18,7 @@ import features.enhancement.AndroidEnhancementModuleBackend
 import features.enhancement.EnhancementModuleCoordinator
 import features.enhancement.EnhancementModulePrompt
 import app.effects.RootBootScriptSynchronizer
+import app.effects.NodeDelayAutoProbe
 import app.effects.SingBoxRuntimeSynchronizer
 import app.effects.TrafficStatsNotificationSynchronizer
 import data.backup.AndroidAppBackupDocumentGateway
@@ -212,6 +213,10 @@ fun App(
     SingBoxRuntimeSynchronizer(
         stateStore = stateStore,
         singBoxRuntimeLifecycle = application.singBoxRuntimeLifecycle,
+    )
+    NodeDelayAutoProbe(
+        stateStore = stateStore,
+        singBoxRuntime = singBoxRuntime,
     )
     ResourceFileSynchronizer(
         resourceFileUseCase = resourceFileUseCase,

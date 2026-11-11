@@ -104,7 +104,7 @@ internal fun RuleEditorChoiceCard(
             modifier = modifier.fillMaxWidth(),
             enabled = interactionEnabled,
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),
         ) {
             Row(

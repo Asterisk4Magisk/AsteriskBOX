@@ -5,11 +5,14 @@ package features.singbox
 
 import app.modes.SingBoxProxyLayoutAuto
 import app.modes.SingBoxProxyLayoutDouble
+import app.AppState
 import app.modes.SingBoxProxyLayoutMultiple
 import app.modes.SingBoxProxyLayoutSingle
 import app.modes.SingBoxProxySortDefault
 import app.modes.SingBoxProxySortDelay
 import app.modes.SingBoxProxySortName
+import app.selectableManagedOutbounds
+import engine.singbox.config.APP_DIRECT_OUTBOUND
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.runtime.SingBoxDelayResult
 import engine.singbox.runtime.SingBoxProxiesState
@@ -48,6 +51,42 @@ internal fun resolveSingBoxProxyDelayStatus(
         delay != null -> SingBoxProxyDelayStatus.Failed
         else -> SingBoxProxyDelayStatus.NotTested
     }
+}
+
+/**
+ * Resolves any managed tag (node, group, selector, direct) to the name the
+ * user sees, so a selector that points at a group still reads as a name.
+ */
+internal fun managedOutboundAlias(state: AppState, tag: String?): String? {
+    if (tag.isNullOrBlank()) return null
+    // Direct/global carry their tag as label; callers substitute a localized
+    // name for those two, so never return the raw tag here.
+    if (tag == APP_DIRECT_OUTBOUND || tag == APP_GLOBAL_SELECTOR) return null
+    return selectableManagedOutbounds(state)
+        .firstOrNull { choice -> choice.tag == tag }
+        ?.label
+        ?.takeIf { label -> label.isNotBlank() }
+}
+
+/**
+ * Follows the global selector down through nested groups to the node that
+ * actually carries traffic. The runtime names nodes by their managed tag.
+ */
+internal fun activeSingBoxNodeTag(proxies: SingBoxProxiesState): String? {
+    val groupsByName = proxies.groups.associateBy { group -> group.name }
+    var name = prioritizeGlobalSingBoxProxyGroup(proxies)
+        .groups
+        .firstOrNull()
+        ?.now
+        ?.takeIf { it.isNotBlank() }
+    val visited = mutableSetOf<String>()
+    while (name != null && visited.add(name)) {
+        val group = groupsByName[name] ?: return name
+        val next = group.now.takeIf { it.isNotBlank() }
+        if (next == null || next == name) return name
+        name = next
+    }
+    return name
 }
 
 internal fun prioritizeGlobalSingBoxProxyGroup(

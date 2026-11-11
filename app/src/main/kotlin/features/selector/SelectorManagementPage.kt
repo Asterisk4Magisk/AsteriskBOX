@@ -498,9 +498,9 @@ private fun SelectorCard(
 ) {
     val containerColor by animateColorAsState(
         targetValue = if (isDragging) {
-            MaterialTheme.colorScheme.surfaceContainerHigh
+            MaterialTheme.colorScheme.surfaceContainerHighest
         } else {
-            MaterialTheme.colorScheme.surfaceContainer
+            MaterialTheme.colorScheme.surfaceContainerHigh
         },
         animationSpec = AsteriskMotion.effects(),
         label = "selector-card-color",
@@ -1284,7 +1284,7 @@ private fun SelectorTargetRow(
         targetValue = if (selected) {
             MaterialTheme.colorScheme.secondaryContainer
         } else {
-            MaterialTheme.colorScheme.surfaceContainer
+            MaterialTheme.colorScheme.surfaceContainerHigh
         },
         animationSpec = AsteriskMotion.effects(),
         label = "selector-target-color",
