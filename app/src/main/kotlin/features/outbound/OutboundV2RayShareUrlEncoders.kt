@@ -42,7 +42,6 @@ private fun JsonObject.encodeVlessShareUrl(remarks: String): String {
         "multiplex",
         "encryption",
         "xray_finalmask",
-        "xray_stream_settings",
     )
     require(stringOrEmpty("network").isBlank()) { "VLESS network cannot be shared" }
     require(!get("multiplex").isMeaningfulShareValue()) { "VLESS multiplex cannot be shared" }

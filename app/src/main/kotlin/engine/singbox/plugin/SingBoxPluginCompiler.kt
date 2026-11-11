@@ -192,7 +192,7 @@ private fun JsonObject.requireSupportedByPlugin(requirement: PluginRequirement, 
     }
 }
 
-private fun JsonElement?.isEmptyValue(): Boolean = when (this) {
+internal fun JsonElement?.isEmptyValue(): Boolean = when (this) {
     null -> true
     is JsonArray -> isEmpty()
     is JsonPrimitive -> contentOrNull.isNullOrBlank()

@@ -210,7 +210,7 @@ internal fun encodePluginShareUrl(type: String, outbound: JsonObject, remarks: S
             if (remarks.isNotBlank()) append('#').append(remarks.encodeUrlComponent())
         }
 
-        "sudoku" -> encodeSudokuShareLink(outbound, server, port)
+        "sudoku" -> encodeSudokuShareLink(outbound, server, port, remarks)
 
         else -> null
     }
@@ -256,15 +256,16 @@ private fun mieruMuxLevel(value: String): String = when (mieruMultiplexingLevel(
  * `sudoku://` + unpadded base64url of a JSON payload with short keys, as
  * written by SUDOKU-ASCII/sudoku (`internal/config/shortlink.go`). Missing
  * values take the link's own defaults: AEAD `none`, entropy tables and
- * padding 5-15 %.
+ * padding 5-15 %. The node name is the payload's `n`; a `#fragment` is
+ * read only when `n` is missing.
  */
 private fun parseSudokuShareLink(link: String): JsonObject {
     val body = link.substringAfter("://")
     val encoded = body.substringBefore('#')
-    val tag = body.substringAfter('#', "").decodeUrlComponentPreservingPlus()
     val payload = runCatching {
         SingBoxJson.parseToJsonElement(SudokuLinkBase64.decode(encoded).decodeToString()) as JsonObject
     }.getOrElse { throw IllegalArgumentException("invalid sudoku link payload") }
+    val tag = payload.stringOrEmpty("n").ifBlank { body.substringAfter('#', "").decodeUrlComponentPreservingPlus() }
     val host = payload.stringOrEmpty("h").removeSurrounding("[", "]")
     val port = payload.intOrZero("p")
     val key = payload.stringOrEmpty("k")
@@ -301,7 +302,7 @@ private fun parseSudokuShareLink(link: String): JsonObject {
     }
 }
 
-private fun encodeSudokuShareLink(outbound: JsonObject, server: String, port: Int): String? {
+private fun encodeSudokuShareLink(outbound: JsonObject, server: String, port: Int, remarks: String): String? {
     val key = outbound.stringOrEmpty("key")
     if (key.isBlank()) return null
     // sudoku-sing-box: a present `httpmask` object replaces the flat http_mask_* fields.
@@ -320,6 +321,7 @@ private fun encodeSudokuShareLink(outbound: JsonObject, server: String, port: In
     val pureDownlink = outbound.stringOrEmpty("enable_pure_downlink").toBooleanStrictOrNull() ?: true
     val tables = outbound.stringListValue("custom_tables").ifEmpty { outbound.stringListValue("custom_table") }
     val payload = buildJsonObject {
+        if (remarks.isNotBlank()) put("n", remarks)
         put("h", server)
         put("p", port)
         put("k", key)

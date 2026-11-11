@@ -94,13 +94,30 @@ internal inline fun <T> Context.withLocalizedVlessXrayErrors(block: () -> T): T 
     throw IllegalArgumentException(vlessXrayRequiredMessage(error), error)
 }
 
+private val VlessPluginUnsupportedTlsFields = listOf(
+    "certificate",
+    "certificate_path",
+    "certificate_public_key_sha256",
+    "client_certificate",
+    "client_certificate_path",
+    "client_key",
+    "client_key_path",
+)
+
 /** Options the plugin cannot honour fail the compile instead of failing in the plugin. */
 internal fun JsonObject.requireSupportedByVlessPlugin(tag: String) {
     require(!((this["multiplex"] as? JsonObject)?.isTrue("enabled") ?: false)) {
         "VLESS plugin outbound $tag does not support multiplex; UDP always uses XUDP"
     }
-    require(!((this["tls"] as? JsonObject)?.isTrue("insecure") ?: false)) {
+    val tls = this["tls"] as? JsonObject
+    require(!(tls?.isTrue("insecure") ?: false)) {
         "VLESS plugin outbound $tag does not support insecure TLS; pin the certificate instead"
+    }
+    // Xray pins the whole certificate (pinned_peer_cert_sha256), not its public
+    // key, and the plugin reads no CA or client certificate: dropping any of
+    // them would silently weaken or change certificate checks.
+    VlessPluginUnsupportedTlsFields.firstOrNull { name -> !tls?.get(name).isEmptyValue() }?.let { name ->
+        throw IllegalArgumentException("VLESS plugin outbound $tag does not support tls.$name")
     }
     val transportType = (this["transport"] as? JsonObject)?.stringOrEmpty("type")?.lowercase().orEmpty()
     require(transportType != "http" && transportType != "quic") {
@@ -196,12 +213,14 @@ private fun JsonObjectBuilder.copyInt(source: JsonObject, name: String, tag: Str
 }
 
 /** A list option: a JSON array (imported config) or a comma/space separated string (editor). */
+internal fun JsonElement?.vlessListValues(): List<String> = when (this) {
+    is JsonArray -> mapNotNull { item -> (item as? JsonPrimitive)?.contentOrNull }
+    is JsonPrimitive -> contentOrNull.orEmpty().split(',', ' ', '\n', '\r', '\t')
+    else -> emptyList()
+}.map(String::trim).filter(String::isNotEmpty)
+
 private fun JsonObjectBuilder.copyList(source: JsonObject, name: String) {
-    val values = when (val element = source[name]) {
-        is JsonArray -> element.mapNotNull { item -> (item as? JsonPrimitive)?.contentOrNull }
-        is JsonPrimitive -> element.contentOrNull.orEmpty().split(',', ' ', '\n', '\r', '\t')
-        else -> emptyList()
-    }.map(String::trim).filter(String::isNotEmpty)
+    val values = source[name].vlessListValues()
     if (values.isNotEmpty()) putJsonArray(name) { values.forEach { value -> add(value) } }
 }
 

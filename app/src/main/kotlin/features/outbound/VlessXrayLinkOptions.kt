@@ -3,6 +3,7 @@
 
 package features.outbound
 
+import engine.singbox.plugin.vlessListValues
 import engine.singbox.plugin.withoutXrayVlessExtensions
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -170,7 +171,7 @@ private fun kotlinx.serialization.json.JsonObjectBuilder.putParam(name: String, 
  * NG's parameter names (V2RayParameters.get). [shareable] is the outbound
  * left for the shared encoder; [transportParameters] replaces the shared
  * transport parameters when non-null. `xray_stream_settings` has no link
- * form and is dropped.
+ * form, so the vless encoder refuses an outbound that sets it.
  */
 internal data class VlessXrayShareParameters(
     val shareable: JsonObject,
@@ -211,11 +212,18 @@ private fun JsonObject.vlessXrayTransportShareParameters(): List<Pair<String, St
     fun MutableList<Pair<String, String>>.addText(name: String, field: String) {
         transport.text(field).takeIf(String::isNotBlank)?.let { add(name to it) }
     }
+    // Hosts are read as the plugin config reads them. XHTTP and mKCP links
+    // carry one host, RAW's HTTP header a comma-separated list.
+    fun MutableList<Pair<String, String>>.addHosts(single: Boolean) {
+        val hosts = transport["host"].vlessListValues()
+        require(!single || hosts.size <= 1) { "Several ${transport.text("type")} hosts cannot be shared" }
+        if (hosts.isNotEmpty()) add("host" to hosts.joinToString(","))
+    }
     return when (text("type").lowercase()) {
         "xhttp" -> buildList {
             add("type" to "xhttp")
             addText("path", "path")
-            addText("host", "host")
+            addHosts(single = true)
             addText("mode", "mode")
             transport["extra"].compactJsonObjectText()?.let { add("extra" to it) }
         }
@@ -223,7 +231,7 @@ private fun JsonObject.vlessXrayTransportShareParameters(): List<Pair<String, St
         "mkcp" -> buildList {
             add("type" to "kcp")
             addText("headerType", "header_type")
-            addText("host", "host")
+            addHosts(single = true)
             addText("mtu", "mtu")
             addText("tti", "tti")
             addText("seed", "seed")
@@ -232,7 +240,7 @@ private fun JsonObject.vlessXrayTransportShareParameters(): List<Pair<String, St
         "raw" -> buildList {
             add("type" to "raw")
             addText("headerType", "header_type")
-            addText("host", "host")
+            addHosts(single = false)
             addText("path", "path")
         }
 
