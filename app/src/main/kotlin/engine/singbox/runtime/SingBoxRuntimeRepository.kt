@@ -5,6 +5,7 @@ package engine.singbox.runtime
 
 import engine.root.dns.withRootDnsMutation
 import android.content.Context
+import androidx.core.content.edit
 import app.AppState
 import app.effects.SingBoxRuntimeLifecycleTarget
 import app.DefaultConnectionTestUrl
@@ -41,6 +42,7 @@ internal class SingBoxRuntimeRepository(
     context: Context,
 ) : SingBoxRuntimeLifecycleTarget {
     private val appContext = context.applicationContext
+    private var lastActiveNodeTag: String? = null
     private val mutableState = MutableStateFlow(SingBoxRuntimeState())
     private val trafficHistory = SingBoxTrafficHistoryBuffer(TrafficHistoryCapacity)
     private val trafficHistoryLock = Any()
@@ -405,8 +407,13 @@ internal class SingBoxRuntimeRepository(
             }
 
             override fun onProxies(proxies: SingBoxProxiesState) {
-                updateIfCurrent(listenerGeneration) { current ->
+                // One lock pass: writing the snapshot and remembering the tag must not straddle a
+                // session replacement, or the tile keeps a stale node.
+                val applied = updateIfCurrent(listenerGeneration) { current ->
                     current.withProxySnapshot(proxies)
+                }
+                if (applied) {
+                    rememberActiveNodeTag(proxies)
                 }
             }
 
@@ -596,6 +603,21 @@ internal class SingBoxRuntimeRepository(
         }
     }
 
+    /**
+     * The quick-settings tile cannot resolve the active node on its own (a
+     * fresh API connection sees only its own session), so the app leaves the
+     * last resolved tag behind whenever it has the proxy snapshots.
+     */
+    private fun rememberActiveNodeTag(proxies: SingBoxProxiesState) {
+        val tag = features.singbox.activeSingBoxNodeTag(proxies) ?: return
+        if (tag == lastActiveNodeTag) return
+        lastActiveNodeTag = tag
+        runCatching {
+            appContext.getSharedPreferences(TileStatePreferences, Context.MODE_PRIVATE)
+                .edit { putString(TileStateActiveNodeKey, tag) }
+        }
+    }
+
     private fun AppState.commandTarget(): SingBoxCommandTarget {
         val local = runMode == RunModeVpnService
         return SingBoxCommandTarget(local = local, control = singBoxControlConfig())
@@ -639,15 +661,13 @@ internal class SingBoxRuntimeRepository(
     private fun updateIfCurrent(
         expectedGeneration: Long,
         transform: (SingBoxRuntimeState) -> SingBoxRuntimeState,
-    ) {
-        updateStateIfGenerationCurrent(
-            lock = sessionLock,
-            expectedGeneration = expectedGeneration,
-            currentGeneration = { generation },
-            state = mutableState,
-            transform = transform,
-        )
-    }
+    ): Boolean = updateStateIfGenerationCurrent(
+        lock = sessionLock,
+        expectedGeneration = expectedGeneration,
+        currentGeneration = { generation },
+        state = mutableState,
+        transform = transform,
+    )
 
     private companion object {
         const val ConnectAttempts = 3
@@ -714,3 +734,6 @@ internal fun SingBoxRuntimeState.finishingDelayTest(
         ),
     )
 }
+
+internal const val TileStatePreferences = "tile_state"
+internal const val TileStateActiveNodeKey = "active_node_tag"
