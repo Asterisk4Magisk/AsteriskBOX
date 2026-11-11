@@ -1091,9 +1091,9 @@ private fun OutboundCard(
     }
     val containerColor by animateColorAsState(
         targetValue = if (isDragging) {
-            MaterialTheme.colorScheme.surfaceContainerHigh
+            MaterialTheme.colorScheme.surfaceContainerHighest
         } else {
-            MaterialTheme.colorScheme.surfaceContainer
+            MaterialTheme.colorScheme.surfaceContainerHigh
         },
         animationSpec = AsteriskMotion.effects(),
         label = "outbound-card-color",

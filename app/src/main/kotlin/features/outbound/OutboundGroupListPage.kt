@@ -1426,7 +1426,7 @@ private fun OutboundGroupAddMethodOption(
             .fillMaxWidth()
             .heightIn(min = 76.dp),
         shape = AsteriskShapeTokens.InnerContainer,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),

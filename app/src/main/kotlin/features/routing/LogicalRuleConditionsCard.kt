@@ -151,6 +151,7 @@ private fun LogicalRuleConditionCard(
     AsteriskExpressiveCard(
         onClick = onEdit,
         modifier = Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.68f),
+        // Nested inside the section card, so it stays one step below it.
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Row(
