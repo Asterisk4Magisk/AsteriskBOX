@@ -6,26 +6,33 @@ package features.outbound
 import engine.singbox.plugin.decodeMieruTrafficPattern
 import engine.singbox.plugin.encodeMieruTrafficPatternBase64
 import engine.singbox.plugin.mieruMultiplexingLevel
+import engine.singbox.config.SingBoxJson
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import java.net.URI
+import kotlin.io.encoding.Base64
 import utils.booleanOrFalse
 import utils.decodeUrlComponentPreservingPlus
 import utils.encodeUrlComponent
 import utils.intOrZero
+import utils.objectValue
+import utils.stringListValue
 import utils.stringOrEmpty
 
 /**
  * Share links of the plugin-backed protocols. Formats follow husi:
  * `mierus://` (Mieru), `sq://` (ShadowQUIC, official format) and
- * `juicity://`.
+ * `juicity://`; `sudoku://` is the Sudoku short link (see [parseSudokuShareLink]).
  */
-internal val PluginShareLinkSchemes = setOf("mierus", "sq", "juicity")
+internal val PluginShareLinkSchemes = setOf("mierus", "sq", "juicity", "sudoku")
 
 internal fun parsePluginShareLink(link: String): JsonObject? {
     val scheme = link.substringBefore("://").lowercase()
     if (scheme !in PluginShareLinkSchemes) return null
+    if (scheme == "sudoku") return parseSudokuShareLink(link)
     val uri = runCatching { URI(link) }.getOrNull() ?: return null
     val host = (uri.host ?: uri.rawAuthority?.substringAfterLast('@')?.substringBefore(':'))
         ?.removeSurrounding("[", "]")
@@ -203,6 +210,8 @@ internal fun encodePluginShareUrl(type: String, outbound: JsonObject, remarks: S
             if (remarks.isNotBlank()) append('#').append(remarks.encodeUrlComponent())
         }
 
+        "sudoku" -> encodeSudokuShareLink(outbound, server, port)
+
         else -> null
     }
 }
@@ -242,3 +251,103 @@ private fun mieruMuxLevel(value: String): String = when (mieruMultiplexingLevel(
     "MULTIPLEXING_HIGH" -> "HIGH"
     else -> ""
 }
+
+/**
+ * `sudoku://` + unpadded base64url of a JSON payload with short keys, as
+ * written by SUDOKU-ASCII/sudoku (`internal/config/shortlink.go`). Missing
+ * values take the link's own defaults: AEAD `none`, entropy tables and
+ * padding 5-15 %.
+ */
+private fun parseSudokuShareLink(link: String): JsonObject {
+    val body = link.substringAfter("://")
+    val encoded = body.substringBefore('#')
+    val tag = body.substringAfter('#', "").decodeUrlComponentPreservingPlus()
+    val payload = runCatching {
+        SingBoxJson.parseToJsonElement(SudokuLinkBase64.decode(encoded).decodeToString()) as JsonObject
+    }.getOrElse { throw IllegalArgumentException("invalid sudoku link payload") }
+    val host = payload.stringOrEmpty("h").removeSurrounding("[", "]")
+    val port = payload.intOrZero("p")
+    val key = payload.stringOrEmpty("k")
+    require(host.isNotBlank() && port in 1..65535 && key.isNotBlank()) { "sudoku link misses host, port or key" }
+    return buildJsonObject {
+        put("type", "sudoku")
+        if (tag.isNotBlank()) put("tag", tag)
+        put("server", host)
+        put("server_port", port)
+        put("key", key)
+        put("aead", payload.stringOrEmpty("e").ifBlank { "none" })
+        put(
+            "ascii",
+            when (val ascii = payload.stringOrEmpty("a").trim().lowercase()) {
+                "ascii", "prefer_ascii" -> "prefer_ascii"
+                "", "entropy", "prefer_entropy" -> "prefer_entropy"
+                else -> ascii
+            },
+        )
+        val tables = payload.stringListValue("ts").ifEmpty { payload.stringListValue("t") }
+        if (tables.isNotEmpty()) putJsonArray("custom_tables") { tables.forEach { table -> add(table) } }
+        put("padding_min", 5)
+        put("padding_max", 15)
+        if (payload.booleanOrFalse("x")) put("enable_pure_downlink", false)
+        payload.stringOrEmpty("hx").takeIf(String::isNotBlank)?.let { mode -> put("multiplex", mode.lowercase()) }
+        val mask = buildJsonObject {
+            if (payload.booleanOrFalse("hd")) put("disable", true)
+            payload.stringOrEmpty("hm").takeIf(String::isNotBlank)?.let { mode -> put("mode", mode) }
+            if (payload.booleanOrFalse("ht")) put("tls", true)
+            payload.stringOrEmpty("hh").takeIf(String::isNotBlank)?.let { maskHost -> put("host", maskHost) }
+            payload.stringOrEmpty("hy").takeIf(String::isNotBlank)?.let { root -> put("path_root", root) }
+        }
+        if (mask.isNotEmpty()) put("httpmask", mask)
+    }
+}
+
+private fun encodeSudokuShareLink(outbound: JsonObject, server: String, port: Int): String? {
+    val key = outbound.stringOrEmpty("key")
+    if (key.isBlank()) return null
+    // sudoku-sing-box: a present `httpmask` object replaces the flat http_mask_* fields.
+    val mask = outbound.objectValue("httpmask")
+    val maskDisabled = mask?.booleanOrFalse("disable") ?: outbound.booleanOrFalse("disable_http_mask")
+    val maskMode = mask?.stringOrEmpty("mode") ?: outbound.stringOrEmpty("http_mask_mode").ifBlank {
+        if (outbound.stringOrEmpty("http_mask_strategy").equals("websocket", ignoreCase = true)) "ws" else ""
+    }
+    val maskTls = mask?.booleanOrFalse("tls") ?: outbound.booleanOrFalse("http_mask_tls")
+    val maskHost = mask?.stringOrEmpty("host") ?: outbound.stringOrEmpty("http_mask_host")
+    val maskPath = mask?.stringOrEmpty("path_root")
+        ?: outbound.stringOrEmpty("http_mask_path_root").ifBlank { outbound.stringOrEmpty("path_root") }
+    val multiplex = (mask?.stringOrEmpty("multiplex") ?: outbound.stringOrEmpty("http_mask_multiplex"))
+        .ifBlank { outbound.stringOrEmpty("multiplex") }
+        .lowercase()
+    val pureDownlink = outbound.stringOrEmpty("enable_pure_downlink").toBooleanStrictOrNull() ?: true
+    val tables = outbound.stringListValue("custom_tables").ifEmpty { outbound.stringListValue("custom_table") }
+    val payload = buildJsonObject {
+        put("h", server)
+        put("p", port)
+        put("k", key)
+        put(
+            "a",
+            when (val ascii = outbound.stringOrEmpty("ascii").trim().lowercase()) {
+                // sing-box defaults to ASCII tables, the link to entropy.
+                "", "ascii", "prefer_ascii" -> "ascii"
+                "entropy", "prefer_entropy" -> "entropy"
+                else -> ascii
+            },
+        )
+        put("e", outbound.stringOrEmpty("aead").ifBlank { "chacha20-poly1305" })
+        put("m", 1080)
+        if (!pureDownlink) put("x", true)
+        when (tables.size) {
+            0 -> Unit
+            1 -> put("t", tables.single())
+            else -> putJsonArray("ts") { tables.forEach { table -> add(table) } }
+        }
+        if (maskDisabled) put("hd", true)
+        maskMode.lowercase().takeIf { it.isNotBlank() && it != "legacy" }?.let { mode -> put("hm", mode) }
+        if (maskTls) put("ht", true)
+        maskHost.takeIf(String::isNotBlank)?.let { put("hh", it) }
+        multiplex.takeIf { it.isNotBlank() && it != "off" }?.let { put("hx", it) }
+        maskPath.takeIf(String::isNotBlank)?.let { put("hy", it) }
+    }
+    return "sudoku://" + SudokuLinkBase64.encode(payload.toString().encodeToByteArray())
+}
+
+private val SudokuLinkBase64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)

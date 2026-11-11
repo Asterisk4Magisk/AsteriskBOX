@@ -9,6 +9,7 @@ import engine.singbox.config.updated
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
@@ -73,6 +74,25 @@ internal fun compilePluginOutbounds(
             val type = (outbound?.get("type") as? JsonPrimitive)?.contentOrNull
             val requirement = type?.let { outboundType ->
                 PluginOutbounds.requirementFor(outboundType, pluginProtocols)
+            }
+            if (outbound != null && requirement == null && type == PluginOutbounds.vless.outboundType) {
+                // The built-in core serves vless: it must not see the Xray extension fields.
+                val features = outbound.xrayOnlyVlessFeatures()
+                when {
+                    features.isEmpty() -> add(outbound.withoutXrayVlessExtensions())
+                    // A check (import, editor) accepts the node, as it does a plugin node whose
+                    // plugin is missing; only a start needs the plugin.
+                    target == null -> add(
+                        buildJsonObject {
+                            put("type", "socks")
+                            put("tag", outbound.stringOrEmpty("tag"))
+                            put("server", PluginSocksHost)
+                            put("server_port", ValidationPort)
+                        },
+                    )
+                    else -> throw VlessXrayRequiredException(outbound.stringOrEmpty("tag"), features)
+                }
+                return@forEach
             }
             if (outbound == null || requirement == null) {
                 add(element)
@@ -164,6 +184,11 @@ private fun JsonObject.requireSupportedByPlugin(requirement: PluginRequirement, 
         PluginOutbounds.naive -> require(booleanOrNull("quic") != true) {
             "NaiveProxy plugin outbound $tag does not support QUIC"
         }
+        // A reverse client publishes local services; a SOCKS hand-off has none.
+        PluginOutbounds.sudoku -> require((this["reverse"] as? JsonObject)?.get("routes").isEmptyValue()) {
+            "Sudoku plugin outbound $tag does not support reverse"
+        }
+        PluginOutbounds.vless -> requireSupportedByVlessPlugin(tag)
     }
 }
 
@@ -256,6 +281,56 @@ private fun buildPluginOutboundPlan(
                 environment = buildMap {
                     put("HYSTERIA_DISABLE_UPDATE_CHECK", "1")
                 },
+            )
+        }
+
+        PluginOutbounds.sudoku.outboundType -> {
+            val fileName = "sudoku_$socksPort.json"
+            PluginOutboundPlan(
+                requirement = requirement,
+                tag = tag,
+                socksPort = socksPort,
+                mappingPort = mappingPort,
+                commandArguments = listOf("-c", $$"${file:$$fileName}"),
+                files = listOf(
+                    PluginFile(
+                        fileName,
+                        buildSudokuConfig(
+                            outbound = outbound,
+                            tag = tag,
+                            socksPort = socksPort,
+                            // The plugin keeps the real server for Host/SNI and dials the mapping port.
+                            mappingAddress = if (useProtect) "" else dialAddress,
+                            protectPath = protect,
+                        ),
+                    ),
+                ),
+                environment = emptyMap(),
+            )
+        }
+
+        PluginOutbounds.vless.outboundType -> {
+            val fileName = "vless_$socksPort.json"
+            PluginOutboundPlan(
+                requirement = requirement,
+                tag = tag,
+                socksPort = socksPort,
+                mappingPort = mappingPort,
+                commandArguments = listOf("-c", $$"${file:$$fileName}"),
+                files = listOf(
+                    PluginFile(
+                        fileName,
+                        buildVlessConfig(
+                            outbound = outbound,
+                            tag = tag,
+                            socksPort = socksPort,
+                            // The plugin keeps the real server for SNI/Host and dials the mapping port.
+                            mappingAddress = if (useProtect) "" else dialAddress,
+                            protectPath = protect,
+                        ),
+                    ),
+                ),
+                environment = emptyMap(),
             )
         }
 
@@ -532,6 +607,80 @@ private fun buildHysteria2Config(
                 }
             }
             put("logLevel", "error")
+        },
+    )
+}
+
+/**
+ * Sudoku plugin config: the listener and dial target around a sing-box
+ * `sudoku` outbound (SUDOKU-ASCII/sudoku-sing-box shape). Only fields the
+ * plugin reads are copied, with editor strings coerced to JSON types.
+ */
+private fun buildSudokuConfig(
+    outbound: JsonObject,
+    tag: String,
+    socksPort: Int,
+    mappingAddress: String,
+    protectPath: String,
+): String {
+    val key = outbound.stringOrEmpty("key")
+    require(key.isNotBlank()) { "Sudoku outbound $tag needs a key" }
+    fun JsonObjectBuilder.copyString(source: JsonObject, name: String) {
+        source.stringOrEmpty(name).takeIf(String::isNotBlank)?.let { value -> put(name, value) }
+    }
+    fun JsonObjectBuilder.copyBoolean(source: JsonObject, name: String) {
+        if (source[name] == null || source.stringOrEmpty(name).isBlank()) return
+        val value = source.booleanOrNull(name)
+            ?: error("Sudoku outbound $tag has an invalid $name")
+        put(name, value)
+    }
+    fun JsonObjectBuilder.copyInt(name: String) {
+        if (outbound[name] == null || outbound.stringOrEmpty(name).isBlank()) return
+        val value = outbound.intOrNull(name) ?: error("Sudoku outbound $tag has an invalid $name")
+        put(name, value)
+    }
+    val sudoku = buildJsonObject {
+        put("type", "sudoku")
+        put("tag", tag)
+        put("server", outbound.stringOrEmpty("server"))
+        put("server_port", outbound.intOrNull("server_port") ?: 0)
+        put("key", key)
+        copyString(outbound, "aead")
+        copyInt("padding_min")
+        copyInt("padding_max")
+        copyString(outbound, "ascii")
+        val tables = textList(outbound, "custom_tables").ifEmpty { textList(outbound, "custom_table") }
+        if (tables.isNotEmpty()) putJsonArray("custom_tables") { tables.forEach { table -> add(table) } }
+        copyBoolean(outbound, "enable_pure_downlink")
+        copyString(outbound, "multiplex")
+        copyBoolean(outbound, "disable_http_mask")
+        listOf(
+            "http_mask_mode",
+            "http_mask_host",
+            "http_mask_path_root",
+            "http_mask_multiplex",
+            "http_mask_strategy",
+            "path_root",
+        ).forEach { name -> copyString(outbound, name) }
+        copyBoolean(outbound, "http_mask_tls")
+        (outbound["httpmask"] as? JsonObject)?.let { mask ->
+            putJsonObject("httpmask") {
+                put("disable", mask.booleanOrNull("disable") ?: false)
+                copyString(mask, "mode")
+                copyBoolean(mask, "tls")
+                copyString(mask, "host")
+                copyString(mask, "path_root")
+                copyString(mask, "multiplex")
+            }
+        }
+    }
+    return encodeSingBoxJson(
+        buildJsonObject {
+            put("listen", "$PluginSocksHost:$socksPort")
+            if (mappingAddress.isNotBlank()) put("dial", mappingAddress)
+            if (protectPath.isNotBlank()) put("protect_path", protectPath)
+            put("log_level", "warn")
+            put("outbound", sudoku)
         },
     )
 }

@@ -40,21 +40,28 @@ private fun JsonObject.encodeVlessShareUrl(remarks: String): String {
         "tls",
         "transport",
         "multiplex",
+        "encryption",
+        "xray_finalmask",
+        "xray_stream_settings",
     )
     require(stringOrEmpty("network").isBlank()) { "VLESS network cannot be shared" }
     require(!get("multiplex").isMeaningfulShareValue()) { "VLESS multiplex cannot be shared" }
     val uuid = stringOrEmpty("uuid")
     require(uuid.isNotBlank()) { "VLESS UUID is required" }
-    val transport = readV2RayShareTransport()
-    val tls = readShareTls(required = false)
+    // Xray extension fields use NG's link parameters; the rest is shared as before.
+    val xray = vlessXrayShareParameters()
+    val transportParameters = xray.transportParameters ?: xray.shareable.readV2RayShareTransport().parameters
+    val tls = xray.shareable.readShareTls(required = false)
     val parameters = buildList {
-        add("encryption" to "none")
+        add("encryption" to stringOrEmpty("encryption").ifBlank { "none" })
         stringOrEmpty("flow").takeIf(String::isNotBlank)?.let { add("flow" to it) }
         stringOrEmpty("packet_encoding").takeIf(String::isNotBlank)?.let {
             add("packetEncoding" to it)
         }
-        addAll(transport.parameters)
+        addAll(transportParameters)
+        xray.finalmask?.let { add("fm" to it) }
         addAll(tls.securityParameters())
+        if (tls.enabled) addAll(xray.tlsParameters)
     }
     return buildOutboundShareUri(
         scheme = "vless",

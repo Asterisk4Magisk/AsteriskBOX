@@ -47,6 +47,7 @@ import engine.singbox.plugin.PluginOutboundPlan
 import engine.singbox.plugin.PluginTarget
 import engine.singbox.plugin.compilePluginOutbounds
 import engine.singbox.plugin.pluginTarget
+import engine.singbox.plugin.withLocalizedVlessXrayErrors
 import engine.singbox.effectiveEbpfDnsMode
 import engine.singbox.EbpfLocalDataPlanes
 import engine.singbox.EbpfSharedDataPlanes
@@ -107,12 +108,14 @@ internal object SingBoxConfigCompiler {
         runMode: Int = appState.runMode,
         exposePorts: Boolean = true,
         customResourceFileOverrides: Map<Int, File> = emptyMap(),
-    ): CompiledSingBoxConfig = finalizeConfig(
-        generate(context, appState, runMode, exposePorts, customResourceFileOverrides),
-        appState,
-        checkWithBundledCore = !context.skipsBundledCoreConfigCheck(runMode),
-        pluginTarget = context.pluginTarget(runMode),
-    )
+    ): CompiledSingBoxConfig = context.withLocalizedVlessXrayErrors {
+        finalizeConfig(
+            generate(context, appState, runMode, exposePorts, customResourceFileOverrides),
+            appState,
+            checkWithBundledCore = !context.skipsBundledCoreConfigCheck(runMode),
+            pluginTarget = context.pluginTarget(runMode),
+        )
+    }
 
     internal fun generate(
         context: Context,

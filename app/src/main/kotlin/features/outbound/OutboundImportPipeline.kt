@@ -54,6 +54,9 @@ private fun canonicalV2RayTransport(transport: String): String? =
         else -> null
     }
 
+/** Link transport names only the VLESS (Xray) plugin implements. */
+private val VlessXrayLinkTransportTypes = setOf("xhttp", "splithttp", "kcp", "mkcp")
+
 private fun canonicalMihomoOutboundType(sourceType: String): String =
     when (sourceType.lowercase()) {
         "socks", "socks5" -> "socks"
@@ -329,12 +332,9 @@ internal object MihomoYamlOutboundParser {
         if (type == "naive" && network.isNotBlank()) return null
         if (type in setOf("vmess", "vless", "trojan") &&
             network.isNotBlank() &&
-            canonicalV2RayTransport(network) == null
-        ) return null
-        val vlessEncryption = stringOrEmpty("encryption")
-        if (type == "vless" &&
-            vlessEncryption.isNotBlank() &&
-            !vlessEncryption.equals("none", ignoreCase = true)
+            canonicalV2RayTransport(network) == null &&
+            // XHTTP runs on the VLESS (Xray) plugin.
+            !(type == "vless" && network == "xhttp")
         ) return null
         if (type == "trojan" && map("ss-opts").bool("enabled")) return null
         if (type == "tuic" && stringOrEmpty("token").isNotBlank()) return null
@@ -499,6 +499,11 @@ internal object MihomoYamlOutboundParser {
                     putNotBlank("uuid", stringOrEmpty("uuid"))
                     putNotBlank("flow", stringOrEmpty("flow"))
                     putNotBlank("packet_encoding", stringOrEmpty("packet-encoding"))
+                    // VLESS Encryption runs on the VLESS (Xray) plugin.
+                    putNotBlank(
+                        "encryption",
+                        stringOrEmpty("encryption").takeUnless { it.equals("none", ignoreCase = true) }.orEmpty(),
+                    )
                 }
                 "shadowtls" -> {
                     putPositive("version", intOrZero("version"))
@@ -717,6 +722,15 @@ internal object MihomoYamlOutboundParser {
         val network = proxy.stringOrEmpty("network")
             .ifBlank { proxy.stringOrEmpty("transport") }
             .lowercase()
+        if (network == "xhttp" && proxy.stringOrEmpty("type").equals("vless", ignoreCase = true)) {
+            val options = proxy.map("xhttp-opts")
+            return buildJsonObject {
+                put("type", "xhttp")
+                putNotBlank("path", options.stringOrEmpty("path"))
+                putNotBlank("host", options.stringOrEmpty("host"))
+                putNotBlank("mode", options.stringOrEmpty("mode"))
+            }
+        }
         val sourceType = canonicalV2RayTransport(network) ?: return null
         if (sourceType == "tcp") return null
         val options = proxy.map("$network-opts").ifEmpty {
@@ -826,7 +840,7 @@ internal object MihomoYamlOutboundParser {
 
 private object ProxyUrlOutboundParser {
     private val urlPattern = Regex(
-        """(?i)(?:socks(?:4a?|5h?)?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2(?:\+realm(?:\+http)?)?|hy2|anytls|snell|ssh|tor|naive(?:\+(?:https|quic))?|wg|wireguard|awg|warp|mierus|sq|juicity)://[^\s<>"']+""",
+        """(?i)(?:socks(?:4a?|5h?)?|https?|ss|vmess|vless|trojan|hysteria|hy1|shadowtls|tuic|hysteria2(?:\+realm(?:\+http)?)?|hy2|anytls|snell|ssh|tor|naive(?:\+(?:https|quic))?|wg|wireguard|awg|warp|mierus|sq|juicity|sudoku)://[^\s<>"']+""",
     )
 
     fun parseOutcomeOrNull(content: String): ImportOutcome<ImportedSingBoxOutbound>? {
@@ -937,19 +951,24 @@ private object ProxyUrlOutboundParser {
         if (type == "snell" && query.intOrZero("version").takeIf { it > 0 } != 4) return null
         val transportType = query.first("type", "network").lowercase()
         val normalizedTransportType = canonicalV2RayTransport(transportType)
+        // vless keeps the Xray-only link options for the VLESS (Xray) plugin.
+        val isVless = type == "vless"
         if (type in setOf("vmess", "vless", "trojan") &&
             transportType.isNotBlank() &&
-            normalizedTransportType == null
+            normalizedTransportType == null &&
+            !(isVless && transportType in VlessXrayLinkTransportTypes)
         ) {
             throw IllegalArgumentException("Unsupported V2Ray transport: $transportType")
         }
         if (
+            !isVless &&
             normalizedTransportType == "tcp" &&
             query.first("headerType", "header_type").let { header ->
                 header.isNotBlank() && !header.equals("none", ignoreCase = true)
             }
         ) return null
-        if (normalizedTransportType == "grpc" &&
+        if (!isVless &&
+            normalizedTransportType == "grpc" &&
             (
                 query.first("authority").isNotBlank() ||
                     query.first("mode").let { mode ->
@@ -962,6 +981,7 @@ private object ProxyUrlOutboundParser {
                 .any { key -> query.first(key).isNotBlank() }
         ) return null
         if (
+            !isVless &&
             listOf("pcs", "pqv", "fm")
                 .any { key -> query.first(key).isNotBlank() }
         ) return null
@@ -1009,10 +1029,6 @@ private object ProxyUrlOutboundParser {
             query.first("pbk", "public-key", "public_key").isBlank()
         ) return null
         val vlessEncryption = query.first("encryption")
-        if (type == "vless" &&
-            vlessEncryption.isNotBlank() &&
-            !vlessEncryption.equals("none", ignoreCase = true)
-        ) return null
         if (type == "hysteria2" &&
             query.first("obfs").let { obfs ->
                 obfs.isNotBlank() && obfs.lowercase() !in setOf("salamander", "gecko")
@@ -1123,6 +1139,8 @@ private object ProxyUrlOutboundParser {
                     putNotBlank("uuid", credentials.first)
                     putNotBlank("flow", query.first("flow"))
                     putNotBlank("packet_encoding", query.first("packetEncoding", "packet_encoding"))
+                    putNotBlank("encryption", vlessEncryption.takeUnless { it.equals("none", ignoreCase = true) }.orEmpty())
+                    vlessXrayFinalmask(query)?.let { mask -> put("xray_finalmask", mask) }
                 }
                 "shadowtls" -> {
                     putNotBlank("password", authentication)
@@ -1174,8 +1192,11 @@ private object ProxyUrlOutboundParser {
             } else {
                 buildUrlTls(type, scheme, query)
             }
-            tls?.let { put("tls", it) }
-            if (type != "naive") {
+            (if (isVless) tls?.withVlessXrayTls(query) else tls)?.let { put("tls", it) }
+            if (isVless) {
+                (vlessXrayLinkTransport(query) ?: buildUrlTransport(query)?.withVlessLinkHeaders(query))
+                    ?.let { put("transport", it) }
+            } else if (type != "naive") {
                 buildUrlTransport(query)?.let { put("transport", it) }
             }
         }

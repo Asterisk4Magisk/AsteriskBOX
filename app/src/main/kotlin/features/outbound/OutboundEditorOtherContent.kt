@@ -136,7 +136,7 @@ internal fun LazyListScope.sshOutboundEditor(state: OutboundEditorContentState) 
 }
 
 /**
- * Plugin-backed outbounds (mieru, shadowquic, juicity) edit like any other:
+ * Plugin-backed outbounds (mieru, shadowquic, juicity, sudoku) edit like any other:
  * their descriptors already declare the sections and fields.
  */
 internal fun LazyListScope.pluginOutboundEditor(state: OutboundEditorContentState) {

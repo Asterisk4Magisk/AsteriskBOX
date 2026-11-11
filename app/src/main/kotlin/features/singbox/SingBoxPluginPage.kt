@@ -166,6 +166,7 @@ private fun PluginPackageRow(
 
 private fun PluginRequirement.implementationSummary(): Int = when (this) {
     PluginOutbounds.naive -> R.string.plugin_use_naive_summary
+    PluginOutbounds.vless -> R.string.plugin_use_vless_summary
     else -> R.string.plugin_use_hysteria2_summary
 }
 

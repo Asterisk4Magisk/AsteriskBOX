@@ -90,6 +90,7 @@ internal object OutboundEditorRegistry {
         OutboundEditorDescriptor("mieru", "Mieru"),
         OutboundEditorDescriptor("shadowquic", "ShadowQUIC"),
         OutboundEditorDescriptor("juicity", "Juicity"),
+        OutboundEditorDescriptor("sudoku", "Sudoku"),
     )
     private val schemaCache = mutableMapOf<String, OutboundEditorSchema>()
 
@@ -147,6 +148,8 @@ internal object OutboundEditorRegistry {
             tls = true,
             transport = true,
             multiplex = true,
+            tlsFieldSpecs = tlsFields() + vlessXrayTlsFields(),
+            transportFieldSpecs = vlessTransportFields(),
         )
         "shadowtls" -> schema(type, descriptor(type).title, shadowTlsOutboundFields(), tls = true)
         "tuic" -> schema(
@@ -169,6 +172,7 @@ internal object OutboundEditorRegistry {
         "mieru" -> schema(type, descriptor(type).title, mieruOutboundFields())
         "shadowquic" -> schema(type, descriptor(type).title, shadowQuicOutboundFields())
         "juicity" -> schema(type, descriptor(type).title, juicityOutboundFields())
+        "sudoku" -> schema(type, descriptor(type).title, sudokuOutboundFields())
         "ssh" -> schema(type, descriptor(type).title, sshOutboundFields())
         else -> throw IllegalArgumentException("Unsupported outbound type: $type")
     }
@@ -182,6 +186,7 @@ internal object OutboundEditorRegistry {
         multiplex: Boolean = false,
         quic: Boolean = false,
         tlsFieldSpecs: List<OutboundFieldSpec>? = null,
+        transportFieldSpecs: List<OutboundFieldSpec>? = null,
         additionalQuicFields: List<OutboundFieldSpec> = emptyList(),
     ): OutboundEditorSchema = OutboundEditorSchema(
         type = type,
@@ -197,7 +202,9 @@ internal object OutboundEditorRegistry {
                     ),
                 )
             }
-            if (transport) add(OutboundSectionSpec(OutboundEditorSection.TRANSPORT, transportFields()))
+            if (transport) {
+                add(OutboundSectionSpec(OutboundEditorSection.TRANSPORT, transportFieldSpecs ?: transportFields()))
+            }
             if (multiplex) add(OutboundSectionSpec(OutboundEditorSection.MULTIPLEX, multiplexFields()))
             if (quic) {
                 add(
@@ -351,17 +358,88 @@ internal object OutboundEditorRegistry {
         ),
     )
 
-    private fun transportFields() = listOf(
-        select("transport.type", "Transport", listOf("", "http", "ws", "quic", "grpc", "httpupgrade")),
+    /** vless only: the shared transports plus the ones the VLESS (Xray) plugin adds. */
+    private fun vlessTransportFields(): List<OutboundFieldSpec> {
+        fun onType(vararg types: String) = listOf(OutboundFieldCondition("transport.type", types.toSet()))
+        val shared = transportFields(xray = true)
+        val grpcIndex = shared.indexOfFirst { it.path == "transport.service_name" } + 1
+        return shared.take(grpcIndex) +
+            listOf(
+                field("transport.authority", "gRPC authority", conditions = onType("grpc")),
+                field("transport.multi_mode", "gRPC multi mode", OutboundFieldKind.BOOLEAN, conditions = onType("grpc")),
+            ) +
+            shared.drop(grpcIndex) +
+            listOf(
+                select(
+                    "transport.mode",
+                    "XHTTP mode",
+                    listOf("", "auto", "packet-up", "stream-up", "stream-one"),
+                    conditions = onType("xhttp"),
+                ),
+                field("transport.extra", "XHTTP extra (JSON)", OutboundFieldKind.MULTILINE, conditions = onType("xhttp")),
+                select(
+                    "transport.header_type",
+                    "Header type",
+                    listOf("", "none", "http", "srtp", "utp", "wechat-video", "dtls", "wireguard", "dns"),
+                    conditions = onType("raw", "mkcp"),
+                ),
+                field("transport.mtu", "MTU", OutboundFieldKind.INTEGER, conditions = onType("mkcp")),
+                field("transport.tti", "TTI", OutboundFieldKind.INTEGER, conditions = onType("mkcp")),
+                field("transport.seed", "mKCP seed", conditions = onType("mkcp")),
+            )
+    }
+
+    /** vless only: TLS and REALITY options the VLESS (Xray) plugin adds. */
+    private fun vlessXrayTlsFields() = listOf(
+        field(
+            "tls.pinned_peer_cert_sha256",
+            "Pinned peer certificate SHA-256",
+            conditions = on("tls.enabled"),
+        ),
+        field(
+            "tls.reality.spider_x",
+            "Reality spider X",
+            conditions = listOf(
+                OutboundFieldCondition("tls.enabled"),
+                OutboundFieldCondition("tls.reality.enabled"),
+            ),
+        ),
+        field(
+            "tls.reality.mldsa65_verify",
+            "Reality ML-DSA-65 verify",
+            conditions = listOf(
+                OutboundFieldCondition("tls.enabled"),
+                OutboundFieldCondition("tls.reality.enabled"),
+            ),
+        ),
+    )
+
+    private fun transportFields(xray: Boolean = false) = listOf(
+        select(
+            "transport.type",
+            "Transport",
+            listOf("", "http", "ws", "quic", "grpc", "httpupgrade") +
+                if (xray) listOf("xhttp", "mkcp", "raw") else emptyList(),
+        ),
         field(
             "transport.host",
             "Host",
-            conditions = listOf(OutboundFieldCondition("transport.type", setOf("http", "httpupgrade"))),
+            conditions = listOf(
+                OutboundFieldCondition(
+                    "transport.type",
+                    setOf("http", "httpupgrade") + if (xray) setOf("xhttp", "mkcp", "raw") else emptySet(),
+                ),
+            ),
         ),
         field(
             "transport.path",
             "Path",
-            conditions = listOf(OutboundFieldCondition("transport.type", setOf("http", "ws", "httpupgrade"))),
+            conditions = listOf(
+                OutboundFieldCondition(
+                    "transport.type",
+                    setOf("http", "ws", "httpupgrade") + if (xray) setOf("xhttp", "raw") else emptySet(),
+                ),
+            ),
         ),
         field(
             "transport.method",
@@ -642,6 +720,35 @@ private fun juicityOutboundFields() = listOf(
     outboundSelect("congestion_control", "Congestion control", listOf("bbr", "cubic")),
 )
 
+/** HTTP mask options appear only while the mask is on. */
+private val SudokuHttpMaskEnabled = listOf(OutboundFieldCondition("httpmask.disable", setOf("", "false")))
+
+/**
+ * SUDOKU-ASCII/sudoku-sing-box outbound fields. HTTP mask settings use the
+ * `httpmask` object that fork recommends; its legacy flat fields still run.
+ * Booleans that default to true are selects, so they can be set to false.
+ */
+private fun sudokuOutboundFields() = listOf(
+    outboundField("key", "Key", required = true),
+    outboundSelect("aead", "Encryption method", listOf("", "chacha20-poly1305", "aes-128-gcm", "none")),
+    outboundSelect("ascii", "Table mode", listOf("", "prefer_ascii", "prefer_entropy")),
+    outboundField("custom_tables", "Custom tables", OutboundFieldKind.TEXT_LIST),
+    outboundField("padding_min", "Minimum padding (%)", OutboundFieldKind.INTEGER),
+    outboundField("padding_max", "Maximum padding (%)", OutboundFieldKind.INTEGER),
+    outboundSelect("enable_pure_downlink", "Pure downlink", listOf("", "true", "false")),
+    outboundSelect("multiplex", "Multiplex mode", listOf("", "off", "auto", "on")),
+    outboundField("httpmask.disable", "Disable HTTP mask", OutboundFieldKind.BOOLEAN),
+    outboundSelect(
+        "httpmask.mode",
+        "HTTP mask mode",
+        listOf("", "legacy", "stream", "poll", "auto", "ws"),
+        conditions = SudokuHttpMaskEnabled,
+    ),
+    outboundField("httpmask.tls", "HTTP mask TLS", OutboundFieldKind.BOOLEAN, conditions = SudokuHttpMaskEnabled),
+    outboundField("httpmask.host", "Host", conditions = SudokuHttpMaskEnabled),
+    outboundField("httpmask.path_root", "Path", conditions = SudokuHttpMaskEnabled),
+)
+
 @StringRes
 internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "0-RTT handshake" -> R.string.outbound_field_zero_rtt_handshake
@@ -689,9 +796,11 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Connection receive window" -> R.string.outbound_field_connection_receive_window
     "Connection reuse" -> R.string.outbound_field_connection_reuse
     "Curve preferences" -> R.string.outbound_field_curve_preferences
+    "Custom tables" -> R.string.outbound_field_custom_tables
     "Detour outbound" -> R.string.outbound_field_detour_outbound
     "Disable Chrome QUIC fingerprint parroting" ->
         R.string.outbound_field_disable_chrome_quic_fingerprint_parroting
+    "Disable HTTP mask" -> R.string.outbound_field_disable_http_mask
     "Disable path MTU discovery" -> R.string.outbound_field_disable_path_mtu_discovery
     "Disable SNI" -> R.string.outbound_field_disable_sni
     "Disable TCP keep-alive" -> R.string.outbound_field_disable_tcp_keep_alive
@@ -711,11 +820,26 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Fragment TLS handshake" -> R.string.outbound_field_fragment_tls_handshake
     "Global padding" -> R.string.outbound_field_global_padding
     "gRPC service name" -> R.string.outbound_field_grpc_service_name
+    "gRPC authority" -> R.string.outbound_field_grpc_authority
+    "gRPC multi mode" -> R.string.outbound_field_grpc_multi_mode
+    "Header type" -> R.string.outbound_field_header_type
+    "mKCP seed" -> R.string.outbound_field_mkcp_seed
+    "Pinned peer certificate SHA-256" -> R.string.outbound_field_pinned_peer_cert_sha256
+    "Reality ML-DSA-65 verify" -> R.string.outbound_field_reality_mldsa65_verify
+    "Reality spider X" -> R.string.outbound_field_reality_spider_x
+    "TTI" -> R.string.outbound_field_tti
+    "VLESS Encryption" -> R.string.outbound_field_vless_encryption
+    "XHTTP extra (JSON)" -> R.string.outbound_field_xhttp_extra
+    "XHTTP mode" -> R.string.outbound_field_xhttp_mode
+    "Xray finalmask (JSON)" -> R.string.outbound_field_xray_finalmask
+    "Xray stream settings (JSON)" -> R.string.outbound_field_xray_stream_settings
     "Headers" -> R.string.outbound_field_headers
     "Heartbeat interval" -> R.string.outbound_field_heartbeat_interval
     "Host" -> R.string.outbound_field_host
     "Host key algorithms" -> R.string.outbound_field_host_key_algorithms
     "Host keys" -> R.string.outbound_field_host_keys
+    "HTTP mask mode" -> R.string.outbound_field_http_mask_mode
+    "HTTP mask TLS" -> R.string.outbound_field_http_mask_tls
     "HTTP method" -> R.string.outbound_field_http_method
     "Idle session check interval" -> R.string.outbound_field_idle_session_check_interval
     "Idle session timeout" -> R.string.outbound_field_idle_session_timeout
@@ -724,20 +848,24 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Insecure concurrency" -> R.string.outbound_field_insecure_concurrency
     "IPv4 bind address" -> R.string.outbound_field_ipv4_bind_address
     "IPv6 bind address" -> R.string.outbound_field_ipv6_bind_address
+    "Key" -> R.string.outbound_field_key
     "Key exchange algorithms" -> R.string.outbound_field_key_exchange_algorithms
     "MAC algorithms" -> R.string.outbound_field_mac_algorithms
     "Maximum connections" -> R.string.outbound_field_maximum_connections
     "Maximum concurrent streams" -> R.string.outbound_field_maximum_concurrent_streams
     "Maximum early data" -> R.string.outbound_field_maximum_early_data
     "Maximum packet size" -> R.string.outbound_field_maximum_packet_size
+    "Maximum padding (%)" -> R.string.outbound_field_maximum_padding
     "Maximum port hopping interval" -> R.string.outbound_field_maximum_port_hopping_interval
     "Maximum streams" -> R.string.outbound_field_maximum_streams
     "Maximum TLS version" -> R.string.outbound_field_maximum_tls_version
     "Minimum idle sessions" -> R.string.outbound_field_minimum_idle_sessions
     "Minimum packet size" -> R.string.outbound_field_minimum_packet_size
+    "Minimum padding (%)" -> R.string.outbound_field_minimum_padding
     "Minimum streams" -> R.string.outbound_field_minimum_streams
     "Minimum TLS version" -> R.string.outbound_field_minimum_tls_version
     "Multiplex" -> R.string.outbound_field_multiplex
+    "Multiplex mode" -> R.string.outbound_field_multiplex_mode
     "Multiplex protocol" -> R.string.outbound_field_multiplex_protocol
     "Network" -> R.string.outbound_field_network
     "Network strategy" -> R.string.outbound_field_network_strategy
@@ -759,6 +887,7 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Private key" -> R.string.outbound_field_private_key
     "Private key passphrase" -> R.string.outbound_field_private_key_passphrase
     "Private key path" -> R.string.outbound_field_private_key_path
+    "Pure downlink" -> R.string.outbound_field_pure_downlink
     "QUIC congestion control" -> R.string.outbound_field_quic_congestion_control
     "QUIC keep-alive period" -> R.string.outbound_field_quic_keep_alive_period
     "QUIC session receive window" -> R.string.outbound_field_quic_session_receive_window
@@ -777,6 +906,7 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Snell version" -> R.string.outbound_field_snell_version
     "SOCKS version" -> R.string.outbound_field_socks_version
     "Stream receive window" -> R.string.outbound_field_stream_receive_window
+    "Table mode" -> R.string.outbound_field_table_mode
     "TCP Fast Open" -> R.string.outbound_field_tcp_fast_open
     "TCP keep-alive" -> R.string.outbound_field_tcp_keep_alive
     "TCP keep-alive interval" -> R.string.outbound_field_tcp_keep_alive_interval

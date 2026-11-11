@@ -41,6 +41,9 @@ internal class PluginNotFoundException(
     message: String,
 ) : FileNotFoundException(message)
 
+/** Latest release of the abox-plugin repository, which carries every plugin APK. */
+internal const val AboxPluginReleases = "https://github.com/Asterisk4Magisk/abox-plugin/releases/latest"
+
 /** Known plugin-backed outbound types, in display order. */
 internal object PluginOutbounds {
     val mieru = PluginRequirement(
@@ -61,6 +64,18 @@ internal object PluginOutbounds {
         displayName = "Juicity",
         downloadUrl = "https://github.com/xchacha20-poly1305/husi/releases?q=plugin-juicity",
     )
+    val sudoku = PluginRequirement(
+        outboundType = "sudoku",
+        pluginId = "sudoku-plugin",
+        displayName = "Sudoku",
+        downloadUrl = AboxPluginReleases,
+    )
+    val vless = PluginRequirement(
+        outboundType = "vless",
+        pluginId = "vless-plugin",
+        displayName = "VLESS (Xray)",
+        downloadUrl = AboxPluginReleases,
+    )
     val hysteria2 = PluginRequirement(
         outboundType = "hysteria2",
         pluginId = "hysteria2-plugin",
@@ -78,10 +93,10 @@ internal object PluginOutbounds {
     )
 
     /** Types that only exist as plugins. */
-    val pluginOnly: List<PluginRequirement> = listOf(mieru, shadowQuic, juicity)
+    val pluginOnly: List<PluginRequirement> = listOf(mieru, shadowQuic, juicity, sudoku)
 
     /** Types the core also implements; they use the plugin only when the user switches them. */
-    val switchable: List<PluginRequirement> = listOf(hysteria2, naive)
+    val switchable: List<PluginRequirement> = listOf(vless, hysteria2, naive)
 
     val all: List<PluginRequirement> = pluginOnly + switchable
 

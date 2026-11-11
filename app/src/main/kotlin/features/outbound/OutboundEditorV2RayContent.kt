@@ -29,6 +29,10 @@ internal fun vlessOutboundFields() = listOf(
     outboundSelect("flow", "Flow", listOf("", "xtls-rprx-vision")),
     outboundSelect("network", "Network", listOf("", "tcp", "udp")),
     outboundSelect("packet_encoding", "Packet encoding", listOf("", "packetaddr", "xudp")),
+    // Read by the VLESS (Xray) plugin only.
+    outboundField("encryption", "VLESS Encryption"),
+    outboundField("xray_finalmask", "Xray finalmask (JSON)", OutboundFieldKind.MULTILINE),
+    outboundField("xray_stream_settings", "Xray stream settings (JSON)", OutboundFieldKind.MULTILINE),
 )
 
 internal fun LazyListScope.vmessOutboundEditor(state: OutboundEditorContentState) {

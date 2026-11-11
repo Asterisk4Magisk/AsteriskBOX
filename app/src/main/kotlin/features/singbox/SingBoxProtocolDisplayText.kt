@@ -41,6 +41,7 @@ internal fun String.displaySingBoxProtocolName(compact: Boolean = false): String
         "mieru" -> "Mieru"
         "shadowquic" -> "ShadowQUIC"
         "juicity" -> "Juicity"
+        "sudoku" -> "Sudoku"
         "anytls", "any-tls" -> "AnyTLS"
         "masque" -> "MASQUE"
         "openvpn", "open-vpn" -> "OpenVPN"

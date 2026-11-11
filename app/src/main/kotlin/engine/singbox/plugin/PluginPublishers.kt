@@ -44,6 +44,17 @@ internal enum class PluginPublisher(
         setOf("35762758ce86a6ec297d9ccac689469bc43b9fed8ae1b27f100a86bbac00a055"),
         "Matsuri",
     ),
+
+    /**
+     * Plugins published with AsteriskBOX itself. Besides the release key,
+     * [PluginRegistry] also trusts the key that signed the running app, so a
+     * debug or self-built AsteriskBOX accepts plugins signed by the same key.
+     */
+    ASTERISK(
+        "org.asterisk.zcc.abox.plugin.",
+        setOf(AsteriskCertificate),
+        "AsteriskBOX",
+    ),
     ;
 
     companion object {
@@ -63,6 +74,10 @@ internal const val SagerNetCertificate =
 internal const val KlzgradCertificate =
     "b7baa7fb895988eb731adb41882b53ade139f77de537b7c011ec33bd9677cbae"
 
+/** AsteriskBOX release signing key (O=Asterisk4Magisk). */
+internal const val AsteriskCertificate =
+    "7f9be0a477a32dd8ede8c7adfa535563e20f3329e9fc7b0d7646e9f2032e0eef"
+
 /**
  * Plugin ids a certificate may provide. A NaiveProxy plugin signed by klzgrad
  * must not be able to claim, say, `mieru-plugin`; null means "any supported id".
@@ -70,6 +85,7 @@ internal const val KlzgradCertificate =
 internal fun PluginPublisher.allowedPluginIds(certificates: Set<String>): Set<String>? = when {
     KlzgradCertificate in certificates -> setOf("naive-plugin")
     this == PluginPublisher.SAGERNET -> setOf("naive-plugin", "hysteria2-plugin")
+    this == PluginPublisher.ASTERISK -> setOf("sudoku-plugin", "vless-plugin")
     else -> null
 }
 

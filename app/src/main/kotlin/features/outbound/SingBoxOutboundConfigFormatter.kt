@@ -5,6 +5,8 @@ package features.outbound
 
 import android.content.Context
 import engine.singbox.plugin.PluginOutbounds
+import engine.singbox.plugin.withoutXrayVlessExtensions
+import engine.singbox.plugin.xrayOnlyVlessFeatures
 import features.resources.runtime.skipsBundledCoreConfigCheck
 import io.nekohasekai.libbox.Libbox
 import kotlinx.serialization.json.Json
@@ -32,6 +34,8 @@ internal object PassthroughSingBoxOutboundConfigFormatter : SingBoxOutboundConfi
  * a SOCKS hand-off before the core sees them, so the core formatter must not see
  * them either. They are pulled out, the rest of the document is formatted (so a
  * broken plain outbound still fails), and the plugin entries go back untouched.
+ * A vless outbound with Xray extension fields is kept the same way: the core
+ * does not know those fields, and the compile strips or rejects them later.
  */
 internal class PluginAwareSingBoxOutboundConfigFormatter(
     private val delegate: SingBoxOutboundConfigFormatter,
@@ -85,8 +89,12 @@ internal class PluginAwareSingBoxOutboundConfigFormatter(
 private val OutboundImportJson = Json { isLenient = true; allowTrailingComma = true }
 
 private fun JsonElement.isPluginBackedOutbound(): Boolean {
-    val type = ((this as? JsonObject)?.get("type") as? JsonPrimitive)?.contentOrNull ?: return false
-    // Switchable protocols are core types too, so the core can format them.
+    val outbound = this as? JsonObject ?: return false
+    val type = (outbound["type"] as? JsonPrimitive)?.contentOrNull ?: return false
+    if (type == PluginOutbounds.vless.outboundType) {
+        return outbound.xrayOnlyVlessFeatures().isNotEmpty() || outbound.withoutXrayVlessExtensions() != outbound
+    }
+    // Other switchable protocols are core types too, so the core can format them.
     return PluginOutbounds.pluginOnly.any { requirement -> requirement.outboundType == type }
 }
 

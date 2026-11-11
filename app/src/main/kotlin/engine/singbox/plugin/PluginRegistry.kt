@@ -27,8 +27,9 @@ internal object PluginRegistry {
             Intent(PluginContract.ActionNativePlugin),
             PackageManager.GET_META_DATA,
         ).mapNotNull { resolveInfo -> resolveInfo.providerInfo }
+        val ownCertificates = packageManager.signedPackage(context.packageName)?.certificates.orEmpty()
         return providers
-            .mapNotNull { provider -> provider.asInstalledPlugin(packageManager) }
+            .mapNotNull { provider -> provider.asInstalledPlugin(packageManager, ownCertificates) }
             .groupBy(InstalledPlugin::pluginId)
             .mapValues { (_, candidates) -> preferred(candidates) }
     }
@@ -49,14 +50,23 @@ internal object PluginRegistry {
         candidates.firstOrNull { plugin -> plugin.publisher == PluginPublisher.HUSI.displayName }
             ?: candidates.minBy(InstalledPlugin::packageName)
 
-    private fun ProviderInfo.asInstalledPlugin(packageManager: PackageManager): InstalledPlugin? {
+    private fun ProviderInfo.asInstalledPlugin(
+        packageManager: PackageManager,
+        ownCertificates: Set<String>,
+    ): InstalledPlugin? {
         val publisher = authority?.takeIf(String::isNotBlank)?.let(PluginPublisher::ofAuthority) ?: return null
         val pluginId = loadMetadataString(packageManager)?.takeIf(String::isNotBlank) ?: return null
         // Only plugin ids this build can use; checked before the signature query.
         if (PluginOutbounds.all.none { requirement -> requirement.pluginId == pluginId }) return null
         val signed = packageManager.signedPackage(packageName) ?: return null
         val certificates = signed.certificates
-        if (certificates.isEmpty() || !publisher.trustedCertificates.containsAll(certificates)) return null
+        // AsteriskBOX's own plugins may also carry the key this app is signed with.
+        val trusted = if (publisher == PluginPublisher.ASTERISK) {
+            publisher.trustedCertificates + ownCertificates
+        } else {
+            publisher.trustedCertificates
+        }
+        if (certificates.isEmpty() || !trusted.containsAll(certificates)) return null
         val allowed = publisher.allowedPluginIds(certificates)
         if (allowed != null && pluginId !in allowed) return null
         val executable = executablePath() ?: return null
