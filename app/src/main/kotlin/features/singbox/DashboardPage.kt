@@ -795,10 +795,10 @@ private fun NodeDelayChip(
     onClick: () -> Unit,
 ) {
     val text = when (status) {
-        SingBoxProxyDelayStatus.Testing -> stringResource(R.string.home_node_delay_testing)
-        SingBoxProxyDelayStatus.NotTested -> stringResource(R.string.home_node_delay_unknown)
-        SingBoxProxyDelayStatus.Failed -> stringResource(R.string.home_node_delay_failed)
-        SingBoxProxyDelayStatus.Measured -> stringResource(R.string.home_node_delay_value, delayMs ?: 0)
+        SingBoxProxyDelayStatus.Testing -> stringResource(R.string.sing_box_proxies_delay_testing)
+        SingBoxProxyDelayStatus.NotTested -> stringResource(R.string.sing_box_proxies_delay_not_tested)
+        SingBoxProxyDelayStatus.Failed -> stringResource(R.string.sing_box_proxies_delay_status_failed)
+        SingBoxProxyDelayStatus.Measured -> stringResource(R.string.monitor_milliseconds, delayMs ?: 0)
     }
     val tint = when (status) {
         SingBoxProxyDelayStatus.Testing, SingBoxProxyDelayStatus.NotTested -> MaterialTheme.colorScheme.onSurfaceVariant
