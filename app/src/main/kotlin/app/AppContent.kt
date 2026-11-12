@@ -99,6 +99,7 @@ import ui.components.AsteriskFloatingNavigationBar
 import ui.components.AsteriskFloatingNavigationItem
 import ui.components.AsteriskScaffold
 import ui.components.floatingChrome
+import ui.components.asteriskNavigationSelection
 import ui.layout.pageWindowPadding
 import ui.layout.shouldShowNavigationRail
 import ui.layout.shouldShowSplitPane
@@ -660,7 +661,12 @@ private fun HomeServicePowerButton(
                 color = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.primary,
             ) {
-                Box(contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .asteriskNavigationSelection(appState.proxyRunning, cornerRadius = 16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
                     if (control.serviceOperationInProgress) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
