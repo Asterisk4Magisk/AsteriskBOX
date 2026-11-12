@@ -8,7 +8,6 @@ import engine.singbox.runtime.SingBoxTrafficSample
 import engine.singbox.runtime.SingBoxTrafficState
 import engine.singbox.runtime.TrafficHistoryCapacity
 import features.monitoring.MonitoringState
-import ui.theme.FocusTone
 import utils.toReadableBytes
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,12 +17,6 @@ internal enum class HomeServiceStatus {
     Enabled,
     Disabled,
     Error,
-}
-
-internal fun homeFocusTone(status: HomeServiceStatus): FocusTone = when (status) {
-    HomeServiceStatus.Enabled -> FocusTone.Primary
-    HomeServiceStatus.Disabled -> FocusTone.Inactive
-    HomeServiceStatus.Error -> FocusTone.Error
 }
 
 internal enum class HomeNetworkRowKind {
