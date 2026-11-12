@@ -14,32 +14,31 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Icon
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -48,19 +47,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.AppServices
-import app.LocalMainDestinationState
-import app.navigation.MainDestination
 import app.LocalAppServices
 import app.LocalAppStateStore
+import app.LocalHomeServiceControl
 import app.LocalIsWideScreen
+import app.LocalMainDestinationState
 import app.LocalNavigator
 import app.LocalUpdateAppState
 import app.R
@@ -75,14 +79,15 @@ import app.modes.RunModeVpnService
 import app.modes.SingBoxModeDirect
 import app.modes.SingBoxModeGlobal
 import app.modes.SingBoxModeRule
+import app.navigation.MainDestination
 import engine.singbox.config.APP_DIRECT_OUTBOUND
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.runtime.SingBoxProxiesState
 import engine.singbox.runtime.SingBoxRuntimeRepository
 import engine.singbox.runtime.SingBoxRuntimeState
-import engine.singbox.runtime.canStartUserDelayTest
 import engine.singbox.runtime.SingBoxTrafficSample
 import engine.singbox.runtime.SingBoxTrafficState
+import engine.singbox.runtime.canStartUserDelayTest
 import features.home.HomeControllerState
 import features.home.HomeModeRuntimeAction
 import features.home.HomeMonitoringOverviewState
@@ -98,14 +103,20 @@ import features.home.buildHomeNetworkActivityState
 import features.home.buildNetworkActivityLineBands
 import features.home.buildNetworkActivityWaveform
 import features.home.formatHomeRuntimeBytes
+import features.home.formatHomeServiceUptime
 import features.home.homeFocusTone
 import features.monitoring.MonitoringIntent
 import features.monitoring.ObserveMonitoring
 import features.monitoring.resource.ProcessStatsSourceKind
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
+import ui.charts.DottedWaveformDotRadius
+import ui.charts.drawDottedWaveform
+import ui.charts.drawSmoothAreaLine
+import ui.charts.rememberDottedWaveformRamp
 import ui.components.AsteriskExpressiveCard
 import ui.components.AsteriskFocusSurface
 import ui.components.AsteriskPageCard
@@ -113,28 +124,14 @@ import ui.components.AsteriskScaffold
 import ui.components.AsteriskSegmentItem
 import ui.components.AsteriskSegmentedControl
 import ui.components.AsteriskTopAppBar
-import ui.charts.DottedWaveformDotRadius
-import ui.charts.drawDottedWaveform
-import ui.charts.drawSmoothAreaLine
-import ui.charts.rememberDottedWaveformRamp
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
-import ui.theme.AsteriskShapeTokens
 import ui.theme.ExpressiveShapeRole
 import ui.theme.FocusDensity
 import utils.toReadableBytes
 import kotlin.time.Duration.Companion.milliseconds
 import app.navigation.Route as AppRoute
 import ui.icons.AsteriskIcons as Icons
-import androidx.compose.runtime.produceState
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
-import app.LocalHomeServiceControl
-import features.home.formatHomeServiceUptime
-import kotlinx.coroutines.delay
 
 private data class HomeTrafficPresentation(
     val traffic: SingBoxTrafficState,
@@ -583,6 +580,8 @@ private fun HomeCurrentNodeRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            // Reserve the delay chip's 48dp touch target plus the row's vertical padding.
+            .heightIn(min = 72.dp)
             .clip(RoundedCornerShape(10.dp))
             .clickable(onClick = onOpenProxies)
             .padding(horizontal = 4.dp, vertical = 12.dp),
