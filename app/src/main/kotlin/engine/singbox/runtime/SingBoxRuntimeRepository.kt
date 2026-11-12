@@ -144,8 +144,8 @@ internal class SingBoxRuntimeRepository(
         latestConnections
     }
 
-    suspend fun getConnectionCount(appState: AppState): Result<Int> =
-        getConnections(appState).map { it.connections.size }
+    suspend fun getConnectionCounts(appState: AppState): Result<ConnectionCounts> =
+        getConnections(appState).map { it.connections.connectionCounts() }
 
     suspend fun closeConnection(appState: AppState, connectionId: String): Result<Boolean> = runCatching {
         val active = requireActiveSession(appState)

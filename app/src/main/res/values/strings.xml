@@ -61,10 +61,6 @@
     <!-- Home -->
     <string name="home_accumulated_download">Downloaded</string>
     <string name="home_accumulated_upload">Uploaded</string>
-    <plurals name="home_connections_unit">
-        <item quantity="one">active connection</item>
-        <item quantity="other">active connections</item>
-    </plurals>
     <string name="home_current_node_title">Current node</string>
     <string name="home_current_outbound_none">No outbound selected</string>
     <string name="home_mode_change_failed">Failed to change Clash mode</string>

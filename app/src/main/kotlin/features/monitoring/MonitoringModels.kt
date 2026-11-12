@@ -4,6 +4,7 @@
 package features.monitoring
 
 import engine.singbox.runtime.SingBoxConnectionsState
+import engine.singbox.runtime.connectionCounts
 import features.monitoring.resource.ProcessStatsSample
 import features.monitoring.resource.ProcessStatsSourceKind
 import features.monitoring.network.LocalNetworkSnapshot
@@ -32,6 +33,8 @@ internal enum class ConnectionMonitorStatus {
 
 internal data class MonitoringConnectionsSummary(
     val activeCount: Int? = null,
+    val directCount: Int? = null,
+    val proxyCount: Int? = null,
     val uploadBytesPerSecond: Long? = null,
     val downloadBytesPerSecond: Long? = null,
     val sessionUploadBytes: Long? = null,
@@ -53,20 +56,12 @@ internal data class MonitoringConnectionsFocusState(
 internal fun buildMonitoringConnectionsFocusState(
     summary: MonitoringConnectionsSummary,
 ): MonitoringConnectionsFocusState {
-    var proxyCount = 0
-    var directCount = 0
-    summary.snapshot.connections.forEach { connection ->
-        when (connection.resolvedConnectionRoute()) {
-            ConnectionRouteKind.Proxy -> proxyCount += 1
-            ConnectionRouteKind.Direct -> directCount += 1
-            null -> Unit
-        }
-    }
+    val counts = summary.snapshot.connections.connectionCounts()
     return MonitoringConnectionsFocusState(
         status = summary.status,
         activeCount = summary.activeCount,
-        proxyCount = proxyCount,
-        directCount = directCount,
+        proxyCount = counts.proxyCount,
+        directCount = counts.directCount,
         error = summary.error,
     )
 }

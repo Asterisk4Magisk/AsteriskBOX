@@ -49,7 +49,6 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -95,6 +94,7 @@ import features.home.HomeNetworkActivityState
 import features.home.HomeNetworkRowKind
 import features.home.HomeNetworkSampleLimit
 import features.home.HomeServiceStatus
+import features.home.HomeUnavailableValue
 import features.home.buildHomeControllerState
 import features.home.buildHomeModeChange
 import features.home.buildHomeModeOperationState
@@ -302,32 +302,15 @@ fun SingBoxDashboardPage(
                         onClick = { navigator.push(AppRoute.ConnectionsMonitor) },
                         modifier = Modifier.weight(1f),
                     ) {
-                        val count = monitoringOverviewState.activeConnectionCount
-                        if (count == null) {
-                            Text(
-                                text = stringResource(R.string.home_value_unavailable),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else {
-                            Row(verticalAlignment = Alignment.Bottom) {
-                                Text(
-                                    text = count.toString(),
-                                    style = MaterialTheme.typography.headlineSmall.copy(
-                                        fontFeatureSettings = "tnum",
-                                    ),
-                                    fontWeight = FontWeight.Bold,
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    text = pluralStringResource(R.plurals.home_connections_unit, count),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(bottom = 5.dp),
-                                    maxLines = 1,
-                                )
-                            }
-                        }
+                        TileInlineMetric(
+                            label = stringResource(R.string.monitor_filter_direct),
+                            value = monitoringOverviewState.directConnectionCount?.toString() ?: HomeUnavailableValue,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        TileInlineMetric(
+                            label = stringResource(R.string.monitor_filter_proxy),
+                            value = monitoringOverviewState.proxyConnectionCount?.toString() ?: HomeUnavailableValue,
+                        )
                     }
                 }
             }
@@ -448,7 +431,7 @@ private fun HomeControllerCard(
                         if (serviceEnabled) R.string.home_service_enabled else R.string.home_service_disabled,
                     ),
                 stateIcon = if (serviceEnabled) Icons.Rounded.VpnLock else Icons.Rounded.PublicOff,
-                // The inner card is the accent one, matching the accent colour
+                // The inner card is the accent one, matching the accent color
                 // picked in Settings > Personalization.
                 containerColor = heroContainer,
                 contentColor = heroContent,
@@ -460,7 +443,7 @@ private fun HomeControllerCard(
                     ServiceModeChip(
                         modeLabel = runModeLabel(controllerState.runMode),
                         // On the error card a translucent chip washes out, so the
-                        // tag inverts instead: onError fill, error-coloured text.
+                        // tag inverts instead: onError fill, error-colored text.
                         containerColor = if (serviceEnabled) {
                             MaterialTheme.colorScheme.secondaryContainer
                         } else {
@@ -1096,7 +1079,7 @@ private const val HomeUiSampleIntervalMillis = 1_000L
 
 private const val HomeServiceUptimePlaceholder = "--:--:--"
 
-// The x axis keeps this many fixed columns no matter how many samples are buffered; the newest
+// The x-axis keeps this many fixed columns no matter how many samples are buffered; the newest
 // sample sits in the rightmost column. It mirrors the sample limit of the home traffic state.
 // The lattice pitch doubles as the vertical step, so a wide card would only get a few rows; this
 // keeps rows at 2.6 dot diameters instead, which is fine enough to read a burst.

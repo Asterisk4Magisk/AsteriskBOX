@@ -6,6 +6,7 @@ package features.monitoring
 import android.content.Context
 import android.os.SystemClock
 import app.modes.RunModeVpnService
+import engine.singbox.runtime.connectionCounts
 import app.modes.isRootRunMode
 import data.AndroidAppStateStore
 import engine.proxy.LocalProxyLoopbackAddress
@@ -397,12 +398,14 @@ internal class MonitoringRepository(
             }
         }
         if (!includeDetails) {
-            singBoxRuntime.getConnectionCount(appState)
-                .onSuccess { activeCount ->
+            singBoxRuntime.getConnectionCounts(appState)
+                .onSuccess { counts ->
                     mutableState.update { current ->
                         current.copy(
                             connections = MonitoringConnectionsSummary(
-                                activeCount = activeCount,
+                                activeCount = counts.activeCount,
+                                directCount = counts.directCount,
+                                proxyCount = counts.proxyCount,
                                 status = ConnectionMonitorStatus.Available,
                             ),
                         )
@@ -425,6 +428,7 @@ internal class MonitoringRepository(
         }
         singBoxRuntime.getConnections(appState)
             .onSuccess { snapshot ->
+                val counts = snapshot.connections.connectionCounts()
                 mutableState.update { current ->
                     val detailSnapshot = deriveConnectionRates(
                         previous = current.connections.snapshot.takeIf { it.updatedAtMillis > 0L },
@@ -432,7 +436,9 @@ internal class MonitoringRepository(
                     )
                     current.copy(
                         connections = MonitoringConnectionsSummary(
-                            activeCount = detailSnapshot.connections.size,
+                            activeCount = counts.activeCount,
+                            directCount = counts.directCount,
+                            proxyCount = counts.proxyCount,
                             uploadBytesPerSecond = detailSnapshot.connections
                                 .sumKnownRates(SingBoxConnection::uploadBytesPerSecond),
                             downloadBytesPerSecond = detailSnapshot.connections
