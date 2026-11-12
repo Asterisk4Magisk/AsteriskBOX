@@ -671,6 +671,24 @@
     <string name="outbound_field_zero_rtt_handshake">0-RTT handshake</string>
     <string name="outbound_group">Group</string>
 
+    <!-- Protocol plugins -->
+    <string name="settings_plugins">Plugins</string>
+    <string name="settings_plugins_summary">Run protocols shipped as separate APKs</string>
+    <string name="plugin_packages_title">Protocol plugins</string>
+    <string name="plugin_installed">Installed</string>
+    <string name="plugin_not_installed">Not installed</string>
+    <string name="plugin_installed_summary">%1$s · %2$s</string>
+    <string name="plugin_missing_summary">Tap to download</string>
+    <string name="plugin_trust_note">Plugins run as child processes of the core. Only plugins signed by AsteriskBOX, husi, SagerNet, Exclave or Matsuri are recognized.</string>
+    <string name="plugin_implementations_title">Protocol implementations</string>
+    <string name="plugin_use_plugin">Use the %1$s plugin</string>
+    <string name="plugin_use_hysteria2_summary">Replaces the built-in implementation; port hopping is not supported</string>
+    <string name="plugin_use_naive_summary">Replaces the built-in implementation; QUIC is not supported</string>
+    <string name="plugin_use_vless_summary">Adds XHTTP, mKCP and VLESS Encryption</string>
+    <string name="plugin_missing_message">The %1$s plugin (%2$s) is not installed. Install it from Advanced settings → Plugins and try again.</string>
+    <string name="plugin_vless_feature_separator">", "</string>
+    <string name="plugin_vless_xray_required">Outbound %1$s uses Xray-only features (%2$s). Enable the VLESS (Xray) plugin.</string>
+
     <!-- Selectors -->
     <string name="selector_add">Add selector</string>
     <plurals name="selector_count">
@@ -1655,22 +1673,4 @@
     <string name="license_title">Third Party Licenses</string>
     <string name="settings_about_project">About project</string>
     <string name="settings_open_source_licenses">Open source licenses</string>
-
-    <!-- Protocol plugins -->
-    <string name="settings_plugins">Plugins</string>
-    <string name="settings_plugins_summary">Run protocols shipped as separate APKs</string>
-    <string name="plugin_packages_title">Protocol plugins</string>
-    <string name="plugin_installed">Installed</string>
-    <string name="plugin_not_installed">Not installed</string>
-    <string name="plugin_installed_summary">%1$s · %2$s</string>
-    <string name="plugin_missing_summary">Tap to download</string>
-    <string name="plugin_trust_note">Plugins run as child processes of the core. Only plugins signed by AsteriskBOX, husi, SagerNet, Exclave or Matsuri are recognized.</string>
-    <string name="plugin_implementations_title">Protocol implementations</string>
-    <string name="plugin_use_plugin">Use the %1$s plugin</string>
-    <string name="plugin_use_hysteria2_summary">Replaces the built-in implementation; port hopping is not supported</string>
-    <string name="plugin_use_naive_summary">Replaces the built-in implementation; QUIC is not supported</string>
-    <string name="plugin_use_vless_summary">Adds XHTTP, mKCP and VLESS Encryption</string>
-    <string name="plugin_missing_message">The %1$s plugin (%2$s) is not installed. Install it from Advanced settings → Plugins and try again.</string>
-    <string name="plugin_vless_feature_separator">", "</string>
-    <string name="plugin_vless_xray_required">Outbound %1$s uses Xray-only features (%2$s). Enable the VLESS (Xray) plugin.</string>
 </resources>
