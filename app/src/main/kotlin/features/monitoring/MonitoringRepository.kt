@@ -114,7 +114,7 @@ internal class MonitoringRepository(
                             launch { collectConnections(interval, plan.collectConnectionDetails) }
                         }
                         plan.trafficIntervalMillis?.let { interval ->
-                            launch { collectTrafficStats(interval, plan.recordTrafficHistory) }
+                            launch { collectTrafficStats(interval) }
                         }
                     }
                 }
@@ -300,10 +300,7 @@ internal class MonitoringRepository(
         }
     }
 
-    private suspend fun collectTrafficStats(
-        intervalMillis: Long,
-        recordHistory: Boolean,
-    ) {
+    private suspend fun collectTrafficStats(intervalMillis: Long) {
         try {
             while (currentCoroutineContext().isActive) {
                 val runtime = singBoxRuntime.state.value
@@ -316,7 +313,6 @@ internal class MonitoringRepository(
                         ledger = trafficLedgerStore.snapshot(),
                         today = today,
                         runtimeTraffic = null,
-                        recordHistory = recordHistory,
                     )
                 } else {
                     val runtimeTraffic = runtime.traffic
@@ -350,9 +346,7 @@ internal class MonitoringRepository(
                             downloadBytesPerSecond = runtimeTraffic.latest.down,
                             sessionUploadBytes = runtimeTraffic.totalUp,
                             sessionDownloadBytes = runtimeTraffic.totalDown,
-                            sampleTimestampMillis = runtimeTraffic.latest.timestampMillis,
                         ),
-                        recordHistory = recordHistory,
                     )
                 }
                 delay(intervalMillis.milliseconds)
@@ -470,7 +464,6 @@ internal class MonitoringRepository(
         ledger: features.monitoring.traffic.TrafficLedger,
         today: String,
         runtimeTraffic: TrafficRuntimeSummary?,
-        recordHistory: Boolean,
     ) {
         mutableState.update { current ->
             current.copy(
@@ -483,22 +476,6 @@ internal class MonitoringRepository(
                     sevenDays = ledger.totalForLastDays(7, today),
                     thirtyDays = ledger.totalForLastDays(30, today),
                     dailyTotals = ledger.days,
-                    speedSamples = if (!recordHistory) {
-                        emptyList()
-                    } else runtimeTraffic?.let { summary ->
-                        val existing = current.traffic.speedSamples
-                        val withLatest = if (existing.lastOrNull()?.timestampMillis == summary.sampleTimestampMillis) {
-                            existing
-                        } else {
-                            existing + MonitoringTrafficSpeedSample(
-                                timestampMillis = summary.sampleTimestampMillis,
-                                uploadBytesPerSecond = summary.uploadBytesPerSecond,
-                                downloadBytesPerSecond = summary.downloadBytesPerSecond,
-                            )
-                        }
-                        withLatest.filter { sample -> sample.timestampMillis >= System.currentTimeMillis() - TrafficSpeedHistoryMillis }
-                            .takeLast(MaxTrafficSpeedSamples)
-                    } ?: current.traffic.speedSamples,
                 ),
             )
         }
@@ -617,7 +594,6 @@ private data class TrafficRuntimeSummary(
     val downloadBytesPerSecond: Long,
     val sessionUploadBytes: Long,
     val sessionDownloadBytes: Long,
-    val sampleTimestampMillis: Long,
 )
 
 private fun List<SingBoxConnection>.sumKnownRates(selector: (SingBoxConnection) -> Long?): Long? {
@@ -628,7 +604,5 @@ private fun List<SingBoxConnection>.sumKnownRates(selector: (SingBoxConnection) 
     }
 }
 
-private const val TrafficSpeedHistoryMillis = 5L * 60L * 1_000L
-private const val MaxTrafficSpeedSamples = 301
 private const val MemoryMonitoringIntervalMillis = 3_000L
 private const val LogTag = "MonitoringRepository"
