@@ -211,16 +211,13 @@ class ProxyQuickSettingsTileService : TileService() {
         processing: Boolean = false,
     ) {
         val tile = qsTile ?: return
-        val state = stateStore.state.value
-        // While the proxy runs the tile leads with the node it is using; the
-        // app name is only the resting label.
-        val activeAlias = if (running) currentOutboundAlias(state) else null
-        tile.label = activeAlias ?: getString(R.string.quick_settings_tile_label)
+        tile.label = getString(R.string.quick_settings_tile_label)
         tile.state = if (running) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             tile.subtitle = when {
                 processing -> getString(R.string.quick_settings_tile_processing)
-                running -> getString(R.string.quick_settings_tile_running)
+                running -> currentOutboundAlias(stateStore.state.value)
+                    ?: getString(R.string.quick_settings_tile_running)
                 else -> getString(R.string.quick_settings_tile_stopped)
             }
         }
@@ -233,7 +230,7 @@ class ProxyQuickSettingsTileService : TileService() {
         return when (tag) {
             APP_DIRECT_OUTBOUND -> getString(R.string.routing_direct)
             APP_GLOBAL_SELECTOR -> getString(R.string.routing_global)
-            // Never surface an internal managed tag as the label.
+            // Never surface an internal managed tag as the subtitle.
             else -> managedOutboundAlias(state, tag)
         }
     }
