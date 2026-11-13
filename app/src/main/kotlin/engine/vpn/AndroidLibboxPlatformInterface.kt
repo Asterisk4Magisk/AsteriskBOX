@@ -68,15 +68,22 @@ internal class AndroidLibboxPlatformInterface(
     private val connectivityManager =
         service.getSystemService(ConnectivityManager::class.java)
     private val networks = AndroidNetworks.get(service)
+    private val packageCache = AndroidVpnPackageCache(service)
     private var activeConfig: VpnServiceStartConfig? = null
     private var tunFileDescriptor: ParcelFileDescriptor? = null
     private var defaultNetworkCallback: ConnectivityManager.NetworkCallback? = null
 
     fun prepare(config: VpnServiceStartConfig) {
+        packageCache.start()
         activeConfig = config
     }
 
     fun closeTun() {
+        packageCache.close()
+        closeTunDescriptor()
+    }
+
+    private fun closeTunDescriptor() {
         runCatching { tunFileDescriptor?.close() }
             .onFailure { error -> AndroidAppLogger.warn(LogTag, "Failed to close VPN TUN", error) }
         tunFileDescriptor = null
@@ -169,7 +176,7 @@ internal class AndroidLibboxPlatformInterface(
             }
         }
 
-        closeTun()
+        closeTunDescriptor()
         val descriptor = builder.establish()
             ?: error("android: the application is not prepared or VPN permission was revoked")
         tunFileDescriptor = descriptor
@@ -230,7 +237,7 @@ internal class AndroidLibboxPlatformInterface(
             check(ownerUid != Process.INVALID_UID) { "android: connection owner not found" }
             ownerUid
         }
-        val packages = service.packageManager.getPackagesForUid(uid).orEmpty().toList()
+        val packages = packageCache.packagesForUid(uid)
         return ConnectionOwner().apply {
             userId = uid
             userName = packages.firstOrNull().orEmpty()
