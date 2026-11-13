@@ -6,7 +6,6 @@ package features.monitoring
 import android.content.Context
 import android.os.SystemClock
 import app.modes.RunModeVpnService
-import engine.singbox.runtime.connectionCounts
 import app.modes.isRootRunMode
 import data.AndroidAppStateStore
 import engine.proxy.LocalProxyLoopbackAddress
@@ -15,6 +14,7 @@ import engine.proxy.toLocalProxyOptions
 import engine.singbox.runtime.SingBoxConnection
 import engine.singbox.runtime.SingBoxConnectionsState
 import engine.singbox.runtime.SingBoxRuntimeRepository
+import engine.singbox.runtime.connectionCounts
 import features.logs.AndroidAppLogger
 import features.monitoring.network.AddressFamily
 import features.monitoring.network.AndroidNetworkMonitor
@@ -99,12 +99,12 @@ internal class MonitoringRepository(
                     updateNetworkPageVisibility(plan.networkPageVisible)
                     if (plan.refreshLocalNetworkOnEnter) refreshLocalNetworkSnapshot()
                     coroutineScope {
-                        plan.runtimeSummaryIntervalMillis?.let { interval ->
+                        if (plan.observeRuntimeSummary) {
                             launch {
-                                while (currentCoroutineContext().isActive) {
-                                    refreshRuntimeSummary()
-                                    delay(interval.milliseconds)
-                                }
+                                singBoxRuntime.state
+                                    .map { runtime -> runtime.running }
+                                    .distinctUntilChanged()
+                                    .collect(::refreshRuntimeSummary)
                             }
                         }
                         plan.resourceIntervalMillis?.let { interval ->
@@ -165,12 +165,11 @@ internal class MonitoringRepository(
         return result
     }
 
-    private fun refreshRuntimeSummary() {
-        val runtime = singBoxRuntime.state.value
+    private fun refreshRuntimeSummary(running: Boolean) {
         mutableState.update { current ->
             current.copy(
-                serviceRunning = runtime.running,
-                network = current.network.copy(proxyConnected = runtime.running),
+                serviceRunning = running,
+                network = current.network.copy(proxyConnected = running),
             )
         }
     }
@@ -212,8 +211,12 @@ internal class MonitoringRepository(
                 val sameProcess = baseline != null && reading != null &&
                     baseline.pid == reading.snapshot.pid &&
                     baseline.startTimeTicks == reading.snapshot.startTimeTicks
-                val cpuPercent = reading?.snapshot?.let { current ->
-                    calculateProcessCpuPercent(baseline, current)
+                val cpuPercent = reading?.let { current ->
+                    calculateProcessCpuPercent(
+                        previous = baseline,
+                        current = current.snapshot,
+                        uptimeMillis = current.uptimeMillis,
+                    )
                 }
                 if (reading != null || isVpnMode) {
                     previousProcessSnapshot = reading?.snapshot
