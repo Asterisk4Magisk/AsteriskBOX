@@ -428,6 +428,7 @@ private fun HomeControllerCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(HomeChinInset),
+            verticalArrangement = Arrangement.spacedBy(HomeChinStripPadding),
         ) {
             AsteriskFocusSurface(
                 title = if (controllerState.serviceStatus == HomeServiceStatus.Enabled) {
@@ -483,15 +484,7 @@ private fun HomeControllerCard(
             )
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    // Same side edges as the accent card, so every layer lines
-                    // up; the strip only adds the vertical breathing room.
-                    .padding(
-                        start = 0.dp,
-                        end = 0.dp,
-                        top = HomeChinStripPadding,
-                        bottom = 0.dp,
-                    ),
+                    .fillMaxWidth(),
             ) {
                 AsteriskSegmentedControl(
                     items = homeModeOptions().map { option ->
@@ -506,6 +499,8 @@ private fun HomeControllerCard(
                     checkedContentColor = MaterialTheme.colorScheme.onPrimary,
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
                     textStyle = MaterialTheme.typography.labelMedium,
+                    // Fill the 48dp touch target so it adds no invisible vertical gap.
+                    minHeight = 48.dp,
                 )
             }
         }
