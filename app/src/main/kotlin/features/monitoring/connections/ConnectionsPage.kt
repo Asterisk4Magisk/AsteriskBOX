@@ -5,6 +5,7 @@ package features.monitoring.connections
 
 import android.text.format.DateUtils
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -43,6 +45,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +59,7 @@ import app.LocalAppStateStore
 import app.collectAppState
 import app.managedReferenceRemarks
 import app.visibleManagedReference
+import coil3.compose.AsyncImage
 import engine.singbox.runtime.SingBoxConnection
 import features.monitoring.ConnectionMonitorStatus
 import features.monitoring.ConnectionRouteFilter
@@ -68,16 +75,21 @@ import features.monitoring.clearDisplayedConnections
 import features.monitoring.discardDisplayedConnection
 import features.monitoring.reduceConnections
 import features.monitoring.resolveDisplayedConnections
+import features.monitoring.restrictsRoute
+import features.proxy.app.model.ProxyAppIconRequest
 import kotlinx.coroutines.launch
+import system.ANDROID_APP_ICON_SIZE_DP
 import app.R
 import ui.components.AsteriskCancelButton
 import ui.components.AsteriskTopBarControls
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskDropdownAnchor
 import ui.components.AsteriskDropdownMenuItem
+import ui.components.AsteriskExpansionIndicator
 import ui.components.AsteriskFilterChip
 import ui.layout.rememberPageGutter
 import ui.theme.AsteriskMotion
+import ui.theme.AsteriskShapeTokens
 import utils.toReadableBytes
 import ui.icons.AsteriskIcons as Icons
 
@@ -89,10 +101,13 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
     val monitoring by services.monitoring.state.collectAsState()
     val connections = monitoring.connections
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val iconSizePx = with(LocalDensity.current) { ANDROID_APP_ICON_SIZE_DP.dp.roundToPx() }
     var query by rememberSaveable { mutableStateOf("") }
     var route by rememberSaveable { mutableStateOf(ConnectionRouteFilter.All) }
     var sort by rememberSaveable { mutableStateOf(ConnectionSort.Traffic) }
     var selected by remember { mutableStateOf<SingBoxConnection?>(null) }
+    var expandedAppKeys by remember { mutableStateOf(emptySet<String>()) }
     var showMenu by rememberSaveable { mutableStateOf(false) }
     var showCloseAllConfirmation by rememberSaveable { mutableStateOf(false) }
     var operationInProgress by rememberSaveable { mutableStateOf(false) }
@@ -157,6 +172,18 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
         )
     }
 
+    val appResolver = remember(context) { ConnectionAppResolver(context) }
+    val appGroups: List<ConnectionAppGroup> = remember(visibleConnections, route) {
+        if (route == ConnectionRouteFilter.App) {
+            groupConnectionsByApp(visibleConnections, appResolver::resolve)
+        } else {
+            emptyList()
+        }
+    }
+    val appRows = remember(appGroups, expandedAppKeys) {
+        buildConnectionAppRows(appGroups, expandedAppKeys)
+    }
+
     fun closeConnection(connection: SingBoxConnection) {
         if (operationInProgress || !appState.proxyRunning || connection.id !in liveIds) return
         operationInProgress = true
@@ -171,6 +198,27 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
                 .onFailure { error -> services.tipNotifier.showError(error, closeFailed) }
             operationInProgress = false
         }
+    }
+
+    // Shared by the flat list and the application grouping so both render identically.
+    val connectionCardItem: @Composable (SingBoxConnection, Modifier) -> Unit = { connection, modifier ->
+        ConnectionCard(
+            connection = connection,
+            expanded = selected?.id == connection.id,
+            onOpen = {
+                selected = if (selected?.id == connection.id) null else connection
+            },
+            onClose = {
+                if (selected?.id == connection.id) selected = null
+                closeConnection(connection)
+            },
+            closeEnabled = !showClosed && appState.proxyRunning &&
+                connection.id in liveIds && !operationInProgress,
+            detectedClosedAt = if (showClosed) displayedHistory.closed[connection.id]?.detectedAtMillis else null,
+            modifier = modifier,
+            referenceLabels = referenceLabels,
+            unavailableLabel = unavailableLabel,
+        )
     }
 
     MonitoringScaffold(
@@ -264,7 +312,7 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
                 }
                 visibleConnections.isEmpty() -> item("empty") {
                     StatusCard(
-                        if (query.isBlank() && route == ConnectionRouteFilter.All) {
+                        if (query.isBlank() && !route.restrictsRoute) {
                             stringResource(
                                 if (showClosed) R.string.monitor_connections_closed_empty
                                 else R.string.monitor_connections_empty,
@@ -278,23 +326,33 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
                     if (displayedConnections.stale) item("stale") {
                         StatusCard(stringResource(R.string.monitor_data_stale))
                     }
-                    items(visibleConnections, key = SingBoxConnection::id) { connection ->
-                        ConnectionCard(
-                            connection = connection,
-                            expanded = selected?.id == connection.id,
-                            onOpen = {
-                                selected = if (selected?.id == connection.id) null else connection
-                            },
-                            onClose = {
-                                if (selected?.id == connection.id) selected = null
-                                closeConnection(connection)
-                            },
-                            closeEnabled = !showClosed && appState.proxyRunning &&
-                                connection.id in liveIds && !operationInProgress,
-                            detectedClosedAt = if (showClosed) displayedHistory.closed[connection.id]?.detectedAtMillis else null,
-                            referenceLabels = referenceLabels,
-                            unavailableLabel = unavailableLabel,
-                        )
+                    if (route == ConnectionRouteFilter.App) {
+                        items(appRows, key = ConnectionAppRow::key) { row ->
+                            val modifier = Modifier.animateItem(
+                                fadeInSpec = AsteriskMotion.effects(),
+                                placementSpec = AsteriskMotion.spatial(),
+                                fadeOutSpec = AsteriskMotion.effects(),
+                            )
+                            when (row) {
+                                is ConnectionAppRow.Group -> ConnectionAppGroupCard(
+                                    group = row.group,
+                                    expanded = row.group.key in expandedAppKeys,
+                                    iconSizePx = iconSizePx,
+                                    modifier = modifier,
+                                    onToggle = {
+                                        expandedAppKeys = expandedAppKeys.toggleAppGroup(row.group.key)
+                                    },
+                                )
+                                is ConnectionAppRow.Link -> connectionCardItem(
+                                    row.connection,
+                                    modifier.then(NestedConnectionModifier),
+                                )
+                            }
+                        }
+                    } else {
+                        items(visibleConnections, key = SingBoxConnection::id) { connection ->
+                            connectionCardItem(connection, Modifier)
+                        }
                     }
                 }
             }
@@ -454,12 +512,110 @@ private fun ConnectionControls(
 }
 
 @Composable
+private fun ConnectionAppGroupCard(
+    group: ConnectionAppGroup,
+    expanded: Boolean,
+    iconSizePx: Int,
+    modifier: Modifier = Modifier,
+    onToggle: () -> Unit,
+) {
+    val label = group.label.ifBlank { stringResource(R.string.monitor_connections_unknown_source) }
+    val packageName = group.packageName
+    Card(
+        onClick = onToggle,
+        modifier = ContentWidthModifier.then(modifier),
+        // One step above the connection cards so a group header reads as their parent.
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = MaterialTheme.shapes.large,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ConnectionAppIcon(
+                packageName = packageName,
+                label = label,
+                iconSizePx = iconSizePx,
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = label,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = pluralStringResource(
+                            R.plurals.monitor_connections_app_count,
+                            group.connectionCount,
+                            group.connectionCount,
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (packageName != null && packageName != label) {
+                    Text(
+                        text = packageName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            AsteriskExpansionIndicator(
+                expanded = expanded,
+                contentDescription = stringResource(R.string.monitor_connections_app_details),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConnectionAppIcon(
+    packageName: String?,
+    label: String,
+    iconSizePx: Int,
+) {
+    Box(
+        modifier = Modifier
+            .size(ANDROID_APP_ICON_SIZE_DP.dp)
+            .clip(AsteriskShapeTokens.SmallContainer)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (packageName == null) {
+            Icon(
+                imageVector = Icons.Rounded.Apps,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            AsyncImage(
+                model = ProxyAppIconRequest(packageName = packageName, sizePx = iconSizePx),
+                contentDescription = label,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+            )
+        }
+    }
+}
+
+@Composable
 private fun ConnectionCard(
     connection: SingBoxConnection,
     expanded: Boolean,
     onOpen: () -> Unit,
     onClose: () -> Unit,
     closeEnabled: Boolean,
+    modifier: Modifier = Modifier,
     detectedClosedAt: Long? = null,
     referenceLabels: Map<String, String>,
     unavailableLabel: String,
@@ -470,7 +626,7 @@ private fun ConnectionCard(
     }
     Card(
         onClick = onOpen,
-        modifier = ContentWidthModifier,
+        modifier = ContentWidthModifier.then(modifier),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         shape = MaterialTheme.shapes.large,
     ) {
@@ -587,6 +743,7 @@ private fun connectionRouteLabel(route: ConnectionRouteFilter): String = stringR
         ConnectionRouteFilter.All -> R.string.common_all
         ConnectionRouteFilter.Proxy -> R.string.monitor_filter_proxy
         ConnectionRouteFilter.Direct -> R.string.monitor_filter_direct
+        ConnectionRouteFilter.App -> R.string.monitor_filter_app
     },
 )
 
@@ -623,3 +780,9 @@ private fun formatDuration(startedAtMillis: Long?, endedAtMillis: Long? = null):
 }
 
 private val ContentWidthModifier = Modifier.fillMaxWidth().widthIn(max = 840.dp)
+
+/** Inset applied to the connections listed under their application. */
+private val NestedConnectionModifier = Modifier.padding(start = 12.dp)
+
+private fun Set<String>.toggleAppGroup(key: String): Set<String> =
+    if (key in this) this - key else this + key
