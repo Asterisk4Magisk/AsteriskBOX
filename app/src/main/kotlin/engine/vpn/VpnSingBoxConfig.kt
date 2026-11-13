@@ -11,19 +11,20 @@ import engine.hevtun.HevSocks5TunnelConfigFileName
 import engine.hevtun.HevSocks5TunnelLogFileName
 import engine.hevtun.hevSocks5TunnelLogFile
 import engine.hevtun.hevSocks5TunnelSocksTargetAddress
+import engine.proxy.LocalProxyOptions
+import engine.proxy.ProxyEngineStartRequest
+import engine.proxy.flowMetadataOptions
+import engine.proxy.toLocalProxyOptions
+import engine.singbox.SingBoxCoreLogPaths
 import engine.singbox.config.SingBoxConfigCompiler
 import engine.singbox.plugin.buildPluginEnvelope
 import engine.singbox.plugin.publishPluginEnvelope
-import engine.singbox.sha256Hex
-import engine.proxy.LocalProxyOptions
-import engine.proxy.toLocalProxyOptions
-import engine.singbox.SingBoxCoreLogPaths
 import engine.singbox.prepareSingBoxCoreLogPaths
+import engine.singbox.sha256Hex
 import features.resources.runtime.prepareSingBoxResourceFilePaths
-import system.toAndroidUserId
-import engine.proxy.ProxyEngineStartRequest
-import utils.writeAtomically
 import java.io.File
+import system.toAndroidUserId
+import utils.writeAtomically
 
 internal data class VpnServiceStartConfig(
     val sessionName: String,
@@ -94,7 +95,11 @@ internal object VpnSingBoxConfigFactory {
             hevSocks5TunnelConfig = buildVpnHevSocks5TunnelConfig(
                 dataDir = resourceFilePaths.dataDir,
                 coreLogPaths = coreLogPaths,
-                localProxyOptions = localProxyOptions,
+                localProxyOptions = if (appState.enableVpnHevTun) {
+                    context.flowMetadataOptions()
+                } else {
+                    localProxyOptions
+                },
                 tunOptions = tunOptions,
                 enableIpv6 = runtimeIpv6,
                 useHevTun = appState.enableVpnHevTun,

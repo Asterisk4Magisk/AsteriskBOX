@@ -8,15 +8,16 @@ import android.content.Context
 import app.AppState
 import app.effectiveFakeIpEnabled
 import app.effectiveLocalDnsEnabled
+import engine.network.normalizedFakeIpIpv4Pool
 import engine.network.toPortOrNull
 import engine.proxy.ProxyEngineStartRequest
-import engine.network.normalizedFakeIpIpv4Pool
+import engine.proxy.flowMetadataOptions
 import engine.singbox.config.SingBoxConfigCompiler
 import engine.singbox.plugin.buildPluginEnvelope
 import engine.singbox.prepareSingBoxCoreLogPaths
+import features.quicksettings.QuickSettingsTileRefreshReceiver
 import features.resources.runtime.SingBoxResourceFilePaths
 import features.resources.runtime.singBoxResourceFilePaths
-import features.quicksettings.QuickSettingsTileRefreshReceiver
 import java.io.File
 
 internal class RootConfigBuildContext(
@@ -24,6 +25,10 @@ internal class RootConfigBuildContext(
     val appState: AppState,
     val resourceFilePaths: SingBoxResourceFilePaths,
 ) {
+    val bridgeOptions by lazy {
+        androidContext.flowMetadataOptions()
+    }
+
     fun buildRootStartConfig(): RootStartConfig {
         // ROOT plugins cannot protect sockets: they dial a loopback mapping inbound.
         val compiled = SingBoxConfigCompiler.compileForRuntime(androidContext, appState)

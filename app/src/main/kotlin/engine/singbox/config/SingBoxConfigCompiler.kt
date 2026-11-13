@@ -114,7 +114,7 @@ internal object SingBoxConfigCompiler {
             appState,
             checkWithBundledCore = !context.skipsBundledCoreConfigCheck(runMode),
             pluginTarget = context.pluginTarget(runMode),
-        )
+        ).let { it.copy(config = it.config.withFlowMetadata(context, appState, runMode, exposePorts)) }
     }
 
     internal fun generate(
