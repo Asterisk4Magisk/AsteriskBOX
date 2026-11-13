@@ -78,7 +78,7 @@
     <string name="home_service_stop">停止服务</string>
     <string name="home_service_stopping">停止中…</string>
     <string name="home_service_uptime">本次运行时长：%1$s</string>
-    <string name="home_traffic_summary">今日 %1$s</string>
+    <string name="home_traffic_today">今日</string>
     <string name="home_value_unavailable">—</string>
     <string name="sing_box_dashboard_network_detection_checking">检测中…</string>
     <string name="sing_box_dashboard_start_failed">启动代理失败</string>

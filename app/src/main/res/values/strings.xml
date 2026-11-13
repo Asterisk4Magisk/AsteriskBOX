@@ -78,7 +78,7 @@
     <string name="home_service_stop">Stop service</string>
     <string name="home_service_stopping">Stopping…</string>
     <string name="home_service_uptime">Run time: %1$s</string>
-    <string name="home_traffic_summary">Today %1$s</string>
+    <string name="home_traffic_today">Today</string>
     <string name="home_value_unavailable">—</string>
     <string name="sing_box_dashboard_network_detection_checking">Checking…</string>
     <string name="sing_box_dashboard_start_failed">Failed to start proxy</string>
