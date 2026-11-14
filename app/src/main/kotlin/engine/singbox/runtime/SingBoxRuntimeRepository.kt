@@ -20,9 +20,11 @@ import io.nekohasekai.libbox.StatusMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -563,20 +565,34 @@ internal class SingBoxRuntimeRepository(
                         }
                     },
                     submit = { leafName ->
-                        synchronized(sessionLock) {
-                            check(generation == runGeneration && session === active) {
-                                "sing-box API session changed during delay test"
+                        fun measure() {
+                            synchronized(sessionLock) {
+                                check(generation == runGeneration && session === active) {
+                                    "sing-box API session changed during delay test"
+                                }
                             }
+                            active.urlTestWithOptions(
+                                outboundTag = leafName,
+                                link = appState.connectionTestUrl.trim()
+                                    .takeIf(::isValidConnectionTestUrl)
+                                    ?: DefaultConnectionTestUrl,
+                                timeoutMillis = appState.connectionTestTimeoutMillis,
+                                unifiedDelay = appState.connectionTestUnifiedDelay,
+                                ignoreHandshakeTime = appState.connectionTestIgnoreHandshakeTime,
+                            )
                         }
-                        active.urlTestWithOptions(
-                            outboundTag = leafName,
-                            link = appState.connectionTestUrl.trim()
-                                .takeIf(::isValidConnectionTestUrl)
-                                ?: DefaultConnectionTestUrl,
-                            timeoutMillis = appState.connectionTestTimeoutMillis,
-                            unifiedDelay = appState.connectionTestUnifiedDelay,
-                            ignoreHandshakeTime = appState.connectionTestIgnoreHandshakeTime,
-                        )
+                        if (preemptible) {
+                            currentCoroutineContext().ensureActive()
+                            // Cancellation releases the test slot without waiting for the blocking core call.
+                            val request = appScope.async(Dispatchers.IO) { measure() }
+                            try {
+                                request.await()
+                            } finally {
+                                request.cancel()
+                            }
+                        } else {
+                            measure()
+                        }
                     },
                 )
                 if (submissions.successfulNames.isEmpty()) {

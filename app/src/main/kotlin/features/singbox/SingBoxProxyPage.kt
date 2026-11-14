@@ -543,7 +543,7 @@ fun SingBoxProxyPage(
                                         currentDisplayName = displayNames[currentName]
                                             ?: currentName.visibleRuntimeName(unavailableLabel),
                                         expanded = expanded,
-                                        testing = testingTarget == group.name,
+                                        testing = !runtimeState.userDelayTestAllowed && testingTarget == group.name,
                                         testingCompleted = runtimeState.delayTestingCompleted,
                                         testingTotal = runtimeState.delayTestingTotal,
                                         delayTestEnabled = runtimeAvailable && runtimeState.userDelayTestAllowed,
@@ -759,7 +759,7 @@ fun SingBoxProxyPage(
                     selectedGroup?.takeIf { !expandable }?.let { group ->
                         ProxyFloatingActions(
                             runtimeAvailable = runtimeAvailable,
-                            testing = testingTarget == group.name,
+                            testing = !runtimeState.userDelayTestAllowed && testingTarget == group.name,
                             testingCompleted = runtimeState.delayTestingCompleted,
                             testingTotal = runtimeState.delayTestingTotal,
                             canLocate = (pendingSelections[group.name] ?: group.now).isNotBlank(),
