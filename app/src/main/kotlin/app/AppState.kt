@@ -65,7 +65,7 @@ data class AppState(
     val routeDefaultNetworkTypes: List<String> = emptyList(),
     val routeDefaultFallbackNetworkTypes: List<String> = emptyList(),
     val routeDefaultFallbackDelay: String = "",
-    val routeFindProcess: Boolean = false,
+    val routeFindProcess: Boolean = true,
     val routeFinal: String = "",
     val routeRules: List<SingBoxRouteRuleState> = DefaultSingBoxRouteRules,
     val nextRouteRuleId: Int =

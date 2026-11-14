@@ -15,7 +15,7 @@ internal data class RoutingSettingsDraft(
     val routeDefaultNetworkTypes: List<String> = emptyList(),
     val routeDefaultFallbackNetworkTypes: List<String> = emptyList(),
     val routeDefaultFallbackDelay: String = "",
-    val routeFindProcess: Boolean = false,
+    val routeFindProcess: Boolean = true,
 ) {
     val showNetworkSettings: Boolean
         get() = routeAutoDetectInterface
