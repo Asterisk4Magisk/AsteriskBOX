@@ -322,9 +322,6 @@ fun AppContent(
             AsteriskNavDisplay(
                 entries = entries,
                 onBack = { navigator.pop() },
-                transitionSpec = AsteriskMotion.navigationForward(),
-                popTransitionSpec = AsteriskMotion.navigationBack(),
-                predictivePopTransitionSpec = AsteriskMotion.predictiveNavigationBack(),
             )
 
             // Global error dialog — visible across every nav destination so the user sees the
