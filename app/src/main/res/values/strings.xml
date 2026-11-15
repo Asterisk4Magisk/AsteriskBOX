@@ -1458,10 +1458,8 @@
     <string name="proxy_app_list_scan_china_progress">Scanned %1$d of %2$d, matched %3$d</string>
     <string name="proxy_app_list_scan_china_skipped_global">Skipped in all-app mode</string>
     <string name="proxy_app_list_search_label">Search apps</string>
-    <string name="proxy_app_list_shared_uid_value">SUID: %1$s</string>
     <string name="proxy_app_list_show_system_apps">Show system apps</string>
     <string name="proxy_app_list_title">Proxy app list</string>
-    <string name="proxy_app_list_uid_value">UID: %1$s</string>
     <string name="proxy_app_list_user_space">User %1$d</string>
     <string name="proxy_app_list_user_space_with_count">%1$s (%2$d)</string>
     <string name="settings_app_management_summary">Choose which installed apps use the proxy and how</string>

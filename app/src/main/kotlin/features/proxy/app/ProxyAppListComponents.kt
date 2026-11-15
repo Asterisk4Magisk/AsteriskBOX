@@ -301,14 +301,7 @@ private fun UidChip(
     sharedUid: Boolean,
 ) {
     AsteriskInfoChip(
-        text = stringResource(
-            if (sharedUid) {
-                R.string.proxy_app_list_shared_uid_value
-            } else {
-                R.string.proxy_app_list_uid_value
-            },
-            uid?.toString() ?: "…",
-        ),
+        text = uid?.toString() ?: "…",
         tone = if (sharedUid) AsteriskChipTone.Tertiary else AsteriskChipTone.Secondary,
     )
 }
