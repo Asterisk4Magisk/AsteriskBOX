@@ -80,7 +80,6 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
         state = codeSearch,
         modifier = Modifier.fillMaxSize(),
         enabled = true,
-        onSearchClosed = codeSearch::focusEditor,
         editorTools = { searchButton ->
             searchButton()
             JavaScriptCodeFormatButton(editorState)
