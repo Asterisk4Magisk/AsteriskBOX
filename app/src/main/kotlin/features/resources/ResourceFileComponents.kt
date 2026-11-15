@@ -324,6 +324,7 @@ internal fun CustomResourceFileCard(
     onUpdate: (CustomResourceFileState) -> Unit,
     onReplace: (CustomResourceFileState) -> Unit,
     onEdit: (CustomResourceFileState) -> Unit,
+    onPreview: (CustomResourceFileState) -> Unit,
     onModify: (CustomResourceFileState) -> Unit,
     onDelete: (CustomResourceFileState) -> Unit,
     modifier: Modifier = Modifier,
@@ -335,6 +336,7 @@ internal fun CustomResourceFileCard(
         ResourceDisplayAction.Update to { onUpdate(file) },
         ResourceDisplayAction.Replace to { onReplace(file) },
         ResourceDisplayAction.Edit to { onEdit(file) },
+        ResourceDisplayAction.Preview to { onPreview(file) },
         ResourceDisplayAction.Modify to { onModify(file) },
         ResourceDisplayAction.Delete to { onDelete(file) },
     )
@@ -514,6 +516,7 @@ private fun ResourceDisplayAction.icon(): ImageVector {
         ResourceDisplayAction.Replace -> Icons.Rounded.FileUpload
         ResourceDisplayAction.Restore -> Icons.Rounded.History
         ResourceDisplayAction.Edit -> Icons.Rounded.Edit
+        ResourceDisplayAction.Preview -> Icons.Rounded.Visibility
         ResourceDisplayAction.Modify -> Icons.Rounded.Code
         ResourceDisplayAction.Delete -> Icons.Rounded.Delete
     }
@@ -527,6 +530,7 @@ private fun ResourceDisplayAction.label(): String {
             ResourceDisplayAction.Replace -> R.string.common_replace
             ResourceDisplayAction.Restore -> R.string.common_restore
             ResourceDisplayAction.Edit -> R.string.common_edit
+            ResourceDisplayAction.Preview -> R.string.settings_resource_files_preview
             ResourceDisplayAction.Modify -> R.string.settings_resource_files_modify
             ResourceDisplayAction.Delete -> R.string.common_delete
         },

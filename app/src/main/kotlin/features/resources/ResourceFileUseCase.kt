@@ -113,6 +113,10 @@ class ResourceFileUseCase(
         return repository.readCustomText(customFile)
     }
 
+    internal suspend fun readCustomRuleSetPreview(customFile: CustomResourceFileState): String {
+        return repository.readCustomRuleSetPreview(customFile)
+    }
+
     internal suspend fun saveCustomText(
         customFile: CustomResourceFileState,
         content: String,

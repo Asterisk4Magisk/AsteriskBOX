@@ -1519,6 +1519,7 @@
         <item quantity="one">%1$d of %2$d ready · %3$s</item>
         <item quantity="other">%1$d of %2$d ready · %3$s</item>
     </plurals>
+    <string name="settings_resource_files_preview">Preview</string>
     <string name="settings_resource_files_ready">Ready</string>
     <string name="settings_resource_files_replaced">{name} replaced</string>
     <string name="settings_resource_files_restored">{name} restored from bundled assets</string>
@@ -1559,6 +1560,7 @@
     <string name="settings_resource_json_editor_title">Modify JSON rule set</string>
     <string name="settings_resource_management">Resource management</string>
     <string name="settings_resource_management_summary">Manage core files and GEO resource files</string>
+    <string name="settings_resource_rule_set_preview_failed">Could not preview this rule set</string>
 
     <!-- Backup and restore -->
     <string name="error_backup_file_creator_missing">Backup file creator is not registered</string>

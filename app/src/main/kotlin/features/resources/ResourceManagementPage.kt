@@ -85,6 +85,7 @@ fun ResourceManagementPage(
     var returnToSourceAfterCatalogHidden by remember { mutableStateOf(false) }
     val showCustomResourceFileDialog = remember { mutableStateOf(false) }
     var editingCustomResourceFile by remember { mutableStateOf<CustomResourceFileState?>(null) }
+    var previewingCustomResourceFile by remember { mutableStateOf<CustomResourceFileState?>(null) }
     val customResourceFileNameState = rememberTextFieldState()
     val customResourceFileUrlState = rememberTextFieldState()
     val editCustomResourceFileNameState = rememberTextFieldState()
@@ -580,6 +581,7 @@ fun ResourceManagementPage(
                         onModify = { file ->
                             navigator.push(Route.ResourceTextEdit(resourceId = file.id))
                         },
+                        onPreview = { file -> previewingCustomResourceFile = file },
                         onDelete = { file ->
                             val remaining = appState.customResourceFiles
                                 .filterNot { customFile -> customFile.id == file.id }
@@ -604,6 +606,9 @@ fun ResourceManagementPage(
                     )
                 }
             }
+        }
+        previewingCustomResourceFile?.let { file ->
+            ResourceRuleSetPreviewDialog(file = file, onDismissRequest = { previewingCustomResourceFile = null })
         }
         ResourceAutoUpdateSheet(
             show = showResourceAutoUpdateSheet,

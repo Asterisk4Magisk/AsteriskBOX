@@ -102,6 +102,7 @@ import androidx.compose.material.icons.rounded.Usb
 import androidx.compose.material.icons.rounded.ViewAgenda
 import androidx.compose.material.icons.rounded.ViewColumn
 import androidx.compose.material.icons.rounded.ViewModule
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VpnLock
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.Widgets
@@ -201,6 +202,7 @@ internal object AsteriskIcons {
         val ViewAgenda: ImageVector = MaterialIcons.Rounded.ViewAgenda
         val ViewColumn: ImageVector = MaterialIcons.Rounded.ViewColumn
         val ViewModule: ImageVector = MaterialIcons.Rounded.ViewModule
+        val Visibility: ImageVector = MaterialIcons.Rounded.Visibility
         val VpnLock: ImageVector = MaterialIcons.Rounded.VpnLock
         val Warning: ImageVector = MaterialIcons.Rounded.Warning
         val Wifi: ImageVector = MaterialIcons.Rounded.Wifi

@@ -16,6 +16,7 @@ internal enum class ResourceDisplayAction {
     Replace,
     Restore,
     Edit,
+    Preview,
     Modify,
     Delete,
 }
@@ -79,6 +80,7 @@ internal fun customResourceDisplayActions(file: CustomResourceFileState): List<R
         if (file.url.isNotBlank()) add(ResourceDisplayAction.Update)
         add(ResourceDisplayAction.Replace)
         add(ResourceDisplayAction.Edit)
+        if (file.name.singBoxRuleSetFormatOrNull() == SingBoxRuleSetFileFormat.Binary) add(ResourceDisplayAction.Preview)
         if (file.name.isEditableResource()) add(ResourceDisplayAction.Modify)
         add(ResourceDisplayAction.Delete)
     }

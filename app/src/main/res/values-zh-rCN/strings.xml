@@ -1495,6 +1495,7 @@
     <plurals name="settings_resource_files_overview_ready">
         <item quantity="other">%1$d/%2$d 已就绪 · %3$s</item>
     </plurals>
+    <string name="settings_resource_files_preview">预览</string>
     <string name="settings_resource_files_ready">已就绪</string>
     <string name="settings_resource_files_replaced">{name} 已替换</string>
     <string name="settings_resource_files_restored">{name} 已恢复为内置文件</string>
@@ -1535,6 +1536,7 @@
     <string name="settings_resource_json_editor_title">修改 JSON 规则集</string>
     <string name="settings_resource_management">资源管理</string>
     <string name="settings_resource_management_summary">管理核心文件与 GEO 资源文件</string>
+    <string name="settings_resource_rule_set_preview_failed">无法预览该规则集</string>
 
     <!-- Backup and restore -->
     <string name="error_backup_file_creator_missing">备份文件创建请求器未注册</string>

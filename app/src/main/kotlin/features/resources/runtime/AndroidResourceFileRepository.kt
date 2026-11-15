@@ -26,6 +26,10 @@ import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import features.resources.isSingBoxJsonRuleSet
 import features.resources.isEditableResource
 import features.resources.isHostsResource
+import features.resources.SingBoxRuleSetFileFormat
+import features.resources.singBoxRuleSetFormatOrNull
+import engine.singbox.readSingBoxBinaryRuleSet
+import java.io.File
 import features.resources.requireValidHostsResource
 import features.resources.InvalidSingBoxJsonRuleSetException
 import features.resources.resourceTextEditorSnapshot
@@ -232,14 +236,20 @@ internal class AndroidResourceFileRepository(
         result.onSuccess {
             runCatching { notifier.dismiss() }
         }.onFailure { error ->
-            if (error is CancellationException) {
-                throw error
-            } else if (error is AndroidResourceFileDownloadCancelledException) {
-                AndroidResourceFileLogger.info("Resource file update cancelled")
-                runCatching { notifier.dismiss() }
-            } else {
-                AndroidResourceFileLogger.error("Failed to update resource files", error)
-                runCatching { notifier.showFailed(error.message ?: error::class.simpleName.orEmpty()) }
+            when (error) {
+                is CancellationException -> {
+                    throw error
+                }
+
+                is AndroidResourceFileDownloadCancelledException -> {
+                    AndroidResourceFileLogger.info("Resource file update cancelled")
+                    runCatching { notifier.dismiss() }
+                }
+
+                else -> {
+                    AndroidResourceFileLogger.error("Failed to update resource files", error)
+                    runCatching { notifier.showFailed(error.message ?: error::class.simpleName.orEmpty()) }
+                }
             }
         }
         return result.getOrElse { error ->
@@ -321,6 +331,16 @@ internal class AndroidResourceFileRepository(
         resourceTextEditorSnapshot(store.readCustomTextOrNull(customFile), customFile.name)
     }
 
+    suspend fun readCustomRuleSetPreview(customFile: CustomResourceFileState): String = withContext(Dispatchers.IO) {
+        require(customFile.name.singBoxRuleSetFormatOrNull() == SingBoxRuleSetFileFormat.Binary)
+        // Preview always uses the bundled core, never a custom ROOT executable.
+        readSingBoxBinaryRuleSet(
+            coreFile = File(appContext.applicationInfo.nativeLibraryDir, "libsing-box.so"),
+            sourceFile = store.file(customFile),
+            cacheDirectory = appContext.cacheDir,
+        )
+    }
+
     suspend fun saveCustomText(
         customFile: CustomResourceFileState,
         content: String,
@@ -381,7 +401,7 @@ internal class AndroidResourceFileRepository(
     }
 
     private suspend fun installOrPublishCoreCandidate(
-        candidateFactory: () -> java.io.File,
+        candidateFactory: () -> File,
     ) {
         executeCoreCandidateInstall(candidateFactory) {
             error(appContext.getString(R.string.settings_root_required))
@@ -389,7 +409,7 @@ internal class AndroidResourceFileRepository(
     }
 
     private suspend fun executeCoreCandidateInstall(
-        candidateFactory: () -> java.io.File,
+        candidateFactory: () -> File,
         deferRootOwned: suspend () -> Unit,
     ) {
         val target = store.file(ResourceFileKind.SingBoxCore)
@@ -404,7 +424,7 @@ internal class AndroidResourceFileRepository(
         )
     }
 
-    private fun installInitialCoreCandidate(candidate: java.io.File) {
+    private fun installInitialCoreCandidate(candidate: File) {
         try {
             val installed = store.installInitialSingBoxCoreCandidate(candidate)
             require(installed || store.file(ResourceFileKind.SingBoxCore).isFile) {
@@ -415,7 +435,7 @@ internal class AndroidResourceFileRepository(
         }
     }
 
-    private fun replaceAppOwnedCoreCandidate(candidate: java.io.File) {
+    private fun replaceAppOwnedCoreCandidate(candidate: File) {
         try {
             store.replaceSingBoxCoreCandidate(candidate)
         } finally {
@@ -423,7 +443,7 @@ internal class AndroidResourceFileRepository(
         }
     }
 
-    private suspend fun replaceCoreCandidateWithRoot(candidate: java.io.File) {
+    private suspend fun replaceCoreCandidateWithRoot(candidate: File) {
         try {
             val target = store.file(ResourceFileKind.SingBoxCore)
             val removal = rootShell.exec(
@@ -441,7 +461,7 @@ internal class AndroidResourceFileRepository(
 
     private fun publishCustomCandidate(
         customFile: CustomResourceFileState,
-        candidate: java.io.File,
+        candidate: File,
         requireCurrentMetadata: Boolean = true,
         expectedTargetRevision: ResourceFileRevision? = null,
         expectedLiveFile: CustomResourceFileState? = if (requireCurrentMetadata) customFile else null,
@@ -516,11 +536,11 @@ private fun ResourceFileRevision?.publicationMode(): ResourceFilePublicationMode
 private data class ResourceFileDownloadTarget(
     val displayName: String,
     val url: String,
-    val targetFile: java.io.File,
+    val targetFile: File,
     val applyPermissions: () -> Unit = {},
     val coreCandidate: Boolean = false,
-    val candidateFactory: (() -> java.io.File)? = null,
-    val publishCandidate: ((java.io.File) -> Unit)? = null,
+    val candidateFactory: (() -> File)? = null,
+    val publishCandidate: ((File) -> Unit)? = null,
 )
 
 private class ResourceFileDownloadFailedException(
