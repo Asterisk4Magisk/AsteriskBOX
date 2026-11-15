@@ -3,7 +3,7 @@
 
 package features.endpoint
 
-import ui.layout.codeEditorShowsSupportingContent
+import ui.layout.rememberCodeEditorFocusState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -118,7 +118,12 @@ internal fun EndpointEditorPage(
     val invalidJsonMessage = stringResource(R.string.endpoint_editor_json_invalid)
     val formatJsonContentDescription = stringResource(R.string.endpoint_editor_format_json)
     val copiedMessage = stringResource(R.string.common_copied)
-    val showProperties = codeEditorShowsSupportingContent(editorState.isFocused)
+    val editorFocus = rememberCodeEditorFocusState(
+        editorFocused = editorState.isFocused,
+        clearEditorFocus = editorState::clearFocus,
+        backEnabled = !saving,
+    )
+    val showProperties = !editorFocus.expanded
 
     fun formatCurrentJson() {
         runCatching {
@@ -235,7 +240,7 @@ internal fun EndpointEditorPage(
         },
         saving = saving,
         saveEnabled = !missing,
-        onBack = navigator::pop,
+        onBack = { if (editorFocus.expanded) editorFocus.exit() else navigator.pop() },
         onSave = ::save,
         actions = {
             AsteriskActionButton(
@@ -342,16 +347,24 @@ internal fun EndpointEditorPage(
                 }
 
                 Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    Text(
-                        stringResource(R.string.endpoint_editor_json),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        stringResource(R.string.endpoint_editor_json_summary),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
-                    )
+                    AnimatedVisibility(
+                        visible = showProperties,
+                        enter = AsteriskMotion.contentEnter(),
+                        exit = AsteriskMotion.contentExit(),
+                    ) {
+                        Column {
+                            Text(
+                                stringResource(R.string.endpoint_editor_json),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Text(
+                                stringResource(R.string.endpoint_editor_json_summary),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
+                            )
+                        }
+                    }
                     Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         JsonCodeEditor(
                             state = editorState,

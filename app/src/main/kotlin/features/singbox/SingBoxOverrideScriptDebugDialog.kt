@@ -5,6 +5,7 @@ package features.singbox
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +31,7 @@ import app.R
 import ui.components.AsteriskCodePreviewDialog
 import ui.components.AsteriskCodePreviewTabs
 import ui.components.AsteriskCodeActionButton
+import ui.layout.rememberCodeEditorFocusState
 import ui.theme.AsteriskMotion
 import ui.icons.AsteriskIcons as Icons
 
@@ -55,6 +57,10 @@ internal fun SingBoxOverrideScriptDebugDialog(
             state.replaceText(outputText, placeCursorAtEnd = false)
         }
     }
+    val outputFocus = rememberCodeEditorFocusState(
+        editorFocused = outputEditorState.isFocused,
+        clearEditorFocus = outputEditorState::clearFocus,
+    )
     val outputEffectsMotion = AsteriskMotion.fastEffects<Float>()
     val hasDiagnostics = !result.error.isNullOrBlank() || !result.warning.isNullOrBlank()
 
@@ -63,6 +69,7 @@ internal fun SingBoxOverrideScriptDebugDialog(
         onDismissRequest = onDismissRequest,
         searchAvailable = showOutput,
         keepSearchButtonVisible = true,
+        focusState = outputFocus,
         actions = {
             AsteriskCodeActionButton(
                 icon = Icons.Rounded.ContentCopy,
@@ -91,30 +98,36 @@ internal fun SingBoxOverrideScriptDebugDialog(
         ) {
             val diagnosticsMaxHeight = maxHeight * 0.35f
             Column(modifier = Modifier.fillMaxSize()) {
-                Column(
-                    modifier = Modifier.fillMaxWidth()
-                        .heightIn(max = diagnosticsMaxHeight)
-                        .verticalScroll(rememberScrollState()),
+                AnimatedVisibility(
+                    visible = !outputFocus.expanded,
+                    enter = AsteriskMotion.contentEnter(),
+                    exit = AsteriskMotion.contentExit(),
                 ) {
-                    result.error?.takeIf(String::isNotBlank)?.let { error ->
-                        DebugSection(
-                            title = stringResource(R.string.singbox_override_script_debug_error),
-                            body = error,
-                            error = true,
-                        )
-                    }
-                    result.warning?.takeIf(String::isNotBlank)?.let { warning ->
-                        DebugSection(
-                            title = stringResource(R.string.singbox_override_script_debug_warning),
-                            body = warning,
-                            warning = true,
-                            modifier = Modifier.padding(top = if (!result.error.isNullOrBlank()) 8.dp else 0.dp),
-                        )
+                    Column(
+                        modifier = Modifier.fillMaxWidth()
+                            .heightIn(max = diagnosticsMaxHeight)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        result.error?.takeIf(String::isNotBlank)?.let { error ->
+                            DebugSection(
+                                title = stringResource(R.string.singbox_override_script_debug_error),
+                                body = error,
+                                error = true,
+                            )
+                        }
+                        result.warning?.takeIf(String::isNotBlank)?.let { warning ->
+                            DebugSection(
+                                title = stringResource(R.string.singbox_override_script_debug_warning),
+                                body = warning,
+                                warning = true,
+                                modifier = Modifier.padding(top = if (!result.error.isNullOrBlank()) 8.dp else 0.dp),
+                            )
+                        }
                     }
                 }
                 AnimatedContent(
                     targetState = showOutput,
-                    modifier = Modifier.fillMaxWidth().weight(1f).padding(top = if (hasDiagnostics) 8.dp else 0.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f).padding(top = if (hasDiagnostics && !outputFocus.expanded) 8.dp else 0.dp),
                     transitionSpec = AsteriskMotion.fadeThrough(outputEffectsMotion),
                     contentAlignment = Alignment.TopStart,
                     label = "script-debug-output",

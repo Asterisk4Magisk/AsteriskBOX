@@ -22,6 +22,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
@@ -50,6 +52,7 @@ internal class SingBoxCodeEditorState(
     placeCursorAtEnd: Boolean = true,
 ) {
     private var editor: CodeEditor? = null
+    private var focusManager: FocusManager? = null
     private var retainedText = initialText
     private var moveCursorToEnd = placeCursorAtEnd
 
@@ -59,9 +62,10 @@ internal class SingBoxCodeEditorState(
     var isFocused by mutableStateOf(false)
         private set
 
-    internal fun attach(editor: CodeEditor) {
+    internal fun attach(editor: CodeEditor, focusManager: FocusManager) {
         if (this.editor === editor) return
         this.editor = editor
+        this.focusManager = focusManager
         applyRetainedText(editor)
     }
 
@@ -70,6 +74,7 @@ internal class SingBoxCodeEditorState(
         retainedText = editor.text.toString()
         isFocused = false
         this.editor = null
+        focusManager = null
     }
 
     internal fun onContentChanged(editor: CodeEditor, action: Int) {
@@ -84,6 +89,12 @@ internal class SingBoxCodeEditorState(
     }
 
     fun snapshotText(): String = editor?.text?.toString() ?: retainedText.toString()
+
+    fun clearFocus() {
+        editor?.hideSoftInput()
+        editor?.clearFocus()
+        focusManager?.clearFocus(force = true)
+    }
 
     fun replaceText(text: String, placeCursorAtEnd: Boolean = true) {
         if (text == retainedText && editor?.text?.toString() == text) return
@@ -144,6 +155,7 @@ internal fun SoraCodeEditor(
     modifier: Modifier = Modifier,
     searchState: AsteriskCodeSearchState? = null,
 ) {
+    val focusManager = LocalFocusManager.current
     val colors = rememberCodeEditorColors()
     val colorScheme = remember(colors) { colors.toSoraColorScheme() }
     val borderWidth by animateDpAsState(if (state.isFocused) FocusedBorderWidth else 0.dp)
@@ -165,12 +177,12 @@ internal fun SoraCodeEditor(
                             editor.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                         }
                         editor.configure(language, colors, colorScheme)
-                        editor.bindState(state)
+                        editor.bindState(state, focusManager)
                         editor.bindSearchState(searchState)
                     }
                 },
                 update = { editor ->
-                    editor.bindState(state)
+                    editor.bindState(state, focusManager)
                     editor.bindSearchState(searchState)
                     editor.updateLanguage(language)
                     if (editor.colorScheme !== colorScheme) {
@@ -185,7 +197,7 @@ internal fun SoraCodeEditor(
                 },
                 onRelease = { editor ->
                     editor.bindSearchState(null)
-                    editor.bindState(null)
+                    editor.bindState(null, focusManager)
                     editor.release()
                 },
                 modifier = Modifier.fillMaxSize(),
@@ -211,11 +223,11 @@ private class SingBoxSoraEditor(context: Context) : CodeEditor(context) {
         }
     }
 
-    fun bindState(state: SingBoxCodeEditorState?) {
+    fun bindState(state: SingBoxCodeEditorState?, focusManager: FocusManager) {
         if (boundState === state) return
         boundState?.detach(this)
         boundState = state
-        state?.attach(this)
+        state?.attach(this, focusManager)
     }
 
     fun bindSearchState(state: AsteriskCodeSearchState?) {

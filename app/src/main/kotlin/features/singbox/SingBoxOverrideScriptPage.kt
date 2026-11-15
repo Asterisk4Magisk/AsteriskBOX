@@ -3,21 +3,7 @@
 
 package features.singbox
 
-
-import androidx.navigationevent.compose.rememberNavigationEventState
-
-import androidx.navigationevent.compose.NavigationBackHandler
-
-import androidx.navigationevent.NavigationEventInfo
-
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-
-import androidx.compose.ui.platform.LocalFocusManager
-
-import androidx.compose.runtime.saveable.rememberSaveable
-
-import androidx.compose.runtime.LaunchedEffect
-
+import ui.layout.rememberCodeEditorFocusState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -85,23 +71,10 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
     val copiedMessage = stringResource(R.string.common_copied)
 
     val codeSearch = rememberAsteriskCodeSearchState()
-    val focusManager = LocalFocusManager.current
-    val keyboard = LocalSoftwareKeyboardController.current
-    var editorExpanded by rememberSaveable { mutableStateOf(false) }
-    LaunchedEffect(editorState.isFocused, codeSearch.active) {
-        if (editorState.isFocused || codeSearch.active) editorExpanded = true
-    }
-    fun exitEditor() {
-        codeSearch.clearEditorFocus()
-        focusManager.clearFocus(force = true)
-        keyboard?.hide()
-        editorExpanded = false
-    }
-    val editorBackState = rememberNavigationEventState(NavigationEventInfo.None)
-    NavigationBackHandler(
-        state = editorBackState,
-        isBackEnabled = editorExpanded && !codeSearch.active,
-        onBackCompleted = ::exitEditor,
+    val editorFocus = rememberCodeEditorFocusState(
+        editorFocused = editorState.isFocused,
+        clearEditorFocus = codeSearch::clearEditorFocus,
+        searchActive = codeSearch.active,
     )
     AsteriskCodeSearchHost(
         state = codeSearch,
@@ -123,7 +96,7 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
                             onClick = {
                                 when {
                                     codeSearch.active -> codeSearch.close()
-                                    editorExpanded -> exitEditor()
+                                    editorFocus.expanded -> editorFocus.exit()
                                     else -> navigator.pop()
                                 }
                             },
@@ -177,7 +150,7 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
                     .imePadding(),
             ) {
                 AnimatedVisibility(
-                    visible = !editorExpanded,
+                    visible = !editorFocus.expanded,
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {

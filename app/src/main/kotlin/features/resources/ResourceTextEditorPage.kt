@@ -3,7 +3,7 @@
 
 package features.resources
 
-import ui.layout.codeEditorShowsSupportingContent
+import ui.layout.rememberCodeEditorFocusState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
@@ -67,7 +67,7 @@ internal fun ResourceTextEditorPage(
     val isHosts = file?.name?.isHostsResource() == true
     val editorState = remember(resourceId) { SingBoxCodeEditorState("") }
     var loadState by remember(resourceId) {
-        mutableStateOf<ResourceTextEditorLoadState>(ResourceTextEditorLoadState.Loading)
+        mutableStateOf(ResourceTextEditorLoadState.Loading)
     }
     var saving by remember(resourceId) { mutableStateOf(false) }
     var loadedSnapshot by remember(resourceId) {
@@ -122,6 +122,12 @@ internal fun ResourceTextEditorPage(
         }
     }
 
+    val editorFocus = rememberCodeEditorFocusState(
+        editorFocused = editorState.isFocused,
+        clearEditorFocus = editorState::clearFocus,
+        backEnabled = !saving,
+    )
+
     fun formatCurrentJson() {
         runCatching { formatJsonRuleSet(editorState.snapshotText()) }
             .onSuccess(editorState::replaceText)
@@ -155,14 +161,22 @@ internal fun ResourceTextEditorPage(
                 val fallback = (error as? InvalidJsonRuleSetStructureException)
                     ?.reason
                     ?.let(validationMessages::getValue)
-                    ?: if (error is InvalidHostsResourceException) {
-                        invalidHostsMessage.format(error.lineNumber)
-                    } else if (error is InvalidSingBoxJsonRuleSetException) {
-                        invalidRuleSetMessage
-                    } else if (error is features.resources.runtime.ResourceFileChangedException) {
-                        changedMessage
-                    } else {
-                        saveFailedMessage
+                    ?: when (error) {
+                        is InvalidHostsResourceException -> {
+                            invalidHostsMessage.format(error.lineNumber)
+                        }
+
+                        is InvalidSingBoxJsonRuleSetException -> {
+                            invalidRuleSetMessage
+                        }
+
+                        is features.resources.runtime.ResourceFileChangedException -> {
+                            changedMessage
+                        }
+
+                        else -> {
+                            saveFailedMessage
+                        }
                     }
                 services.tipNotifier.showError(
                     error = error,
@@ -182,7 +196,7 @@ internal fun ResourceTextEditorPage(
             Column {
                 Text(stringResource(if (isHosts) R.string.settings_resource_hosts_editor_title else R.string.settings_resource_json_editor_title))
                 Text(
-                    file?.name ?: stringResource(if (isHosts) R.string.settings_resource_hosts_editor_summary else R.string.settings_resource_json_editor_summary),
+                    file?.name ?: stringResource(R.string.settings_resource_json_editor_summary),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -190,7 +204,7 @@ internal fun ResourceTextEditorPage(
         },
         saving = saving,
         saveEnabled = loadState == ResourceTextEditorLoadState.Ready,
-        onBack = navigator::pop,
+        onBack = { if (editorFocus.expanded) editorFocus.exit() else navigator.pop() },
         onSave = ::save,
     ) { contentPadding ->
         AnimatedContent(
@@ -222,7 +236,7 @@ internal fun ResourceTextEditorPage(
                     modifier = Modifier.fillMaxSize().padding(bottom = 12.dp),
                 ) {
                     AnimatedVisibility(
-                        visible = codeEditorShowsSupportingContent(editorState.isFocused),
+                        visible = !editorFocus.expanded,
                         enter = AsteriskMotion.contentEnter(),
                         exit = AsteriskMotion.contentExit(),
                     ) {
