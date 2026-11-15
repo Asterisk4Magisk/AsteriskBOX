@@ -19,7 +19,7 @@
     <string name="code_editor_search_empty">无匹配结果</string>
     <string name="code_editor_search_hint">查找</string>
     <string name="code_editor_search_invalid">正则表达式无效</string>
-    <string name="code_editor_search_move">拖动移动查找浮窗，点击恢复位置</string>
+    <string name="code_editor_search_move">拖动移动查找浮窗</string>
     <string name="code_editor_search_next">下一个匹配</string>
     <string name="code_editor_search_previous">上一个匹配</string>
     <string name="code_editor_search_regex">使用正则表达式</string>

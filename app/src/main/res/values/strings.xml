@@ -19,7 +19,7 @@
     <string name="code_editor_search_empty">No matches</string>
     <string name="code_editor_search_hint">Find</string>
     <string name="code_editor_search_invalid">Invalid regular expression</string>
-    <string name="code_editor_search_move">Drag to move search; tap to reset position</string>
+    <string name="code_editor_search_move">Drag to move search</string>
     <string name="code_editor_search_next">Next match</string>
     <string name="code_editor_search_previous">Previous match</string>
     <string name="code_editor_search_regex">Use regular expression</string>
