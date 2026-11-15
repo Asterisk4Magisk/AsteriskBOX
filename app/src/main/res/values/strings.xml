@@ -1539,7 +1539,6 @@
     <string name="settings_resource_hosts_editor_loading">Loading Hosts file…</string>
     <string name="settings_resource_hosts_editor_missing">This Hosts resource is unavailable</string>
     <string name="settings_resource_hosts_editor_save_failed">Could not save this Hosts file</string>
-    <string name="settings_resource_hosts_editor_summary">Hosts resource file</string>
     <string name="settings_resource_hosts_editor_title">Modify Hosts file</string>
     <string name="settings_resource_json_editor_changed">The file changed after it was opened. Reopen it before saving.</string>
     <string name="settings_resource_json_editor_content">JSON rule set</string>

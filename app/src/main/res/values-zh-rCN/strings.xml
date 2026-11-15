@@ -1515,7 +1515,6 @@
     <string name="settings_resource_hosts_editor_loading">正在加载 Hosts 文件…</string>
     <string name="settings_resource_hosts_editor_missing">该 Hosts 资源文件不可用</string>
     <string name="settings_resource_hosts_editor_save_failed">无法保存该 Hosts 文件</string>
-    <string name="settings_resource_hosts_editor_summary">Hosts 资源文件</string>
     <string name="settings_resource_hosts_editor_title">修改 Hosts 文件</string>
     <string name="settings_resource_json_editor_changed">文件打开后已发生变化，请重新进入编辑器后再保存。</string>
     <string name="settings_resource_json_editor_content">JSON 规则集</string>
