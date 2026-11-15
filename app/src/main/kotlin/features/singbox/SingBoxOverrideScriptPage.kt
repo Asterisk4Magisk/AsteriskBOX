@@ -3,12 +3,26 @@
 
 package features.singbox
 
+
+import androidx.navigationevent.compose.rememberNavigationEventState
+
+import androidx.navigationevent.compose.NavigationBackHandler
+
+import androidx.navigationevent.NavigationEventInfo
+
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+
+import androidx.compose.ui.platform.LocalFocusManager
+
+import androidx.compose.runtime.saveable.rememberSaveable
+
+import androidx.compose.runtime.LaunchedEffect
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import features.settings.SettingsSectionCard
 import features.settings.SettingsSwitchRow
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
@@ -17,8 +31,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,7 +38,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -47,14 +58,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ui.clipboard.setPlainText
+import ui.components.AsteriskCodeSearchHost
+import ui.components.rememberAsteriskCodeSearchState
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskSaveButton
 import ui.components.AsteriskScaffold
 import ui.components.AsteriskTopAppBar
 import ui.layout.pageContentPaddingWithCutout
-import ui.layout.codeEditorShowsSupportingContent
 import ui.theme.AsteriskMotion
-import ui.theme.AsteriskShapeTokens
 import ui.icons.AsteriskIcons as Icons
 
 @Composable
@@ -73,131 +84,163 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
     var result by remember { mutableStateOf<SingBoxScriptResult?>(null) }
     val copiedMessage = stringResource(R.string.common_copied)
 
-    AsteriskScaffold(
-        topBar = {
-            AsteriskTopAppBar(
-                title = { Text(stringResource(R.string.singbox_override_script_title)) },
-                navigationIcon = {
-                    IconButton(onClick = navigator::pop) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.common_back))
+    val codeSearch = rememberAsteriskCodeSearchState()
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    var editorExpanded by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(editorState.isFocused, codeSearch.active) {
+        if (editorState.isFocused || codeSearch.active) editorExpanded = true
+    }
+    fun exitEditor() {
+        codeSearch.clearEditorFocus()
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
+        editorExpanded = false
+    }
+    val editorBackState = rememberNavigationEventState(NavigationEventInfo.None)
+    NavigationBackHandler(
+        state = editorBackState,
+        isBackEnabled = editorExpanded && !codeSearch.active,
+        onBackCompleted = ::exitEditor,
+    )
+    AsteriskCodeSearchHost(
+        state = codeSearch,
+        modifier = Modifier.fillMaxSize(),
+        enabled = true,
+        onSearchClosed = codeSearch::focusEditor,
+        editorTools = { searchButton ->
+            searchButton()
+            JavaScriptCodeFormatButton(editorState)
+        },
+    ) { _, editorModifier, backdrop ->
+        AsteriskScaffold(
+            backdrop = backdrop,
+            topBar = {
+                AsteriskTopAppBar(
+                    title = { Text(stringResource(R.string.singbox_override_script_title)) },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = {
+                                when {
+                                    codeSearch.active -> codeSearch.close()
+                                    editorExpanded -> exitEditor()
+                                    else -> navigator.pop()
+                                }
+                            },
+                        ) {
+                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.common_back))
+                        }
+                    },
+                    actions = {
+                        AsteriskActionButton(
+                            text = stringResource(if (debugging) R.string.singbox_override_script_debug_running else R.string.singbox_override_script_debug_run),
+                            icon = Icons.Rounded.BugReport,
+                            loading = debugging,
+                            onClick = {
+                                val script = editorState.snapshotText()
+                                val snapshot = appState
+                                debugging = true
+                                scope.launch {
+                                    result = try {
+                                        withContext(Dispatchers.Default) {
+                                            debugSingBoxConfigOverride(
+                                                SingBoxConfigCompiler.generate(context, snapshot), script, snapshot.pluginProtocols,
+                                            )
+                                        }
+                                    } catch (cancelled: CancellationException) {
+                                        throw cancelled
+                                    } catch (error: Exception) {
+                                        SingBoxScriptResult(error = error.message ?: error.toString())
+                                    } finally {
+                                        debugging = false
+                                    }
+                                }
+                            },
+                        )
+                        AsteriskSaveButton(
+                            onClick = {
+                                val script = editorState.snapshotText()
+                                updateAppState { state ->
+                                    state.copy(configOverrideScript = script, enableConfigOverrideScript = scriptEnabled)
+                                }
+                                navigator.pop()
+                            },
+                        )
+                    },
+                )
+            },
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier.fillMaxSize()
+                    .padding(pageContentPaddingWithCutout(innerPadding, padding, isWideScreen))
+                    .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 12.dp)
+                    .imePadding(),
+            ) {
+                AnimatedVisibility(
+                    visible = !editorExpanded,
+                    enter = AsteriskMotion.contentEnter(),
+                    exit = AsteriskMotion.contentExit(),
+                ) {
+                    SettingsSectionCard {
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.singbox_override_script_enable),
+                            icon = Icons.Rounded.Code,
+                            checked = scriptEnabled,
+                            onCheckedChange = { scriptEnabled = it },
+                        )
+                    }
+                }
+                SoraCodeEditor(
+                    state = editorState,
+                    language = SingBoxCodeLanguage.JavaScript,
+                    readOnly = false,
+                    searchState = codeSearch,
+                    modifier = Modifier.fillMaxWidth().weight(1f).then(editorModifier),
+                )
+            }
+            SingBoxOverrideScriptDebugDialog(
+                result = result,
+                onDismissRequest = { result = null },
+                onCopy = { report ->
+                    scope.launch {
+                        clipboard.setPlainText(report)
+                        services.tipNotifier.show(copiedMessage)
                     }
                 },
-                actions = {
-                    AsteriskActionButton(
-                        text = stringResource(if (debugging) R.string.singbox_override_script_debug_running else R.string.singbox_override_script_debug_run),
-                        icon = Icons.Rounded.BugReport,
-                        loading = debugging,
-                        onClick = {
-                            val script = editorState.snapshotText()
-                            val snapshot = appState
-                            debugging = true
-                            scope.launch {
-                                try {
-                                    result = withContext(Dispatchers.Default) {
-                                        debugSingBoxConfigOverride(
-                                            SingBoxConfigCompiler.generate(context, snapshot), script, snapshot.pluginProtocols,
-                                        )
-                                    }
-                                } catch (cancelled: CancellationException) {
-                                    throw cancelled
-                                } catch (error: Exception) {
-                                    result = SingBoxScriptResult(error = error.message ?: error.toString())
-                                } finally {
-                                    debugging = false
-                                }
-                            }
-                        },
-                    )
-                    AsteriskSaveButton(
-                        onClick = {
-                            val script = editorState.snapshotText()
-                            updateAppState { state ->
-                                state.copy(configOverrideScript = script, enableConfigOverrideScript = scriptEnabled)
-                            }
-                            navigator.pop()
-                        },
-                    )
-                },
-            )
-        },
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier.fillMaxSize()
-                .padding(pageContentPaddingWithCutout(innerPadding, padding, isWideScreen))
-                .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 12.dp)
-                .imePadding(),
-        ) {
-            AnimatedVisibility(
-                visible = codeEditorShowsSupportingContent(editorState.isFocused),
-                enter = AsteriskMotion.contentEnter(),
-                exit = AsteriskMotion.contentExit(),
-            ) {
-                SettingsSectionCard {
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.singbox_override_script_enable),
-                        icon = Icons.Rounded.Code,
-                        checked = scriptEnabled,
-                        onCheckedChange = { scriptEnabled = it },
-                    )
-                }
-            }
-            JavaScriptCodeEditor(
-                state = editorState,
-                modifier = Modifier.fillMaxWidth().weight(1f),
             )
         }
-        SingBoxOverrideScriptDebugDialog(
-            result = result,
-            onDismissRequest = { result = null },
-            onCopy = { report ->
-                scope.launch {
-                    clipboard.setPlainText(report.toClipboardReport())
-                    services.tipNotifier.show(copiedMessage)
-                }
-            },
-        )
     }
 }
 
 @Composable
-private fun JavaScriptCodeEditor(state: SingBoxCodeEditorState, modifier: Modifier = Modifier) {
+private fun JavaScriptCodeFormatButton(state: SingBoxCodeEditorState) {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     val tipNotifier = LocalAppServices.current.tipNotifier
     var formatting by remember { mutableStateOf(false) }
     val failed = stringResource(R.string.code_editor_format_failed)
     val changed = stringResource(R.string.code_editor_format_content_changed)
-    Box(modifier) {
-        SoraCodeEditor(state, SingBoxCodeLanguage.JavaScript, readOnly = false, modifier = Modifier.fillMaxSize())
-        Surface(
-            modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-            shape = AsteriskShapeTokens.InnerContainer,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            tonalElevation = 3.dp,
-        ) {
-            IconButton(
-                enabled = !formatting,
-                onClick = {
-                    val source = state.snapshotText()
-                    formatting = true
-                    scope.launch {
-                        try {
-                            val formatted = formatSingBoxScript(context, source)
-                            if (source == state.snapshotText()) state.replaceText(formatted)
-                            else tipNotifier.show(changed)
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
-                            tipNotifier.show(failed)
-                        } finally {
-                            formatting = false
-                        }
-                    }
-                },
-            ) {
-                if (formatting) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                else Icon(Icons.Rounded.AutoFixHigh, stringResource(R.string.code_editor_format_javascript))
+    IconButton(
+        enabled = !formatting,
+        onClick = {
+            val source = state.snapshotText()
+            formatting = true
+            scope.launch {
+                try {
+                    val formatted = formatSingBoxScript(context, source)
+                    if (source == state.snapshotText()) state.replaceText(formatted)
+                    else tipNotifier.show(changed)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    tipNotifier.show(failed)
+                } finally {
+                    formatting = false
+                }
             }
-        }
+        },
+    ) {
+        if (formatting) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+        else Icon(Icons.Rounded.AutoFixHigh, stringResource(R.string.code_editor_format_javascript))
     }
 }

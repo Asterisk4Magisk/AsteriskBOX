@@ -6,6 +6,7 @@ package features.singbox
 import android.content.Context
 import android.graphics.Typeface
 import android.text.InputType
+import android.view.ViewGroup
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
@@ -25,6 +26,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import io.github.rosemoe.sora.event.PublishSearchResultEvent
+import io.github.rosemoe.sora.event.SelectionChangeEvent
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.lang.EmptyLanguage
 import io.github.rosemoe.sora.lang.analysis.AnalyzeManager
@@ -37,16 +40,18 @@ import io.github.rosemoe.sora.lang.styling.TextStyle
 import io.github.rosemoe.sora.text.Content
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
+import ui.components.AsteriskCodeSearchState
 import ui.isInDarkTheme
 import ui.theme.AsteriskShapeTokens
 
 @Stable
 internal class SingBoxCodeEditorState(
-    initialText: String = "",
+    initialText: CharSequence = "",
+    placeCursorAtEnd: Boolean = true,
 ) {
     private var editor: CodeEditor? = null
     private var retainedText = initialText
-    private var moveCursorToEnd = true
+    private var moveCursorToEnd = placeCursorAtEnd
 
     var documentVersion by mutableIntStateOf(0)
         private set
@@ -78,7 +83,7 @@ internal class SingBoxCodeEditorState(
         }
     }
 
-    fun snapshotText(): String = editor?.text?.toString() ?: retainedText
+    fun snapshotText(): String = editor?.text?.toString() ?: retainedText.toString()
 
     fun replaceText(text: String, placeCursorAtEnd: Boolean = true) {
         if (text == retainedText && editor?.text?.toString() == text) return
@@ -104,11 +109,13 @@ internal fun JsonCodeEditor(
     state: SingBoxCodeEditorState,
     modifier: Modifier = Modifier,
     readOnly: Boolean = false,
+    searchState: AsteriskCodeSearchState? = null,
 ) {
     SoraCodeEditor(
         state = state,
         language = SingBoxCodeLanguage.Json,
         readOnly = readOnly,
+        searchState = searchState,
         modifier = modifier,
     )
 }
@@ -118,11 +125,13 @@ internal fun HostsCodeEditor(
     state: SingBoxCodeEditorState,
     modifier: Modifier = Modifier,
     readOnly: Boolean = false,
+    searchState: AsteriskCodeSearchState? = null,
 ) {
     SoraCodeEditor(
         state = state,
         language = SingBoxCodeLanguage.Hosts,
         readOnly = readOnly,
+        searchState = searchState,
         modifier = modifier,
     )
 }
@@ -133,6 +142,7 @@ internal fun SoraCodeEditor(
     language: SingBoxCodeLanguage,
     readOnly: Boolean,
     modifier: Modifier = Modifier,
+    searchState: AsteriskCodeSearchState? = null,
 ) {
     val colors = rememberCodeEditorColors()
     val colorScheme = remember(colors) { colors.toSoraColorScheme() }
@@ -151,12 +161,17 @@ internal fun SoraCodeEditor(
             AndroidView(
                 factory = { context ->
                     SingBoxSoraEditor(context).also { editor ->
+                        if (searchState != null) {
+                            editor.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                        }
                         editor.configure(language, colors, colorScheme)
                         editor.bindState(state)
+                        editor.bindSearchState(searchState)
                     }
                 },
                 update = { editor ->
                     editor.bindState(state)
+                    editor.bindSearchState(searchState)
                     editor.updateLanguage(language)
                     if (editor.colorScheme !== colorScheme) {
                         editor.colorScheme = colorScheme
@@ -165,9 +180,11 @@ internal fun SoraCodeEditor(
                     editor.isEnabled = behavior.enabled
                     editor.isFocusable = behavior.selectionEnabled
                     editor.isFocusableInTouchMode = behavior.selectionEnabled
-                    editor.isEditable = behavior.editable
+                    if (editor.isEditable != behavior.editable) editor.isEditable = behavior.editable
+                    searchState?.updateEditable(editor)
                 },
                 onRelease = { editor ->
+                    editor.bindSearchState(null)
                     editor.bindState(null)
                     editor.release()
                 },
@@ -179,12 +196,16 @@ internal fun SoraCodeEditor(
 
 private class SingBoxSoraEditor(context: Context) : CodeEditor(context) {
     private var boundState: SingBoxCodeEditorState? = null
+    private var boundSearchState: AsteriskCodeSearchState? = null
     private var language: SingBoxCodeLanguage? = null
 
     init {
         subscribeAlways(ContentChangeEvent::class.java) { event ->
             boundState?.onContentChanged(this, event.action)
+            boundSearchState?.onContentChanged(this)
         }
+        subscribeAlways(PublishSearchResultEvent::class.java) { boundSearchState?.onResultsPublished(this) }
+        subscribeAlways(SelectionChangeEvent::class.java) { boundSearchState?.onSelectionChanged(this) }
         onFocusChangeListener = OnFocusChangeListener { _, focused ->
             boundState?.onFocusChanged(this, focused)
         }
@@ -194,6 +215,13 @@ private class SingBoxSoraEditor(context: Context) : CodeEditor(context) {
         if (boundState === state) return
         boundState?.detach(this)
         boundState = state
+        state?.attach(this)
+    }
+
+    fun bindSearchState(state: AsteriskCodeSearchState?) {
+        if (boundSearchState === state) return
+        boundSearchState?.detach(this)
+        boundSearchState = state
         state?.attach(this)
     }
 
@@ -214,7 +242,7 @@ private fun SingBoxSoraEditor.configure(
     setTypefaceLineNumber(Typeface.MONOSPACE)
     setLineSpacing(dp(EditorLineSpacing).toFloat(), 1f)
     setTabWidth(EditorTabWidth)
-    setWordwrap(false)
+    isWordwrap = false
     setPinLineNumber(true)
     setLineNumberEnabled(true)
     setDisplayLnPanel(false)
@@ -222,9 +250,9 @@ private fun SingBoxSoraEditor.configure(
     setDividerWidth(dp(DividerWidth).toFloat())
     setHighlightCurrentBlock(false)
     setBlockLineEnabled(false)
-    setRenderFunctionCharacters(false)
+    isRenderFunctionCharacters = false
     setLigatureEnabled(false)
-    setScalable(true)
+    isScalable = true
     setCursorAnimationEnabled(true)
     setInputType(
         InputType.TYPE_CLASS_TEXT or
@@ -357,6 +385,8 @@ private fun CodeEditorColors.toSoraColorScheme(): EditorColorScheme {
         setColor(EditorColorScheme.SELECTION_INSERT, accent.toArgb())
         setColor(EditorColorScheme.SELECTION_HANDLE, accent.toArgb())
         setColor(EditorColorScheme.SELECTED_TEXT_BACKGROUND, selection.toArgb())
+        setColor(EditorColorScheme.MATCHED_TEXT_BACKGROUND, selection.toArgb())
+        setColor(EditorColorScheme.MATCHED_TEXT_BORDER, accent.toArgb())
         setColor(EditorColorScheme.CURRENT_LINE, currentLine.toArgb())
         setColor(EditorColorScheme.SCROLL_BAR_TRACK, border.toArgb())
         setColor(EditorColorScheme.SCROLL_BAR_THUMB, lineNumber.toArgb())
