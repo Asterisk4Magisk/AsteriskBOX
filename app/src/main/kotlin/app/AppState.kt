@@ -43,7 +43,7 @@ data class AppState(
     val seedIndex: Int = 0,
     val networkActivityStyle: Int = NetworkActivityStyleDotted,
     val hideRecentTasks: Boolean = false,
-    val allowScreenshots: Boolean = false,
+    val allowScreenshots: Boolean = true,
     val hideLauncherIcon: Boolean = false,
     val autoHideNavigationBar: Boolean = false,
     val navigationBarStyle: Int = NavigationBarStyleClassic,
