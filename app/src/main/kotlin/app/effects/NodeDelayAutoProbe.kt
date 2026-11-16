@@ -6,6 +6,8 @@ package app.effects
 import android.os.SystemClock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -20,22 +22,29 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 
 /**
- * Probes the first testable active node on each résumé. Later selections do not launch another
- * probe or cancel one already running; group batches and foreground lifecycle still may cancel it.
+ * Probes the first testable active node on home entry and resume. Home visibility only gates
+ * new probes; an already started probe finishes across navigation and selector changes.
+ * Group batches and foreground lifecycle still may cancel it.
  */
 @Composable
 internal fun NodeDelayAutoProbe(
     stateStore: AndroidAppStateStore,
     singBoxRuntime: SingBoxRuntimeRepository,
+    homeVisible: Boolean,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    val latestHomeVisible = rememberUpdatedState(homeVisible)
     LaunchedEffect(lifecycleOwner, stateStore, singBoxRuntime) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            val revision = singBoxRuntime.state.value.proxySelectionRevision
-            val tag = singBoxRuntime.state.awaitResumeProbeNode(revision) {
-                stateStore.state.value.singBoxMode
-            } ?: return@repeatOnLifecycle
-            singBoxRuntime.probeProxyDelay(stateStore.state.value, tag, SystemClock.elapsedRealtime())
+            snapshotFlow { latestHomeVisible.value }.collect { visible ->
+                if (!visible) return@collect
+                val revision = singBoxRuntime.state.value.proxySelectionRevision
+                val tag = singBoxRuntime.state.awaitResumeProbeNode(revision) {
+                    stateStore.state.value.singBoxMode
+                } ?: return@collect
+                if (!latestHomeVisible.value) return@collect
+                singBoxRuntime.probeProxyDelay(stateStore.state.value, tag, SystemClock.elapsedRealtime())
+            }
         }
     }
 }

@@ -60,6 +60,7 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import app.effects.NodeDelayAutoProbe
 import app.modes.NavigationBarStyleCompact
 import app.navigation.MainDestination
 import app.navigation.MainDestinationState
@@ -155,6 +156,12 @@ fun AppContent(
 
     val backStack = remember { mutableStateListOf<NavKey>().apply { add(Route.Main) } }
     val navigator = remember { Navigator(backStack) }
+
+    NodeDelayAutoProbe(
+        stateStore = LocalAppStateStore.current,
+        singBoxRuntime = LocalAppServices.current.singBoxRuntime,
+        homeVisible = navigator.current() is Route.Main && mainDestinationState.current == MainDestination.Home,
+    )
 
     MainScreenBackHandler(mainDestinationState, navigator)
 
