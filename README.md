@@ -102,7 +102,7 @@ The build downloads the pinned AndroidLibBoxLite AAR, builds the native submodul
 
 Debug builds carry the application id `org.asterisk.zcc.abox.debug` and a DEV-badged launcher icon (`app/src/debug/res`), so a debug build installs alongside a release build.
 
-If Gradle cannot find the Android NDK, configure it through Android Studio, `ndk.dir` in `local.properties`, or `ANDROID_NDK_HOME`.
+The Android NDK version is pinned by `ProjectConfig.NDK_VERSION` in [`buildSrc/src/main/kotlin/BuildConfig.kt`](buildSrc/src/main/kotlin/BuildConfig.kt). Install that version through SDK Manager.
 
 ## License
 
