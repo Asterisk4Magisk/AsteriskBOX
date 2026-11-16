@@ -10,7 +10,6 @@ import androidx.compose.material.icons.automirrored.rounded.CompareArrows
 import androidx.compose.material.icons.automirrored.rounded.Help
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
-import androidx.compose.material.icons.automirrored.rounded.PlaylistAddCheck
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.automirrored.rounded.Sort
 import androidx.compose.material.icons.rounded.AccountTree
@@ -40,6 +39,7 @@ import androidx.compose.material.icons.rounded.DataUsage
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Dns
+import androidx.compose.material.icons.rounded.DoneAll
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.Edit
@@ -141,6 +141,7 @@ internal object AsteriskIcons {
         val Delete: ImageVector = MaterialIcons.Rounded.Delete
         val Description: ImageVector = MaterialIcons.Rounded.Description
         val Dns: ImageVector = MaterialIcons.Rounded.Dns
+        val DoneAll: ImageVector = MaterialIcons.Rounded.DoneAll
         val Download: ImageVector = MaterialIcons.Rounded.Download
         val DragIndicator: ImageVector = MaterialIcons.Rounded.DragIndicator
         val Edit: ImageVector = MaterialIcons.Rounded.Edit
@@ -219,7 +220,6 @@ internal object AsteriskIcons {
             val OpenInNew: ImageVector = MaterialIcons.AutoMirrored.Rounded.OpenInNew
             val Send: ImageVector = MaterialIcons.AutoMirrored.Rounded.Send
             val CompareArrows: ImageVector = MaterialIcons.AutoMirrored.Rounded.CompareArrows
-            val PlaylistAddCheck: ImageVector = MaterialIcons.AutoMirrored.Rounded.PlaylistAddCheck
             val Sort: ImageVector = MaterialIcons.AutoMirrored.Rounded.Sort
         }
     }
