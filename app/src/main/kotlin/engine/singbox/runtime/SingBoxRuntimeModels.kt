@@ -77,13 +77,12 @@ internal data class SingBoxRuntimeState(
     val version: SingBoxVersionState = SingBoxVersionState(),
     val proxies: SingBoxProxiesState = SingBoxProxiesState(),
     val proxiesRefreshing: Boolean = false,
+    val proxySelectionRevision: Long = 0L,
     val delayTestingTarget: String? = null,
-    // The running test is a background probe a user test may preempt; only meaningful while
-    // [delayTestingTarget] is set, so the resets that clear the target need not clear it.
-    val delayTestingAutomatic: Boolean = false,
     val delayTestingCompleted: Int = 0,
     val delayTestingTotal: Int = 0,
     val delayTestingBaselines: Map<String, Long> = emptyMap(),
+    val nodeDelayTesting: Map<String, SingBoxDelayProgress> = emptyMap(),
     val delayFailureBaselines: Map<String, Long> = emptyMap(),
     val lastError: String = "",
 )
@@ -96,11 +95,36 @@ internal fun SingBoxRuntimeState.withServiceEpoch(startedAtMillis: Long): SingBo
 internal data class SingBoxDelayResult(
     val delays: Map<String, Int> = emptyMap(),
     val failedTargets: Set<String> = emptySet(),
-) {
-    val firstDelay: Int?
-        get() = delays.values.firstOrNull()
-}
+)
 
-/** True when a user-started delay test may begin now (nothing runs, or only a background probe). */
+internal data class SingBoxDelayProgress(
+    val baselines: Map<String, Long>,
+    val total: Int,
+    val completed: Int = 0,
+)
+
+internal data class SingBoxDelayTaskKey(
+    val generation: Long,
+    val name: String,
+    val url: String,
+    val timeoutMillis: Int,
+    val unifiedDelay: Boolean,
+    val ignoreHandshakeTime: Boolean,
+)
+
+/** A group batch has its own progress; individual tests may continue alongside it. */
 internal val SingBoxRuntimeState.canStartUserDelayTest: Boolean
-    get() = delayTestingTarget == null || delayTestingAutomatic
+    get() = delayTestingTarget == null
+
+internal fun SingBoxRuntimeState.canStartProxyDelayTest(name: String): Boolean = name !in nodeDelayTesting
+
+internal val SingBoxRuntimeState.allDelayTestingBaselines: Map<String, Long>
+    get() {
+        val merged = delayTestingBaselines.toMutableMap()
+        nodeDelayTesting.values.forEach { progress ->
+            progress.baselines.forEach { (name, baseline) ->
+                merged[name] = maxOf(merged[name] ?: Long.MIN_VALUE, baseline)
+            }
+        }
+        return merged
+    }

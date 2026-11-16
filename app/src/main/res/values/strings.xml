@@ -283,7 +283,6 @@
 
     <!-- Proxy selection -->
     <string name="sing_box_option_with_value">%1$s (%2$s)</string>
-    <string name="sing_box_proxies_delay_done">Delay test complete</string>
     <string name="sing_box_proxies_delay_failed">Delay test failed</string>
     <string name="sing_box_proxies_delay_not_tested">Not tested</string>
     <string name="sing_box_proxies_delay_status_failed">Failed</string>

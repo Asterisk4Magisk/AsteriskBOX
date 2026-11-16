@@ -14,7 +14,6 @@ import app.modes.SingBoxProxySortName
 import app.selectableManagedOutbounds
 import engine.singbox.config.APP_DIRECT_OUTBOUND
 import engine.singbox.config.APP_GLOBAL_SELECTOR
-import engine.singbox.runtime.SingBoxDelayResult
 import engine.singbox.runtime.SingBoxProxiesState
 import engine.singbox.runtime.SingBoxProxyGroup
 
@@ -25,9 +24,8 @@ internal enum class SingBoxProxyDelayStatus {
     Failed,
 }
 
-internal fun didSingBoxProxyDelayTestSucceed(result: SingBoxDelayResult): Boolean {
-    return result.firstDelay != null
-}
+internal fun singBoxProxyNodeGridItemKey(name: String, index: Int, delaySortEnabled: Boolean, groupName: String): String =
+    if (delaySortEnabled) "delay-slot:${groupName.length}:$groupName:$index" else "node:${groupName.length}:$groupName:$name"
 
 internal fun resolveSingBoxProxyDelayStatus(
     nodeName: String,

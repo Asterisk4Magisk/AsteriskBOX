@@ -93,7 +93,8 @@ import engine.singbox.runtime.SingBoxRuntimeRepository
 import engine.singbox.runtime.SingBoxRuntimeState
 import engine.singbox.runtime.SingBoxTrafficSample
 import engine.singbox.runtime.SingBoxTrafficState
-import engine.singbox.runtime.canStartUserDelayTest
+import engine.singbox.runtime.canStartProxyDelayTest
+import engine.singbox.runtime.allDelayTestingBaselines
 import features.home.HomeControllerState
 import features.home.HomeModeRuntimeAction
 import features.home.HomeMonitoringOverviewState
@@ -511,7 +512,6 @@ private fun HomeControllerCard(
 private data class HomeNodeRuntime(
     val running: Boolean = false,
     val proxies: SingBoxProxiesState = SingBoxProxiesState(),
-    val delayTestingTarget: String? = null,
     val delayTestingBaselines: Map<String, Long> = emptyMap(),
     val delayFailedNodes: Set<String> = emptySet(),
 )
@@ -521,8 +521,7 @@ private fun SingBoxRuntimeRepository.homeNodeRuntimeSnapshot() = state.value.toH
 private fun SingBoxRuntimeState.toHomeNodeRuntime() = HomeNodeRuntime(
     running = running,
     proxies = proxies,
-    delayTestingTarget = delayTestingTarget,
-    delayTestingBaselines = delayTestingBaselines,
+    delayTestingBaselines = allDelayTestingBaselines,
     delayFailedNodes = delayFailureBaselines.keys,
 )
 
@@ -608,15 +607,14 @@ private fun HomeCurrentNodeRow(
                 nodeName = testableNode,
                 delay = node?.delay,
                 delayUpdatedAtEpochSeconds = node?.delayUpdatedAtEpochSeconds,
-                testingBaselines = if (runtime.delayTestingTarget != null) runtime.delayTestingBaselines else emptyMap(),
+                testingBaselines = runtime.delayTestingBaselines,
                 failedNodes = runtime.delayFailedNodes,
             )
             NodeDelayChip(
                 status = status,
                 delayMs = node?.delay,
                 onClick = {
-                    // A user test preempts a background probe; it never stacks on another user test.
-                    if (singBoxRuntime.state.value.canStartUserDelayTest) {
+                    if (singBoxRuntime.state.value.canStartProxyDelayTest(testableNode)) {
                         services.appScope.launch {
                             singBoxRuntime.testProxyDelay(latestAppState.value, testableNode)
                         }

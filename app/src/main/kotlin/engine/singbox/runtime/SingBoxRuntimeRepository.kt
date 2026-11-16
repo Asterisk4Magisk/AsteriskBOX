@@ -20,7 +20,7 @@ import io.nekohasekai.libbox.StatusMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -50,6 +50,7 @@ internal class SingBoxRuntimeRepository(
     private val trafficHistoryLock = Any()
     private val sessionLock = Any()
     private val delayTestRunGate = SingBoxDelayTestRunGate()
+    private val sharedDelayTasks = SingBoxSharedDelayTasks<SingBoxDelayTaskKey, SingBoxDelayResult>()
     private val delayProbeThrottle = SingBoxDelayProbeThrottle(DelayProbeThrottleMillis)
     @Volatile
     private var session: SingBoxCommandClient? = null
@@ -61,6 +62,7 @@ internal class SingBoxRuntimeRepository(
     @Volatile
     private var desiredMode = "rule"
     private val modeMutex = Mutex()
+    private val proxySelectionMutex = Mutex()
 
     val state: StateFlow<SingBoxRuntimeState> = mutableState.asStateFlow()
 
@@ -126,6 +128,7 @@ internal class SingBoxRuntimeRepository(
                     delayTestingCompleted = 0,
                     delayTestingTotal = 0,
                     delayTestingBaselines = emptyMap(),
+                    nodeDelayTesting = emptyMap(),
                     lastError = "",
                 )
             }
@@ -212,17 +215,26 @@ internal class SingBoxRuntimeRepository(
         proxyName: String,
     ): Result<Unit> = runCatching {
         val active = requireActiveSession(appState)
-        appContext.withRootDnsMutation(appState) {
-            active.selectOutbound(groupName, proxyName)
+        val runGeneration = synchronized(sessionLock) {
+            mutableState.update { it.copy(proxySelectionRevision = it.proxySelectionRevision + 1L) }
+            generation
         }
-        mutableState.update { current ->
-            current.copy(
-                proxies = current.proxies.copy(
-                    groups = current.proxies.groups.map { group ->
-                        if (group.name == groupName) group.copy(now = proxyName) else group
-                    },
-                ),
-            )
+        proxySelectionMutex.withLock {
+            withContext(Dispatchers.IO) {
+                synchronized(sessionLock) {
+                    check(generation == runGeneration && session === active) { "sing-box API session changed before selection" }
+                }
+                appContext.withRootDnsMutation(appState) { active.selectOutbound(groupName, proxyName) }
+                check(updateDelayTestIfGenerationCurrent(runGeneration) { current ->
+                    current.copy(
+                        proxies = current.proxies.copy(
+                            groups = current.proxies.groups.map { group ->
+                                if (group.name == groupName) group.copy(now = proxyName) else group
+                            },
+                        ),
+                    )
+                }) { "sing-box API session changed during selection" }
+            }
         }
     }
 
@@ -241,14 +253,15 @@ internal class SingBoxRuntimeRepository(
     ): Result<SingBoxDelayResult> = runDelayTest(
         appState = appState,
         target = proxyName,
+        singleNode = true,
         buildPlan = { proxies -> buildSingBoxProxyDelayTestPlan(proxies, proxyName) },
     )
 
     /**
-     * Background latency refresh for the node carrying traffic. It never competes with the user:
-     * it is skipped while any test runs, and a user test started meanwhile preempts it. A tag
-     * probed within [DelayProbeThrottleMillis] is skipped, so a start followed by a resume, or
-     * a quick back-and-forth between apps, tests once; switching to another node always probes.
+     * Background latency refresh shares slots with later single-node tests and yields to a group
+     * batch. It is skipped while user work already runs. A tag
+     * probed within [DelayProbeThrottleMillis] is skipped, so a start followed by a résumé, or
+     * a quick back-and-forth between apps, tests once.
      */
     suspend fun probeProxyDelay(
         appState: AppState,
@@ -262,6 +275,7 @@ internal class SingBoxRuntimeRepository(
                 runDelayTest(
                     appState = appState,
                     target = proxyName,
+                    singleNode = true,
                     preemptible = true,
                     buildPlan = { proxies -> buildSingBoxProxyDelayTestPlan(proxies, proxyName) },
                 )
@@ -302,6 +316,7 @@ internal class SingBoxRuntimeRepository(
                     delayTestingCompleted = 0,
                     delayTestingTotal = 0,
                     delayTestingBaselines = emptyMap(),
+                    nodeDelayTesting = emptyMap(),
                     lastError = "",
                 )
             }
@@ -397,6 +412,7 @@ internal class SingBoxRuntimeRepository(
                         delayTestingCompleted = 0,
                         delayTestingTotal = 0,
                         delayTestingBaselines = emptyMap(),
+                        nodeDelayTesting = emptyMap(),
                         lastError = message,
                     )
                 }
@@ -509,14 +525,15 @@ internal class SingBoxRuntimeRepository(
     private suspend fun runDelayTest(
         appState: AppState,
         target: String,
+        singleNode: Boolean = false,
         preemptible: Boolean = false,
         buildPlan: (SingBoxProxiesState) -> SingBoxDelayTestPlan,
     ): Result<SingBoxDelayResult> = runDelayTestCatching {
         val lease = if (preemptible) {
-            delayTestRunGate.tryAcquirePreemptible(currentCoroutineContext()[Job]!!)
+            delayTestRunGate.tryAcquirePreemptible(currentCoroutineContext()[Job]!!, target)
                 ?: error("sing-box delay test is already running")
         } else {
-            delayTestRunGate.acquire()
+            delayTestRunGate.acquire(nodeName = target.takeIf { singleNode })
         }
         try {
             val active = requireActiveSession(appState)
@@ -526,124 +543,108 @@ internal class SingBoxRuntimeRepository(
             }
             val before = state.value
             val plan = buildPlan(before.proxies)
-            val baselineTimes = plan.freshnessBaselines(
-                failureBaselines = before.delayFailureBaselines,
-            )
-            check(
-                updateDelayTestIfGenerationCurrent(runGeneration) { current ->
-                    current.startingDelayTest(
-                        target = target,
-                        automatic = preemptible,
-                        baselines = baselineTimes,
-                        targetNames = plan.targetNames,
-                        totalCount = plan.leafTargetNames.size,
-                    )
-                },
-            ) {
-                "sing-box API session changed during delay test"
-            }
+            val baselineTimes = plan.freshnessBaselines(before.delayFailureBaselines)
+            check(updateDelayTestIfGenerationCurrent(runGeneration) { current ->
+                current.startingDelayTest(target, singleNode, baselineTimes, plan.targetNames, plan.leafTargetNames.size)
+            }) { "sing-box API session changed during delay test" }
             try {
-                delay(DelayTestTimestampBoundaryWaitMillis.milliseconds)
-                // One measurement per leaf outbound with the user's custom
-                // URL test options (link/timeout/unified delay/handshake),
-                // husi style; the submission pool bounds concurrency and
-                // runs the blocking daemon calls on Dispatchers.IO. Each
-                // completed submission bumps the visible progress counter
-                // (under the session lock, so concurrent workers can't race).
-                val submissions = submitSingBoxDelayCommandsAsync(
-                    submissionNames = plan.leafTargetNames,
-                    concurrency = appState.connectionTestConcurrent,
-                    onCompleted = {
-                        updateDelayTestIfGenerationCurrent(runGeneration) { current ->
-                            if (current.delayTestingTarget == target) {
+                val results = runSingBoxDelayBatch(
+                    targets = plan.leafTargetNames,
+                    onResult = { leafResult: SingBoxDelayResult ->
+                        val partial = plan.leafResult(leafResult)
+                        val completedNames = partial.delays.keys + partial.failedTargets
+                        updateDelayTestIfGenerationCurrent(runGeneration) { previous ->
+                            val current = previous.withDelayTestResult(partial, baselineTimes)
+                            if (singleNode) {
+                                val progress = current.nodeDelayTesting[target]
+                                if (progress == null) current else current.copy(
+                                    nodeDelayTesting = current.nodeDelayTesting +
+                                        (target to progress.copy(
+                                            completed = progress.completed + 1,
+                                            baselines = progress.baselines - completedNames,
+                                        )),
+                                )
+                            } else if (current.delayTestingTarget == target) {
                                 current.copy(
                                     delayTestingCompleted = current.delayTestingCompleted + 1,
+                                    delayTestingBaselines = current.delayTestingBaselines - completedNames,
                                 )
-                            } else {
-                                current
-                            }
+                            } else current
                         }
                     },
-                    submit = { leafName ->
-                        fun measure() {
-                            synchronized(sessionLock) {
-                                check(generation == runGeneration && session === active) {
-                                    "sing-box API session changed during delay test"
-                                }
-                            }
-                            active.urlTestWithOptions(
-                                outboundTag = leafName,
-                                link = appState.connectionTestUrl.trim()
-                                    .takeIf(::isValidConnectionTestUrl)
-                                    ?: DefaultConnectionTestUrl,
-                                timeoutMillis = appState.connectionTestTimeoutMillis,
-                                unifiedDelay = appState.connectionTestUnifiedDelay,
-                                ignoreHandshakeTime = appState.connectionTestIgnoreHandshakeTime,
-                            )
-                        }
-                        if (preemptible) {
-                            currentCoroutineContext().ensureActive()
-                            // Cancellation releases the test slot without waiting for the blocking core call.
-                            val request = appScope.async(Dispatchers.IO) { measure() }
-                            try {
-                                request.await()
-                            } finally {
-                                request.cancel()
-                            }
-                        } else {
-                            measure()
-                        }
-                    },
-                )
-                if (submissions.successfulNames.isEmpty()) {
-                    val failure = SingBoxDelayResult(failedTargets = plan.targetNames)
-                    updateDelayTestIfGenerationCurrent(runGeneration) { current ->
-                        current.finishingDelayTest(target, failure)
-                    }
-                    error("Failed to submit sing-box delay test commands")
+                ) { leafName ->
+                    measureSharedDelay(appState, active, runGeneration, leafName, target.takeUnless { singleNode })
                 }
-                val knownFailures = plan.knownSubmissionFailures(submissions)
-                val completed = awaitSingBoxDelayTestSnapshot(
-                    runtimeStates = runtimeStatesForGeneration(runGeneration),
-                    plan = plan,
-                    baselineTimes = baselineTimes,
-                    knownFailures = knownFailures,
-                    idleTimeoutMillis = DelayTestNoProgressTimeoutMillis,
-                    hardTimeoutMillis = plan.deadlineMillis(
-                        connectionTestTimeoutMillis = appState.connectionTestTimeoutMillis,
-                        concurrency = appState.connectionTestConcurrent,
-                    ),
-                )
-                val result = plan.finish(
-                    delays = completed.freshDelays,
-                )
-                check(
-                    updateDelayTestIfGenerationCurrent(runGeneration) { current ->
-                        check(current.delayTestingTarget == target) {
-                            "sing-box delay test is no longer active"
-                        }
-                        current.finishingDelayTest(target, result)
-                    },
-                ) {
-                    "sing-box API session changed during delay test"
-                }
+                val delays = results.flatMap { it.delays.entries }.associate { it.key to it.value }
+                val result = plan.finish(delays)
+                check(updateDelayTestIfGenerationCurrent(runGeneration) { current ->
+                    current.clearingDelayTest(target, singleNode)
+                }) { "sing-box API session changed during delay test" }
+                check(result.delays.isNotEmpty()) { "Failed to complete sing-box delay test commands" }
                 result
             } finally {
-                updateDelayTestIfGenerationCurrent(runGeneration) { current ->
-                    if (current.delayTestingTarget == target) {
-                        current.copy(
-                            delayTestingTarget = null,
-                            delayTestingCompleted = 0,
-                            delayTestingTotal = 0,
-                            delayTestingBaselines = emptyMap(),
-                        )
-                    } else {
-                        current
-                    }
-                }
+                updateDelayTestIfGenerationCurrent(runGeneration) { it.clearingDelayTest(target, singleNode) }
             }
         } finally {
             lease.release()
+        }
+    }
+
+    private suspend fun measureSharedDelay(
+        appState: AppState,
+        active: SingBoxCommandClient,
+        runGeneration: Long,
+        leafName: String,
+        owner: String?,
+    ): SingBoxDelayResult {
+        val key = SingBoxDelayTaskKey(
+            generation = runGeneration,
+            name = leafName,
+            url = appState.connectionTestUrl.trim().takeIf(::isValidConnectionTestUrl) ?: DefaultConnectionTestUrl,
+            timeoutMillis = appState.connectionTestTimeoutMillis,
+            unifiedDelay = appState.connectionTestUnifiedDelay,
+            ignoreHandshakeTime = appState.connectionTestIgnoreHandshakeTime,
+        )
+        // The RPC returns no delay value: different options for the same outbound must not
+        // overwrite each other's history before their command-stream result is observed.
+        return sharedDelayTasks.run(
+            key, appState.connectionTestConcurrent.coerceAtLeast(1), owner,
+            resourceKey = runGeneration to leafName,
+        ) {
+            val before = state.value
+            val plan = SingBoxDelayTestPlan(
+                leafTargetNames = listOf(leafName),
+                targetNames = setOf(leafName),
+                baselineTimes = mapOf(leafName to (before.proxies.nodeByName[leafName]?.delayUpdatedAtEpochSeconds ?: Long.MIN_VALUE)),
+            )
+            val baselines = plan.freshnessBaselines(before.delayFailureBaselines)
+            // The command stream timestamps history in seconds. Only wait when the previous
+            // measurement belongs to this second; cold nodes need no artificial startup delay.
+            delay(singBoxDelayTimestampWaitMillis(baselines.getValue(leafName), System.currentTimeMillis()).milliseconds)
+            synchronized(sessionLock) {
+                check(generation == runGeneration && session === active) { "sing-box API session changed during delay test" }
+            }
+            currentCoroutineContext().ensureActive()
+            // Once submitted, drain the matching history even if its last waiter leaves.
+            // The next request for this outbound must not consume this call's late snapshot.
+            withContext(NonCancellable) {
+                val submitted = runDelayTestCatching {
+                    active.urlTestWithOptions(leafName, key.url, key.timeoutMillis, key.unifiedDelay, key.ignoreHandshakeTime)
+                }
+                if (submitted.isFailure) {
+                    SingBoxDelayResult(failedTargets = setOf(leafName))
+                } else {
+                    val completed = awaitSingBoxDelayTestSnapshot(
+                        runtimeStates = runtimeStatesForGeneration(runGeneration),
+                        plan = plan,
+                        baselineTimes = baselines,
+                        knownFailures = emptySet(),
+                        idleTimeoutMillis = DelayTestNoProgressTimeoutMillis,
+                        hardTimeoutMillis = plan.deadlineMillis(appState.connectionTestTimeoutMillis, 1),
+                    )
+                    plan.finish(completed.freshDelays)
+                }
+            }
         }
     }
 
@@ -705,7 +706,6 @@ internal class SingBoxRuntimeRepository(
         const val ConnectRetryMillis = 750L
         const val ReconnectDelayMillis = 1_000L
         const val SessionWaitMillis = 8_000L
-        const val DelayTestTimestampBoundaryWaitMillis = 1_100L
         const val DelayTestNoProgressTimeoutMillis = 5_000L
         const val DelayProbeThrottleMillis = 30_000L
         const val LogTag = "SingBoxRuntime"
@@ -732,39 +732,60 @@ internal fun SingBoxRuntimeState.withProxySnapshot(
 ): SingBoxRuntimeState = copy(
     running = true,
     proxies = proxies,
+    delayFailureBaselines = delayFailureBaselines.filter { (name, baseline) ->
+        val node = proxies.nodeByName[name]
+        node?.delay == null || node.delay < 0 || (node.delayUpdatedAtEpochSeconds ?: Long.MIN_VALUE) <= baseline
+    },
     proxiesRefreshing = false,
     lastError = "",
 )
 
 internal fun SingBoxRuntimeState.startingDelayTest(
     target: String,
-    automatic: Boolean,
+    singleNode: Boolean,
     baselines: Map<String, Long>,
     targetNames: Set<String>,
     totalCount: Int,
-): SingBoxRuntimeState = copy(
-    delayTestingTarget = target,
-    delayTestingAutomatic = automatic,
-    delayTestingCompleted = 0,
-    delayTestingTotal = totalCount.coerceAtLeast(0),
-    delayTestingBaselines = baselines,
-    delayFailureBaselines = delayFailureBaselines - targetNames,
-)
-
-internal fun SingBoxRuntimeState.finishingDelayTest(
-    target: String,
-    result: SingBoxDelayResult,
 ): SingBoxRuntimeState {
-    if (delayTestingTarget != target) return this
+    val current = copy(delayFailureBaselines = delayFailureBaselines - targetNames)
+    return if (singleNode) {
+        current.copy(nodeDelayTesting = nodeDelayTesting + (target to SingBoxDelayProgress(baselines, totalCount)))
+    } else {
+        current.copy(
+            delayTestingTarget = target,
+            delayTestingCompleted = 0,
+            delayTestingTotal = totalCount.coerceAtLeast(0),
+            delayTestingBaselines = baselines,
+        )
+    }
+}
+
+internal fun SingBoxRuntimeState.clearingDelayTest(target: String, singleNode: Boolean): SingBoxRuntimeState =
+    if (singleNode) {
+        if (target !in nodeDelayTesting) this else copy(nodeDelayTesting = nodeDelayTesting - target)
+    } else if (delayTestingTarget == target) {
+        copy(
+            delayTestingTarget = null,
+            delayTestingCompleted = 0,
+            delayTestingTotal = 0,
+            delayTestingBaselines = emptyMap(),
+        )
+    } else this
+
+internal fun SingBoxRuntimeState.withDelayTestResult(
+    result: SingBoxDelayResult,
+    baselines: Map<String, Long>,
+): SingBoxRuntimeState {
+    val currentFailures = result.failedTargets.filterTo(linkedSetOf()) { name ->
+        val node = proxies.nodeByName[name]
+        node?.delay == null || node.delay < 0 ||
+            (node.delayUpdatedAtEpochSeconds ?: Long.MIN_VALUE) <= (baselines[name] ?: Long.MIN_VALUE)
+    }
     return copy(
-        delayTestingTarget = null,
-        delayTestingCompleted = 0,
-        delayTestingTotal = 0,
-        delayTestingBaselines = emptyMap(),
         delayFailureBaselines = mergeSingBoxDelayFailures(
             currentFailureBaselines = delayFailureBaselines,
-            result = result,
-            runBaselines = delayTestingBaselines,
+            result = result.copy(failedTargets = currentFailures),
+            runBaselines = baselines,
         ),
     )
 }

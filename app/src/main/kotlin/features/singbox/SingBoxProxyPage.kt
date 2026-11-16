@@ -23,7 +23,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -52,6 +52,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -105,10 +106,13 @@ import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.plugin.PluginOutbounds
 import engine.singbox.runtime.SingBoxProxiesState
 import engine.singbox.runtime.canStartUserDelayTest
+import engine.singbox.runtime.canStartProxyDelayTest
+import engine.singbox.runtime.allDelayTestingBaselines
 import engine.singbox.runtime.SingBoxProxyGroup
 import engine.singbox.runtime.SingBoxProxyNode
 import engine.singbox.runtime.SingBoxRuntimeState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -128,12 +132,14 @@ import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
 import ui.icons.AsteriskIcons as Icons
 
 private data class SingBoxProxyPageRuntimeState(
     val proxies: SingBoxProxiesState,
     val proxiesRefreshing: Boolean,
     val delayTestingTarget: String?,
+    val nodeDelayTesting: Set<String>,
     val userDelayTestAllowed: Boolean,
     val delayTestingCompleted: Int,
     val delayTestingTotal: Int,
@@ -146,12 +152,19 @@ private fun SingBoxRuntimeState.toProxyPageRuntimeState() = SingBoxProxyPageRunt
     proxies = proxies,
     proxiesRefreshing = proxiesRefreshing,
     delayTestingTarget = delayTestingTarget,
+    nodeDelayTesting = nodeDelayTesting.keys,
     userDelayTestAllowed = canStartUserDelayTest,
     delayTestingCompleted = delayTestingCompleted,
     delayTestingTotal = delayTestingTotal,
-    delayTestingBaselines = delayTestingBaselines,
+    delayTestingBaselines = allDelayTestingBaselines,
     delayFailedNodes = delayFailureBaselines.keys,
     lastError = lastError,
+)
+
+private data class SingBoxDelaySortSnapshot(
+    val proxies: SingBoxProxiesState,
+    val baselines: Map<String, Long>,
+    val failedNodes: Set<String>,
 )
 
 private fun AppServices.singBoxProxyPageRuntimeSnapshot() =
@@ -175,7 +188,6 @@ fun SingBoxProxyPage(
     val runtimeUnavailableMessage = stringResource(R.string.sing_box_proxies_runtime_unavailable)
     val selectFailedMessage = stringResource(R.string.sing_box_proxies_select_failed)
     val delayFailedMessage = stringResource(R.string.sing_box_proxies_delay_failed)
-    val delayDoneMessage = stringResource(R.string.sing_box_proxies_delay_done)
 
     LaunchedEffect(
         services.singBoxRuntime,
@@ -253,6 +265,24 @@ fun SingBoxProxyPage(
     val resolvedSelectedGroupName = selectedGroupName.takeIf { groupName -> groupName in groupNames }
         ?: groupNames.firstOrNull().orEmpty()
     val testingTarget = runtimeState.delayTestingTarget
+    val delaySortEnabled = appState.singBoxProxySort == SingBoxProxySortDelay
+    val refreshDelaySort = delaySortEnabled && (testingTarget != null || runtimeState.nodeDelayTesting.isNotEmpty())
+    val latestDelaySort = rememberUpdatedState(
+        SingBoxDelaySortSnapshot(visibleProxies, runtimeState.delayTestingBaselines, runtimeState.delayFailedNodes),
+    )
+    var delaySortSnapshot by remember { mutableStateOf<SingBoxDelaySortSnapshot?>(null) }
+    LaunchedEffect(refreshDelaySort) {
+        if (!refreshDelaySort) {
+            delaySortSnapshot = null
+            return@LaunchedEffect
+        }
+        delaySortSnapshot = latestDelaySort.value
+        while (true) {
+            delay(3_000L.milliseconds)
+            delaySortSnapshot = latestDelaySort.value
+        }
+    }
+    val sortSnapshot = if (refreshDelaySort) delaySortSnapshot ?: latestDelaySort.value else latestDelaySort.value
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val selectedGroup = visibleProxies.groups.firstOrNull { group -> group.name == resolvedSelectedGroupName }
     val groupLayout = if (appState.singBoxProxyGroupLayout == SingBoxProxyGroupLayoutExpandable) {
@@ -263,6 +293,7 @@ fun SingBoxProxyPage(
     val proxyLayout = resolveSingBoxProxyLayout(appState.singBoxProxyLayout, isWideScreen)
     val columns = resolveSingBoxProxyColumns(proxyLayout)
     var pendingSelections by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    val selectionRequests = remember { mutableMapOf<String, Any>() }
     var locateRequestTrigger by remember { mutableIntStateOf(0) }
     var expandedGroupNames by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
     val keyword = searchQuery.trim()
@@ -286,14 +317,6 @@ fun SingBoxProxyPage(
         val lastIndex = groupNames.lastIndex
         if (groupLayout == SingBoxProxyGroupLayoutTabs && lastIndex >= 0 && groupPagerState.currentPage > lastIndex) {
             groupPagerState.scrollToPage(lastIndex)
-        }
-    }
-
-    LaunchedEffect(visibleProxies.groups) {
-        if (pendingSelections.isEmpty()) return@LaunchedEffect
-        pendingSelections = pendingSelections.filter { (groupName, proxyName) ->
-            val group = visibleProxies.groups.firstOrNull { item -> item.name == groupName } ?: return@filter false
-            group.now != proxyName && proxyName in group.all
         }
     }
 
@@ -341,10 +364,16 @@ fun SingBoxProxyPage(
         val pendingProxyName = pendingSelections[group.name]
         if (pendingProxyName == node.name || (pendingProxyName == null && group.now == node.name)) return
         pendingSelections = pendingSelections + (group.name to node.name)
+        val request = Any()
+        selectionRequests[group.name] = request
         // Finish the DNS transaction even if this page leaves composition.
         services.appScope.launch(Dispatchers.Main.immediate) {
             services.singBoxRuntime.selectProxy(appState, group.name, node.name)
                 .onSuccess {
+                    if (selectionRequests[group.name] === request) {
+                        pendingSelections = pendingSelections - group.name
+                        selectionRequests.remove(group.name)
+                    }
                     if (isSingBoxProxySelectionPersistent(group)) {
                         updateAppState { state ->
                             state.withSelectorSelection(group.name, node.name)
@@ -352,8 +381,9 @@ fun SingBoxProxyPage(
                     }
                 }
                 .onFailure { error ->
-                    if (pendingSelections[group.name] == node.name) {
+                    if (selectionRequests[group.name] === request) {
                         pendingSelections = pendingSelections - group.name
+                        selectionRequests.remove(group.name)
                     }
                     tipNotifier.showError(error, selectFailedMessage)
                 }
@@ -366,25 +396,16 @@ fun SingBoxProxyPage(
         val groupName = group.name
         services.appScope.launch {
             services.singBoxRuntime.testGroupDelay(stateSnapshot, groupName)
-                .onSuccess { tipNotifier.show(delayDoneMessage) }
                 .onFailure { error -> tipNotifier.showError(error, delayFailedMessage) }
         }
     }
 
     fun testProxy(node: SingBoxProxyNode) {
-        if (!requireRuntime() || !runtimeState.userDelayTestAllowed) return
+        if (!requireRuntime() || !services.singBoxRuntime.state.value.canStartProxyDelayTest(node.name)) return
         val stateSnapshot = appState
         val proxyName = node.name
         services.appScope.launch {
             services.singBoxRuntime.testProxyDelay(stateSnapshot, proxyName)
-                .onSuccess { result ->
-                    val message = if (didSingBoxProxyDelayTestSucceed(result)) {
-                        delayDoneMessage
-                    } else {
-                        delayFailedMessage
-                    }
-                    tipNotifier.show(message)
-                }
                 .onFailure { error -> tipNotifier.showError(error, delayFailedMessage) }
         }
     }
@@ -467,23 +488,21 @@ fun SingBoxProxyPage(
                 Box {
                     if (expandable) {
                         val sections = remember(
-                            visibleProxies,
+                            sortSnapshot,
                             keyword,
                             appState.singBoxProxySort,
                             managedGroupNames,
                             outboundDisplayNames,
                             outboundDisplayNamesWithoutGroup,
-                            runtimeState.delayTestingBaselines,
-                            runtimeState.delayFailedNodes,
                         ) {
                             reduceSingBoxProxyGroupSections(
-                                proxies = visibleProxies,
+                                proxies = sortSnapshot.proxies,
                                 query = keyword,
                                 sort = appState.singBoxProxySort,
                                 displayNamesForGroup = ::groupNodeDisplayNames,
                                 protocolTypes = outboundProtocolTypes,
-                                testingBaselines = runtimeState.delayTestingBaselines,
-                                failedNodes = runtimeState.delayFailedNodes,
+                                testingBaselines = sortSnapshot.baselines,
+                                failedNodes = sortSnapshot.failedNodes,
                             )
                         }
                         fun isExpanded(group: SingBoxProxyGroup) = if (keyword.isNotEmpty()) {
@@ -529,7 +548,8 @@ fun SingBoxProxyPage(
                                     SingBoxProxyEmptyCard()
                                 }
                             }
-                            sections.forEach { (group, nodes) ->
+                            sections.forEach { (sampledGroup, nodes) ->
+                                val group = visibleProxies.groups.firstOrNull { it.name == sampledGroup.name } ?: sampledGroup
                                 val expanded = isExpanded(group)
                                 val currentName = pendingSelections[group.name] ?: group.now
                                 val displayNames = groupNodeDisplayNames(group)
@@ -584,11 +604,11 @@ fun SingBoxProxyPage(
                                             )
                                         }
                                     }
-                                    items(
+                                    itemsIndexed(
                                         items = nodes,
-                                        key = { "node:${group.name.length}:${group.name}:$it" },
-                                        contentType = { "node" },
-                                    ) { nodeName ->
+                                        key = { index, name -> singBoxProxyNodeGridItemKey(name, index, delaySortEnabled, group.name) },
+                                        contentType = { _, _ -> "node" },
+                                    ) { _, nodeName ->
                                         val node = proxies.node(nodeName)
                                         val selectionBehavior = resolveSingBoxProxySelectionBehavior(group, runtimeAvailable)
                                         val onSelect: (() -> Unit)? = if (selectionBehavior.canSelect) {
@@ -603,7 +623,7 @@ fun SingBoxProxyPage(
                                             protocolType = outboundProtocolTypes[node.name] ?: node.type,
                                             selected = isSingBoxProxyNodeCurrent(group, node.name, pendingSelections),
                                             selectionEnabled = selectionBehavior.cardEnabled,
-                                            delayTestEnabled = runtimeAvailable && runtimeState.userDelayTestAllowed,
+                                            delayTestEnabled = runtimeAvailable,
                                             compact = columns > 1,
                                             delayStatus = resolveSingBoxProxyDelayStatus(
                                                 nodeName = node.name,
@@ -612,7 +632,7 @@ fun SingBoxProxyPage(
                                                 testingBaselines = runtimeState.delayTestingBaselines,
                                                 failedNodes = runtimeState.delayFailedNodes,
                                             ),
-                                            testing = testingTarget == node.name,
+                                            testing = node.name in runtimeState.nodeDelayTesting || node.name in runtimeState.delayTestingBaselines,
                                             onSelect = onSelect,
                                             onDelayTest = { testProxy(node) },
                                             modifier = Modifier.animateItem(
@@ -631,24 +651,23 @@ fun SingBoxProxyPage(
                         verticalAlignment = Alignment.Top,
                     ) { page ->
                         val group = visibleProxies.groups.getOrNull(page)
+                        val sortGroup = sortSnapshot.proxies.groups.firstOrNull { it.name == group?.name }
                         val pageDisplayNames = groupNodeDisplayNames(group)
                         val pageNodes = remember(
-                            group,
-                            visibleProxies,
+                            sortGroup,
+                            sortSnapshot,
                             searchQuery,
                             appState.singBoxProxySort,
                             pageDisplayNames,
-                            runtimeState.delayTestingBaselines,
-                            runtimeState.delayFailedNodes,
                         ) {
                             reduceSingBoxProxyNodeNames(
-                                group = group,
-                                proxies = visibleProxies,
+                                group = sortGroup,
+                                proxies = sortSnapshot.proxies,
                                 query = searchQuery,
                                 sort = resolveSingBoxProxySort(appState.singBoxProxySort),
                                 displayNames = pageDisplayNames,
-                                testingBaselines = runtimeState.delayTestingBaselines,
-                                failedNodes = runtimeState.delayFailedNodes,
+                                testingBaselines = sortSnapshot.baselines,
+                                failedNodes = sortSnapshot.failedNodes,
                                 protocolTypes = outboundProtocolTypes,
                             )
                         }
@@ -706,10 +725,10 @@ fun SingBoxProxyPage(
                                         SingBoxProxyEmptyCard()
                                     }
                                 } else {
-                                    items(
+                                    itemsIndexed(
                                         items = pageNodes,
-                                        key = { nodeName -> "${group.name}:$nodeName" },
-                                    ) { nodeName ->
+                                        key = { index, name -> singBoxProxyNodeGridItemKey(name, index, delaySortEnabled, group.name) },
+                                    ) { _, nodeName ->
                                         val node = proxies.node(nodeName)
                                         val selectionBehavior =
                                             resolveSingBoxProxySelectionBehavior(
@@ -736,7 +755,7 @@ fun SingBoxProxyPage(
                                                 pendingSelections = pendingSelections,
                                             ),
                                             selectionEnabled = selectionBehavior.cardEnabled,
-                                            delayTestEnabled = runtimeAvailable && runtimeState.userDelayTestAllowed,
+                                            delayTestEnabled = runtimeAvailable,
                                             compact = columns > 1,
                                             delayStatus = resolveSingBoxProxyDelayStatus(
                                                 nodeName = node.name,
@@ -747,7 +766,7 @@ fun SingBoxProxyPage(
                                                     runtimeState.delayTestingBaselines,
                                                 failedNodes = runtimeState.delayFailedNodes,
                                             ),
-                                            testing = testingTarget == node.name,
+                                            testing = node.name in runtimeState.nodeDelayTesting || node.name in runtimeState.delayTestingBaselines,
                                             onSelect = onSelect,
                                             onDelayTest = { testProxy(node) },
                                         )
@@ -758,7 +777,7 @@ fun SingBoxProxyPage(
                     }
                     selectedGroup?.takeIf { !expandable }?.let { group ->
                         ProxyFloatingActions(
-                            runtimeAvailable = runtimeAvailable,
+                            runtimeAvailable = runtimeAvailable && runtimeState.userDelayTestAllowed,
                             testing = !runtimeState.userDelayTestAllowed && testingTarget == group.name,
                             testingCompleted = runtimeState.delayTestingCompleted,
                             testingTotal = runtimeState.delayTestingTotal,
@@ -1393,7 +1412,7 @@ private fun ProtocolDelayLine(
                 .fillMaxWidth()
                 .height(24.dp)
                 .clip(ui.theme.AsteriskShapeTokens.Pill)
-                .clickable(enabled = enabled, onClick = onClick),
+                .clickable(enabled = enabled, onClick = { if (!testing) onClick() }),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {

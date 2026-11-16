@@ -3,22 +3,15 @@
 
 package engine.singbox.runtime
 
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformLatest
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
@@ -31,11 +24,7 @@ internal data class SingBoxDelayTestPlan(
     // resolves through its selected leaf's URL test history.
     val targetNames: Set<String>,
     val baselineTimes: Map<String, Long>,
-)
-
-internal data class SingBoxDelayCommandSubmissions(
-    val successfulNames: Set<String>,
-    val failedNames: Set<String>,
+    val selectedLeaves: Map<String, String> = emptyMap(),
 )
 
 internal enum class SingBoxDelayAwaitCompletion {
@@ -51,43 +40,40 @@ internal data class SingBoxDelayAwaitResult(
 )
 
 /**
- * One delay test runs at a time. A background probe only takes a free gate and yields it: a user
- * test that finds a probe running cancels it and waits for its cleanup instead of failing, while a
- * second user test still fails fast as before.
+ * Single-node tests share the scheduler, including an already running automatic probe.
+ * One group batch may run alongside them; starting that batch still preempts the probe.
  */
 internal class SingBoxDelayTestRunGate {
     private val lock = Any()
-    private var owner: Any? = null
-    private var preemptibleOwner: Job? = null
+    private data class Entry(val nodeName: String?, val probe: Job?)
+    private val owners = mutableMapOf<Any, Entry>()
 
-    suspend fun acquire(): SingBoxDelayTestRunLease {
+    suspend fun acquire(nodeName: String? = null): SingBoxDelayTestRunLease {
         while (true) {
             val probe = synchronized(lock) {
-                if (owner == null) return take(preemptible = null)
-                checkNotNull(preemptibleOwner) { "sing-box delay test is already running" }
+                check(owners.values.none { it.nodeName == nodeName }) { "sing-box delay test is already running" }
+                val automatic = owners.values.firstNotNullOfOrNull(Entry::probe)
+                if (nodeName != null || automatic == null) return take(nodeName, probe = null)
+                automatic
             }
             probe.cancelAndJoin()
         }
     }
 
     /** Takes the gate for [probe] only when it is free; the probe never waits or preempts. */
-    fun tryAcquirePreemptible(probe: Job): SingBoxDelayTestRunLease? = synchronized(lock) {
-        if (owner != null) null else take(preemptible = probe)
+    fun tryAcquirePreemptible(probe: Job, nodeName: String): SingBoxDelayTestRunLease? = synchronized(lock) {
+        if (owners.isNotEmpty()) null else take(nodeName, probe)
     }
 
-    private fun take(preemptible: Job?): SingBoxDelayTestRunLease {
+    private fun take(nodeName: String?, probe: Job?): SingBoxDelayTestRunLease {
         val token = Any()
-        owner = token
-        preemptibleOwner = preemptible
+        owners[token] = Entry(nodeName, probe)
         return SingBoxDelayTestRunLease(this, token)
     }
 
     internal fun release(token: Any) {
         synchronized(lock) {
-            if (owner === token) {
-                owner = null
-                preemptibleOwner = null
-            }
+            owners.remove(token)
         }
     }
 }
@@ -169,6 +155,7 @@ internal fun buildSingBoxDelayTestPlan(
         baselineTimes = targetNames.associateWith { name ->
             proxies.nodeByName[name]?.delayUpdatedAtEpochSeconds ?: Long.MIN_VALUE
         },
+        selectedLeaves = targetNames.mapNotNull { name -> proxies.delayTestLeaf(name)?.let { name to it } }.toMap(),
     )
 }
 
@@ -176,19 +163,28 @@ internal fun buildSingBoxProxyDelayTestPlan(
     proxies: SingBoxProxiesState,
     proxyName: String,
 ): SingBoxDelayTestPlan {
-    if (proxies.groups.any { group -> group.name == proxyName }) {
-        return buildSingBoxDelayTestPlan(proxies, proxyName)
-    }
-    val proxy = requireNotNull(proxies.nodeByName[proxyName]) {
+    val leaf = requireNotNull(proxies.delayTestLeaf(proxyName)) {
         "sing-box proxy is unavailable: $proxyName"
     }
+    require(proxies.nodeByName.containsKey(leaf)) { "sing-box proxy is unavailable: $leaf" }
+    val targets = setOf(proxyName, leaf)
     return SingBoxDelayTestPlan(
-        leafTargetNames = listOf(proxyName),
-        targetNames = setOf(proxyName),
-        baselineTimes = mapOf(
-            proxyName to (proxy.delayUpdatedAtEpochSeconds ?: Long.MIN_VALUE),
-        ),
+        leafTargetNames = listOf(leaf),
+        targetNames = targets,
+        baselineTimes = targets.associateWith { proxies.nodeByName[it]?.delayUpdatedAtEpochSeconds ?: Long.MIN_VALUE },
+        selectedLeaves = mapOf(proxyName to leaf),
     )
+}
+
+internal fun SingBoxProxiesState.delayTestLeaf(name: String): String? {
+    var current = name
+    val visited = mutableSetOf<String>()
+    repeat(groups.size + 1) {
+        val group = groups.firstOrNull { it.name == current } ?: return current
+        if (!visited.add(group.name) || group.now.isBlank()) return null
+        current = group.now
+    }
+    return null
 }
 
 internal fun SingBoxDelayTestPlan.freshnessBaselines(
@@ -200,52 +196,10 @@ internal fun SingBoxDelayTestPlan.freshnessBaselines(
     )
 }
 
-internal suspend fun submitSingBoxDelayCommandsAsync(
-    submissionNames: List<String>,
-    concurrency: Int,
-    onCompleted: suspend () -> Unit = {},
-    submit: suspend (String) -> Unit,
-): SingBoxDelayCommandSubmissions {
-    val distinctNames = submissionNames.distinct()
-    if (distinctNames.isEmpty()) {
-        return SingBoxDelayCommandSubmissions(
-            successfulNames = emptySet(),
-            failedNames = emptySet(),
-        )
-    }
-    val semaphore = Semaphore(concurrency.coerceAtLeast(1))
-    val outcomes = coroutineScope {
-        distinctNames.map { name ->
-            async {
-                val succeeded = runCatching {
-                    // The callback blocks on the daemon-side measurement;
-                    // keep it off the caller's thread (UI/Default) and let
-                    // the semaphore bound how many measurements run at once.
-                    semaphore.withPermit { withContext(Dispatchers.IO) { submit(name) } }
-                }.onFailure { error ->
-                    if (error is CancellationException) throw error
-                }.isSuccess
-                // Progress hook: fires once per finished name, success or
-                // failure; skipped when the run was cancelled.
-                onCompleted()
-                succeeded
-            }
-        }.awaitAll()
-    }
-    val successfulNames = linkedSetOf<String>()
-    val failedNames = linkedSetOf<String>()
-    distinctNames.forEachIndexed { index, name ->
-        if (outcomes[index]) successfulNames += name else failedNames += name
-    }
-    return SingBoxDelayCommandSubmissions(
-        successfulNames = successfulNames,
-        failedNames = failedNames,
-    )
+internal fun singBoxDelayTimestampWaitMillis(baselineSeconds: Long, nowMillis: Long): Long {
+    val nowSeconds = nowMillis / 1_000L
+    return if (baselineSeconds < nowSeconds) 0L else (nowSeconds + 1L) * 1_000L - nowMillis + 1L
 }
-
-internal fun SingBoxDelayTestPlan.knownSubmissionFailures(
-    submissions: SingBoxDelayCommandSubmissions,
-): Set<String> = submissions.failedNames
 
 internal fun SingBoxDelayTestPlan.deadlineMillis(
     connectionTestTimeoutMillis: Int,
@@ -336,10 +290,21 @@ private data class SingBoxDelayObservation(
 
 internal fun SingBoxDelayTestPlan.finish(
     delays: Map<String, Int>,
-): SingBoxDelayResult = SingBoxDelayResult(
-    delays = delays,
-    failedTargets = targetNames - delays.keys,
-)
+): SingBoxDelayResult {
+    val resolved = targetNames.mapNotNull { name ->
+        (delays[name] ?: selectedLeaves[name]?.let(delays::get))?.let { name to it }
+    }.toMap()
+    return SingBoxDelayResult(delays = resolved, failedTargets = targetNames - resolved.keys)
+}
+
+internal fun SingBoxDelayTestPlan.leafResult(result: SingBoxDelayResult): SingBoxDelayResult {
+    val measured = result.delays.keys + result.failedTargets
+    val targets = targetNames.filterTo(linkedSetOf()) { (selectedLeaves[it] ?: it) in measured }
+    val delays = targets.mapNotNull { name ->
+        (result.delays[name] ?: selectedLeaves[name]?.let(result.delays::get))?.let { name to it }
+    }.toMap()
+    return SingBoxDelayResult(delays, targets - delays.keys)
+}
 
 internal fun mergeSingBoxDelayFailures(
     currentFailureBaselines: Map<String, Long>,
