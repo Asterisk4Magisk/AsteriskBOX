@@ -20,12 +20,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.ProjectInfo
@@ -36,7 +35,7 @@ import ui.theme.AsteriskShapeTokens
 
 private const val ProjectSourceUri = "https://github.com/Asterisk4Magisk/AsteriskBOX"
 private const val TelegramChannelUri = "https://t.me/Asterisk4Magisk"
-private const val AboutIconForegroundScale = 1.25f
+private const val AboutIconForegroundScale = 1.5f
 
 @Composable
 internal fun AboutIdentityHeader(
@@ -73,7 +72,6 @@ internal fun AboutIdentityHeader(
 private fun AboutAppIcon(
     modifier: Modifier = Modifier,
 ) {
-    val iconStyle = aboutIconStyle()
     Box(
         modifier = modifier,
         contentAlignment = Alignment.Center,
@@ -81,33 +79,17 @@ private fun AboutAppIcon(
         androidx.compose.material3.Surface(
             modifier = Modifier.fillMaxSize(),
             shape = AsteriskShapeTokens.PageCard,
-            color = iconStyle.containerColor,
+            color = colorResource(R.color.ic_launcher_background),
         ) {
             Image(
-                painter = painterResource(iconStyle.foregroundResId),
+                painter = painterResource(R.drawable.ic_launcher_foreground),
                 contentDescription = ProjectInfo.PROJECT_NAME,
                 contentScale = ContentScale.Fit,
-                colorFilter = iconStyle.foregroundTint?.let(ColorFilter::tint),
                 modifier = Modifier.fillMaxSize().scale(AboutIconForegroundScale),
             )
         }
     }
 }
-
-@Composable
-private fun aboutIconStyle(): AboutIconStyle {
-    return AboutIconStyle(
-        foregroundResId = R.drawable.ic_launcher_foreground,
-        foregroundTint = null,
-        containerColor = Color.Transparent,
-    )
-}
-
-private data class AboutIconStyle(
-    val foregroundResId: Int,
-    val foregroundTint: Color?,
-    val containerColor: Color,
-)
 
 @Composable
 internal fun AboutRuntimeSection(
