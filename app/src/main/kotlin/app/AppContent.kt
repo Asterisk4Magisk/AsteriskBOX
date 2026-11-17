@@ -100,6 +100,7 @@ import ui.components.AsteriskFloatingNavigationBar
 import ui.components.AsteriskFloatingNavigationItem
 import ui.components.AsteriskScaffold
 import ui.components.floatingActionChrome
+import ui.components.floatingActionContentColor
 import ui.components.asteriskNavigationSelection
 import ui.layout.pageWindowPadding
 import ui.layout.shouldShowNavigationRail
@@ -631,6 +632,7 @@ private fun HomeServicePowerButton(
 ) {
     val appState by LocalAppStateStore.current.collectAppState()
     val control = LocalHomeServiceControl.current
+    val contentColor = floatingActionContentColor(appState.proxyRunning)
     val label = stringResource(
         when (control.operation) {
             HomeServiceOperation.Starting -> R.string.home_service_starting
@@ -650,14 +652,14 @@ private fun HomeServicePowerButton(
         // a service operation is in progress.
         val shape = RoundedCornerShape(16.dp)
         Box(modifier = semanticsModifier.size(56.dp)) {
-            Box(Modifier.matchParentSize().floatingActionChrome(shape))
+            Box(Modifier.matchParentSize().floatingActionChrome(appState.proxyRunning, shape))
             Surface(
                 onClick = control.toggleService,
                 enabled = !control.busy,
                 modifier = Modifier.matchParentSize(),
                 shape = shape,
                 color = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                contentColor = contentColor,
             ) {
                 Box(
                     modifier = Modifier
@@ -669,7 +671,7 @@ private fun HomeServicePowerButton(
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
                             strokeWidth = 3.dp,
-                            color = MaterialTheme.colorScheme.onPrimary,
+                            color = contentColor,
                         )
                     } else {
                         Icon(
@@ -693,7 +695,7 @@ private fun HomeServicePowerButton(
             CircularProgressIndicator(
                 modifier = Modifier.size(32.dp),
                 strokeWidth = 3.dp,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = contentColor,
             )
         } else {
             Icon(
