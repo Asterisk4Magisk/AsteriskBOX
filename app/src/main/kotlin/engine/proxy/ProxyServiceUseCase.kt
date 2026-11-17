@@ -96,7 +96,8 @@ internal class ProxyServiceUseCase(
         null
     }
 
-    private suspend fun start(state: AppState): ProxyServiceResult {
+    /** An explicit start never turns an already running proxy off. */
+    suspend fun start(state: AppState): ProxyServiceResult {
         return runCatching {
             proxyEngine.start(ProxyEngineStartRequest(state), requestVpnPermission)
         }.fold(

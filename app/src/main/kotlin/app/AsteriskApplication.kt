@@ -15,8 +15,6 @@ import app.effects.AppActivityForegroundTracker
 import app.effects.SingBoxRuntimeLifecycleCoordinator
 import app.modes.RunModeVpnService
 import features.boot.BootAutoConnect
-import features.quicksettings.quickSettingsTileState
-import features.quicksettings.refreshQuickSettingsTileUnlessShowing
 import data.AndroidAppStateStore
 import data.AppSettingsPreferences
 import engine.singbox.config.validateSingBoxRuntimeConfiguration
@@ -46,7 +44,6 @@ import coil3.SingletonImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -327,25 +324,6 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
         appScope.launch(Dispatchers.IO) { VpnSession.watch(applicationContext) }
     }
 
-    /**
-     * Asks SystemUI to rebind the quick settings tile whenever a state source in this process
-     * changes it; the first collection is the refresh at process start. The language is included
-     * because opening the panel no longer refreshes an active tile, and so is the active node the
-     * tile names. A `proxyRunning` the tile writes back itself is skipped, since the tile shows it
-     * without reading the status again.
-     */
-    private fun refreshQuickSettingsTileOnProxyStateChange() {
-        appScope.launch {
-            // The runtime ticks every second for traffic; only a new proxy snapshot can move the node.
-            val runtimeNodes = singBoxRuntime.state.distinctUntilChanged { old, new ->
-                old.running == new.running && old.proxies === new.proxies
-            }
-            combine(stateStore.state, runtimeNodes) { state, runtime -> state.quickSettingsTileState(runtime) }
-                .distinctUntilChanged()
-                .collect { tileState -> refreshQuickSettingsTileUnlessShowing(applicationContext, tileState) }
-        }
-    }
-
     override fun onCreate() {
         super.onCreate()
         // The `:service` process only executes: the VPN Service with its core and the traffic
@@ -364,7 +342,6 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
                 if (result is ResourceFileUpdateResult.Success) runningConfigurationApplier.request()
             }
         }
-        refreshQuickSettingsTileOnProxyStateChange()
         appScope.launch {
             val scheduler = ResourceAutoUpdateScheduler(applicationContext)
             stateStore.state
