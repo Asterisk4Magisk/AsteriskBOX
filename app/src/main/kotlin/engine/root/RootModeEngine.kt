@@ -20,6 +20,7 @@ import engine.root.publication.rootRuntimeLayout
 import engine.root.runtime.RootEbpfFailureAnalyzer
 import engine.root.runtime.RootFailureReport
 import engine.root.runtime.RootFailureWatcher
+import engine.root.runtime.RootPrivateDnsException
 import engine.root.runtime.RootRuntimeBusyException
 import engine.root.runtime.RootRuntimeConflictException
 import engine.root.runtime.RootSupervisorController
@@ -102,6 +103,7 @@ internal class RootModeEngine(
         }.getOrElse { error ->
             if (error is CancellationException) throw error
             if (error is RootRuntimeConflictException || error is RootRuntimeBusyException) throw error
+            if (error is RootPrivateDnsException) throw error
             // Surface a diagnostic dialog for start failures that happen synchronously (for
             // example the launcher script refusing to run). Failures that happen after the
             // supervisor already reached `running` are picked up by RootFailureWatcher.

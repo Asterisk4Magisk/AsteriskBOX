@@ -1224,6 +1224,7 @@
     <string name="root_foreign_owner_conflict">The ROOT proxy service is being used by %1$s. Stop it in %1$s and try again.</string>
     <string name="settings_app_list_enhancement">Application list enhancement</string>
     <string name="settings_app_list_enhancement_summary">Route system DNS by app list; isolate caches</string>
+    <string name="error_app_list_enhancement_private_dns">Turn off Private DNS to use application list enhancement</string>
     <string name="settings_ebpf_data_plane">Data plane</string>
     <string name="settings_ebpf_dns_disabled">Local DNS is disabled; off is in effect.</string>
     <string name="settings_ebpf_dns_mode">DNS mode</string>

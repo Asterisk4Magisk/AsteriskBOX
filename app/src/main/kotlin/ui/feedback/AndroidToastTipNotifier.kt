@@ -10,7 +10,6 @@ import features.logs.GenericUserActionFailureContext
 import features.logs.reportFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import app.R
 
 internal class AndroidToastTipNotifier(context: Context) {
     private val appContext = context.applicationContext
@@ -26,9 +25,7 @@ internal class AndroidToastTipNotifier(context: Context) {
         fallbackMessage: String? = null,
         failureContext: FailureLogContext = GenericUserActionFailureContext,
     ) {
-        val rootMessage = error.rootOperationTipMessageOrNull { owner ->
-            appContext.getString(R.string.root_foreign_owner_conflict, owner)
-        }
+        val rootMessage = error.rootOperationTipMessageOrNull(appContext)
         deliverErrorFeedback(
             error = error,
             fallbackMessage = rootMessage ?: fallbackMessage,
