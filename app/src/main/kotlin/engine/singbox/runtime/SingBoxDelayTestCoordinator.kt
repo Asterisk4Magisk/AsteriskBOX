@@ -297,15 +297,6 @@ internal fun SingBoxDelayTestPlan.finish(
     return SingBoxDelayResult(delays = resolved, failedTargets = targetNames - resolved.keys)
 }
 
-internal fun SingBoxDelayTestPlan.leafResult(result: SingBoxDelayResult): SingBoxDelayResult {
-    val measured = result.delays.keys + result.failedTargets
-    val targets = targetNames.filterTo(linkedSetOf()) { (selectedLeaves[it] ?: it) in measured }
-    val delays = targets.mapNotNull { name ->
-        (result.delays[name] ?: selectedLeaves[name]?.let(result.delays::get))?.let { name to it }
-    }.toMap()
-    return SingBoxDelayResult(delays, targets - delays.keys)
-}
-
 internal fun mergeSingBoxDelayFailures(
     currentFailureBaselines: Map<String, Long>,
     result: SingBoxDelayResult,

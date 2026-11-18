@@ -10,11 +10,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.milliseconds
+
+private const val DelayPublishIntervalMillis = 100L
 
 /** Shared requests keep their slots until blocking Command API calls actually return. */
 internal class SingBoxSharedDelayTasks<K, R> {
@@ -102,17 +107,40 @@ internal class SingBoxSharedDelayTasks<K, R> {
     }
 }
 
-internal suspend fun <T, R> runSingBoxDelayBatch(
+internal suspend fun <T, R : Any> runSingBoxDelayBatch(
     targets: List<T>,
-    onResult: (R) -> Unit,
+    batchResults: Boolean,
+    onResults: (List<R>) -> Unit,
     test: suspend (T) -> R,
 ): List<R> = coroutineScope {
-    targets.map { target ->
-        async(start = CoroutineStart.UNDISPATCHED) {
+    fun startMeasurements(onResult: (R) -> Unit) = targets.map { target ->
+        this@coroutineScope.async(start = CoroutineStart.UNDISPATCHED) {
             test(target).also { result ->
                 currentCoroutineContext().ensureActive()
                 onResult(result)
             }
         }
-    }.awaitAll()
+    }
+
+    if (!batchResults) return@coroutineScope startMeasurements { onResults(listOf(it)) }.awaitAll()
+
+    val pending = Channel<R>(Channel.UNLIMITED)
+    val finished = CompletableDeferred<Unit>()
+    val publisher = launch {
+        for (first in pending) {
+            // Wait for the window or normal completion without timing out a channel receive.
+            withTimeoutOrNull(DelayPublishIntervalMillis.milliseconds) { finished.await() }
+            val batch = mutableListOf(first)
+            while (true) {
+                batch += pending.tryReceive().getOrNull() ?: break
+            }
+            currentCoroutineContext().ensureActive()
+            onResults(batch)
+        }
+    }
+    val results = startMeasurements { pending.trySend(it) }.awaitAll()
+    pending.close()
+    finished.complete(Unit)
+    publisher.join()
+    results
 }

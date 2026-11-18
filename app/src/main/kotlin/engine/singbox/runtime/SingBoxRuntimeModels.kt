@@ -97,6 +97,12 @@ internal data class SingBoxDelayResult(
     val failedTargets: Set<String> = emptySet(),
 )
 
+internal data class SingBoxLeafDelayResult(
+    val name: String,
+    val delay: Int?,
+    val sequence: Long,
+)
+
 internal data class SingBoxDelayProgress(
     val baselines: Map<String, Long>,
     val total: Int,
