@@ -8,7 +8,7 @@ import java.io.InputStream
 import java.net.URI
 import java.nio.charset.StandardCharsets
 
-internal const val MaxImportBytes = 8 * 1024 * 1024
+internal const val MaxImportBytes = 256 * 1024 * 1024
 internal const val MaxImportCandidates = 10_000
 internal const val MaxPersistedImportSummaryCharacters = 512
 internal const val MaxImportErrorPreviewBytes = 64 * 1024
@@ -18,16 +18,21 @@ internal class ImportLimitException(
     message: String,
 ) : IllegalArgumentException(message)
 
-internal fun requireImportTextWithinLimit(
-    content: String,
-    maxBytes: Int = MaxImportBytes,
-): String {
-    if (content.toByteArray(StandardCharsets.UTF_8).size > maxBytes) {
+internal fun requireImportSizeWithinLimit(sizeBytes: Long, maxBytes: Int = MaxImportBytes) {
+    if (sizeBytes > maxBytes) {
         throw ImportLimitException(
             reason = ImportIssueReason.INPUT_TOO_LARGE,
             message = "Import content exceeds the allowed size",
         )
     }
+}
+
+internal fun requireImportTextWithinLimit(
+    content: String,
+    maxBytes: Int = MaxImportBytes,
+): String {
+    requireImportSizeWithinLimit(content.length.toLong(), maxBytes)
+    requireImportSizeWithinLimit(content.toByteArray(StandardCharsets.UTF_8).size.toLong(), maxBytes)
     return content
 }
 
@@ -54,12 +59,7 @@ internal fun InputStream.readImportUtf8WithinLimit(
         val read = read(buffer)
         if (read < 0) break
         total += read
-        if (total > maxBytes) {
-            throw ImportLimitException(
-                reason = ImportIssueReason.INPUT_TOO_LARGE,
-                message = "Import content exceeds the allowed size",
-            )
-        }
+        requireImportSizeWithinLimit(total.toLong(), maxBytes)
         output.write(buffer, 0, read)
     }
     return output.toString(StandardCharsets.UTF_8.name())

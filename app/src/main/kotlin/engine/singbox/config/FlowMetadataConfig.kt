@@ -4,11 +4,8 @@
 package engine.singbox.config
 
 import android.content.Context
-import app.AppState
 import engine.proxy.FlowMetadataInboundTag
 import engine.proxy.flowMetadataOptions
-import engine.proxy.usesFlowMetadata
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -18,15 +15,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
-internal fun String.withFlowMetadata(
-    context: Context,
-    state: AppState,
-    runMode: Int = state.runMode,
-    exposePorts: Boolean = true,
-): String {
-    if (!exposePorts || !state.usesFlowMetadata(runMode)) return this
-
-    val root = Json.parseToJsonElement(this).jsonObject
+internal fun JsonObject.withFlowMetadata(context: Context): JsonObject {
     val options = context.flowMetadataOptions()
     val inbound = buildJsonObject {
         put("type", "socks")
@@ -42,8 +31,8 @@ internal fun String.withFlowMetadata(
             )
         }
     }
-    val existing = root["inbounds"]?.jsonArray.orEmpty().filterNot {
+    val existing = this["inbounds"]?.jsonArray.orEmpty().filterNot {
         it.jsonObject["tag"]?.jsonPrimitive?.content == FlowMetadataInboundTag
     }
-    return JsonObject(root + ("inbounds" to JsonArray(existing + inbound))).toString()
+    return updated("inbounds", JsonArray(existing + inbound))
 }

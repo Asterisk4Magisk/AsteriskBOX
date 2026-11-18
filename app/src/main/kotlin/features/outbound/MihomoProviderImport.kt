@@ -8,12 +8,17 @@ import features.importing.ImportIssueReason
 import features.importing.ImportIssueSeverity
 import features.importing.ImportOutcome
 import features.importing.ImportStage
+import features.importing.MaxImportBytes
 import features.importing.requireImportCandidateCount
 import features.importing.requireImportTextWithinLimit
 import java.net.URI
 import kotlin.coroutines.cancellation.CancellationException
 import org.snakeyaml.engine.v2.api.Load
 import org.snakeyaml.engine.v2.api.LoadSettings
+
+internal val MihomoYamlImportLoadSettings: LoadSettings = LoadSettings.builder()
+    .setCodePointLimit(MaxImportBytes)
+    .build()
 
 internal data class MihomoProviderRequest(
     val url: String,
@@ -36,7 +41,7 @@ internal fun containsMihomoProviders(content: String): Boolean {
     val candidates = listOfNotNull(content, decodeBase64ImportPayload(content))
     return candidates.any { candidate ->
         runCatching {
-            val root = Load(LoadSettings.builder().build()).loadFromString(candidate) as? Map<*, *>
+            val root = Load(MihomoYamlImportLoadSettings).loadFromString(candidate) as? Map<*, *>
             root?.containsKey("proxy-providers") == true
         }.getOrDefault(false)
     }

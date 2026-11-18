@@ -41,6 +41,7 @@ import app.withUnavailableManagedRuleSetsDisabled
 import engine.network.toPortOrNull
 import engine.proxy.LocalProxyLoopbackAddress
 import engine.proxy.toLocalProxyOptions
+import engine.proxy.usesFlowMetadata
 import engine.root.RootModeEngine
 import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.plugin.PluginOutboundPlan
@@ -109,12 +110,18 @@ internal object SingBoxConfigCompiler {
         exposePorts: Boolean = true,
         customResourceFileOverrides: Map<Int, File> = emptyMap(),
     ): CompiledSingBoxConfig = context.withLocalizedVlessXrayErrors {
-        finalizeConfig(
-            generate(context, appState, runMode, exposePorts, customResourceFileOverrides),
-            appState,
-            checkWithBundledCore = !context.skipsBundledCoreConfigCheck(runMode),
-            pluginTarget = context.pluginTarget(runMode),
-        ).let { it.copy(config = it.config.withFlowMetadata(context, appState, runMode, exposePorts)) }
+        val generated = generate(context, appState, runMode, exposePorts, customResourceFileOverrides)
+        val overridden = applySingBoxConfigOverride(
+            generated, appState.enableConfigOverrideScript, appState.configOverrideScript,
+        )
+        // Plugin outbounds are compiled after the script so it can add them like any other outbound.
+        val pluginTarget = context.pluginTarget(runMode)
+        val compiled = compilePluginOutbounds(overridden, appState.pluginProtocols, pluginTarget)
+        val includeFlowMetadata = exposePorts && appState.usesFlowMetadata(runMode)
+        val runtime = if (includeFlowMetadata) compiled.root.withFlowMetadata(context) else compiled.root
+        val encoded = if (includeFlowMetadata) runtime.toString() else encodeSingBoxJson(runtime)
+        if (!context.skipsBundledCoreConfigCheck(runMode)) SingBoxConfigChecker.check(runtime, encoded)
+        CompiledSingBoxConfig(encoded, compiled.plans, pluginTarget)
     }
 
     internal fun generate(
@@ -165,23 +172,6 @@ internal object SingBoxConfigCompiler {
                 RootInboundUidPolicy()
             },
         )
-    }
-
-    // Plugin outbounds are compiled after the override script, so a script sees
-    // and may add them like any other outbound.
-    private fun finalizeConfig(
-        root: JsonObject,
-        appState: AppState,
-        checkWithBundledCore: Boolean,
-        pluginTarget: PluginTarget,
-    ): CompiledSingBoxConfig {
-        val overridden = applySingBoxConfigOverride(
-            root, appState.enableConfigOverrideScript, appState.configOverrideScript,
-        )
-        val compiled = compilePluginOutbounds(overridden, appState.pluginProtocols, pluginTarget)
-        val encoded = encodeSingBoxJson(compiled.root)
-        if (checkWithBundledCore) SingBoxConfigChecker.check(encoded)
-        return CompiledSingBoxConfig(encoded, compiled.plans, pluginTarget)
     }
 
     internal fun compileGeneratedRoot(

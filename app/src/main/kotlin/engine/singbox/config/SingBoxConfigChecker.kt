@@ -12,11 +12,14 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 
 internal object SingBoxConfigChecker {
-    fun check(content: String) {
-        val root = parseSingBoxJson(content)
+    fun check(content: String) = check(parseSingBoxJson(content))
+
+    fun check(root: JsonObject, encoded: String? = null) {
         SingBoxDeprecatedConfigValidator.validate(root)
         val compatibleRoot = root.withLibboxCompatibleEbpfInbounds()
-        Libbox.checkConfig(encodeSingBoxJson(compatibleRoot))
+        Libbox.checkConfig(
+            if (encoded != null && compatibleRoot === root) encoded else encodeSingBoxJson(compatibleRoot),
+        )
     }
 
     fun format(content: String): String {

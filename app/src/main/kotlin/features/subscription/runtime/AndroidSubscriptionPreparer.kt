@@ -11,6 +11,7 @@ import features.outbound.MihomoProviderRequest
 import features.outbound.containsMihomoProviders
 import features.importing.MaxImportErrorPreviewBytes
 import features.importing.readImportUtf8WithinLimit
+import features.importing.requireImportSizeWithinLimit
 import features.importing.requireImportTextWithinLimit
 import features.importing.sanitizeImportErrorPreview
 import features.subscription.usecase.SubscriptionSyncStage
@@ -264,6 +265,7 @@ private fun downloadSubscription(
                 },
             )
         }
+        requireImportSizeWithinLimit(connection.contentLengthLong)
         val content = connection.inputStream.use(InputStream::readImportUtf8WithinLimit)
         val rawContentDisposition = connection.getHeaderField(ContentDispositionHeader).orEmpty()
         return DownloadedSubscription.Content(

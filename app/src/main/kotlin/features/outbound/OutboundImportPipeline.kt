@@ -23,7 +23,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.snakeyaml.engine.v2.api.Load
-import org.snakeyaml.engine.v2.api.LoadSettings
 import java.net.URI
 import utils.decodeUrlComponentPreservingPlus
 import utils.encodeBase64
@@ -223,7 +222,7 @@ internal object MihomoYamlOutboundParser {
         jsonFormatter: SingBoxOutboundConfigFormatter,
         providerContext: MihomoProviderImportContext,
     ): ImportOutcome<ImportedSingBoxOutbound>? {
-        val loader = Load(LoadSettings.builder().build())
+        val loader = Load(MihomoYamlImportLoadSettings)
         val loaded = runCatching { loader.loadFromString(content) as? Map<*, *> }
         val root = loaded.getOrNull() ?: return if (MihomoProxiesHeader.containsMatchIn(content)) {
             invalidRecognizedOutboundDocument(
