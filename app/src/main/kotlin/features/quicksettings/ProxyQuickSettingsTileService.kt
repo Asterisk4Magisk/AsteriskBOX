@@ -108,9 +108,10 @@ class ProxyQuickSettingsTileService : TileService() {
         operationSequence.incrementAndGet()
 
         operationScope.launch {
-            updateTile(processing = true)
+            var finalRunning: Boolean? = null
             try {
-                setProxyRunning(shouldRun)
+                updateTile(processing = true)
+                finalRunning = setProxyRunning(shouldRun)
             } catch (error: Throwable) {
                 if (error is CancellationException) throw error
                 reportFailure(
@@ -120,7 +121,14 @@ class ProxyQuickSettingsTileService : TileService() {
                 showToast(error.quickSettingsErrorMessage())
             } finally {
                 operationInProgress.set(false)
-                refreshIfListening()
+                activeService?.get()?.let { service ->
+                    if (finalRunning == null) {
+                        service.refreshTile()
+                    } else {
+                        service.refreshJob?.cancel()
+                        service.updateTile(running = finalRunning)
+                    }
+                }
             }
         }
     }
@@ -158,13 +166,13 @@ class ProxyQuickSettingsTileService : TileService() {
         updateTile(running = running)
     }
 
-    private suspend fun setProxyRunning(shouldRun: Boolean) {
+    private suspend fun setProxyRunning(shouldRun: Boolean): Boolean? {
         val state = stateStore.state.value
         if (shouldRun && state.requiresVpnPermission()) {
             showToast(getString(R.string.quick_settings_tile_vpn_permission_required))
             launchActivityAndCollapse(VpnService.prepare(this))
             stateStore.update { currentState -> currentState.copy(proxyRunning = false) }
-            return
+            return null
         }
 
         val result = if (shouldRun) {
@@ -172,7 +180,7 @@ class ProxyQuickSettingsTileService : TileService() {
         } else {
             proxyServiceUseCase.stop(state.runMode)
         }
-        when (result) {
+        return when (result) {
             is ProxyServiceResult.Success -> {
                 stateStore.update { currentState ->
                     currentState.copy(
@@ -188,10 +196,12 @@ class ProxyQuickSettingsTileService : TileService() {
                         getString(R.string.proxy_service_stopped)
                     },
                 )
+                result.proxyRunning.takeIf { stateStore.state.value.runMode == state.runMode }
             }
 
             is ProxyServiceResult.Failed -> {
                 showToast(result.error.quickSettingsErrorMessage())
+                null
             }
         }
     }
