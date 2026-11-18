@@ -20,6 +20,7 @@ import io.nekohasekai.libbox.OutboundGroupIterator
 import io.nekohasekai.libbox.RemoteConnectionOptions
 import io.nekohasekai.libbox.StatusMessage
 import io.nekohasekai.libbox.StringIterator
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -59,7 +61,6 @@ internal class SingBoxCommandClient(
 
     @JvmOverloads
     fun connect(modeOnly: Boolean = false) {
-        disconnect()
         val options = CommandClientOptions().apply {
             if (!modeOnly) {
                 addCommand(Libbox.CommandStatus)
@@ -70,6 +71,11 @@ internal class SingBoxCommandClient(
             addCommand(Libbox.CommandClashMode)
             statusInterval = StatusIntervalNanos
         }
+        connect(options)
+    }
+
+    private fun connect(options: CommandClientOptions) {
+        disconnect()
         val nextClient = if (target.local) {
             Libbox.newCommandClient(this, options)
         } else {
@@ -357,7 +363,33 @@ internal class SingBoxCommandClient(
         }
     }
 
-    private companion object {
+    companion object {
+        /** Reads one group snapshot without starting the dashboard's runtime monitor. */
+        suspend fun readProxyGroups(target: SingBoxCommandTarget): SingBoxProxiesState? = withContext(Dispatchers.IO) {
+            val snapshot = CompletableDeferred<SingBoxProxiesState?>()
+            val client = SingBoxCommandClient(
+                target = target,
+                listener = object : SingBoxCommandListener {
+                    override fun onConnected() = Unit
+                    override fun onDisconnected(message: String) {
+                        snapshot.complete(null)
+                    }
+                    override fun onStatus(status: StatusMessage) = Unit
+                    override fun onProxies(proxies: SingBoxProxiesState) {
+                        snapshot.complete(proxies)
+                    }
+                    override fun onConnections(connections: SingBoxConnectionsState) = Unit
+                },
+            )
+            try {
+                client.connect(CommandClientOptions().apply { addCommand(Libbox.CommandGroup) })
+                withTimeoutOrNull(GroupSnapshotTimeoutMillis.milliseconds) { snapshot.await() }
+            } finally {
+                client.disconnect()
+            }
+        }
+
+        private const val GroupSnapshotTimeoutMillis = 1_500L
         const val StatusIntervalNanos = 1_000_000_000L
         const val ModeConfirmationTimeoutMillis = 5_000L
     }

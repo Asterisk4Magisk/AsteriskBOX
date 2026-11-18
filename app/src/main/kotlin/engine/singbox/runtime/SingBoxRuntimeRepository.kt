@@ -148,6 +148,9 @@ internal class SingBoxRuntimeRepository(
         require(state.value.proxies.updatedAtMillis > 0L) { "sing-box proxy groups are not available" }
     }
 
+    suspend fun readRunningProxyGroups(appState: AppState): SingBoxProxiesState? =
+        SingBoxCommandClient.readProxyGroups(appState.commandTarget())
+
     suspend fun getConnections(appState: AppState): Result<SingBoxConnectionsState> = runCatching {
         requireActiveSession(appState)
         latestConnections
