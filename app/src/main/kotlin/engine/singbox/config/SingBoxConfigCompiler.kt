@@ -5,6 +5,7 @@ package engine.singbox.config
 
 import app.sanitizedRouteNetworkTypes
 import android.content.Context
+import android.os.Process
 import app.AppState
 import app.DefaultSingBoxUrlTestUrl
 import app.effectiveFakeIpEnabled
@@ -114,9 +115,14 @@ internal object SingBoxConfigCompiler {
         val overridden = applySingBoxConfigOverride(
             generated, appState.enableConfigOverrideScript, appState.configOverrideScript,
         )
+        val root = if (runMode == RunModeTun || runMode == RunModeEbpf) {
+            overridden.withRootInboundSelfBypass(Process.myUid())
+        } else {
+            overridden
+        }
         // Plugin outbounds are compiled after the script so it can add them like any other outbound.
         val pluginTarget = context.pluginTarget(runMode)
-        val compiled = compilePluginOutbounds(overridden, appState.pluginProtocols, pluginTarget)
+        val compiled = compilePluginOutbounds(root, appState.pluginProtocols, pluginTarget)
         val includeFlowMetadata = exposePorts && appState.usesFlowMetadata(runMode)
         val runtime = if (includeFlowMetadata) compiled.root.withFlowMetadata(context) else compiled.root
         val encoded = if (includeFlowMetadata) runtime.toString() else encodeSingBoxJson(runtime)
