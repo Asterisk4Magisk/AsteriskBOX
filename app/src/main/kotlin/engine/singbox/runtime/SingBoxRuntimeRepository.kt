@@ -11,10 +11,16 @@ import app.DefaultConnectionTestUrl
 import app.isValidConnectionTestUrl
 import app.modes.RunModeVpnService
 import engine.proxy.ProxyEngineStartRequest
+import engine.network.ProxyIpProbeException
+import engine.network.ProxyIpProbeRequest
+import engine.network.ProxyIpProbeResponse
+import engine.network.readOrCreateProxyIpProbeToken
 import engine.singbox.singBoxControlConfig
 import engine.singbox.singBoxModeName
 import engine.vpn.VpnSingBoxConfigFactory
 import features.logs.AndroidAppLogger
+import features.resources.runtime.singBoxResourceFilesDir
+import features.resources.runtime.skipsBundledCoreConfigCheck
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.StatusMessage
 import java.util.concurrent.atomic.AtomicLong
@@ -529,6 +535,25 @@ internal class SingBoxRuntimeRepository(
      */
     suspend fun activeCommandClient(appState: AppState): SingBoxCommandClient =
         requireActiveSession(appState)
+
+    suspend fun usesBundledCore(runMode: Int): Boolean = withContext(Dispatchers.IO) {
+        !appContext.skipsBundledCoreConfigCheck(runMode)
+    }
+
+    suspend fun probeProxyIp(appState: AppState, request: ProxyIpProbeRequest): ProxyIpProbeResponse =
+        withContext(Dispatchers.IO) {
+            if (!appState.proxyRunning || appContext.skipsBundledCoreConfigCheck(appState.runMode)) {
+                throw ProxyIpProbeException("UNSUPPORTED")
+            }
+            val target = appState.commandTarget()
+            val active = synchronized(sessionLock) {
+                session.takeIf { sessionTarget == target && state.value.running }
+            } ?: throw ProxyIpProbeException("NOT_RUNNING")
+            val token = readOrCreateProxyIpProbeToken(appContext.singBoxResourceFilesDir())
+            val result = active.probeProxyIp(request, token)
+            if (session !== active) throw ProxyIpProbeException("RUNTIME_CHANGED")
+            result
+        }
 
     private suspend fun runDelayTest(
         appState: AppState,

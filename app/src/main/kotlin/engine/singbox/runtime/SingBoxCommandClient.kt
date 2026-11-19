@@ -3,6 +3,9 @@
 
 package engine.singbox.runtime
 
+import engine.network.ProxyIpProbeException
+import engine.network.ProxyIpProbeRequest
+import engine.network.ProxyIpProbeResponse
 import engine.singbox.SingBoxControlConfig
 import features.logs.AndroidCoreLogRepository
 import features.logs.currentLogTime
@@ -17,6 +20,7 @@ import io.nekohasekai.libbox.NetworkQualityTestHandler
 import io.nekohasekai.libbox.NetworkQualityTestSession
 import io.nekohasekai.libbox.OutboundGroupItemIterator
 import io.nekohasekai.libbox.OutboundGroupIterator
+import io.nekohasekai.libbox.ProxyIpProbeHandler
 import io.nekohasekai.libbox.RemoteConnectionOptions
 import io.nekohasekai.libbox.StatusMessage
 import io.nekohasekai.libbox.StringIterator
@@ -31,6 +35,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.Json
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.time.Duration.Companion.milliseconds
@@ -116,12 +121,23 @@ internal class SingBoxCommandClient(
         previous?.let { runCatching { it.disconnect() } }
     }
 
+    suspend fun probeProxyIp(request: ProxyIpProbeRequest, token: String): ProxyIpProbeResponse =
+        suspendCancellableCoroutine { continuation ->
+            val handler = object : ProxyIpProbeHandler {
+                override fun onError(code: String) {
+                    continuation.resumeWithException(ProxyIpProbeException(code))
+                }
+
+                override fun onResult(resultJSON: String) {
+                    continuation.resumeWith(runCatching { ProxyIpProbeJson.decodeFromString(resultJSON) })
+                }
+            }
+            val session = requireClient().probeProxyIp(request.outboundTag, request.url, token, handler)
+            continuation.invokeOnCancellation { runCatching { session.close() } }
+        }
+
     fun selectOutbound(groupTag: String, outboundTag: String) {
         requireClient().selectOutbound(groupTag, outboundTag)
-    }
-
-    fun urlTest(groupTag: String) {
-        requireClient().urlTest(groupTag)
     }
 
     /**
@@ -389,6 +405,7 @@ internal class SingBoxCommandClient(
             }
         }
 
+        private val ProxyIpProbeJson = Json { ignoreUnknownKeys = true }
         private const val GroupSnapshotTimeoutMillis = 1_500L
         const val StatusIntervalNanos = 1_000_000_000L
         const val ModeConfirmationTimeoutMillis = 5_000L

@@ -4,8 +4,6 @@
 package features.monitoring.network
 
 import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,18 +25,28 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.LocalAppServices
+import app.LocalAppStateStore
+import app.collectAppState
+import app.managedReferenceRemarks
+import engine.singbox.config.APP_GLOBAL_SELECTOR
 import features.monitoring.MonitoringIntent
 import features.monitoring.MonitoringScaffold
 import features.monitoring.MonitoringSectionCard
@@ -57,28 +65,72 @@ internal fun NetworkMonitorPage(padding: PaddingValues) {
     val services = LocalAppServices.current
     val monitoring by services.monitoring.state.collectAsState()
     val network = monitoring.network
-    val context = LocalContext.current
+    val appState by LocalAppStateStore.current.collectAppState()
+    val runtime by services.singBoxRuntime.state.collectAsState()
+    val rootGeneration by services.proxyEngine.rootStatusWatchGeneration.collectAsState()
+    val globalGroupLabel = stringResource(R.string.routing_global)
+    val groupLabels = remember(appState) { appState.managedReferenceRemarks() }
+    val groups = remember(runtime.proxies.groups, groupLabels, globalGroupLabel) {
+        runtime.proxies.groups.filterNot { it.hidden }.map { group ->
+            val label = groupLabels[group.name]
+                ?: globalGroupLabel.takeIf { group.name == APP_GLOBAL_SELECTOR }
+                ?: group.displayName
+            ProxyIpProbeTarget(group.name, label)
+        }
+    }
+    val serviceEpoch = runtime.serviceStartedAtMillis
+    val sessionKey = listOf(
+        appState.runMode, appState.proxyRunning, runtime.running, runtime.control, rootGeneration, serviceEpoch,
+    )
+    var bundledCore by remember(sessionKey) { mutableStateOf(false) }
+    LaunchedEffect(sessionKey) {
+        bundledCore = appState.proxyRunning && runtime.running && services.singBoxRuntime.usesBundledCore(appState.runMode)
+    }
+    val showGroupPicker = bundledCore && groups.isNotEmpty()
+    var selectedGroup by remember(sessionKey) { mutableStateOf<String?>(null) }
+    val target = if (showGroupPicker) groups.firstOrNull { it.tag == selectedGroup } else null
+    val selectedOutbound = runtime.proxies.groups.firstOrNull { it.name == target?.tag }?.now
+    val strategyProbe = remember(sessionKey, target?.tag, selectedOutbound, runtime.proxySelectionRevision) {
+        ProxyIpProbeState()
+    }
+    DisposableEffect(strategyProbe) {
+        onDispose { strategyProbe.cancel() }
+    }
+    val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val pageSessionId = rememberSaveable { UUID.randomUUID().toString() }
     val copiedMessage = stringResource(R.string.common_copied)
     ObserveMonitoring(MonitoringIntent.Network, pageSessionId)
 
-    fun copy(label: String, value: String) {
-        if (value.isBlank()) return
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        clipboard.setPrimaryClip(ClipData.newPlainText(label, value))
-        scope.launch { services.tipNotifier.show(copiedMessage) }
+    fun refreshStrategy(family: AddressFamily? = null) {
+        val tag = target?.tag ?: return
+        strategyProbe.start(scope, tag, family) { request -> services.singBoxRuntime.probeProxyIp(appState, request) }
     }
 
+    LaunchedEffect(strategyProbe) {
+        refreshStrategy()
+    }
+
+    fun copy(label: String, value: String) {
+        if (value.isBlank()) return
+        scope.launch {
+            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, value)))
+            services.tipNotifier.show(copiedMessage)
+        }
+    }
+
+    val refreshing = if (target == null) network.publicProbe.refreshing else strategyProbe.refreshing
     MonitoringScaffold(
         title = stringResource(R.string.monitor_network_title),
         outerPadding = padding,
         actions = {
             IconButton(
-                onClick = { services.monitoring.refreshNetworkStatus() },
-                enabled = !network.publicProbe.refreshing,
+                onClick = {
+                    if (target == null) services.monitoring.refreshNetworkStatus() else refreshStrategy()
+                },
+                enabled = !refreshing,
             ) {
-                if (network.publicProbe.refreshing) {
+                if (refreshing) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
                 } else {
                     Icon(Icons.Rounded.Refresh, stringResource(R.string.monitor_refresh))
@@ -100,27 +152,38 @@ internal fun NetworkMonitorPage(padding: PaddingValues) {
             item("public") {
                 MonitoringSectionCard(stringResource(R.string.monitor_network_public), NetworkContentModifier) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            stringResource(R.string.monitor_network_probe_source),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        PublicAddressFamilyCard(
-                            family = AddressFamily.Ipv4,
-                            generalResult = network.publicProbe.ipv4,
-                            cloudflareResult = network.publicProbe.cloudflareIpv4,
-                            refreshing = network.publicProbe.refreshing,
-                            onCopy = { label, value -> copy(label, value) },
-                            onRetry = { services.monitoring.refreshPublicNetworkProbe(AddressFamily.Ipv4) },
-                        )
-                        PublicAddressFamilyCard(
-                            family = AddressFamily.Ipv6,
-                            generalResult = network.publicProbe.ipv6,
-                            cloudflareResult = network.publicProbe.cloudflareIpv6,
-                            refreshing = network.publicProbe.refreshing,
-                            onCopy = { label, value -> copy(label, value) },
-                            onRetry = { services.monitoring.refreshPublicNetworkProbe(AddressFamily.Ipv6) },
-                        )
+                        if (showGroupPicker) {
+                            ProxyIpProbeTargetPicker(groups, target) { next ->
+                                if (next?.tag != target?.tag) {
+                                    strategyProbe.cancel()
+                                    selectedGroup = next?.tag
+                                    if (next == null) services.monitoring.refreshPublicNetworkProbe()
+                                }
+                            }
+                        }
+                        AddressFamily.entries.forEach { family ->
+                            val isIpv4 = family == AddressFamily.Ipv4
+                            val general = target?.let { strategyProbe.measurement(family, ProbeTarget.General) }
+                            val cloudflare = target?.let { strategyProbe.measurement(family, ProbeTarget.Cloudflare) }
+                            val familyRefreshing = if (target == null) {
+                                network.publicProbe.refreshing
+                            } else {
+                                general?.refreshing == true || cloudflare?.refreshing == true
+                            }
+                            PublicAddressFamilyCard(
+                                family = family,
+                                generalResult = general?.displayResult()
+                                    ?: if (isIpv4) network.publicProbe.ipv4 else network.publicProbe.ipv6,
+                                cloudflareResult = cloudflare?.displayResult()
+                                    ?: if (isIpv4) network.publicProbe.cloudflareIpv4 else network.publicProbe.cloudflareIpv6,
+                                refreshing = familyRefreshing,
+                                onCopy = ::copy,
+                                onRetry = {
+                                    if (target == null) services.monitoring.refreshPublicNetworkProbe(family)
+                                    else refreshStrategy(family)
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -170,6 +233,11 @@ internal fun NetworkMonitorPage(padding: PaddingValues) {
         }
     }
 }
+
+@Composable
+private fun ProxyIpProbeState.Measurement.displayResult(): PublicAddressProbeResult = result.copy(
+    errorMessage = message?.let { stringResource(it) }.orEmpty(),
+)
 
 @Composable
 private fun PublicAddressFamilyCard(
@@ -224,7 +292,6 @@ private fun PublicAddressFamilyCard(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                 modifier = Modifier.padding(vertical = 2.dp),
             )
-
             PublicAddressSection(
                 title = stringResource(R.string.monitor_network_probe_cloudflare),
                 result = cloudflareResult,
