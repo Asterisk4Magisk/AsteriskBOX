@@ -145,7 +145,7 @@ internal class PublicNetworkProbeClient(
                 if (InetAddress.getByName(attempt.address) != address) {
                     return result.copy(error = PublicProbeError.InvalidResponse)
                 }
-                result.applyAttempt(attempt, System.currentTimeMillis()).copy(durationMillis = null)
+                attempt.toResult()
             }
             is PublicProbeAttempt.Failure -> result.copy(
                 error = if (attempt.error == PublicProbeError.Unavailable) PublicProbeError.InvalidResponse else attempt.error,
@@ -190,7 +190,6 @@ internal class PublicNetworkProbeClient(
             PublicProbeAttempt.Failure(
                 error = PublicProbeError.Timeout,
                 message = "Timed out",
-                endpointHost = endpoint.host,
             )
         }
     }
@@ -230,7 +229,6 @@ internal class PublicNetworkProbeClient(
                             return@runCatching PublicProbeAttempt.Failure(
                                 PublicProbeError.Network,
                                 "Cancelled",
-                                endpoint.host,
                             )
                         }
                         try {
@@ -245,8 +243,6 @@ internal class PublicNetworkProbeClient(
                                     PublicProbeAttempt.Success(
                                         address = parsed.address,
                                         durationMillis = SystemClock.elapsedRealtime() - startedAt,
-                                        endpointHost = endpoint.host,
-                                        target = endpoint.target,
                                         country = parsed.country,
                                         countryCode = parsed.countryCode,
                                         region = parsed.region,
@@ -262,7 +258,6 @@ internal class PublicNetworkProbeClient(
                                     PublicProbeAttempt.Failure(
                                         PublicProbeError.Unavailable,
                                         "",
-                                        endpoint.host,
                                     )
                                 }
 
@@ -270,7 +265,6 @@ internal class PublicNetworkProbeClient(
                                     PublicProbeAttempt.Failure(
                                         PublicProbeError.InvalidResponse,
                                         "Invalid ${endpoint.family.name.uppercase()} address",
-                                        endpoint.host,
                                     )
                                 }
                             }
@@ -283,7 +277,6 @@ internal class PublicNetworkProbeClient(
                     PublicProbeAttempt.Failure(
                         error = PublicProbeError.Network,
                         message = error.message?.take(160).orEmpty().ifBlank { "Request failed" },
-                        endpointHost = endpoint.host,
                     )
                 }
                 if (continuation.isActive) continuation.resume(attempt)
