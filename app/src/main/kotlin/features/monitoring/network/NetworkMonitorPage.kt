@@ -4,6 +4,7 @@
 package features.monitoring.network
 
 import android.content.ClipData
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -40,11 +41,12 @@ import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import app.LocalAppServices
 import app.LocalAppStateStore
 import app.collectAppState
+import engine.singbox.runtime.delayTestLeaf
 import app.managedReferenceRemarks
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import features.monitoring.MonitoringIntent
@@ -90,7 +92,8 @@ internal fun NetworkMonitorPage(padding: PaddingValues) {
     var selectedGroup by remember(sessionKey) { mutableStateOf<String?>(null) }
     val target = if (showGroupPicker) groups.firstOrNull { it.tag == selectedGroup } else null
     val selectedOutbound = runtime.proxies.groups.firstOrNull { it.name == target?.tag }?.now
-    val strategyProbe = remember(sessionKey, target?.tag, selectedOutbound, runtime.proxySelectionRevision) {
+    val selectedNode = target?.let { runtime.proxies.delayTestLeaf(it.tag) }
+    val strategyProbe = remember(sessionKey, target?.tag, selectedOutbound, selectedNode, runtime.proxySelectionRevision) {
         ProxyIpProbeState()
     }
     DisposableEffect(strategyProbe) {
@@ -104,6 +107,11 @@ internal fun NetworkMonitorPage(padding: PaddingValues) {
 
     fun refreshStrategy(family: AddressFamily? = null) {
         val tag = target?.tag ?: return
+        strategyProbe.startEntry(scope, family) {
+            val node = selectedNode ?: return@startEntry emptyList()
+            val hosts = services.singBoxRuntime.proxyEntryHosts(node)
+            services.monitoring.probeProxyEntry(hosts, family)
+        }
         strategyProbe.start(scope, tag, family) { request -> services.singBoxRuntime.probeProxyIp(appState, request) }
     }
 
@@ -168,7 +176,7 @@ internal fun NetworkMonitorPage(padding: PaddingValues) {
                             val familyRefreshing = if (target == null) {
                                 network.publicProbe.refreshing
                             } else {
-                                general?.refreshing == true || cloudflare?.refreshing == true
+                                strategyProbe.entryRefreshing || general?.refreshing == true || cloudflare?.refreshing == true
                             }
                             PublicAddressFamilyCard(
                                 family = family,
@@ -176,6 +184,8 @@ internal fun NetworkMonitorPage(padding: PaddingValues) {
                                     ?: if (isIpv4) network.publicProbe.ipv4 else network.publicProbe.ipv6,
                                 cloudflareResult = cloudflare?.displayResult()
                                     ?: if (isIpv4) network.publicProbe.cloudflareIpv4 else network.publicProbe.cloudflareIpv6,
+                                entryResults = target?.let { strategyProbe.entry(family).orEmpty() },
+                                entryRefreshing = strategyProbe.entryRefreshing,
                                 refreshing = familyRefreshing,
                                 onCopy = ::copy,
                                 onRetry = {
@@ -244,6 +254,8 @@ private fun PublicAddressFamilyCard(
     family: AddressFamily,
     generalResult: PublicAddressProbeResult,
     cloudflareResult: PublicAddressProbeResult,
+    entryResults: List<PublicAddressProbeResult>?,
+    entryRefreshing: Boolean,
     refreshing: Boolean,
     onCopy: (String, String) -> Unit,
     onRetry: () -> Unit,
@@ -271,7 +283,9 @@ private fun PublicAddressFamilyCard(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                if (generalResult.hasRetryableError || cloudflareResult.hasRetryableError) {
+                if (generalResult.hasRetryableError || cloudflareResult.hasRetryableError ||
+                    entryResults?.any { it.hasRetryableError } == true
+                ) {
                     TextButton(
                         onClick = onRetry,
                         enabled = !refreshing,
@@ -281,12 +295,40 @@ private fun PublicAddressFamilyCard(
                 }
             }
 
-            PublicAddressSection(
-                title = stringResource(R.string.monitor_network_probe_general),
-                result = generalResult,
-                family = family,
-                onCopy = { onCopy(familyLabel, it) },
-            )
+            if (entryResults == null) {
+                PublicAddressSection(
+                    title = stringResource(R.string.monitor_network_probe_general),
+                    result = generalResult,
+                    family = family,
+                    onCopy = { onCopy(familyLabel, it) },
+                )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ProbeSectionTitle(stringResource(R.string.monitor_network_probe_entry))
+                        if (entryResults.isEmpty()) {
+                            Text(
+                                text = if (entryRefreshing) "—" else stringResource(R.string.monitor_network_probe_entry_empty),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        entryResults.forEach { entry ->
+                            PublicAddressValues(entry, family) { onCopy(familyLabel, it) }
+                        }
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ProbeSectionTitle(stringResource(R.string.monitor_network_probe_exit))
+                        PublicAddressValues(generalResult, family) { onCopy(familyLabel, it) }
+                    }
+                }
+            }
 
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
@@ -312,74 +354,98 @@ private fun PublicAddressSection(
     family: AddressFamily,
     onCopy: (String) -> Unit,
 ) {
-    val locationSummary = result.locationSummary(formatCloudflareColo(result.colo))
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        ProbeSectionTitle(title)
+        PublicAddressValues(result, family, onCopy)
+    }
+}
+
+@Composable
+private fun ProbeSectionTitle(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun PublicAddressValues(
+    result: PublicAddressProbeResult,
+    family: AddressFamily,
+    onCopy: (String) -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val typography = MaterialTheme.typography
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (result.error == PublicProbeError.Unavailable || result.address.isBlank()) {
+            val unavailable = if (family == AddressFamily.Ipv6) {
+                R.string.monitor_network_probe_unallocated_ipv6
+            } else {
+                R.string.monitor_network_probe_unallocated_ipv4
+            }
+            Text(
+                text = if (result.error == PublicProbeError.Unavailable) stringResource(unavailable) else "—",
+                style = typography.bodyMedium,
+                color = scheme.onSurfaceVariant,
+            )
+        } else {
+            CopyableProbeText(
+                result.address,
+                typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold, color = scheme.onSurface),
+                onCopy,
+            )
+        }
+        val location = result.locationSummary(formatCloudflareColo(result.colo)).ifBlank { result.countryCode }
+        val flag = countryCodeToEmoji(result.countryCode)
+        CopyableProbeText(
+            location,
+            typography.bodyMedium.copy(color = scheme.primary),
+            onCopy,
+            label = listOf(flag, location).filter(String::isNotBlank).joinToString(" "),
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                if (result.error == PublicProbeError.Unavailable) {
-                    Text(
-                        text = stringResource(
-                            if (family == AddressFamily.Ipv6) {
-                                R.string.monitor_network_probe_unallocated_ipv6
-                            } else {
-                                R.string.monitor_network_probe_unallocated_ipv4
-                            }
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Text(
-                        text = result.address.ifBlank { "—" },
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (locationSummary.isNotBlank()) {
-                    Text(
-                        text = locationSummary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                result.durationMillis?.let { duration ->
-                    Text(
-                        stringResource(R.string.monitor_network_request_duration_value, duration),
-                        modifier = Modifier.padding(top = 2.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (result.address.isNotBlank() && result.error != PublicProbeError.Unavailable) {
-                IconButton(onClick = { onCopy(result.address) }) {
-                    Icon(Icons.Rounded.ContentCopy, stringResource(R.string.monitor_copy_value))
-                }
-            }
+        val detailStyle = typography.bodyMedium.copy(color = scheme.onSurfaceVariant)
+        CopyableProbeText(result.asn, detailStyle, onCopy)
+        CopyableProbeText(result.isp, detailStyle, onCopy)
+        if (result.warp.equals("on", ignoreCase = true)) {
+            Text("WARP", style = detailStyle)
+        }
+        result.durationMillis?.let { duration ->
+            Text(
+                stringResource(R.string.monitor_network_request_duration_value, duration),
+                style = typography.bodySmall,
+                color = scheme.onSurfaceVariant,
+            )
         }
         if (result.error != null && result.error != PublicProbeError.Unavailable) {
             Text(
                 result.errorMessage.ifBlank { publicProbeErrorLabel(result.error) },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+                style = typography.bodySmall,
+                color = scheme.error,
             )
             if (result.stale) {
-                Text(stringResource(R.string.monitor_data_stale), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.monitor_data_stale), style = typography.bodySmall)
             }
         }
     }
+}
+
+@Composable
+private fun CopyableProbeText(
+    value: String,
+    style: TextStyle,
+    onCopy: (String) -> Unit,
+    label: String = value,
+) {
+    if (value.isBlank()) return
+    Text(
+        text = label,
+        modifier = Modifier.clickable(
+            onClickLabel = stringResource(R.string.monitor_copy_value),
+            onClick = { onCopy(value) },
+        ),
+        style = style,
+    )
 }
 
 @Composable

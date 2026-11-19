@@ -15,14 +15,17 @@ import engine.network.ProxyIpProbeException
 import engine.network.ProxyIpProbeRequest
 import engine.network.ProxyIpProbeResponse
 import engine.network.readOrCreateProxyIpProbeToken
+import engine.singbox.config.parseSingBoxJson
 import engine.singbox.singBoxControlConfig
 import engine.singbox.singBoxModeName
 import engine.vpn.VpnSingBoxConfigFactory
 import features.logs.AndroidAppLogger
 import features.resources.runtime.singBoxResourceFilesDir
+import features.resources.runtime.singBoxResourceFilePaths
 import features.resources.runtime.skipsBundledCoreConfigCheck
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.StatusMessage
+import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,6 +47,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -538,6 +545,20 @@ internal class SingBoxRuntimeRepository(
 
     suspend fun usesBundledCore(runMode: Int): Boolean = withContext(Dispatchers.IO) {
         !appContext.skipsBundledCoreConfigCheck(runMode)
+    }
+
+    suspend fun proxyEntryHosts(node: String): List<String> = withContext(Dispatchers.IO) {
+        val file = File(appContext.singBoxResourceFilePaths().dataDir, "config.json")
+        val config = parseSingBoxJson(file.readText())
+        val outbound = sequenceOf("outbounds", "endpoints")
+            .flatMap { (config[it] as? JsonArray).orEmpty().asSequence() }
+            .filterIsInstance<JsonObject>()
+            .firstOrNull { (it["tag"] as? JsonPrimitive)?.contentOrNull == node }
+            ?: return@withContext emptyList()
+        val server = (outbound["server"] as? JsonPrimitive)?.contentOrNull
+        if (!server.isNullOrBlank()) return@withContext listOf(server)
+        (outbound["peers"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>()
+            .mapNotNull { (it["address"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
     }
 
     suspend fun probeProxyIp(appState: AppState, request: ProxyIpProbeRequest): ProxyIpProbeResponse =
