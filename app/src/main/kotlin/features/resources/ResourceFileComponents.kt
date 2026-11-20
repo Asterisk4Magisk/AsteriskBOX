@@ -99,6 +99,7 @@ internal fun ResourceOverviewCard(
     AsteriskStatusCard(
         modifier = modifier,
         status = "$sourceText\n$lastCheckText",
+        statusRowOffset = 3.dp,
         controls = {
             AnimatedContent(
                 targetState = updating,
