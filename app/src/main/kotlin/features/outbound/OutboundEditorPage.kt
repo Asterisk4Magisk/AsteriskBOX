@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -282,6 +283,7 @@ internal fun OutboundEditorPage(
 internal fun EditorSectionCard(
     title: String,
     description: String,
+    endsWithTextField: Boolean = false,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -300,6 +302,8 @@ internal fun EditorSectionCard(
                 )
             }
             content()
+            // Text fields have less space below their outline than preference rows have below their icon.
+            Spacer(Modifier.height(if (endsWithTextField) 10.dp else 4.dp))
         }
     }
 }

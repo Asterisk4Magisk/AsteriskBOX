@@ -85,6 +85,13 @@ internal fun LazyListScope.outboundEditorSections(state: OutboundEditorContentSt
         EditorSectionCard(
             title = section.section.localizedTitle(),
             description = section.section.localizedSummary(),
+            endsWithTextField = when (section.fields.last { it.visible }.field.kind) {
+                OutboundFieldKind.TEXT,
+                OutboundFieldKind.INTEGER,
+                OutboundFieldKind.TEXT_LIST,
+                OutboundFieldKind.MULTILINE -> true
+                else -> false
+            },
         ) {
             val fieldEnter = AsteriskMotion.contentEnter()
             val fieldExit = AsteriskMotion.contentExit()
