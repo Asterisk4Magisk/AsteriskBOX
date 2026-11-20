@@ -14,6 +14,7 @@ import engine.proxy.ProxyEngineStartRequest
 import engine.network.ProxyIpProbeException
 import engine.network.ProxyIpProbeRequest
 import engine.network.ProxyIpProbeResponse
+import engine.network.isIpv6Address
 import engine.network.readOrCreateProxyIpProbeToken
 import engine.singbox.config.parseSingBoxJson
 import engine.singbox.singBoxControlConfig
@@ -26,6 +27,7 @@ import features.resources.runtime.skipsBundledCoreConfigCheck
 import io.nekohasekai.libbox.Libbox
 import io.nekohasekai.libbox.StatusMessage
 import java.io.File
+import java.net.URI
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -556,7 +558,21 @@ internal class SingBoxRuntimeRepository(
             .firstOrNull { (it["tag"] as? JsonPrimitive)?.contentOrNull == node }
             ?: return@withContext emptyList()
         val server = (outbound["server"] as? JsonPrimitive)?.contentOrNull
-        if (!server.isNullOrBlank()) return@withContext listOf(server)
+        val type = (outbound["type"] as? JsonPrimitive)?.contentOrNull
+        if (!server.isNullOrBlank()) {
+            val address = server.trim()
+            val host = if (type == "openconnect" && !isIpv6Address(address)) {
+                val url = if ("://" in address) address else "https://$address"
+                runCatching { URI(url).host?.removeSurrounding("[", "]") }.getOrNull()
+            } else {
+                address
+            }
+            return@withContext listOfNotNull(host)
+        }
+        if (type == "openvpn-client") {
+            return@withContext (outbound["servers"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>()
+                .mapNotNull { (it["server"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
+        }
         (outbound["peers"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>()
             .mapNotNull { (it["address"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
     }
