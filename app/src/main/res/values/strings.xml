@@ -117,7 +117,7 @@
     <string name="monitor_loading">Loading live data…</string>
     <string name="monitor_milliseconds">%1$d ms</string>
     <string name="monitor_no_samples">No samples yet. Paused intervals remain as gaps.</string>
-    <string name="monitor_rate_pair">↓ %1$s/s · ↑ %2$s/s</string>
+    <string name="monitor_rate_pair">↑ %1$s/s · ↓ %2$s/s</string>
     <string name="monitor_refresh">Refresh</string>
     <string name="monitor_service_not_enabled">Service not enabled</string>
     <string name="monitor_sort_rate">Real-time rate</string>

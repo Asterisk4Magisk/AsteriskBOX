@@ -112,7 +112,7 @@
     <string name="monitor_loading">正在读取实时数据…</string>
     <string name="monitor_milliseconds">%1$d ms</string>
     <string name="monitor_no_samples">暂无采样；暂停期间留空。</string>
-    <string name="monitor_rate_pair">↓ %1$s/s · ↑ %2$s/s</string>
+    <string name="monitor_rate_pair">↑ %1$s/s · ↓ %2$s/s</string>
     <string name="monitor_refresh">刷新</string>
     <string name="monitor_service_not_enabled">服务未启用</string>
     <string name="monitor_sort_rate">实时速率</string>

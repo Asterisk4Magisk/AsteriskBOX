@@ -770,18 +770,18 @@ private fun connectionSortLabel(sort: ConnectionSort): String = stringResource(
 
 @Composable
 private fun formatConnectionRate(connection: SingBoxConnection): String {
-    val down = connection.downloadBytesPerSecond
     val up = connection.uploadBytesPerSecond
-    return formatRatePair(down, up)
+    val down = connection.downloadBytesPerSecond
+    return formatRatePair(upload = up, download = down)
 }
 
 @Composable
-private fun formatRatePair(download: Long?, upload: Long?): String {
-    if (download == null && upload == null) return "—"
+private fun formatRatePair(upload: Long?, download: Long?): String {
+    if (upload == null && download == null) return "—"
     return stringResource(
         R.string.monitor_rate_pair,
-        (download ?: 0L).toReadableBytes(),
         (upload ?: 0L).toReadableBytes(),
+        (download ?: 0L).toReadableBytes(),
     )
 }
 
