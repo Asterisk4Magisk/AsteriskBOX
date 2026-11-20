@@ -204,10 +204,15 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
         }
     }
 
-    // Shared by the flat list and the application grouping so both render identically.
-    val connectionCardItem: @Composable (SingBoxConnection, Modifier) -> Unit = { connection, modifier ->
+    @Composable
+    fun ConnectionCardItem(
+        connection: SingBoxConnection,
+        modifier: Modifier = Modifier,
+        groupPackageName: String? = null,
+    ) {
         ConnectionCard(
             connection = connection,
+            groupPackageName = groupPackageName,
             expanded = selected?.id == connection.id,
             onOpen = {
                 selected = if (selected?.id == connection.id) null else connection
@@ -338,15 +343,16 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
                                         expandedAppKeys = expandedAppKeys.toggleAppGroup(row.group.key)
                                     },
                                 )
-                                is ConnectionAppRow.Link -> connectionCardItem(
-                                    row.connection,
-                                    modifier.then(NestedConnectionModifier),
+                                is ConnectionAppRow.Link -> ConnectionCardItem(
+                                    connection = row.connection,
+                                    modifier = modifier.then(NestedConnectionModifier),
+                                    groupPackageName = row.group.packageName,
                                 )
                             }
                         }
                     } else {
                         items(visibleConnections, key = SingBoxConnection::id) { connection ->
-                            connectionCardItem(connection, Modifier)
+                            ConnectionCardItem(connection)
                         }
                     }
                 }
@@ -624,6 +630,7 @@ private fun ConnectionAppIcon(
 @Composable
 private fun ConnectionCard(
     connection: SingBoxConnection,
+    groupPackageName: String?,
     expanded: Boolean,
     onOpen: () -> Unit,
     onClose: () -> Unit,
@@ -656,8 +663,9 @@ private fun ConnectionCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = listOf(
-                        connection.process.ifBlank { stringResource(R.string.monitor_connections_unknown_source) },
+                    text = listOfNotNull(
+                        connection.process.takeUnless { it.trim() == groupPackageName }
+                            ?.ifBlank { stringResource(R.string.monitor_connections_unknown_source) },
                         connection.network.uppercase().ifBlank { stringResource(R.string.common_unknown) },
                         formatDuration(connection.startedAtMillis, detectedClosedAt),
                     ).joinToString(" · "),
