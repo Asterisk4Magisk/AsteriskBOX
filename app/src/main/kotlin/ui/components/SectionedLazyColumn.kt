@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
@@ -20,11 +22,13 @@ internal fun SectionedLazyColumn(
     itemSpacing: Dp,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    state: LazyListState = rememberLazyListState(),
     content: SectionedListScope.() -> Unit,
 ) {
     LazyColumn(
         modifier = modifier,
         contentPadding = contentPadding,
+        state = state,
     ) {
         SectionedListScope(this, itemSpacing).content()
     }
@@ -55,11 +59,20 @@ internal class SectionedListScope(
         contentType: Any?,
         content: @Composable LazyItemScope.() -> Unit,
     ) {
-        val topPadding = nextItemPadding()
-        target.item(key, contentType) {
+        itemWithPadding(key, contentType) { padding ->
             val itemScope = this
-            Column(Modifier.padding(top = topPadding)) { content(itemScope) }
+            Column(padding) { content(itemScope) }
         }
+    }
+
+    /** Passes section spacing to an item that supplies its own layout root. */
+    fun itemWithPadding(
+        key: Any?,
+        contentType: Any? = null,
+        content: @Composable LazyItemScope.(Modifier) -> Unit,
+    ) {
+        val padding = Modifier.padding(top = nextItemPadding())
+        target.item(key, contentType) { content(padding) }
         firstItem = false
         previousWasTitle = false
     }

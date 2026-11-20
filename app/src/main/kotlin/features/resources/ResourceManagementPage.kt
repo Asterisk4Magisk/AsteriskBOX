@@ -8,7 +8,7 @@ import features.resources.runtime.withScannedResourceFiles
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import ui.components.SectionedLazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.input.clearText
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
@@ -48,11 +48,21 @@ import app.withRemovedManagedResourceFiles
 import features.resources.runtime.ResourceFileBatchDownloadFailedException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskScaffold
 import ui.components.AsteriskTopAppBar
+import ui.components.SectionedLazyColumn
+import ui.components.animateDraggedCardLift
+import ui.components.draggedCardLift
+import ui.components.longPressReorderDragHandle
+import ui.components.rememberAsteriskReorderableLazyListState
+import ui.components.rememberReorderPreview
+import ui.components.reorderByIds
+import ui.components.verticalReorderScrollThresholdPadding
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.text.formatTemplate
+import ui.theme.AsteriskShapeTokens
 import kotlin.coroutines.cancellation.CancellationException
 import ui.icons.AsteriskIcons as Icons
 
@@ -453,10 +463,37 @@ fun ResourceManagementPage(
             isWideScreen = isWideScreen,
         )
         val listPadding = pageListPadding(contentPadding)
+        val customFiles = appState.customResourceFiles
+        val reorderEnabled = customFiles.size > 1 && !resourceActionRunning
+        val preview = rememberReorderPreview(
+            items = customFiles,
+            key = CustomResourceFileState::id,
+            enabled = reorderEnabled,
+        ) { orderedIds ->
+            updateAppState { state ->
+                state.copy(
+                    customResourceFiles = state.customResourceFiles.reorderByIds(
+                        orderedIds,
+                        CustomResourceFileState::id,
+                    ),
+                )
+            }
+            true
+        }
+        val listState = rememberLazyListState()
+        val reorderableState = rememberAsteriskReorderableLazyListState(
+            lazyListState = listState,
+            itemCount = preview.items.size,
+            // The overview card and three section titles precede the custom files.
+            indexOffset = ResourceFileKind.entries.size + 4,
+            scrollThresholdPadding = verticalReorderScrollThresholdPadding(listPadding),
+            onMove = preview.onMove,
+        )
 
         SectionedLazyColumn(
             contentPadding = listPadding,
             itemSpacing = 10.dp,
+            state = listState,
         ) {
             item(key = "resource_overview") {
                 ResourceOverviewCard(
@@ -556,59 +593,77 @@ fun ResourceManagementPage(
                     )
                 }
             }
-            if (appState.customResourceFiles.isNotEmpty()) {
+            if (customFiles.isNotEmpty()) {
                 sectionTitleItem(key = "resource_custom_section") {
                     ResourceSectionTitle(stringResource(R.string.settings_resource_files_custom_section))
                 }
             }
-            appState.customResourceFiles.forEach { customFile ->
-                item(key = "custom_resource_file_${customFile.id}") {
-                    CustomResourceFileCard(
-                        fileStatus = status.statusOf(customFile),
-                        updateState = updateQueueState.displayStateOf(
-                            ResourceFileUpdateTarget.Custom(customFile.id),
-                        ),
-                        actionsEnabled = !resourceActionRunning,
-                        onUpdate = ::updateCustomResourceFile,
-                        onReplace = { file ->
-                            runResourceFileAction(
-                                action = {
-                                    resourceFileUseCase.replaceCustom(file, appState.customResourceFiles)
-                                },
-                                successMessage = replacedMessage.formatTemplate("name" to file.name),
-                            )
-                        },
-                        onEdit = { file ->
-                            editCustomResourceFileNameState.setTextAndPlaceCursorAtEnd(file.name)
-                            editCustomResourceFileUrlState.setTextAndPlaceCursorAtEnd(file.url)
-                            editingCustomResourceFile = file
-                        },
-                        onModify = { file ->
-                            navigator.push(Route.ResourceTextEdit(resourceId = file.id))
-                        },
-                        onPreview = { file -> previewingCustomResourceFile = file },
-                        onDelete = { file ->
-                            val remaining = appState.customResourceFiles
-                                .filterNot { customFile -> customFile.id == file.id }
-                            runResourceFileAction(
-                                action = {
-                                    resourceFileUseCase.deleteCustom(file, remaining)
-                                },
-                                successMessage = deletedMessage.formatTemplate("name" to file.name),
-                                onSuccess = {
-                                    updateAppState { state ->
-                                        state.withRemovedManagedResourceFiles(setOf(file.name))
-                                            .copy(
-                                                customResourceFiles =
-                                                    state.customResourceFiles.filterNot {
-                                                        customFile -> customFile.id == file.id
-                                                    },
-                                            )
-                                    }
-                                },
-                            )
-                        },
-                    )
+            preview.items.forEach { customFile ->
+                val key = "custom_resource_file_${customFile.id}"
+                itemWithPadding(key = key) { itemPadding ->
+                    ReorderableItem(
+                        state = reorderableState.reorderableState,
+                        key = key,
+                        modifier = itemPadding.fillMaxWidth(),
+                        animateItemModifier = Modifier.animateItem(),
+                    ) { isDragging ->
+                        val lift = animateDraggedCardLift(isDragging, label = "custom-resource-card")
+                        CustomResourceFileCard(
+                            fileStatus = status.statusOf(customFile),
+                            modifier = Modifier
+                                .longPressReorderDragHandle(
+                                    scope = this,
+                                    enabled = reorderEnabled,
+                                    state = reorderableState,
+                                    onDragStarted = preview.onDragStarted,
+                                    onDragStopped = preview.onDragStopped,
+                                )
+                                .draggedCardLift(lift, cornerRadius = AsteriskShapeTokens.InnerContainerRadius),
+                            updateState = updateQueueState.displayStateOf(
+                                ResourceFileUpdateTarget.Custom(customFile.id),
+                            ),
+                            actionsEnabled = !resourceActionRunning,
+                            onUpdate = ::updateCustomResourceFile,
+                            onReplace = { file ->
+                                runResourceFileAction(
+                                    action = {
+                                        resourceFileUseCase.replaceCustom(file, appState.customResourceFiles)
+                                    },
+                                    successMessage = replacedMessage.formatTemplate("name" to file.name),
+                                )
+                            },
+                            onEdit = { file ->
+                                editCustomResourceFileNameState.setTextAndPlaceCursorAtEnd(file.name)
+                                editCustomResourceFileUrlState.setTextAndPlaceCursorAtEnd(file.url)
+                                editingCustomResourceFile = file
+                            },
+                            onModify = { file ->
+                                navigator.push(Route.ResourceTextEdit(resourceId = file.id))
+                            },
+                            onPreview = { file -> previewingCustomResourceFile = file },
+                            onDelete = { file ->
+                                val remaining = appState.customResourceFiles
+                                    .filterNot { customFile -> customFile.id == file.id }
+                                runResourceFileAction(
+                                    action = {
+                                        resourceFileUseCase.deleteCustom(file, remaining)
+                                    },
+                                    successMessage = deletedMessage.formatTemplate("name" to file.name),
+                                    onSuccess = {
+                                        updateAppState { state ->
+                                            state.withRemovedManagedResourceFiles(setOf(file.name))
+                                                .copy(
+                                                    customResourceFiles =
+                                                        state.customResourceFiles.filterNot {
+                                                            customFile -> customFile.id == file.id
+                                                        },
+                                                )
+                                        }
+                                    },
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }
