@@ -1516,6 +1516,12 @@
     <string name="settings_resource_files_custom_url_optional">URL (optional)</string>
     <string name="settings_resource_files_deleted">{name} deleted</string>
     <string name="settings_resource_files_files">Resource files</string>
+    <string name="settings_resource_cidr_editor_hint">Enter one CIDR of the matching address family per line. Use # for comments.</string>
+    <string name="settings_resource_cidr_editor_unavailable">This resource file is unavailable</string>
+    <string name="settings_resource_cidr_editor_empty">The resource file cannot be blank</string>
+    <string name="settings_resource_cidr_editor_invalid_line">Invalid CIDR or wrong address family on line %1$d</string>
+    <string name="settings_resource_cidr_editor_save_failed">Could not save this resource file</string>
+    <string name="settings_resource_cidr_editor_saved">%1$s saved</string>
     <string name="settings_resource_files_last_check">Last check {time}</string>
     <string name="settings_resource_files_local_only">Local replacement only</string>
     <string name="settings_resource_files_missing">Missing</string>
@@ -1546,7 +1552,7 @@
     <string name="settings_resource_hosts_editor_missing">This Hosts resource is unavailable</string>
     <string name="settings_resource_hosts_editor_save_failed">Could not save this Hosts file</string>
     <string name="settings_resource_hosts_editor_title">Modify Hosts file</string>
-    <string name="settings_resource_json_editor_changed">The file changed after it was opened. Reopen it before saving.</string>
+    <string name="settings_resource_editor_changed">The file changed after it was opened. Reopen it before saving.</string>
     <string name="settings_resource_json_editor_content">JSON rule set</string>
     <string name="settings_resource_json_editor_content_summary">Edit the source rules directly. Saving checks the sing-box rule-set structure and runtime configuration.</string>
     <string name="settings_resource_json_editor_draft">This file has not been created. Save to create it.</string>

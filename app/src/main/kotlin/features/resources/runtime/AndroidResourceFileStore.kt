@@ -187,14 +187,9 @@ internal class AndroidResourceFileStore(
 
     fun replace(kind: ResourceFileKind, uri: Uri) {
         require(kind != ResourceFileKind.SingBoxCore) { "sing-box core must be replaced through the locked publisher" }
-        dataDir.mkdirs()
-        val replaceTempFile = assetDirectory.createCandidate("replace-")
         appContext.contentResolver.openInputStream(uri)?.use { input ->
-            replaceTempFile.outputStream().use { output -> input.copyTo(output) }
+            writeAtomically(file(kind)) { output -> input.copyTo(output) }
         } ?: throw FileNotFoundException(uri.toString())
-
-        replaceFile(replaceTempFile, file(kind))
-        kind.applyPermissions(file(kind))
     }
 
     fun stageSingBoxCoreCandidate(uri: Uri): File {

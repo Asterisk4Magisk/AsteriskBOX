@@ -84,6 +84,7 @@ import features.outbound.OutboundGroupListPage
 import features.outbound.OutboundListPage
 import features.proxy.app.ProxyAppListPage
 import features.resources.ResourceTextEditorPage
+import features.resources.ResourceCidrEditorPage
 import features.resources.ResourceManagementPage
 import features.routing.RouteRuleEditorPage
 import features.routing.RoutingManagementPage
@@ -210,6 +211,9 @@ fun AppContent(
                 }
                 entry<Route.ResourceManagement> {
                     ResourceManagementPage(padding = padding)
+                }
+                entry<Route.ResourceCidrEdit> { route ->
+                    ResourceCidrEditorPage(padding = padding, kind = route.kind)
                 }
                 entry<Route.ResourceTextEdit> { route ->
                     key(route.resourceId) {

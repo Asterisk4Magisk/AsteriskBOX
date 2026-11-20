@@ -289,12 +289,14 @@ internal fun ResourceFileCard(
     updateState: ResourceFileUpdateDisplayState = ResourceFileUpdateDisplayState.Idle,
     onUpdate: (() -> Unit)? = null,
     onRestore: (() -> Unit)? = null,
+    onModify: (() -> Unit)? = null,
     description: String? = null,
     actionsEnabled: Boolean = true,
 ) {
     val actions = buildList {
         onUpdate?.let { add(ResourceMenuEntry(ResourceDisplayAction.Update, it)) }
         add(ResourceMenuEntry(ResourceDisplayAction.Replace, onReplace))
+        onModify?.let { add(ResourceMenuEntry(ResourceDisplayAction.Modify, it)) }
         onRestore?.let { add(ResourceMenuEntry(ResourceDisplayAction.Restore, it)) }
     }
     ResourceFileCardSurface(

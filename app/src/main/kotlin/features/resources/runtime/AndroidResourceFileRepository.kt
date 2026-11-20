@@ -19,6 +19,8 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import features.resources.ResourceFileUpdateOptions
+import features.resources.isDirectCidrResource
+import features.resources.requireValidCidrResource
 import features.resources.ResourceTextEditorSnapshot
 import features.resources.ResourceTextFileOrigin
 import engine.root.publication.RootCoreRemovalCommand
@@ -30,6 +32,7 @@ import features.resources.SingBoxRuleSetFileFormat
 import features.resources.singBoxRuleSetFormatOrNull
 import engine.singbox.readSingBoxBinaryRuleSet
 import java.io.File
+import features.resources.runtime.writeResourceAtomically as writeAtomically
 import features.resources.requireValidHostsResource
 import features.resources.InvalidSingBoxJsonRuleSetException
 import features.resources.resourceTextEditorSnapshot
@@ -56,6 +59,23 @@ internal class AndroidResourceFileRepository(
     suspend fun hasCustomSingBoxCore(): Boolean = withContext(Dispatchers.IO) {
         store.hasCustomSingBoxCore()
     }
+
+    suspend fun readCidrText(kind: ResourceFileKind): String = withContext(Dispatchers.IO) {
+        require(kind.isDirectCidrResource())
+        store.file(kind).readText()
+    }
+
+    suspend fun saveCidrText(kind: ResourceFileKind, original: String, content: String) =
+        withContext(Dispatchers.IO) {
+            requireValidCidrResource(kind, content)
+            val target = store.file(kind)
+            writeAtomically(target) { output ->
+                if (!target.isFile || target.readText() != original) {
+                    throw ResourceFileChangedException(target.name)
+                }
+                output.write(content.toByteArray())
+            }
+        }
 
     suspend fun restoreBundledDefaults(resourceFileSource: Int): ResourceFilesStatus = withContext(Dispatchers.IO) {
         store.restoreBundledDefaults(resourceFileSource)

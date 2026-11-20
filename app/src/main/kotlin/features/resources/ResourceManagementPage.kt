@@ -535,6 +535,11 @@ fun ResourceManagementPage(
                             ResourceFileUpdateTarget.BuiltIn(kind),
                         ),
                         actionsEnabled = !resourceActionRunning,
+                        onModify = if (kind.isDirectCidrResource() && status.statusOf(kind).exists) {
+                            { navigator.push(Route.ResourceCidrEdit(kind)) }
+                        } else {
+                            null
+                        },
                         onUpdate = { updateResourceFile(kind) },
                         onReplace = {
                             runResourceFileAction(

@@ -81,7 +81,7 @@ internal fun ResourceTextEditorPage(
     val saveFailedMessage = stringResource(if (isHosts) R.string.settings_resource_hosts_editor_save_failed else R.string.settings_resource_json_editor_save_failed)
     val invalidHostsMessage = stringResource(R.string.settings_resource_hosts_editor_invalid)
     val invalidRuleSetMessage = stringResource(R.string.settings_resource_json_editor_invalid_rule_set)
-    val changedMessage = stringResource(R.string.settings_resource_json_editor_changed)
+    val changedMessage = stringResource(R.string.settings_resource_editor_changed)
     val savedMessage = stringResource(
         R.string.settings_resource_json_editor_saved,
         file?.name.orEmpty(),

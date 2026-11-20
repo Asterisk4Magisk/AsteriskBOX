@@ -148,9 +148,25 @@ internal fun HostsCodeEditor(
 }
 
 @Composable
+internal fun PlainTextCodeEditor(
+    state: SingBoxCodeEditorState,
+    modifier: Modifier = Modifier,
+    readOnly: Boolean = false,
+    searchState: AsteriskCodeSearchState? = null,
+) {
+    SoraCodeEditor(
+        state = state,
+        language = null,
+        readOnly = readOnly,
+        searchState = searchState,
+        modifier = modifier,
+    )
+}
+
+@Composable
 internal fun SoraCodeEditor(
     state: SingBoxCodeEditorState,
-    language: SingBoxCodeLanguage,
+    language: SingBoxCodeLanguage?,
     readOnly: Boolean,
     modifier: Modifier = Modifier,
     searchState: AsteriskCodeSearchState? = null,
@@ -237,15 +253,15 @@ private class SingBoxSoraEditor(context: Context) : CodeEditor(context) {
         state?.attach(this)
     }
 
-    fun updateLanguage(language: SingBoxCodeLanguage) {
+    fun updateLanguage(language: SingBoxCodeLanguage?) {
         if (this.language == language) return
         this.language = language
-        setEditorLanguage(SingBoxSoraLanguage(language))
+        setEditorLanguage(language?.let(::SingBoxSoraLanguage) ?: EmptyLanguage())
     }
 }
 
 private fun SingBoxSoraEditor.configure(
-    language: SingBoxCodeLanguage,
+    language: SingBoxCodeLanguage?,
     colors: CodeEditorColors,
     colorScheme: EditorColorScheme,
 ) {

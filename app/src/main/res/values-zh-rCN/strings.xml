@@ -1493,6 +1493,12 @@
     <string name="settings_resource_files_custom_url_optional">URL（可选）</string>
     <string name="settings_resource_files_deleted">{name} 已删除</string>
     <string name="settings_resource_files_files">资源文件</string>
+    <string name="settings_resource_cidr_editor_hint">每行填写一个同地址族的 CIDR，使用 # 添加注释。</string>
+    <string name="settings_resource_cidr_editor_unavailable">此资源文件不可用</string>
+    <string name="settings_resource_cidr_editor_empty">资源文件不能为空白</string>
+    <string name="settings_resource_cidr_editor_invalid_line">第 %1$d 行的 CIDR 格式或地址族不正确</string>
+    <string name="settings_resource_cidr_editor_save_failed">无法保存此资源文件</string>
+    <string name="settings_resource_cidr_editor_saved">已保存 %1$s</string>
     <string name="settings_resource_files_last_check">最近检查 {time}</string>
     <string name="settings_resource_files_local_only">仅支持本地替换</string>
     <string name="settings_resource_files_missing">缺失</string>
@@ -1522,7 +1528,7 @@
     <string name="settings_resource_hosts_editor_missing">该 Hosts 资源文件不可用</string>
     <string name="settings_resource_hosts_editor_save_failed">无法保存该 Hosts 文件</string>
     <string name="settings_resource_hosts_editor_title">修改 Hosts 文件</string>
-    <string name="settings_resource_json_editor_changed">文件打开后已发生变化，请重新进入编辑器后再保存。</string>
+    <string name="settings_resource_editor_changed">文件打开后已发生变化，请重新进入编辑器后再保存。</string>
     <string name="settings_resource_json_editor_content">JSON 规则集</string>
     <string name="settings_resource_json_editor_content_summary">直接编辑源规则；保存时会校验 sing-box 规则集结构及完整运行配置。</string>
     <string name="settings_resource_json_editor_draft">该文件尚未创建，保存后创建。</string>

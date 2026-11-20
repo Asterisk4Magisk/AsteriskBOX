@@ -4,6 +4,7 @@
 package app.navigation
 
 import androidx.navigation3.runtime.NavKey
+import app.ResourceFileKind
 import app.SingBoxDnsRuleState
 import app.SingBoxRouteRuleState
 import kotlinx.serialization.Serializable
@@ -33,6 +34,9 @@ sealed interface Route : NavKey {
 
     @Serializable
     data object ResourceManagement : Route
+
+    @Serializable
+    data class ResourceCidrEdit(val kind: ResourceFileKind) : Route
 
     @Serializable
     data object ConfigOverrideScript : Route
