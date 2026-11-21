@@ -57,7 +57,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import app.R
 import ui.clipboard.setPlainText
-import ui.components.AsteriskActionButton
+import ui.components.AsteriskCodeActionButton
 import ui.components.AsteriskFilterChip
 import ui.components.AsteriskNoWrapTextField
 import ui.components.EditorPageScaffold
@@ -216,9 +216,9 @@ internal fun OutboundEditorPage(
         onSave = ::save,
         actions = {
             if (editing != null) {
-                AsteriskActionButton(
-                    text = stringResource(R.string.common_copy),
+                AsteriskCodeActionButton(
                     icon = Icons.Rounded.ContentCopy,
+                    label = stringResource(R.string.common_copy),
                     onClick = {
                         scope.launch {
                             clipboard.setPlainText(

@@ -55,7 +55,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import app.R
 import ui.clipboard.setPlainText
-import ui.components.AsteriskActionButton
 import ui.components.AsteriskCodeActionButton
 import ui.components.AsteriskCodeSearchHost
 import ui.components.EditorPageScaffold
@@ -266,9 +265,9 @@ internal fun EndpointEditorPage(
             onSave = ::save,
             backdrop = backdrop,
             actions = {
-                AsteriskActionButton(
-                    text = stringResource(R.string.common_copy),
+                AsteriskCodeActionButton(
                     icon = Icons.Rounded.ContentCopy,
+                    label = stringResource(R.string.common_copy),
                     onClick = {
                         scope.launch {
                             clipboard.setPlainText(editorState.snapshotText())

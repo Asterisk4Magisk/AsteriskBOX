@@ -229,7 +229,6 @@ internal fun ResourceTextEditorPage(
             },
             onSave = ::save,
             backdrop = backdrop,
-            saveIconOnly = isHosts,
             actions = { if (isHosts) searchButton() },
         ) { contentPadding ->
             AnimatedContent(

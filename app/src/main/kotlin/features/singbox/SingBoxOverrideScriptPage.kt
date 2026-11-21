@@ -44,10 +44,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ui.clipboard.setPlainText
+import ui.components.AsteriskCodeActionButton
 import ui.components.AsteriskCodeSearchHost
 import ui.components.rememberAsteriskCodeSearchState
-import ui.components.AsteriskActionButton
-import ui.components.AsteriskSaveButton
 import ui.components.AsteriskScaffold
 import ui.components.AsteriskTopAppBar
 import ui.layout.pageContentPaddingWithCutout
@@ -104,9 +103,12 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
                         }
                     },
                     actions = {
-                        AsteriskActionButton(
-                            text = stringResource(if (debugging) R.string.singbox_override_script_debug_running else R.string.singbox_override_script_debug_run),
+                        AsteriskCodeActionButton(
                             icon = Icons.Rounded.BugReport,
+                            label = stringResource(
+                                if (debugging) R.string.singbox_override_script_debug_running
+                                else R.string.singbox_override_script_debug_run,
+                            ),
                             loading = debugging,
                             onClick = {
                                 val script = editorState.snapshotText()
@@ -129,7 +131,9 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
                                 }
                             },
                         )
-                        AsteriskSaveButton(
+                        AsteriskCodeActionButton(
+                            icon = Icons.Rounded.Save,
+                            label = stringResource(R.string.common_save),
                             onClick = {
                                 val script = editorState.snapshotText()
                                 updateAppState { state ->

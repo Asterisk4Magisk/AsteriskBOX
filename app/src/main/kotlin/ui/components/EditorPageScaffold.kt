@@ -45,7 +45,6 @@ internal fun EditorPageScaffold(
     searchPlaceholder: String = "",
     searchField: @Composable ((Modifier) -> Unit)? = null,
     backdrop: HazeState = rememberHazeState(),
-    saveIconOnly: Boolean = false,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val state = EditorPageScaffoldState(saving, saveEnabled)
@@ -69,21 +68,13 @@ internal fun EditorPageScaffold(
             }
             val editorActions: @Composable RowScope.() -> Unit = {
                 actions()
-                if (saveIconOnly) {
-                    AsteriskCodeActionButton(
-                        icon = Icons.Rounded.Save,
-                        label = stringResource(R.string.common_save),
-                        onClick = onSave,
-                        enabled = state.saveEnabled,
-                        loading = saving,
-                    )
-                } else {
-                    AsteriskSaveButton(
-                        onClick = onSave,
-                        enabled = state.saveEnabled,
-                        loading = saving,
-                    )
-                }
+                AsteriskCodeActionButton(
+                    icon = Icons.Rounded.Save,
+                    label = stringResource(R.string.common_save),
+                    onClick = onSave,
+                    enabled = state.saveEnabled,
+                    loading = saving,
+                )
             }
             if (searchQuery != null) {
                 AsteriskSearchTopAppBar(
