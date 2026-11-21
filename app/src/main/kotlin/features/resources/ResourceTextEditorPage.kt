@@ -7,7 +7,6 @@ import ui.layout.rememberCodeEditorFocusState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -19,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -46,7 +44,10 @@ import features.singbox.SingBoxCodeEditorState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import app.R
+import ui.components.AsteriskCodeActionButton
+import ui.components.AsteriskCodeSearchHost
 import ui.components.EditorPageScaffold
+import ui.components.rememberAsteriskCodeSearchState
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 import ui.icons.AsteriskIcons as Icons
@@ -122,9 +123,11 @@ internal fun ResourceTextEditorPage(
         }
     }
 
+    val codeSearch = rememberAsteriskCodeSearchState()
     val editorFocus = rememberCodeEditorFocusState(
         editorFocused = editorState.isFocused,
         clearEditorFocus = editorState::clearFocus,
+        searchActive = codeSearch.active,
         backEnabled = !saving,
     )
 
@@ -189,128 +192,136 @@ internal fun ResourceTextEditorPage(
         }
     }
 
-    EditorPageScaffold(
-        outerPadding = padding,
-        isWideScreen = isWideScreen,
-        title = {
-            Column {
-                Text(stringResource(if (isHosts) R.string.settings_resource_hosts_editor_title else R.string.settings_resource_json_editor_title))
-                Text(
-                    file?.name ?: stringResource(R.string.settings_resource_json_editor_summary),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+    AsteriskCodeSearchHost(
+        state = codeSearch,
+        modifier = Modifier.fillMaxSize(),
+        enabled = loadState == ResourceTextEditorLoadState.Ready && !saving,
+        editorTools = if (isHosts) null else { searchButton ->
+            searchButton()
+            AsteriskCodeActionButton(
+                icon = Icons.Rounded.AutoFixHigh,
+                label = stringResource(R.string.settings_resource_json_editor_format),
+                onClick = ::formatCurrentJson,
+            )
         },
-        saving = saving,
-        saveEnabled = loadState == ResourceTextEditorLoadState.Ready,
-        onBack = { if (editorFocus.expanded) editorFocus.exit() else navigator.pop() },
-        onSave = ::save,
-    ) { contentPadding ->
-        AnimatedContent(
-            targetState = loadState,
-            transitionSpec = transitionSpec,
-            label = "resource-text-editor-state",
-            modifier = Modifier.fillMaxSize().padding(contentPadding),
-        ) { state ->
-            when (state) {
-                ResourceTextEditorLoadState.Loading -> ResourceTextEditorMessage {
-                    CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.height(12.dp))
-                    Text(stringResource(if (isHosts) R.string.settings_resource_hosts_editor_loading else R.string.settings_resource_json_editor_loading))
-                }
-                ResourceTextEditorLoadState.Unavailable -> ResourceTextEditorMessage {
-                    Icon(
-                        Icons.Rounded.ErrorOutline,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(8.dp))
+    ) { searchButton, editorModifier, backdrop ->
+        EditorPageScaffold(
+            outerPadding = padding,
+            isWideScreen = isWideScreen,
+            title = {
+                Column {
+                    Text(stringResource(if (isHosts) R.string.settings_resource_hosts_editor_title else R.string.settings_resource_json_editor_title))
                     Text(
-                        stringResource(if (isHosts) R.string.settings_resource_hosts_editor_missing else R.string.settings_resource_json_editor_missing),
+                        file?.name ?: stringResource(R.string.settings_resource_json_editor_summary),
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                ResourceTextEditorLoadState.Ready -> Column(
-                    modifier = Modifier.fillMaxSize().padding(bottom = 12.dp),
-                ) {
-                    AnimatedVisibility(
-                        visible = !editorFocus.expanded,
-                        enter = AsteriskMotion.contentEnter(),
-                        exit = AsteriskMotion.contentExit(),
+            },
+            saving = saving,
+            saveEnabled = loadState == ResourceTextEditorLoadState.Ready,
+            onBack = {
+                when {
+                    codeSearch.active -> codeSearch.close()
+                    editorFocus.expanded -> editorFocus.exit()
+                    else -> navigator.pop()
+                }
+            },
+            onSave = ::save,
+            backdrop = backdrop,
+            saveIconOnly = isHosts,
+            actions = { if (isHosts) searchButton() },
+        ) { contentPadding ->
+            AnimatedContent(
+                targetState = loadState,
+                transitionSpec = transitionSpec,
+                label = "resource-text-editor-state",
+                modifier = Modifier.fillMaxSize().padding(contentPadding),
+            ) { state ->
+                when (state) {
+                    ResourceTextEditorLoadState.Loading -> ResourceTextEditorMessage {
+                        CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.height(12.dp))
+                        Text(stringResource(if (isHosts) R.string.settings_resource_hosts_editor_loading else R.string.settings_resource_json_editor_loading))
+                    }
+                    ResourceTextEditorLoadState.Unavailable -> ResourceTextEditorMessage {
+                        Icon(
+                            Icons.Rounded.ErrorOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(if (isHosts) R.string.settings_resource_hosts_editor_missing else R.string.settings_resource_json_editor_missing),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    ResourceTextEditorLoadState.Ready -> Column(
+                        modifier = Modifier.fillMaxSize().padding(bottom = 12.dp),
                     ) {
-                        Column {
-                            Text(
-                                stringResource(if (isHosts) R.string.settings_resource_hosts_editor_content else R.string.settings_resource_json_editor_content),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            AnimatedVisibility(
-                                visible = loadedSnapshot?.isDraft == true,
-                                enter = AsteriskMotion.contentEnter(),
-                                exit = AsteriskMotion.contentExit(),
-                            ) {
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                                    shape = AsteriskShapeTokens.InnerContainer,
-                                    color = MaterialTheme.colorScheme.primaryContainer,
+                        AnimatedVisibility(
+                            visible = !editorFocus.expanded,
+                            enter = AsteriskMotion.contentEnter(),
+                            exit = AsteriskMotion.contentExit(),
+                        ) {
+                            Column {
+                                Text(
+                                    stringResource(if (isHosts) R.string.settings_resource_hosts_editor_content else R.string.settings_resource_json_editor_content),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                AnimatedVisibility(
+                                    visible = loadedSnapshot?.isDraft == true,
+                                    enter = AsteriskMotion.contentEnter(),
+                                    exit = AsteriskMotion.contentExit(),
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                        shape = AsteriskShapeTokens.InnerContainer,
+                                        color = MaterialTheme.colorScheme.primaryContainer,
                                     ) {
-                                        Icon(
-                                            Icons.Rounded.Description,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(20.dp),
-                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        )
-                                        Text(
-                                            stringResource(R.string.settings_resource_json_editor_draft),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        )
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Icon(
+                                                Icons.Rounded.Description,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(20.dp),
+                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            )
+                                            Text(
+                                                stringResource(R.string.settings_resource_json_editor_draft),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            )
+                                        }
                                     }
                                 }
+                                Text(
+                                    stringResource(if (isHosts) R.string.settings_resource_hosts_editor_content_summary else R.string.settings_resource_json_editor_content_summary),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
+                                )
                             }
-                            Text(
-                                stringResource(if (isHosts) R.string.settings_resource_hosts_editor_content_summary else R.string.settings_resource_json_editor_content_summary),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
-                            )
                         }
-                    }
-                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        val modifier = Modifier.fillMaxWidth().weight(1f).then(editorModifier)
                         if (isHosts) {
                             HostsCodeEditor(
                                 state = editorState,
                                 readOnly = saving,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = modifier,
+                                searchState = codeSearch,
                             )
                         } else {
                             JsonCodeEditor(
                                 state = editorState,
                                 readOnly = saving,
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = modifier,
+                                searchState = codeSearch,
                             )
-                        }
-                        if (!isHosts) Surface(
-                            modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-                            shape = AsteriskShapeTokens.InnerContainer,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            tonalElevation = 3.dp,
-                        ) {
-                            IconButton(onClick = ::formatCurrentJson, enabled = !saving) {
-                                Icon(
-                                    Icons.Rounded.AutoFixHigh,
-                                    contentDescription = stringResource(
-                                        R.string.settings_resource_json_editor_format,
-                                    ),
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                )
-                            }
                         }
                     }
                 }

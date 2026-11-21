@@ -14,6 +14,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.R
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.rememberHazeState
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.icons.AsteriskIcons as Icons
@@ -42,6 +44,8 @@ internal fun EditorPageScaffold(
     onSearchQueryChange: (String) -> Unit = {},
     searchPlaceholder: String = "",
     searchField: @Composable ((Modifier) -> Unit)? = null,
+    backdrop: HazeState = rememberHazeState(),
+    saveIconOnly: Boolean = false,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val state = EditorPageScaffoldState(saving, saveEnabled)
@@ -50,6 +54,7 @@ internal fun EditorPageScaffold(
 
     AsteriskScaffold(
         modifier = modifier,
+        backdrop = backdrop,
         topBar = {
             val navigationIcon: @Composable () -> Unit = {
                 IconButton(
@@ -64,11 +69,21 @@ internal fun EditorPageScaffold(
             }
             val editorActions: @Composable RowScope.() -> Unit = {
                 actions()
-                AsteriskSaveButton(
-                    onClick = onSave,
-                    enabled = state.saveEnabled,
-                    loading = saving,
-                )
+                if (saveIconOnly) {
+                    AsteriskCodeActionButton(
+                        icon = Icons.Rounded.Save,
+                        label = stringResource(R.string.common_save),
+                        onClick = onSave,
+                        enabled = state.saveEnabled,
+                        loading = saving,
+                    )
+                } else {
+                    AsteriskSaveButton(
+                        onClick = onSave,
+                        enabled = state.saveEnabled,
+                        loading = saving,
+                    )
+                }
             }
             if (searchQuery != null) {
                 AsteriskSearchTopAppBar(

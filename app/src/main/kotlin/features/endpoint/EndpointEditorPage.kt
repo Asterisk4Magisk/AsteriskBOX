@@ -6,7 +6,6 @@ package features.endpoint
 import ui.layout.rememberCodeEditorFocusState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -58,8 +56,11 @@ import kotlinx.coroutines.withContext
 import app.R
 import ui.clipboard.setPlainText
 import ui.components.AsteriskActionButton
+import ui.components.AsteriskCodeActionButton
+import ui.components.AsteriskCodeSearchHost
 import ui.components.EditorPageScaffold
 import ui.components.localizedLabel
+import ui.components.rememberAsteriskCodeSearchState
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 import ui.icons.AsteriskIcons as Icons
@@ -118,9 +119,11 @@ internal fun EndpointEditorPage(
     val invalidJsonMessage = stringResource(R.string.endpoint_editor_json_invalid)
     val formatJsonContentDescription = stringResource(R.string.endpoint_editor_format_json)
     val copiedMessage = stringResource(R.string.common_copied)
+    val codeSearch = rememberAsteriskCodeSearchState()
     val editorFocus = rememberCodeEditorFocusState(
         editorFocused = editorState.isFocused,
         clearEditorFocus = editorState::clearFocus,
+        searchActive = codeSearch.active,
         backEnabled = !saving,
     )
     val showProperties = !editorFocus.expanded
@@ -215,181 +218,182 @@ internal fun EndpointEditorPage(
         }
     }
 
-    EditorPageScaffold(
-        outerPadding = padding,
-        isWideScreen = isWideScreen,
-        // The properties title supplies spacing only while the properties are visible.
-        topExtra = if (showProperties) 0.dp else 8.dp,
-        title = {
-            Column {
-                Text(
-                    stringResource(
-                        if (editing == null) {
-                            R.string.endpoint_editor_add
-                        } else {
-                            R.string.endpoint_editor_edit
-                        },
-                    ),
-                )
-                Text(
-                    endpointTypeTitle(type),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        saving = saving,
-        saveEnabled = !missing,
-        onBack = { if (editorFocus.expanded) editorFocus.exit() else navigator.pop() },
-        onSave = ::save,
-        actions = {
-            AsteriskActionButton(
-                text = stringResource(R.string.common_copy),
-                icon = Icons.Rounded.ContentCopy,
-                onClick = {
-                    scope.launch {
-                        clipboard.setPlainText(editorState.snapshotText())
-                        services.tipNotifier.show(copiedMessage)
-                    }
-                },
-                enabled = !missing,
+    AsteriskCodeSearchHost(
+        state = codeSearch,
+        modifier = Modifier.fillMaxSize(),
+        enabled = !missing && !saving,
+        editorTools = { searchButton ->
+            searchButton()
+            AsteriskCodeActionButton(
+                icon = Icons.Rounded.AutoFixHigh,
+                label = formatJsonContentDescription,
+                onClick = ::formatCurrentJson,
             )
         },
-    ) { contentPadding ->
-        if (missing) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(contentPadding),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(
-                    Icons.Rounded.ErrorOutline,
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.endpoint_editor_missing),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(contentPadding)
-                    .padding(bottom = 12.dp),
-            ) {
-                AnimatedVisibility(
-                    visible = showProperties,
-                    enter = AsteriskMotion.contentEnter(),
-                    exit = AsteriskMotion.contentExit(),
-                ) {
-                    Column {
-                        EditorSectionCard(
-                            title = stringResource(R.string.endpoint_editor_type),
-                            description = endpointTypeSummary(type),
-                        ) {
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                                shape = AsteriskShapeTokens.InnerContainer,
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(
-                                        endpointTypeIcon(type),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    )
-                                    Spacer(Modifier.width(12.dp))
-                                    Text(
-                                        endpointTypeTitle(type),
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    )
-                                }
-                            }
-                            OutlinedTextField(
-                                value = remarks,
-                                onValueChange = { remarks = it },
-                                enabled = !saving,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                                label = { Text(stringResource(R.string.endpoint_editor_remarks)) },
-                                singleLine = true,
-                                shape = AsteriskShapeTokens.InnerContainer,
-                            )
-                            SettingsDropdownRow(
-                                title = stringResource(R.string.endpoint_editor_detour),
-                                icon = Icons.AutoMirrored.Rounded.AltRoute,
-                                items = detourLabels,
-                                selectedIndex = detourValues.indexOf(detour).coerceAtLeast(0),
-                                onSelectedIndexChange = { index -> detour = detourValues[index] },
-                            )
-                            SettingsDropdownRow(
-                                title = stringResource(R.string.endpoint_editor_domain_resolver),
-                                icon = Icons.Rounded.Dns,
-                                items = dnsResolverLabels,
-                                selectedIndex = dnsResolverValues.indexOf(domainResolver).coerceAtLeast(0),
-                                onSelectedIndexChange = { index ->
-                                    domainResolver = dnsResolverValues[index]
-                                },
-                            )
-                        }
-                        Spacer(Modifier.height(14.dp))
-                    }
+    ) { _, editorModifier, backdrop ->
+        EditorPageScaffold(
+            outerPadding = padding,
+            isWideScreen = isWideScreen,
+            // The properties title supplies spacing only while the properties are visible.
+            topExtra = if (showProperties) 0.dp else 8.dp,
+            title = {
+                Column {
+                    Text(
+                        stringResource(
+                            if (editing == null) {
+                                R.string.endpoint_editor_add
+                            } else {
+                                R.string.endpoint_editor_edit
+                            },
+                        ),
+                    )
+                    Text(
+                        endpointTypeTitle(type),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
-
-                Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            },
+            saving = saving,
+            saveEnabled = !missing,
+            onBack = {
+                when {
+                    codeSearch.active -> codeSearch.close()
+                    editorFocus.expanded -> editorFocus.exit()
+                    else -> navigator.pop()
+                }
+            },
+            onSave = ::save,
+            backdrop = backdrop,
+            actions = {
+                AsteriskActionButton(
+                    text = stringResource(R.string.common_copy),
+                    icon = Icons.Rounded.ContentCopy,
+                    onClick = {
+                        scope.launch {
+                            clipboard.setPlainText(editorState.snapshotText())
+                            services.tipNotifier.show(copiedMessage)
+                        }
+                    },
+                    enabled = !missing,
+                )
+            },
+        ) { contentPadding ->
+            if (missing) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(contentPadding),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(
+                        Icons.Rounded.ErrorOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.endpoint_editor_missing),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(contentPadding)
+                        .padding(bottom = 12.dp),
+                ) {
                     AnimatedVisibility(
                         visible = showProperties,
                         enter = AsteriskMotion.contentEnter(),
                         exit = AsteriskMotion.contentExit(),
                     ) {
                         Column {
-                            Text(
-                                stringResource(R.string.endpoint_editor_json),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                stringResource(R.string.endpoint_editor_json_summary),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
-                            )
+                            EditorSectionCard(
+                                title = stringResource(R.string.endpoint_editor_type),
+                                description = endpointTypeSummary(type),
+                            ) {
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                                    shape = AsteriskShapeTokens.InnerContainer,
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Icon(
+                                            endpointTypeIcon(type),
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        )
+                                        Spacer(Modifier.width(12.dp))
+                                        Text(
+                                            endpointTypeTitle(type),
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        )
+                                    }
+                                }
+                                OutlinedTextField(
+                                    value = remarks,
+                                    onValueChange = { remarks = it },
+                                    enabled = !saving,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                                    label = { Text(stringResource(R.string.endpoint_editor_remarks)) },
+                                    singleLine = true,
+                                    shape = AsteriskShapeTokens.InnerContainer,
+                                )
+                                SettingsDropdownRow(
+                                    title = stringResource(R.string.endpoint_editor_detour),
+                                    icon = Icons.AutoMirrored.Rounded.AltRoute,
+                                    items = detourLabels,
+                                    selectedIndex = detourValues.indexOf(detour).coerceAtLeast(0),
+                                    onSelectedIndexChange = { index -> detour = detourValues[index] },
+                                )
+                                SettingsDropdownRow(
+                                    title = stringResource(R.string.endpoint_editor_domain_resolver),
+                                    icon = Icons.Rounded.Dns,
+                                    items = dnsResolverLabels,
+                                    selectedIndex = dnsResolverValues.indexOf(domainResolver).coerceAtLeast(0),
+                                    onSelectedIndexChange = { index ->
+                                        domainResolver = dnsResolverValues[index]
+                                    },
+                                )
+                            }
+                            Spacer(Modifier.height(14.dp))
                         }
                     }
-                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                        JsonCodeEditor(
-                            state = editorState,
-                            readOnly = saving,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(8.dp),
-                            shape = AsteriskShapeTokens.InnerContainer,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            tonalElevation = 3.dp,
+
+                    Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        AnimatedVisibility(
+                            visible = showProperties,
+                            enter = AsteriskMotion.contentEnter(),
+                            exit = AsteriskMotion.contentExit(),
                         ) {
-                            IconButton(
-                                onClick = ::formatCurrentJson,
-                                enabled = !saving,
-                            ) {
-                                Icon(
-                                    Icons.Rounded.AutoFixHigh,
-                                    formatJsonContentDescription,
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            Column {
+                                Text(
+                                    stringResource(R.string.endpoint_editor_json),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                Text(
+                                    stringResource(R.string.endpoint_editor_json_summary),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
                                 )
                             }
                         }
+                        JsonCodeEditor(
+                            state = editorState,
+                            readOnly = saving,
+                            modifier = Modifier.fillMaxWidth().weight(1f).then(editorModifier),
+                            searchState = codeSearch,
+                        )
                     }
                 }
             }
