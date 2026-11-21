@@ -3,6 +3,7 @@
 
 package ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,11 +20,13 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,6 +39,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ui.clipboard.setPlainText
+import ui.layout.LocalAdaptiveWindow
+import ui.layout.avoidFold
 import ui.layout.pageListPadding
 import ui.layout.CodeEditorFocusState
 import ui.theme.AsteriskMotion
@@ -61,6 +66,7 @@ internal fun AsteriskCodePreviewDialog(
             else -> onDismissRequest()
         }
     }
+    val window = LocalAdaptiveWindow.current
     Dialog(
         onDismissRequest = onBack,
         properties = DialogProperties(
@@ -71,7 +77,10 @@ internal fun AsteriskCodePreviewDialog(
     ) {
         AsteriskCodeSearchHost(
             state = searchState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface)
+                .avoidFold(window)
+                .clipToBounds(),
             enabled = searchAvailable,
             showSearchButton = keepSearchButtonVisible || searchAvailable,
         ) { searchButton, editorModifier, backdrop ->

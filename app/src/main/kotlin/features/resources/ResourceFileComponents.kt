@@ -3,6 +3,8 @@
 
 package features.resources
 
+import ui.layout.LocalAdaptiveWindow
+import androidx.compose.ui.platform.LocalDensity
 import ui.components.AsteriskCancelButton
 import ui.components.AsteriskDropdownAnchor
 import ui.components.AsteriskDropdownMenuItem
@@ -99,11 +101,39 @@ internal fun ResourceOverviewCard(
     val sourceText = stringResource(R.string.settings_resource_files_source_value, sourceOptions[safeSource])
     val lastCheckText = stringResource(R.string.settings_resource_files_last_check)
         .formatTemplate("time" to lastUpdatedAtMillis.toReadableDateTimeOrDash())
+    val wideContent = LocalAdaptiveWindow.current.supportsWideContent
+    val inlineSource = wideContent && LocalDensity.current.fontScale <= 1.3f
+    val sourceAction: @Composable (Modifier) -> Unit = { actionModifier ->
+        TextButton(
+            onClick = { sourceMenuExpanded = true },
+            enabled = actionsEnabled && !updating,
+            modifier = actionModifier,
+        ) {
+            Text(stringResource(R.string.settings_resource_files_source))
+            Spacer(Modifier.width(4.dp))
+            AsteriskDropdownAnchor(
+                expanded = sourceMenuExpanded,
+                onDismissRequest = { sourceMenuExpanded = false },
+            ) {
+                sourceOptions.forEachIndexed { index, option ->
+                    AsteriskDropdownMenuItem(
+                        text = option,
+                        selected = index == safeSource,
+                        onClick = {
+                            sourceMenuExpanded = false
+                            onSourceChange(index)
+                        },
+                    )
+                }
+            }
+        }
+    }
     AsteriskStatusCard(
         modifier = modifier,
         status = "$sourceText\n$lastCheckText",
-        statusRowOffset = 3.dp,
+        statusRowOffset = if (wideContent) 0.dp else 3.dp,
         controls = {
+            if (inlineSource) sourceAction(Modifier)
             AnimatedContent(
                 targetState = updating,
                 transitionSpec = AsteriskMotion.fadeThrough(statusEffectsMotion),
@@ -168,29 +198,9 @@ internal fun ResourceOverviewCard(
         ) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
-        Box(modifier = Modifier.align(Alignment.End)) {
-            TextButton(
-                onClick = { sourceMenuExpanded = true },
-                enabled = actionsEnabled && !updating,
-                modifier = Modifier.offset(x = 12.dp),
-            ) {
-                Text(stringResource(R.string.settings_resource_files_source))
-                Spacer(Modifier.width(4.dp))
-                AsteriskDropdownAnchor(
-                    expanded = sourceMenuExpanded,
-                    onDismissRequest = { sourceMenuExpanded = false },
-                ) {
-                    sourceOptions.forEachIndexed { index, option ->
-                        AsteriskDropdownMenuItem(
-                            text = option,
-                            selected = index == safeSource,
-                            onClick = {
-                                sourceMenuExpanded = false
-                                onSourceChange(index)
-                            },
-                        )
-                    }
-                }
+        if (!inlineSource) {
+            Box(Modifier.align(Alignment.End)) {
+                sourceAction(if (wideContent) Modifier else Modifier.offset(x = 12.dp))
             }
         }
     }
@@ -295,6 +305,7 @@ internal fun ResourceFileCard(
     onModify: (() -> Unit)? = null,
     description: String? = null,
     actionsEnabled: Boolean = true,
+    inGrid: Boolean = false,
 ) {
     val actions = buildList {
         onUpdate?.let { add(ResourceMenuEntry(ResourceDisplayAction.Update, it)) }
@@ -310,6 +321,7 @@ internal fun ResourceFileCard(
         description = description,
         updateState = updateState,
         actionsEnabled = actionsEnabled,
+        inGrid = inGrid,
         actions = actions,
     )
 }
@@ -326,6 +338,7 @@ internal fun CustomResourceFileCard(
     modifier: Modifier = Modifier,
     updateState: ResourceFileUpdateDisplayState = ResourceFileUpdateDisplayState.Idle,
     actionsEnabled: Boolean = true,
+    inGrid: Boolean = false,
 ) {
     val file = fileStatus.file
     val callbacks = mapOf(
@@ -348,6 +361,7 @@ internal fun CustomResourceFileCard(
         modifier = modifier,
         updateState = updateState,
         actionsEnabled = actionsEnabled,
+        inGrid = inGrid,
         actions = customResourceDisplayActions(file).mapNotNull { action ->
             callbacks[action]?.let { callback -> ResourceMenuEntry(action, callback) }
         },
@@ -369,6 +383,7 @@ private fun ResourceFileCardSurface(
     actions: List<ResourceMenuEntry>,
     modifier: Modifier = Modifier,
     description: String? = null,
+    inGrid: Boolean,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val updatingDescription = stringResource(R.string.settings_resource_file_updating)
@@ -396,7 +411,12 @@ private fun ResourceFileCardSurface(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 84.dp)
-                .padding(start = 14.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+                .padding(
+                    start = 14.dp,
+                    end = 4.dp,
+                    top = if (inGrid) 8.dp else 12.dp,
+                    bottom = if (inGrid) 8.dp else 12.dp,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
@@ -416,7 +436,7 @@ private fun ResourceFileCardSurface(
                     text = fileName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
+                    maxLines = if (inGrid) 2 else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (!description.isNullOrBlank()) {

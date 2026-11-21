@@ -57,6 +57,11 @@
     <string name="common_restore">恢复</string>
     <string name="common_retry">重试</string>
     <string name="common_save">保存</string>
+    <string name="editor_switch_unsaved_title">有未保存的修改</string>
+    <string name="editor_switch_unsaved_message">切换到其他条目前，请保存或放弃当前修改。</string>
+    <string name="editor_switch_save">保存并切换</string>
+    <string name="editor_switch_discard">放弃修改并切换</string>
+    <string name="editor_switch_cancel">继续编辑</string>
     <string name="common_search">搜索</string>
     <string name="common_share">分享</string>
     <string name="common_tcp">TCP</string>
@@ -85,6 +90,7 @@
     <string name="home_monitor_traffic">流量</string>
     <string name="home_network_activity">网络活动</string>
     <string name="home_no_network_activity">暂无活动</string>
+    <string name="home_waiting_for_network_samples">正在等待流量数据</string>
     <string name="home_service_disabled">服务未启用</string>
     <string name="home_service_enabled">服务已启用</string>
     <string name="home_service_start">启动服务</string>

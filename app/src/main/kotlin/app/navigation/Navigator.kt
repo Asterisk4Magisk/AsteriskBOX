@@ -15,7 +15,16 @@ class Navigator(
     val backStack: MutableList<NavKey>,
 ) {
     private val resultBus = mutableMapOf<String, MutableSharedFlow<Any>>()
-    private val pendingResultRoutes = mutableMapOf<String, Route>()
+    // Nested editors carry the request key in their restored navigation entry.
+    private val pendingResultRoutes = buildMap<String, Route> {
+        backStack.forEach { key ->
+            when (key) {
+                is Route.RouteRuleEdit -> if (key.nested && key.resultKey.isNotBlank()) put(key.resultKey, key)
+                is Route.DnsRuleEdit -> if (key.nested && key.resultKey.isNotBlank()) put(key.resultKey, key)
+                else -> Unit
+            }
+        }
+    }.toMutableMap()
 
     /**
      * Push a key onto the back stack.

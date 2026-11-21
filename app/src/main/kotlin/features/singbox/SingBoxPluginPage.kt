@@ -48,6 +48,7 @@ import ui.components.AsteriskScaffold
 import ui.components.AsteriskTopAppBar
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
+import ui.layout.singleColumnPageWidth
 import ui.icons.AsteriskIcons as Icons
 
 /**
@@ -86,6 +87,7 @@ internal fun SingBoxPluginPage(padding: PaddingValues) {
         },
     ) { innerPadding ->
         LazyColumn(
+            modifier = Modifier.singleColumnPageWidth(),
             contentPadding = pageListPadding(pageContentPaddingWithCutout(innerPadding, padding, isWideScreen)),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

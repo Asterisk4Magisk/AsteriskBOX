@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -27,19 +28,23 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import app.LocalAppServices
 import app.LocalAppStateStore
 import app.LocalIsWideScreen
@@ -56,6 +61,9 @@ import features.dns.dnsServerTypeLabel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import app.R
+import ui.layout.pageReadableWidth
+import ui.layout.EditorListPane
+import ui.layout.EditorListItem
 import ui.clipboard.setPlainText
 import ui.components.AsteriskCodeActionButton
 import ui.components.AsteriskFilterChip
@@ -74,37 +82,37 @@ internal fun OutboundEditorPage(
     initialGroupId: Int,
     initialType: String,
 ) {
-    val appState by LocalAppStateStore.current.collectAppState()
+    val stateStore = LocalAppStateStore.current
+    val appState by stateStore.collectAppState()
     val navigator = LocalNavigator.current
     val services = LocalAppServices.current
     val resources = LocalResources.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     val isWideScreen = LocalIsWideScreen.current
-    val editing = remember(outboundId) {
-        appState.outbounds.firstOrNull { outbound -> outbound.id == outboundId }
+    val focusManager = LocalFocusManager.current
+    var activeOutboundId by rememberSaveable(outboundId) { mutableIntStateOf(outboundId) }
+    val editing = remember(activeOutboundId) {
+        appState.outbounds.firstOrNull { outbound -> outbound.id == activeOutboundId }
     }
     val type = editing?.type ?: initialType
     val schema = remember(type) { OutboundEditorRegistry.schema(type) }
-    var document by remember(outboundId, editing?.json, type) {
-        mutableStateOf(
-            editing?.json
-                ?.let { json -> runCatching { SingBoxJson.parseToJsonElement(json) as JsonObject }.getOrNull() }
-                ?.let(::OutboundEditorDocument)
-                ?: OutboundEditorDocument.create(
-                    type,
-                    "outbound_draft",
-                ),
-        )
+    val initialDocument = remember(editing?.json, type) {
+        editing?.json
+            ?.let { json -> runCatching { SingBoxJson.parseToJsonElement(json) as JsonObject }.getOrNull() }
+            ?.let(::OutboundEditorDocument)
+            ?: OutboundEditorDocument.create(type, "outbound_draft")
     }
-    var remarks by remember(outboundId, editing?.remarks) {
+    var document by remember(activeOutboundId, initialDocument) { mutableStateOf(initialDocument) }
+    var remarks by remember(activeOutboundId, editing?.remarks) {
         mutableStateOf(editing?.remarks.orEmpty())
     }
-    var selectedGroupId by remember(outboundId) {
+    var selectedGroupId by remember(activeOutboundId) {
         mutableIntStateOf(editing?.groupId ?: initialGroupId)
     }
-    var attemptedSave by remember { mutableStateOf(false) }
-    var saving by remember(outboundId) { mutableStateOf(false) }
+    var attemptedSave by remember(activeOutboundId) { mutableStateOf(false) }
+    var saving by remember(activeOutboundId) { mutableStateOf(false) }
+    var pendingSwitchId by remember(activeOutboundId) { mutableStateOf<Int?>(null) }
     val visibleGroups = appState.outboundGroups.filter { it.enabled || it.id == selectedGroupId }
     if (visibleGroups.none { it.id == selectedGroupId }) {
         selectedGroupId = visibleGroups.firstOrNull()?.id ?: appState.outboundGroups.firstOrNull()?.id ?: 0
@@ -149,16 +157,28 @@ internal fun OutboundEditorPage(
     val stateChangedMessage = stringResource(R.string.outbound_group_sync_failed)
     val invalidMessage = stringResource(R.string.outbound_import_failed)
     val copiedMessage = stringResource(R.string.common_copied)
-    fun save() {
+    fun switchTo(targetId: Int) {
+        if (stateStore.state.value.outbounds.none { it.id == targetId }) {
+            scope.launch { services.tipNotifier.show(stateChangedMessage) }
+            return
+        }
+        focusManager.clearFocus(force = true)
+        activeOutboundId = targetId
+    }
+    fun save(switchTargetId: Int? = null) {
         if (saving) return
         attemptedSave = true
         val currentErrors = document.validate() + document.validateReferences(referenceValues)
         when {
-            selectedGroupId == 0 -> scope.launch {
-                services.tipNotifier.show(resources.getString(R.string.outbound_group_required))
+            selectedGroupId == 0 -> {
+                pendingSwitchId = null
+                scope.launch {
+                    services.tipNotifier.show(resources.getString(R.string.outbound_group_required))
+                }
             }
-            currentErrors.isNotEmpty() -> scope.launch {
-                services.tipNotifier.show(invalidMessage)
+            currentErrors.isNotEmpty() -> {
+                pendingSwitchId = null
+                scope.launch { services.tipNotifier.show(invalidMessage) }
             }
             else -> {
                 val imported = document.toImported(remarks)
@@ -172,7 +192,13 @@ internal fun OutboundEditorPage(
                 scope.launch {
                     try {
                         when (val result = services.outboundRepository.save(editing, draft)) {
-                            is OutboundCommandResult.Saved -> navigator.pop()
+                            is OutboundCommandResult.Saved -> {
+                                if (switchTargetId == null) {
+                                    navigator.pop()
+                                } else {
+                                    switchTo(switchTargetId)
+                                }
+                            }
                             OutboundCommandResult.Conflict -> services.tipNotifier.show(stateChangedMessage)
                             is OutboundCommandResult.Invalid -> services.tipNotifier.show(invalidMessage)
                             is OutboundCommandResult.PersistenceFailed -> services.tipNotifier.showError(
@@ -183,6 +209,7 @@ internal fun OutboundEditorPage(
                             else -> error("Unexpected outbound save result: $result")
                         }
                     } finally {
+                        pendingSwitchId = null
                         saving = false
                     }
                 }
@@ -213,7 +240,7 @@ internal fun OutboundEditorPage(
         saving = saving,
         saveEnabled = true,
         onBack = navigator::pop,
-        onSave = ::save,
+        onSave = { save() },
         actions = {
             if (editing != null) {
                 AsteriskCodeActionButton(
@@ -232,50 +259,108 @@ internal fun OutboundEditorPage(
             }
         },
     ) { contentPadding ->
-        LazyColumn(
-            contentPadding = contentPadding,
+        val listGroupId = if (editing == null) selectedGroupId else initialGroupId
+        val groupEntries = remember(appState.outbounds, listGroupId) {
+            appState.outbounds.filter { it.groupId == listGroupId }.map { outbound ->
+                EditorListItem(outbound.id, outbound.remarks.ifBlank { outbound.type })
+            }
+        }
+        EditorListPane(
+            title = stringResource(R.string.outbound_management),
+            entries = groupEntries,
+            selectedId = editing?.id,
+            padding = contentPadding,
+            onSelect = editing?.let { current ->
+                select@{ targetId ->
+                    if (saving || targetId == current.id) return@select
+                    if (document != initialDocument || remarks != current.remarks || selectedGroupId != current.groupId) {
+                        focusManager.clearFocus(force = true)
+                        pendingSwitchId = targetId
+                    } else {
+                        switchTo(targetId)
+                    }
+                }
+            },
+            selectionEnabled = !saving,
         ) {
-            item(key = "identity") {
-                EditorSectionCard(
-                    title = stringResource(R.string.outbound_editor_section_identity),
-                    description = stringResource(R.string.outbound_editor_section_identity_summary),
+            key(activeOutboundId) {
+                LazyColumn(
+                    modifier = Modifier.pageReadableWidth(maxWidth = 800.dp),
+                    contentPadding = contentPadding,
                 ) {
-                    OutlinedTextField(
-                        value = remarks,
-                        onValueChange = { remarks = it },
-                        label = { Text(stringResource(R.string.outbound_remarks)) },
-                        singleLine = true,
-                        shape = AsteriskShapeTokens.InnerContainer,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp),
+                    item(key = "identity") {
+                        EditorSectionCard(
+                            title = stringResource(R.string.outbound_editor_section_identity),
+                            description = stringResource(R.string.outbound_editor_section_identity_summary),
+                        ) {
+                            OutlinedTextField(
+                                value = remarks,
+                                onValueChange = { remarks = it },
+                                label = { Text(stringResource(R.string.outbound_remarks)) },
+                                singleLine = true,
+                                shape = AsteriskShapeTokens.InnerContainer,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                            )
+                            SettingsDropdownRow(
+                                title = stringResource(R.string.outbound_group),
+                                icon = Icons.Rounded.Folder,
+                                items = visibleGroups.map { it.displayName() },
+                                selectedIndex = visibleGroups
+                                    .indexOfFirst { it.id == selectedGroupId }
+                                    .coerceAtLeast(0),
+                                onSelectedIndexChange = { index ->
+                                    selectedGroupId = visibleGroups[index].id
+                                },
+                            )
+                        }
+                    }
+
+                    outboundEditorContent(
+                        state = OutboundEditorContentState(
+                            schema = schema,
+                            document = document,
+                            errors = errors,
+                            referenceOptions = referenceOptions,
+                            onDocumentChange = { document = it },
+                        ),
                     )
-                    SettingsDropdownRow(
-                        title = stringResource(R.string.outbound_group),
-                        icon = Icons.Rounded.Folder,
-                        items = visibleGroups.map { it.displayName() },
-                        selectedIndex = visibleGroups
-                            .indexOfFirst { it.id == selectedGroupId }
-                            .coerceAtLeast(0),
-                        onSelectedIndexChange = { index ->
-                            selectedGroupId = visibleGroups[index].id
-                        },
-                    )
+
+                    item(key = "bottom_space") { Spacer(Modifier.width(1.dp)) }
                 }
             }
-
-            outboundEditorContent(
-                state = OutboundEditorContentState(
-                    schema = schema,
-                    document = document,
-                    errors = errors,
-                    referenceOptions = referenceOptions,
-                    onDocumentChange = { document = it },
-                ),
-            )
-
-            item(key = "bottom_space") { Spacer(Modifier.width(1.dp)) }
         }
+    }
+    pendingSwitchId?.let { targetId ->
+        AlertDialog(
+            onDismissRequest = { if (!saving) pendingSwitchId = null },
+            properties = DialogProperties(dismissOnBackPress = !saving, dismissOnClickOutside = !saving),
+            title = { Text(stringResource(R.string.editor_switch_unsaved_title)) },
+            text = { Text(stringResource(R.string.editor_switch_unsaved_message)) },
+            confirmButton = {
+                TextButton(onClick = { save(targetId) }, enabled = !saving) {
+                    Text(stringResource(R.string.editor_switch_save))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingSwitchId = null }, enabled = !saving) {
+                    Text(stringResource(R.string.editor_switch_cancel))
+                }
+                TextButton(
+                    onClick = {
+                        pendingSwitchId = null
+                        switchTo(targetId)
+                    },
+                    enabled = !saving,
+                ) {
+                    Text(
+                        stringResource(R.string.editor_switch_discard),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+        )
     }
 }
 

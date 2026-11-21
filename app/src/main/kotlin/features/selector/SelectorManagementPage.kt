@@ -10,6 +10,8 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -23,6 +25,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -54,6 +58,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.pluralStringResource
@@ -120,9 +125,11 @@ import ui.components.rememberReorderPreview
 import ui.components.reorderByIds
 import ui.components.singBoxOptionLabel
 import ui.components.verticalReorderScrollThresholdPadding
+import ui.layout.LocalAdaptiveWindow
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
 import ui.theme.AsteriskMotion
+import ui.layout.pageReadableWidth
 import ui.theme.AsteriskShapeTokens
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import ui.icons.AsteriskIcons as Icons
@@ -971,11 +978,7 @@ internal fun SelectorEditorScaffold(
         onBack = onDismissRequest,
         onSave = { onSave(draft) },
     ) { contentPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxWidth(),
-            contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
+        val settings: LazyListScope.() -> Unit = {
             item(key = "remarks") {
                 OutlinedTextField(
                     value = remarks,
@@ -1198,35 +1201,174 @@ internal fun SelectorEditorScaffold(
                     }
                 }
             }
+        }
+        val defaultOutboundSetting: @Composable () -> Unit = {
+            AnimatedVisibility(
+                visible = memberHeader.showDefaultOutbound,
+                enter = AsteriskMotion.contentEnter(),
+                exit = AsteriskMotion.contentExit(),
+            ) {
+                SettingsDropdownRow(
+                    title = stringResource(R.string.selector_editor_default),
+                    horizontalPadding = 0.dp,
+                    icon = Icons.AutoMirrored.Rounded.AltRoute,
+                    items = defaultOptionTags.map { member ->
+                        member?.let { tag ->
+                            targetsByTag[tag]?.displayLabel()
+                        } ?: stringResource(R.string.selector_target_unavailable)
+                    },
+                    selectedIndex = if (effectiveMembers.isEmpty()) {
+                        0
+                    } else {
+                        selectorDefaultMemberIndex(effectiveMembers, resolvedDefault)
+                    },
+                    onSelectedIndexChange = { index ->
+                        defaultOptionTags.getOrNull(index)?.let { member ->
+                            default = member
+                        }
+                    },
+                    enabled = effectiveMembers.isNotEmpty(),
+                )
+            }
+        }
+        val membershipSwitch: @Composable () -> Unit = {
+            SettingsSwitchRow(
+                title = stringResource(R.string.selector_editor_dynamic_members),
+                summary = stringResource(R.string.selector_editor_dynamic_members_summary),
+                icon = Icons.Rounded.FilterAlt,
+                checked = nodeNameMatchingEnabled,
+                onCheckedChange = { enabled ->
+                    focusManager.clearFocus()
+                    if (enabled && nodeNameRegexInput.isBlank() && regexEnabled) {
+                        nodeNameRegexInput = query
+                    }
+                    nodeNameMatchingEnabled = enabled
+                },
+                horizontalPadding = 0.dp,
+            )
+        }
+        val matchingFields: @Composable () -> Unit = {
+            Column {
+                SelectorMatchGroupPicker(
+                    groups = state.outboundGroups,
+                    selectedGroupIds = matchOutboundGroupIds,
+                    onSelectedGroupIdsChange = { matchOutboundGroupIds = it },
+                )
+                OutlinedTextField(
+                    value = nodeNameRegexInput,
+                    onValueChange = { nodeNameRegexInput = it },
+                    label = { Text(stringResource(R.string.selector_editor_node_name_regex)) },
+                    supportingText = {
+                        Text(
+                            when {
+                                nodeNameRegex.isEmpty() ->
+                                    stringResource(R.string.selector_editor_node_name_regex_required)
+                                nodeNameRegexInvalid ->
+                                    stringResource(R.string.selector_editor_regex_invalid)
+                                else -> pluralStringResource(
+                                    R.plurals.selector_editor_node_name_matches,
+                                    regexMemberTags.size,
+                                    regexMemberTags.size,
+                                )
+                            },
+                        )
+                    },
+                    isError = nodeNameRegexInvalid,
+                    singleLine = true,
+                    shape = AsteriskShapeTokens.InnerContainer,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                )
+            }
+        }
+        val manualMemberSearch: @Composable (Boolean) -> Unit = { split ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = if (split) 0.dp else 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = {
+                        Text(
+                            text = stringResource(R.string.selector_editor_search_targets),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Search, contentDescription = null)
+                    },
+                    trailingIcon = {
+                        val nodesOnlyDescription = stringResource(R.string.selector_editor_nodes_only)
+                        val toggleColors = IconButtonDefaults.iconToggleButtonColors(
+                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 44.dp) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconToggleButton(
+                                    checked = regexEnabled,
+                                    onCheckedChange = { regexEnabled = it },
+                                    colors = toggleColors,
+                                    modifier = Modifier.semantics {
+                                        contentDescription = regexToggleDescription
+                                    },
+                                ) {
+                                    Text(
+                                        text = ".*",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
+                                }
+                                IconToggleButton(
+                                    checked = nodesOnly,
+                                    onCheckedChange = { nodesOnly = it },
+                                    colors = toggleColors,
+                                    modifier = Modifier.semantics {
+                                        contentDescription = nodesOnlyDescription
+                                    },
+                                ) {
+                                    Icon(Icons.Rounded.Router, contentDescription = null)
+                                }
+                            }
+                        }
+                    },
+                    isError = searchInvalid,
+                    supportingText = if (searchInvalid) {
+                        {
+                            Text(stringResource(R.string.selector_editor_regex_invalid))
+                        }
+                    } else {
+                        null
+                    },
+                    singleLine = true,
+                    shape = AsteriskShapeTokens.InnerContainer,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(
+                    modifier = Modifier.width(48.dp).height(56.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    TriStateCheckbox(
+                        state = toggleableState,
+                        onClick = ::toggleVisibleMembers,
+                        enabled = !searchInvalid &&
+                            interactiveVisibleTargetTags.isNotEmpty(),
+                        modifier = Modifier.semantics {
+                            contentDescription = bulkSelectionDescription
+                        },
+                    )
+                }
+            }
+        }
+        val members: LazyListScope.(Boolean) -> Unit = { split ->
             item(key = "members-header") {
                 Column {
-                    AnimatedVisibility(
-                        visible = memberHeader.showDefaultOutbound,
-                        enter = AsteriskMotion.contentEnter(),
-                        exit = AsteriskMotion.contentExit(),
-                    ) {
-                        SettingsDropdownRow(
-                            title = stringResource(R.string.selector_editor_default),
-                            horizontalPadding = 0.dp,
-                            icon = Icons.AutoMirrored.Rounded.AltRoute,
-                            items = defaultOptionTags.map { member ->
-                                member?.let { tag ->
-                                    targetsByTag[tag]?.displayLabel()
-                                } ?: stringResource(R.string.selector_target_unavailable)
-                            },
-                            selectedIndex = if (effectiveMembers.isEmpty()) {
-                                0
-                            } else {
-                                selectorDefaultMemberIndex(effectiveMembers, resolvedDefault)
-                            },
-                            onSelectedIndexChange = { index ->
-                                defaultOptionTags.getOrNull(index)?.let { member ->
-                                    default = member
-                                }
-                            },
-                            modifier = Modifier.padding(bottom = 14.dp),
-                            enabled = effectiveMembers.isNotEmpty(),
-                        )
+                    if (!split) {
+                        Box(Modifier.padding(bottom = if (memberHeader.showDefaultOutbound) 14.dp else 0.dp)) {
+                            defaultOutboundSetting()
+                        }
                     }
                     Text(
                         stringResource(R.string.selector_editor_members),
@@ -1237,141 +1379,23 @@ internal fun SelectorEditorScaffold(
             }
             item(key = "dynamic-members") {
                 Column {
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.selector_editor_dynamic_members),
-                        summary = stringResource(R.string.selector_editor_dynamic_members_summary),
-                        icon = Icons.Rounded.FilterAlt,
-                        checked = nodeNameMatchingEnabled,
-                        onCheckedChange = { enabled ->
-                            focusManager.clearFocus()
-                            if (enabled && nodeNameRegexInput.isBlank() && regexEnabled) {
-                                nodeNameRegexInput = query
-                            }
-                            nodeNameMatchingEnabled = enabled
-                        },
-                        horizontalPadding = 0.dp,
-                    )
-                    AnimatedContent(
-                        targetState = nodeNameMatchingEnabled,
-                        transitionSpec = AsteriskMotion.fadeThrough(
-                            effectsSpec = memberFadeIn,
-                            sizeSpec = AsteriskMotion.contentSize(),
-                        ),
-                        label = "selector-member-source",
-                    ) { dynamicMembers ->
-                        if (dynamicMembers) {
-                            Column {
-                                SelectorMatchGroupPicker(
-                                    groups = state.outboundGroups,
-                                    selectedGroupIds = matchOutboundGroupIds,
-                                    onSelectedGroupIdsChange = { matchOutboundGroupIds = it },
-                                )
-                                OutlinedTextField(
-                                    value = nodeNameRegexInput,
-                                    onValueChange = { nodeNameRegexInput = it },
-                                    label = { Text(stringResource(R.string.selector_editor_node_name_regex)) },
-                                    supportingText = {
-                                        Text(
-                                            when {
-                                                nodeNameRegex.isEmpty() ->
-                                                    stringResource(R.string.selector_editor_node_name_regex_required)
-                                                nodeNameRegexInvalid ->
-                                                    stringResource(R.string.selector_editor_regex_invalid)
-                                                else -> pluralStringResource(
-                                                    R.plurals.selector_editor_node_name_matches,
-                                                    regexMemberTags.size,
-                                                    regexMemberTags.size,
-                                                )
-                                            },
-                                        )
-                                    },
-                                    isError = nodeNameRegexInvalid,
-                                    singleLine = true,
-                                    shape = AsteriskShapeTokens.InnerContainer,
-                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                )
-                            }
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.Top,
-                            ) {
-                                OutlinedTextField(
-                                    value = query,
-                                    onValueChange = { query = it },
-                                    placeholder = {
-                                        Text(
-                                            text = stringResource(R.string.selector_editor_search_targets),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    },
-                                    leadingIcon = {
-                                        Icon(Icons.Rounded.Search, contentDescription = null)
-                                    },
-                                    trailingIcon = {
-                                        val nodesOnlyDescription = stringResource(R.string.selector_editor_nodes_only)
-                                        val toggleColors = IconButtonDefaults.iconToggleButtonColors(
-                                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        )
-                                        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 44.dp) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                IconToggleButton(
-                                                    checked = regexEnabled,
-                                                    onCheckedChange = { regexEnabled = it },
-                                                    colors = toggleColors,
-                                                    modifier = Modifier.semantics {
-                                                        contentDescription = regexToggleDescription
-                                                    },
-                                                ) {
-                                                    Text(
-                                                        text = ".*",
-                                                        style = MaterialTheme.typography.titleMedium,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                    )
-                                                }
-                                                IconToggleButton(
-                                                    checked = nodesOnly,
-                                                    onCheckedChange = { nodesOnly = it },
-                                                    colors = toggleColors,
-                                                    modifier = Modifier.semantics {
-                                                        contentDescription = nodesOnlyDescription
-                                                    },
-                                                ) {
-                                                    Icon(Icons.Rounded.Router, contentDescription = null)
-                                                }
-                                            }
-                                        }
-                                    },
-                                    isError = searchInvalid,
-                                    supportingText = if (searchInvalid) {
-                                        {
-                                            Text(stringResource(R.string.selector_editor_regex_invalid))
-                                        }
-                                    } else {
-                                        null
-                                    },
-                                    singleLine = true,
-                                    shape = AsteriskShapeTokens.InnerContainer,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                Box(
-                                    modifier = Modifier.width(48.dp).height(56.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    TriStateCheckbox(
-                                        state = toggleableState,
-                                        onClick = ::toggleVisibleMembers,
-                                        enabled = !searchInvalid &&
-                                            interactiveVisibleTargetTags.isNotEmpty(),
-                                        modifier = Modifier.semantics {
-                                            contentDescription = bulkSelectionDescription
-                                        },
-                                    )
-                                }
-                            }
+                    if (split) {
+                        AnimatedVisibility(
+                            visible = !nodeNameMatchingEnabled,
+                            enter = AsteriskMotion.contentEnter(),
+                            exit = AsteriskMotion.contentExit(),
+                        ) { manualMemberSearch(true) }
+                    } else {
+                        membershipSwitch()
+                        AnimatedContent(
+                            targetState = nodeNameMatchingEnabled,
+                            transitionSpec = AsteriskMotion.fadeThrough(
+                                effectsSpec = memberFadeIn,
+                                sizeSpec = AsteriskMotion.contentSize(),
+                            ),
+                            label = "selector-member-source",
+                        ) { dynamicMembers ->
+                            if (dynamicMembers) matchingFields() else manualMemberSearch(false)
                         }
                     }
                 }
@@ -1415,6 +1439,55 @@ internal fun SelectorEditorScaffold(
                         ),
                         onClick = { toggleMember(target.tag) },
                     )
+                }
+            }
+        }
+        val settingsListState = rememberLazyListState()
+        val membersListState = rememberLazyListState()
+        val compactListState = rememberLazyListState()
+        BoxWithConstraints(Modifier.pageReadableWidth(maxWidth = 1160.dp).fillMaxSize()) {
+            if (
+                LocalAdaptiveWindow.current.supportsWideContent &&
+                maxWidth >= 760.dp && LocalDensity.current.fontScale <= 1.3f
+            ) {
+                Row(Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        modifier = Modifier.weight(0.9f).fillMaxHeight(),
+                        state = settingsListState,
+                        contentPadding = contentPadding,
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        settings()
+                        if (memberHeader.showDefaultOutbound) {
+                            item("default-outbound") { defaultOutboundSetting() }
+                        }
+                        item("membership-settings") {
+                            Column {
+                                membershipSwitch()
+                                AnimatedVisibility(
+                                    visible = nodeNameMatchingEnabled,
+                                    enter = AsteriskMotion.contentEnter(),
+                                    exit = AsteriskMotion.contentExit(),
+                                ) { matchingFields() }
+                            }
+                        }
+                    }
+                    LazyColumn(
+                        modifier = Modifier.weight(1.1f).fillMaxHeight(),
+                        state = membersListState,
+                        contentPadding = contentPadding,
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) { members(true) }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    state = compactListState,
+                    contentPadding = contentPadding,
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    settings()
+                    members(false)
                 }
             }
         }

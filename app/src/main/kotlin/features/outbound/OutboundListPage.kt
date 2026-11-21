@@ -133,6 +133,7 @@ import ui.components.singBoxOptionLabel
 import ui.components.verticalReorderScrollThresholdPadding
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
+import ui.layout.pageReadableWidth
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 import androidx.compose.foundation.lazy.grid.items as gridItems
@@ -759,7 +760,7 @@ internal fun OutboundListPage(
         }
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.pageReadableWidth().fillMaxSize(),
             verticalAlignment = Alignment.Top,
         ) { page ->
             val group = groups.getOrNull(page)

@@ -57,6 +57,11 @@
     <string name="common_restore">Restore</string>
     <string name="common_retry">Retry</string>
     <string name="common_save">Save</string>
+    <string name="editor_switch_unsaved_title">Unsaved changes</string>
+    <string name="editor_switch_unsaved_message">Save or discard your changes before switching to another entry.</string>
+    <string name="editor_switch_save">Save and switch</string>
+    <string name="editor_switch_discard">Discard and switch</string>
+    <string name="editor_switch_cancel">Keep editing</string>
     <string name="common_search">Search</string>
     <string name="common_share">Share</string>
     <string name="common_tcp">TCP</string>
@@ -85,6 +90,7 @@
     <string name="home_monitor_traffic">Traffic</string>
     <string name="home_network_activity">Network activity</string>
     <string name="home_no_network_activity">No activity yet</string>
+    <string name="home_waiting_for_network_samples">Waiting for traffic data</string>
     <string name="home_run_mode_bpf2socks" translatable="false">BPF2SOCKS</string>
     <string name="home_run_mode_ebpf" translatable="false">eBPF</string>
     <string name="home_run_mode_tproxy" translatable="false">TPROXY</string>
