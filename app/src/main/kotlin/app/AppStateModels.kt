@@ -183,6 +183,9 @@ data class SingBoxSelectorState(
     val interruptExistConnections: Boolean = true,
     val fallbackEnabled: Boolean = false,
     val fallbackMaxDelay: String = "",
+    val nodeNameRegex: String = "",
+    // Null matches all enabled outbound groups. An empty list matches none.
+    val matchOutboundGroupIds: List<Int>? = null,
 ) {
     val tag: String
         get() = managedSelectorTag(id, remarks)
@@ -557,7 +560,11 @@ fun AppState.withRemovedManagedOutboundTags(
                 default = if (selector.type == SingBoxSelectorTypeUrlTest) {
                     ""
                 } else {
-                    selector.default.takeIf(members::contains)
+                    selector.default.takeIf { tag ->
+                        tag in members || (
+                            selector.nodeNameRegex.isNotBlank() && tag !in unavailableWithDependencies
+                            )
+                    }
                         ?: members.firstOrNull().orEmpty()
                 },
             )
@@ -567,7 +574,7 @@ fun AppState.withRemovedManagedOutboundTags(
         )
         updatedOutbounds = prunedRaw.outbounds
         val newlyUnavailableTags = updatedSelectors
-            .filter { selector -> selector.outbounds.isEmpty() }
+            .filter { selector -> selector.outbounds.isEmpty() && selector.nodeNameRegex.isBlank() }
             .mapTo(mutableSetOf(), SingBoxSelectorState::tag)
             .apply { addAll(prunedRaw.newlyUnavailableTags) }
             .minus(unavailableWithDependencies)

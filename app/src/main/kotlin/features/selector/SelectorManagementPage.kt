@@ -7,6 +7,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,9 +17,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -26,7 +28,10 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -34,11 +39,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconToggleButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,8 +55,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -78,6 +87,7 @@ import app.SingBoxSelectorTypeUrlTest
 import app.SupportedSingBoxSelectorTypes
 import app.collectAppState
 import app.selectableManagedOutbounds
+import app.selectorRegexMemberTags
 import app.withRemovedManagedOutboundTags
 import engine.singbox.SingBoxUnsigned16Max
 import engine.singbox.config.APP_DIRECT_OUTBOUND
@@ -85,6 +95,7 @@ import engine.singbox.config.validateSingBoxRuntimeConfiguration
 import engine.singbox.isSingBoxDurationNotGreaterThan
 import features.logs.FailureLogContext
 import features.logs.reportFailure
+import features.settings.SettingsActionRow
 import features.settings.SettingsDropdownRow
 import features.settings.SettingsSwitchRow
 import kotlinx.coroutines.CancellationException
@@ -92,6 +103,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import sh.calvin.reorderable.ReorderableItem
+import ui.components.AsteriskActionButton
+import ui.components.AsteriskCancelButton
+import ui.components.AsteriskCheckbox
 import ui.components.AsteriskInfoChip
 import ui.components.AsteriskScaffold
 import ui.components.AsteriskSearchTopAppBar
@@ -678,6 +692,7 @@ internal fun SelectorEditorScaffold(
     onDismissRequest: () -> Unit,
     onSave: (SingBoxSelectorState) -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
     var type by remember(selector?.id) {
         mutableStateOf(selector?.type ?: SingBoxSelectorTypeSelector)
     }
@@ -711,17 +726,32 @@ internal fun SelectorEditorScaffold(
     }
     var query by remember(selector?.id) { mutableStateOf("") }
     var regexEnabled by remember(selector?.id) { mutableStateOf(false) }
+    var nodesOnly by remember(selector?.id) { mutableStateOf(false) }
+    var nodeNameMatchingEnabled by remember(selector?.id) {
+        mutableStateOf(!selector?.nodeNameRegex.isNullOrBlank())
+    }
+    var nodeNameRegexInput by remember(selector?.id) {
+        mutableStateOf(selector?.nodeNameRegex.orEmpty())
+    }
+    var matchOutboundGroupIds by remember(selector?.id) {
+        mutableStateOf(selector?.matchOutboundGroupIds)
+    }
+    val nodeNameRegex = nodeNameRegexInput.trim()
+    val nodeNameRegexInvalid = remember(nodeNameRegex) {
+        nodeNameRegex.isEmpty() || selectorTargetRegexOrNull(nodeNameRegex) == null
+    }
     val normalizedRemarks = remarks.trim()
+    val targetSelectorId = if (nodeNameMatchingEnabled) 0 else selector?.id ?: 0
     val targetChoices = remember(
         state.outboundGroups,
         state.outbounds,
         state.endpoints,
         state.selectors,
-        selector?.id,
+        targetSelectorId,
     ) {
         selectorTargetChoices(
             state = state,
-            selectorId = selector?.id ?: 0,
+            selectorId = targetSelectorId,
         )
     }
     val targets = remember(targetChoices, selector?.outbounds) {
@@ -737,9 +767,10 @@ internal fun SelectorEditorScaffold(
                 )
             }
     }
-    val searchResult = remember(targets, query, regexEnabled) {
+    val targetsByTag = remember(targets) { targets.associateBy(SelectorTargetUi::tag) }
+    val searchResult = remember(targets, query, regexEnabled, nodesOnly) {
         filterSelectorTargets(
-            targets = targets.map { target ->
+            targets = targets.filter { !nodesOnly || it.kind == SelectorTargetKind.Outbound }.map { target ->
                 SelectorTargetSearchCandidate(
                     tag = target.tag,
                     label = target.label,
@@ -755,12 +786,29 @@ internal fun SelectorEditorScaffold(
         val visibleTargetTagSet = visibleTargetTags.toSet()
         targets.filter { target -> target.tag in visibleTargetTagSet }
     }
-    val effectiveMembers = remember(state, memberReferences, targetChoices) {
-        selectorEffectiveMemberTags(
-            state = state,
-            memberReferences = memberReferences,
-            targets = targetChoices,
-        )
+    val regexMemberTags = remember(state, selector, nodeNameRegex, nodeNameRegexInvalid, matchOutboundGroupIds) {
+        if (nodeNameRegexInvalid) {
+            emptyList()
+        } else {
+            val current = selector ?: SingBoxSelectorState(id = 0, remarks = "")
+            state.selectorRegexMemberTags(
+                current.copy(
+                    outbounds = emptyList(),
+                    nodeNameRegex = nodeNameRegex,
+                    matchOutboundGroupIds = matchOutboundGroupIds,
+                ),
+            )
+        }
+    }
+    val matchedTargets = remember(targetsByTag, regexMemberTags) {
+        regexMemberTags.mapNotNull(targetsByTag::get)
+    }
+    val effectiveMembers = if (nodeNameMatchingEnabled) {
+        regexMemberTags
+    } else {
+        remember(state, memberReferences, targetChoices) {
+            selectorEffectiveMemberTags(state, memberReferences, targetChoices)
+        }
     }
     val lockedOutboundTags = remember(state, memberReferences) {
         state.selectorGroupLockedOutboundTags(memberReferences)
@@ -810,7 +858,7 @@ internal fun SelectorEditorScaffold(
     val draft = SingBoxSelectorState(
         id = selector?.id ?: 0,
         remarks = normalizedRemarks,
-        outbounds = memberReferences,
+        outbounds = if (nodeNameMatchingEnabled) emptyList() else memberReferences,
         default = default.takeIf(effectiveMembers::contains)
             ?: effectiveMembers.firstOrNull().orEmpty(),
         type = type,
@@ -825,8 +873,10 @@ internal fun SelectorEditorScaffold(
         interruptExistConnections = interrupt,
         fallbackEnabled = fallbackEnabled,
         fallbackMaxDelay = fallbackMaxDelay,
+        nodeNameRegex = if (nodeNameMatchingEnabled) nodeNameRegex else "",
+        matchOutboundGroupIds = matchOutboundGroupIds.takeIf { nodeNameMatchingEnabled },
     )
-    val canSave = !saving && runCatching {
+    val canSave = !saving && (!nodeNameMatchingEnabled || !nodeNameRegexInvalid) && runCatching {
         validateSelectorDraft(state, draft)
     }.isSuccess
     val typeLabels = listOf(
@@ -840,6 +890,9 @@ internal fun SelectorEditorScaffold(
         ),
     )
     val selectionOptionsMotion = AsteriskMotion.fastEffects<Float>()
+    val memberFadeIn = AsteriskMotion.contentFade()
+    val memberFadeOut = AsteriskMotion.fastEffects<Float>()
+    val memberPlacement = AsteriskMotion.contentPlacement()
     val resolvedDefault = draft.default
     val defaultOptionTags = selectorDefaultOptionTags(effectiveMembers)
     val toggleableState = when (selectionState) {
@@ -893,7 +946,7 @@ internal fun SelectorEditorScaffold(
             updateSelectorMemberReferencesForMatches(
                 state = state,
                 memberReferences = memberReferences,
-                matchedTags = visibleTargetTags,
+                matchedTags = interactiveVisibleTargetTags,
                 select = selectionState != SelectorTargetSelectionState.All,
             ),
         )
@@ -1158,9 +1211,7 @@ internal fun SelectorEditorScaffold(
                             icon = Icons.AutoMirrored.Rounded.AltRoute,
                             items = defaultOptionTags.map { member ->
                                 member?.let { tag ->
-                                    targets
-                                        .firstOrNull { target -> target.tag == tag }
-                                        ?.displayLabel()
+                                    targetsByTag[tag]?.displayLabel()
                                 } ?: stringResource(R.string.selector_target_unavailable)
                             },
                             selectedIndex = if (effectiveMembers.isEmpty()) {
@@ -1184,90 +1235,306 @@ internal fun SelectorEditorScaffold(
                     )
                 }
             }
-            item(key = "target-search") {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.Top,
-                ) {
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        placeholder = {
-                            Text(stringResource(R.string.selector_editor_search_targets))
+            item(key = "dynamic-members") {
+                Column {
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.selector_editor_dynamic_members),
+                        summary = stringResource(R.string.selector_editor_dynamic_members_summary),
+                        icon = Icons.Rounded.FilterAlt,
+                        checked = nodeNameMatchingEnabled,
+                        onCheckedChange = { enabled ->
+                            focusManager.clearFocus()
+                            if (enabled && nodeNameRegexInput.isBlank() && regexEnabled) {
+                                nodeNameRegexInput = query
+                            }
+                            nodeNameMatchingEnabled = enabled
                         },
-                        leadingIcon = {
-                            Icon(Icons.Rounded.Search, contentDescription = null)
-                        },
-                        trailingIcon = {
-                            IconToggleButton(
-                                checked = regexEnabled,
-                                onCheckedChange = { regexEnabled = it },
-                                colors = IconButtonDefaults.iconToggleButtonColors(
-                                    checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                ),
-                                modifier = Modifier.semantics {
-                                    contentDescription = regexToggleDescription
-                                },
-                            ) {
-                                Text(
-                                    text = ".*",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
+                        horizontalPadding = 0.dp,
+                    )
+                    AnimatedContent(
+                        targetState = nodeNameMatchingEnabled,
+                        transitionSpec = AsteriskMotion.fadeThrough(
+                            effectsSpec = memberFadeIn,
+                            sizeSpec = AsteriskMotion.contentSize(),
+                        ),
+                        label = "selector-member-source",
+                    ) { dynamicMembers ->
+                        if (dynamicMembers) {
+                            Column {
+                                SelectorMatchGroupPicker(
+                                    groups = state.outboundGroups,
+                                    selectedGroupIds = matchOutboundGroupIds,
+                                    onSelectedGroupIdsChange = { matchOutboundGroupIds = it },
+                                )
+                                OutlinedTextField(
+                                    value = nodeNameRegexInput,
+                                    onValueChange = { nodeNameRegexInput = it },
+                                    label = { Text(stringResource(R.string.selector_editor_node_name_regex)) },
+                                    supportingText = {
+                                        Text(
+                                            when {
+                                                nodeNameRegex.isEmpty() ->
+                                                    stringResource(R.string.selector_editor_node_name_regex_required)
+                                                nodeNameRegexInvalid ->
+                                                    stringResource(R.string.selector_editor_regex_invalid)
+                                                else -> pluralStringResource(
+                                                    R.plurals.selector_editor_node_name_matches,
+                                                    regexMemberTags.size,
+                                                    regexMemberTags.size,
+                                                )
+                                            },
+                                        )
+                                    },
+                                    isError = nodeNameRegexInvalid,
+                                    singleLine = true,
+                                    shape = AsteriskShapeTokens.InnerContainer,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                                 )
                             }
-                        },
-                        isError = searchInvalid,
-                        supportingText = if (searchInvalid) {
-                            {
-                                Text(stringResource(R.string.selector_editor_regex_invalid))
-                            }
                         } else {
-                            null
-                        },
-                        singleLine = true,
-                        shape = AsteriskShapeTokens.InnerContainer,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Box(
-                        modifier = Modifier.width(48.dp).height(56.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        TriStateCheckbox(
-                            state = toggleableState,
-                            onClick = ::toggleVisibleMembers,
-                            enabled = !searchInvalid &&
-                                interactiveVisibleTargetTags.isNotEmpty(),
-                            modifier = Modifier.semantics {
-                                contentDescription = bulkSelectionDescription
-                            },
-                        )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                OutlinedTextField(
+                                    value = query,
+                                    onValueChange = { query = it },
+                                    placeholder = {
+                                        Text(
+                                            text = stringResource(R.string.selector_editor_search_targets),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
+                                    leadingIcon = {
+                                        Icon(Icons.Rounded.Search, contentDescription = null)
+                                    },
+                                    trailingIcon = {
+                                        val nodesOnlyDescription = stringResource(R.string.selector_editor_nodes_only)
+                                        val toggleColors = IconButtonDefaults.iconToggleButtonColors(
+                                            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        )
+                                        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 44.dp) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                IconToggleButton(
+                                                    checked = regexEnabled,
+                                                    onCheckedChange = { regexEnabled = it },
+                                                    colors = toggleColors,
+                                                    modifier = Modifier.semantics {
+                                                        contentDescription = regexToggleDescription
+                                                    },
+                                                ) {
+                                                    Text(
+                                                        text = ".*",
+                                                        style = MaterialTheme.typography.titleMedium,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                    )
+                                                }
+                                                IconToggleButton(
+                                                    checked = nodesOnly,
+                                                    onCheckedChange = { nodesOnly = it },
+                                                    colors = toggleColors,
+                                                    modifier = Modifier.semantics {
+                                                        contentDescription = nodesOnlyDescription
+                                                    },
+                                                ) {
+                                                    Icon(Icons.Rounded.Router, contentDescription = null)
+                                                }
+                                            }
+                                        }
+                                    },
+                                    isError = searchInvalid,
+                                    supportingText = if (searchInvalid) {
+                                        {
+                                            Text(stringResource(R.string.selector_editor_regex_invalid))
+                                        }
+                                    } else {
+                                        null
+                                    },
+                                    singleLine = true,
+                                    shape = AsteriskShapeTokens.InnerContainer,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Box(
+                                    modifier = Modifier.width(48.dp).height(56.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    TriStateCheckbox(
+                                        state = toggleableState,
+                                        onClick = ::toggleVisibleMembers,
+                                        enabled = !searchInvalid &&
+                                            interactiveVisibleTargetTags.isNotEmpty(),
+                                        modifier = Modifier.semantics {
+                                            contentDescription = bulkSelectionDescription
+                                        },
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
-            item(key = "members-required") {
-                AnimatedVisibility(
-                    visible = effectiveMembers.isEmpty(),
-                    enter = AsteriskMotion.contentEnter(),
-                    exit = AsteriskMotion.contentExit(),
-                ) {
-                    Text(
-                        stringResource(R.string.selector_editor_members_required),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+            if (nodeNameMatchingEnabled) {
+                items(matchedTargets, key = { target -> "matched:${target.tag}" }) { target ->
+                    SelectorMatchedMemberRow(
+                        target = target,
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = memberFadeIn,
+                            fadeOutSpec = memberFadeOut,
+                            placementSpec = memberPlacement,
+                        ),
+                    )
+                }
+            } else {
+                if (effectiveMembers.isEmpty()) {
+                    item(key = "members-required") {
+                        Text(
+                            stringResource(R.string.selector_editor_members_required),
+                            modifier = Modifier.animateItem(
+                                fadeInSpec = memberFadeIn,
+                                fadeOutSpec = memberFadeOut,
+                                placementSpec = memberPlacement,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                items(visibleTargets, key = SelectorTargetUi::tag) { target ->
+                    SelectorTargetRow(
+                        target = target,
+                        selected = target.tag in memberReferences || target.tag in effectiveMembers,
+                        enabled = target.tag !in lockedOutboundTags,
+                        lockedByGroup = target.tag in lockedOutboundTags,
+                        modifier = Modifier.animateItem(
+                            fadeInSpec = memberFadeIn,
+                            fadeOutSpec = memberFadeOut,
+                            placementSpec = memberPlacement,
+                        ),
+                        onClick = { toggleMember(target.tag) },
                     )
                 }
             }
-            items(visibleTargets, key = SelectorTargetUi::tag) { target ->
-                SelectorTargetRow(
-                    target = target,
-                    selected = target.tag in memberReferences || target.tag in effectiveMembers,
-                    enabled = target.tag !in lockedOutboundTags,
-                    lockedByGroup = target.tag in lockedOutboundTags,
-                    onClick = { toggleMember(target.tag) },
+        }
+    }
+}
+
+@Composable
+private fun SelectorMatchGroupPicker(
+    groups: List<OutboundGroupState>,
+    selectedGroupIds: List<Int>?,
+    onSelectedGroupIdsChange: (List<Int>?) -> Unit,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    val title = stringResource(R.string.selector_editor_match_groups)
+    val allGroups = stringResource(R.string.selector_editor_match_all_groups)
+    val focusManager = LocalFocusManager.current
+    SettingsActionRow(
+        title = title,
+        icon = Icons.Rounded.Folder,
+        value = selectedGroupIds?.size?.let { count ->
+            pluralStringResource(R.plurals.outbound_group_count, count, count)
+        } ?: allGroups,
+        horizontalPadding = 0.dp,
+        onClick = {
+            focusManager.clearFocus()
+            showPicker = true
+        },
+    )
+    if (showPicker) {
+        var selection by remember { mutableStateOf(selectedGroupIds) }
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            title = { Text(title) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    (listOf(null) + groups).forEach { group ->
+                        val groupId = group?.id
+                        val checked = if (groupId == null) selection == null else groupId in selection.orEmpty()
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                                .toggleable(
+                                    value = checked,
+                                    role = Role.Checkbox,
+                                    onValueChange = { selected ->
+                                        selection = when {
+                                            groupId == null -> if (selected) null else emptyList()
+                                            selected -> selection.orEmpty() + groupId
+                                            else -> selection.orEmpty() - groupId
+                                        }
+                                    },
+                                ),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            AsteriskCheckbox(checked = checked, onCheckedChange = null)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = group?.name ?: allGroups,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                                if (group?.enabled == false) {
+                                    Text(
+                                        text = stringResource(R.string.selector_group_disabled),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            dismissButton = { AsteriskCancelButton(onClick = { showPicker = false }) },
+            confirmButton = {
+                AsteriskActionButton(
+                    text = stringResource(R.string.common_ok),
+                    icon = Icons.Rounded.Check,
+                    enabled = selection?.isNotEmpty() != false,
+                    onClick = {
+                        onSelectedGroupIdsChange(selection)
+                        showPicker = false
+                    },
                 )
-            }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SelectorMatchedMemberRow(
+    target: SelectorTargetUi,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        shape = AsteriskShapeTokens.InnerContainer,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Rounded.Router, contentDescription = null)
+            Text(
+                text = target.displayLabel().ifBlank { target.tag },
+                style = MaterialTheme.typography.bodyLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -1278,6 +1545,7 @@ private fun SelectorTargetRow(
     selected: Boolean,
     enabled: Boolean,
     lockedByGroup: Boolean,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val containerColor by animateColorAsState(
@@ -1293,7 +1561,7 @@ private fun SelectorTargetRow(
     Card(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.semantics {
+        modifier = modifier.semantics {
             if (lockedByGroup) stateDescription = lockedStateDescription
         },
         colors = CardDefaults.cardColors(

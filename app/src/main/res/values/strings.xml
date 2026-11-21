@@ -736,10 +736,21 @@
     <string name="selector_editor_clear_all_matches">Clear all matching outbounds</string>
     <string name="selector_editor_default">Default outbound</string>
     <string name="selector_editor_edit">Edit selector</string>
+    <string name="selector_editor_dynamic_members">Dynamic members</string>
+    <string name="selector_editor_dynamic_members_summary">Build the member list from a node name rule</string>
+    <string name="selector_editor_match_groups">Matching groups</string>
+    <string name="selector_editor_match_all_groups">All groups</string>
+    <string name="selector_editor_node_name_regex">Node name regex</string>
+    <string name="selector_editor_node_name_regex_required">Enter a regular expression</string>
+    <plurals name="selector_editor_node_name_matches">
+        <item quantity="one">%1$d matching node</item>
+        <item quantity="other">%1$d matching nodes</item>
+    </plurals>
     <string name="selector_editor_interrupt">Interrupt existing connections</string>
     <string name="selector_editor_interrupt_summary">Close existing connections when switching outbounds</string>
     <string name="selector_editor_members">Outbound members</string>
     <string name="selector_editor_members_required">Select at least one outbound</string>
+    <string name="selector_editor_nodes_only">Nodes only</string>
     <string name="selector_editor_regex_disable">Disable regular expression search</string>
     <string name="selector_editor_regex_enable">Enable regular expression search</string>
     <string name="selector_editor_regex_invalid">Invalid regular expression</string>

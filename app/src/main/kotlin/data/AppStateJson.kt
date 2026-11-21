@@ -52,28 +52,22 @@ internal object StringMapJson {
     private const val LogTag = "AppStateJson"
 }
 
+internal object IntListJson {
+    fun encode(values: List<Int>): String = appStateJson.encodeToString(values)
+
+    fun decode(payload: String): List<Int> =
+        runCatching {
+            appStateJson.decodeFromString<List<Int>>(payload)
+        }.onFailure { error ->
+            AndroidAppLogger.warn("AppStateJson", "Failed to decode persisted integer list", error)
+        }.getOrDefault(emptyList())
+}
+
 internal object SingBoxDnsServerJson {
     fun encode(value: SingBoxDnsServerState): String = appStateJson.encodeToString(value)
 
     fun decode(payload: String): SingBoxDnsServerState =
         appStateJson.decodeFromString(payload)
-}
-
-internal object SingBoxDnsRuleListJson {
-    fun encode(values: List<SingBoxDnsRuleState>): String =
-        appStateJson.encodeToString(values)
-
-    fun decode(payload: String): List<SingBoxDnsRuleState> {
-        return runCatching {
-            appStateJson.decodeFromString<List<SingBoxDnsRuleState>>(payload)
-                .filter(SingBoxDnsRuleState::isValidPersistedDnsRule)
-                .distinctBy(SingBoxDnsRuleState::id)
-        }.onFailure { error ->
-            AndroidAppLogger.warn(LogTag, "Failed to decode persisted DNS rules", error)
-        }.getOrDefault(emptyList())
-    }
-
-    private const val LogTag = "AppStateJson"
 }
 
 private fun SingBoxDnsRuleState.isValidPersistedDnsRule(): Boolean =

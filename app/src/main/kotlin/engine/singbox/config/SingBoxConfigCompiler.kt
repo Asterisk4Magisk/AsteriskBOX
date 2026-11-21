@@ -38,6 +38,7 @@ import app.modes.isRootRunMode
 import app.rootIpv6DataPathEnabled
 import app.withCanonicalManagedTagReferences
 import app.withPrunedDnsServerReferences
+import app.withResolvedSelectorRegexMembers
 import app.withUnavailableManagedRuleSetsDisabled
 import engine.network.toPortOrNull
 import engine.proxy.LocalProxyLoopbackAddress
@@ -189,7 +190,7 @@ internal object SingBoxConfigCompiler {
         hostsResourcePaths: Map<Int, String> = emptyMap(),
     ): JsonObject = generateRoot(
         sourceRoot = JsonObject(emptyMap()),
-        appState = appState.withCanonicalManagedTagReferences(),
+        appState = appState.withCanonicalManagedTagReferences().withResolvedSelectorRegexMembers(),
         runMode = runMode,
         exposePorts = exposePorts,
         localRuleSets = localRuleSets,

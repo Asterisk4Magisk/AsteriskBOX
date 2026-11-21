@@ -130,3 +130,10 @@ internal val MIGRATION_6_7 = object : Migration(6, 7) {
         db.execSQL("ALTER TABLE selectors ADD COLUMN fallbackMaxDelay TEXT NOT NULL DEFAULT ''")
     }
 }
+
+internal val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE selectors ADD COLUMN nodeNameRegex TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE selectors ADD COLUMN matchOutboundGroupIds TEXT")
+    }
+}

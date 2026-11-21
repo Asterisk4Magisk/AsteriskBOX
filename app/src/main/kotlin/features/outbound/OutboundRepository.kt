@@ -253,6 +253,14 @@ internal class OutboundRepository(
             val updated = snapshot.copy(
                 outboundGroups = snapshot.outboundGroups.filterNot { item -> item.id == groupId },
                 outbounds = snapshot.outbounds.filterNot { outbound -> outbound.groupId == groupId },
+                selectors = snapshot.selectors.map { selector ->
+                    val groupIds = selector.matchOutboundGroupIds
+                    if (groupIds != null && groupId in groupIds) {
+                        selector.copy(matchOutboundGroupIds = groupIds - groupId)
+                    } else {
+                        selector
+                    }
+                },
             ).withRemovedManagedOutboundTags(removedTags)
             when (
                 val result = commitPreparedAndRunPostEffects(snapshot, updated) {
@@ -350,7 +358,7 @@ internal class OutboundRepository(
         currentCoroutineContext().ensureActive()
         // Every outbound-side mutation funnels through here, so this is the one place
         // that has to notice a running core going stale. The marker rides along with
-        // the same commit, so it can never describe a write that failed to persist.
+        // the same commit, so it can never describe a White that failed to persist.
         val committed = updated.withConfigRestartPendingFrom(expected)
         return withContext(NonCancellable) {
             mapPersistence(
@@ -387,10 +395,9 @@ internal class OutboundRepository(
     }
 
     private fun OutboundState.semanticallyMatches(other: OutboundState): Boolean {
-        if (groupId != other.groupId) return false
-        return runCatching {
+        return groupId == other.groupId && runCatching {
             importFingerprint(type, remarks, json) ==
-                importFingerprint(other.type, other.remarks, other.json)
+                    importFingerprint(other.type, other.remarks, other.json)
         }.getOrDefault(false)
     }
 

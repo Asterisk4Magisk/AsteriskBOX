@@ -39,7 +39,7 @@ internal fun filterSelectorTargets(
         )
     }
     val regex = if (regexEnabled) {
-        runCatching { Regex(normalized, RegexOption.IGNORE_CASE) }.getOrNull()
+        selectorTargetRegexOrNull(normalized)
             ?: return SelectorTargetSearchResult.InvalidRegex
     } else {
         null
@@ -56,6 +56,9 @@ internal fun filterSelectorTargets(
         }.map(SelectorTargetSearchCandidate::tag)
     return SelectorTargetSearchResult.Valid(matchedTags)
 }
+
+internal fun selectorTargetRegexOrNull(query: String): Regex? =
+    runCatching { Regex(query.trim(), RegexOption.IGNORE_CASE) }.getOrNull()
 
 internal fun selectorTargetSelectionState(
     selectedTags: Collection<String>,

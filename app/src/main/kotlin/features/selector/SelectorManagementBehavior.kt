@@ -9,12 +9,14 @@ import app.DefaultSingBoxUrlTestInterval
 import app.DefaultSingBoxUrlTestTolerance
 import app.DefaultSingBoxUrlTestUrl
 import app.ManagedOutboundChoice
+import app.OutboundGroupState
 import app.SingBoxSelectorTypeSelector
 import app.SingBoxSelectorTypeUrlTest
 import app.SingBoxSelectorState
 import app.SupportedSingBoxSelectorTypes
 import app.nextAvailableSelectorId
 import app.selectableManagedOutbounds
+import app.selectorRegexMemberTags
 import engine.singbox.SingBoxUnsigned16Max
 import engine.singbox.isNonNegativeSingBoxDuration
 import engine.singbox.isSingBoxDurationNotGreaterThan
@@ -37,6 +39,7 @@ internal fun selectorCardMemberCount(
     state: AppState,
     selector: SingBoxSelectorState,
 ): Int {
+    if (selector.nodeNameRegex.isNotBlank()) return state.selectorRegexMemberTags(selector).size
     val targets = selectorTargetChoices(state = state, selectorId = selector.id)
     return selectorEffectiveMemberTags(
         state = state,
@@ -93,34 +96,45 @@ internal fun validateSelectorDraft(
     val remarks = draft.remarks.trim()
     require(remarks.isNotEmpty()) { "Selector remarks are required" }
 
-    val availableTargets = selectorTargetChoices(
-        state = state,
-        selectorId = draft.id,
-    )
-    val requestedMembers = draft.outbounds
-        .map(String::trim)
-        .filter(String::isNotEmpty)
-        .toSet()
-    val memberReferences = availableTargets
-        .map(ManagedOutboundChoice::tag)
-        .filter(requestedMembers::contains)
-    require(memberReferences.size == requestedMembers.size) {
-        "Selector contains an unavailable outbound"
+    val pattern = draft.nodeNameRegex.trim()
+    require(pattern.isEmpty() || selectorTargetRegexOrNull(pattern) != null) { "Invalid node name regex" }
+    val normalized: SingBoxSelectorState
+    val members: List<String>
+    if (pattern.isNotEmpty()) {
+        val groupIds = state.outboundGroups.mapTo(mutableSetOf(), OutboundGroupState::id)
+        normalized = draft.copy(
+            outbounds = emptyList(),
+            nodeNameRegex = pattern,
+            matchOutboundGroupIds = draft.matchOutboundGroupIds?.filter(groupIds::contains)?.distinct(),
+        )
+        members = state.selectorRegexMemberTags(normalized)
+    } else {
+        val availableTargets = selectorTargetChoices(state = state, selectorId = draft.id)
+        val requestedMembers = draft.outbounds
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .toSet()
+        val memberReferences = availableTargets
+            .map(ManagedOutboundChoice::tag)
+            .filter(requestedMembers::contains)
+        require(memberReferences.size == requestedMembers.size) {
+            "Selector contains an unavailable outbound"
+        }
+        normalized = draft.copy(outbounds = memberReferences, nodeNameRegex = "", matchOutboundGroupIds = null)
+        members = selectorEffectiveMemberTags(
+            state = state,
+            memberReferences = memberReferences,
+            targets = availableTargets,
+        )
+        require(members.isNotEmpty()) { "Selector requires at least one outbound" }
     }
-    val members = selectorEffectiveMemberTags(
-        state = state,
-        memberReferences = memberReferences,
-        targets = availableTargets,
-    )
-    require(members.isNotEmpty()) { "Selector requires at least one outbound" }
     return when (type) {
         SingBoxSelectorTypeSelector -> {
-            val default = draft.default.trim().ifBlank { members.first() }
-            require(default in members) { "Selector default must be a member" }
-            draft.copy(
+            val default = draft.default.trim().ifBlank { members.firstOrNull().orEmpty() }
+            require(default.isEmpty() || default in members) { "Selector default must be a member" }
+            normalized.copy(
                 type = type,
                 remarks = remarks,
-                outbounds = memberReferences,
                 default = default,
             )
         }
@@ -141,10 +155,9 @@ internal fun validateSelectorDraft(
             require(!draft.fallbackEnabled || fallbackMaxDelay.isEmpty() || isValidSingBoxDuration(fallbackMaxDelay)) {
                 "URLTest fallback maximum delay is invalid"
             }
-            draft.copy(
+            normalized.copy(
                 type = type,
                 remarks = remarks,
-                outbounds = memberReferences,
                 default = "",
                 url = url,
                 interval = interval,

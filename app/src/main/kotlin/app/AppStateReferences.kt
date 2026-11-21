@@ -29,6 +29,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import features.dns.disableUnavailableDnsConfigurationReferences
 import features.dns.ManagedFakeIpDnsTag
+import features.selector.SelectorTargetSearchCandidate
+import features.selector.filterSelectorTargets
 
 internal enum class ManagedOutboundChoiceKind {
     Group,
@@ -110,6 +112,38 @@ internal fun selectableManagedOutbounds(
     includeDirect = includeDirect,
     includeGlobalSelector = includeGlobalSelector,
 )
+
+internal fun AppState.selectorRegexMemberTags(selector: SingBoxSelectorState): List<String> {
+    if (selector.nodeNameRegex.isBlank()) return emptyList()
+    val original = selectors.firstOrNull { it.id == selector.id }
+    val draft = if (original == null) {
+        selector.copy(id = nextAvailableSelectorId())
+    } else {
+        // Existing references still use the saved selector tag while the draft is open.
+        selector.copy(remarks = original.remarks)
+    }
+    val state = if (original == draft) this else copy(
+        selectors = selectors.filterNot { it.id == draft.id } + draft,
+    )
+    return ManagedOutboundReferenceIndex(state).regexMembers(draft.tag)
+}
+
+internal fun AppState.withResolvedSelectorRegexMembers(): AppState {
+    if (selectors.none { it.nodeNameRegex.isNotBlank() }) return this
+    val index = ManagedOutboundReferenceIndex(this)
+    val unavailable = mutableSetOf<String>()
+    val resolved = selectors.map { selector ->
+        if (selector.nodeNameRegex.isBlank()) {
+            selector
+        } else {
+            val members = index.regexMembers(selector.tag)
+            if (members.isEmpty()) unavailable += selector.tag
+            selector.copy(outbounds = members, nodeNameRegex = "", matchOutboundGroupIds = null)
+        }
+    }
+    // Remove unavailable references only from the generated configuration.
+    return copy(selectors = resolved).withRemovedManagedOutboundTags(unavailable)
+}
 
 internal fun selectableDetourOutbounds(
     state: AppState,
@@ -810,9 +844,11 @@ private class ManagedOutboundReferenceIndex(state: AppState) {
                 }
                 .map(IndexedEndpoint::tag)
     }
-    private val reverseDependencies: Map<String, Set<String>> by lazy(LazyThreadSafetyMode.NONE) {
-        buildReverseDependencies()
-    }
+    private val referenceGraph by lazy(LazyThreadSafetyMode.NONE, ::buildReferenceGraph)
+
+    fun regexMembers(selectorTag: String): List<String> =
+        if (selectorsByTag[selectorTag]?.value?.nodeNameRegex.isNullOrBlank()) emptyList()
+        else referenceGraph.regexMembersByTag[selectorTag].orEmpty()
 
     fun selectableChoices(
         excludedTag: String,
@@ -844,7 +880,13 @@ private class ManagedOutboundReferenceIndex(state: AppState) {
                 }
             }
             selectors
-                .filter { selector -> selector.value.outbounds.isNotEmpty() }
+                .filter { selector ->
+                    if (selector.value.nodeNameRegex.isBlank()) {
+                        selector.value.outbounds.isNotEmpty()
+                    } else {
+                        regexMembers(selector.tag).isNotEmpty()
+                    }
+                }
                 .forEach { selector ->
                     add(
                         ManagedOutboundChoice(
@@ -922,7 +964,13 @@ private class ManagedOutboundReferenceIndex(state: AppState) {
             .stableSortedByKindPriority()
     }
 
-    fun tagsDependingOn(targets: Set<String>): Set<String> {
+    fun tagsDependingOn(targets: Set<String>): Set<String> =
+        if (targets.isEmpty()) emptySet() else tagsDependingOn(targets, referenceGraph.reverseDependencies)
+
+    private fun tagsDependingOn(
+        targets: Set<String>,
+        reverseDependencies: Map<String, Set<String>>,
+    ): Set<String> {
         if (targets.isEmpty()) return emptySet()
         val pending = ArrayDeque<String>()
         targets.forEach(pending::addLast)
@@ -935,7 +983,7 @@ private class ManagedOutboundReferenceIndex(state: AppState) {
         return dependents
     }
 
-    private fun buildReverseDependencies(): Map<String, Set<String>> {
+    private fun buildReferenceGraph(): ManagedOutboundReferenceGraph {
         val reverse = mutableMapOf<String, MutableSet<String>>()
         buildList {
             add(APP_DIRECT_OUTBOUND)
@@ -951,13 +999,53 @@ private class ManagedOutboundReferenceIndex(state: AppState) {
                     reverse.getOrPut(dependency, ::mutableSetOf).add(source)
                 }
             }
-        return reverse
+        val candidates by lazy(LazyThreadSafetyMode.NONE) {
+            outbounds
+                .filter { outbound ->
+                    outbound.value.groupId in enabledGroupIds &&
+                        outbound.value.type != SingBoxSelectorTypeSelector &&
+                        outbound.value.type != SingBoxSelectorTypeUrlTest &&
+                        outbound.json != null
+                }
+                .map { outbound ->
+                    SelectorTargetSearchCandidate(
+                        tag = outbound.tag,
+                        label = outbound.value.remarks.trim(),
+                        groupName = null,
+                    )
+                }
+        }
+        val regexMembers = buildMap {
+            selectors
+                .filter { it.value.nodeNameRegex.isNotBlank() }
+                .sortedBy { it.value.id }
+                .forEach { selector ->
+                    // The global selector also includes custom selectors in the compiled config.
+                    val dependents = tagsDependingOn(setOf(selector.tag, APP_GLOBAL_SELECTOR), reverse)
+                    val groupIds = selector.value.matchOutboundGroupIds?.toSet()
+                    val scopedCandidates = if (groupIds == null) candidates else candidates.filter { candidate ->
+                        outboundsByTag.getValue(candidate.tag).value.groupId in groupIds
+                    }
+                    val matches = filterSelectorTargets(
+                        targets = scopedCandidates,
+                        query = selector.value.nodeNameRegex,
+                        regexEnabled = true,
+                    ).matchedTags.filterNot(dependents::contains)
+                    put(selector.tag, matches)
+                    matches.forEach { member ->
+                        reverse.getOrPut(member, ::mutableSetOf).add(selector.tag)
+                    }
+                }
+        }
+        return ManagedOutboundReferenceGraph(reverse, regexMembers)
     }
 
     private fun dependenciesOf(tag: String): List<String> = when (tag) {
         APP_DIRECT_OUTBOUND -> emptyList()
         APP_GLOBAL_SELECTOR -> globalDependencies
-        in selectorsByTag -> selectorsByTag.getValue(tag).value.outbounds
+        in selectorsByTag -> selectorsByTag.getValue(tag).value.let { selector ->
+            if (selector.nodeNameRegex.isBlank()) selector.outbounds else emptyList()
+        }
         in groupsByTag -> outboundsByGroup[groupsByTag.getValue(tag).value.id]
             .orEmpty()
             .map(IndexedOutbound::tag)
@@ -991,6 +1079,11 @@ private class ManagedOutboundReferenceIndex(state: AppState) {
         }
     }
 }
+
+private data class ManagedOutboundReferenceGraph(
+    val reverseDependencies: Map<String, Set<String>>,
+    val regexMembersByTag: Map<String, List<String>>,
+)
 
 private data class IndexedOutboundGroup(
     val value: OutboundGroupState,

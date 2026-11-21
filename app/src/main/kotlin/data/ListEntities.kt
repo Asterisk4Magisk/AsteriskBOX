@@ -214,12 +214,14 @@ internal data class SelectorEntity(
     val interruptExistConnections: Boolean,
     @ColumnInfo(defaultValue = "0") val fallbackEnabled: Boolean = false,
     @ColumnInfo(defaultValue = "''") val fallbackMaxDelay: String = "",
+    @ColumnInfo(defaultValue = "''") val nodeNameRegex: String = "",
+    val matchOutboundGroupIds: List<Int>? = null,
 ) {
     fun toState(): SingBoxSelectorState =
         SingBoxSelectorState(
             id = id,
             remarks = remarks,
-            outbounds = outbounds,
+            outbounds = if (nodeNameRegex.isBlank()) outbounds else emptyList(),
             default = defaultOutbound,
             type = type,
             url = url,
@@ -229,6 +231,8 @@ internal data class SelectorEntity(
             interruptExistConnections = interruptExistConnections,
             fallbackEnabled = fallbackEnabled,
             fallbackMaxDelay = fallbackMaxDelay,
+            nodeNameRegex = nodeNameRegex,
+            matchOutboundGroupIds = matchOutboundGroupIds.takeIf { nodeNameRegex.isNotBlank() },
         )
 
     companion object {
@@ -247,6 +251,8 @@ internal data class SelectorEntity(
                 interruptExistConnections = selector.interruptExistConnections,
                 fallbackEnabled = selector.fallbackEnabled,
                 fallbackMaxDelay = selector.fallbackMaxDelay,
+                nodeNameRegex = selector.nodeNameRegex,
+                matchOutboundGroupIds = selector.matchOutboundGroupIds,
             )
     }
 }

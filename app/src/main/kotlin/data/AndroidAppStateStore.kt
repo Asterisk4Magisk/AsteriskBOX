@@ -213,7 +213,7 @@ class AndroidAppStateStore private constructor(
             }
             val initialized = previous.withInitializedBundledRuleSets().withCompatibleProxyAppListMode()
             // Persist the records, references and marker in one Room transaction before exposing them.
-            // Otherwise a process death after deletion could cause defaults to be seeded again.
+            // Otherwise, a process death after deletion could cause defaults to be seeded again.
             if (initialized !== previous) {
                 // TUN bypass references live in preferences. Commit them before the Room marker;
                 // if the Room transaction fails, the same deterministic migration can be retried.
@@ -298,7 +298,7 @@ class AndroidAppStateStore private constructor(
         )
             // Keep committed state in the main DB file for file-based backup tools.
             .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
             .build()
     }
 

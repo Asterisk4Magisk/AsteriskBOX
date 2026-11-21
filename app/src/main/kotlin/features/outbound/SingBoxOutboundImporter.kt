@@ -320,7 +320,7 @@ internal fun AppState.withImportedOutbounds(
         addAll(endpoints.map { endpoint -> endpoint.tag })
         addAll(
             selectors
-                .filter { selector -> selector.outbounds.isNotEmpty() }
+                .filter { selector -> selector.outbounds.isNotEmpty() || selector.nodeNameRegex.isNotBlank() }
                 .map { selector -> selector.tag },
         )
         addAll(

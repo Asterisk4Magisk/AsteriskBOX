@@ -281,6 +281,8 @@ private fun SingBoxSelectorState.toBackup(): AppBackupSelector =
         interruptExistConnections = interruptExistConnections,
         fallbackEnabled = fallbackEnabled,
         fallbackMaxDelay = fallbackMaxDelay,
+        nodeNameRegex = nodeNameRegex,
+        matchOutboundGroupIds = matchOutboundGroupIds,
     )
 
 private fun CustomResourceFileState.toBackup(): AppBackupCustomResourceFile =
@@ -295,7 +297,8 @@ private fun AppBackupData.toAppState(): AppState {
     val restoredOutboundGroups = outboundGroups.map(AppBackupOutboundGroup::toState)
     val restoredOutbounds = outbounds.map(AppBackupOutbound::toState)
     val restoredEndpoints = endpoints.map(AppBackupEndpoint::toState)
-    val restoredSelectors = selectors.map(AppBackupSelector::toState)
+    val restoredGroupIds = restoredOutboundGroups.mapTo(mutableSetOf(), OutboundGroupState::id)
+    val restoredSelectors = selectors.map { selector -> selector.toState(restoredGroupIds) }
     val restoredCustomResourceFiles = customResourceFiles.map(AppBackupCustomResourceFile::toState)
 
     return defaults.copy(
@@ -475,11 +478,11 @@ private fun AppBackupEndpoint.toState(): SingBoxEndpointState =
         json = json,
     )
 
-private fun AppBackupSelector.toState(): SingBoxSelectorState =
+private fun AppBackupSelector.toState(groupIds: Set<Int>): SingBoxSelectorState =
     SingBoxSelectorState(
         id = id,
         remarks = remarks,
-        outbounds = outbounds,
+        outbounds = if (nodeNameRegex.isBlank()) outbounds else emptyList(),
         default = default,
         type = type,
         url = url,
@@ -489,6 +492,11 @@ private fun AppBackupSelector.toState(): SingBoxSelectorState =
         interruptExistConnections = interruptExistConnections,
         fallbackEnabled = fallbackEnabled,
         fallbackMaxDelay = fallbackMaxDelay,
+        nodeNameRegex = nodeNameRegex,
+        matchOutboundGroupIds = matchOutboundGroupIds
+            ?.takeIf { nodeNameRegex.isNotBlank() }
+            ?.filter(groupIds::contains)
+            ?.distinct(),
     )
 
 private fun AppBackupCustomResourceFile.toState(): CustomResourceFileState =

@@ -242,6 +242,8 @@ internal data class AppBackupSelector(
     val interruptExistConnections: Boolean = true,
     val fallbackEnabled: Boolean = false,
     val fallbackMaxDelay: String = "",
+    val nodeNameRegex: String = "",
+    val matchOutboundGroupIds: List<Int>? = null,
 )
 
 @Serializable

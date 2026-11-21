@@ -11,4 +11,10 @@ internal class RoomTypeConverters {
 
     @TypeConverter
     fun decodeStringList(payload: String): List<String> = StringListJson.decode(payload)
+
+    @TypeConverter
+    fun encodeIntList(values: List<Int>?): String? = values?.let(IntListJson::encode)
+
+    @TypeConverter
+    fun decodeIntList(payload: String?): List<Int>? = payload?.let(IntListJson::decode)
 }

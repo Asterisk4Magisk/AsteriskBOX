@@ -722,10 +722,20 @@
     <string name="selector_editor_clear_all_matches">取消选择匹配的出站</string>
     <string name="selector_editor_default">默认出站</string>
     <string name="selector_editor_edit">编辑选择器</string>
+    <string name="selector_editor_dynamic_members">动态成员</string>
+    <string name="selector_editor_dynamic_members_summary">根据节点名称规则生成成员</string>
+    <string name="selector_editor_match_groups">匹配分组</string>
+    <string name="selector_editor_match_all_groups">全部分组</string>
+    <string name="selector_editor_node_name_regex">节点名称正则表达式</string>
+    <string name="selector_editor_node_name_regex_required">请输入正则表达式</string>
+    <plurals name="selector_editor_node_name_matches">
+        <item quantity="other">匹配到 %1$d 个节点</item>
+    </plurals>
     <string name="selector_editor_interrupt">中断现有连接</string>
     <string name="selector_editor_interrupt_summary">切换出站时断开已有连接</string>
     <string name="selector_editor_members">出站成员</string>
     <string name="selector_editor_members_required">请至少选择一个出站</string>
+    <string name="selector_editor_nodes_only">仅节点</string>
     <string name="selector_editor_regex_disable">关闭正则表达式搜索</string>
     <string name="selector_editor_regex_enable">启用正则表达式搜索</string>
     <string name="selector_editor_regex_invalid">正则表达式无效</string>
