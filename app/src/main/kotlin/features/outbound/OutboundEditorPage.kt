@@ -107,9 +107,12 @@ internal fun OutboundEditorPage(
     var remarks by remember(activeOutboundId, editing?.remarks) {
         mutableStateOf(editing?.remarks.orEmpty())
     }
-    var selectedGroupId by remember(activeOutboundId) {
-        mutableIntStateOf(editing?.groupId ?: initialGroupId)
-    }
+    val originalGroupId = editing?.groupId
+        ?: appState.outboundGroups.firstOrNull { it.id == initialGroupId }?.id
+        ?: appState.outboundGroups.firstOrNull { it.enabled }?.id
+        ?: appState.outboundGroups.firstOrNull()?.id
+        ?: 0
+    var selectedGroupId by remember(activeOutboundId) { mutableIntStateOf(originalGroupId) }
     var attemptedSave by remember(activeOutboundId) { mutableStateOf(false) }
     var saving by remember(activeOutboundId) { mutableStateOf(false) }
     var pendingSwitchId by remember(activeOutboundId) { mutableStateOf<Int?>(null) }
@@ -259,7 +262,7 @@ internal fun OutboundEditorPage(
             }
         },
     ) { contentPadding ->
-        val listGroupId = if (editing == null) selectedGroupId else initialGroupId
+        val listGroupId = editing?.groupId ?: selectedGroupId
         val groupEntries = remember(appState.outbounds, listGroupId) {
             appState.outbounds.filter { it.groupId == listGroupId }.map { outbound ->
                 EditorListItem(outbound.id, outbound.remarks.ifBlank { outbound.type })
@@ -270,15 +273,15 @@ internal fun OutboundEditorPage(
             entries = groupEntries,
             selectedId = editing?.id,
             padding = contentPadding,
-            onSelect = editing?.let { current ->
-                select@{ targetId ->
-                    if (saving || targetId == current.id) return@select
-                    if (document != initialDocument || remarks != current.remarks || selectedGroupId != current.groupId) {
-                        focusManager.clearFocus(force = true)
-                        pendingSwitchId = targetId
-                    } else {
-                        switchTo(targetId)
-                    }
+            onSelect = select@{ targetId ->
+                if (saving || targetId == activeOutboundId) return@select
+                if (document != initialDocument || remarks != editing?.remarks.orEmpty() ||
+                    selectedGroupId != originalGroupId
+                ) {
+                    focusManager.clearFocus(force = true)
+                    pendingSwitchId = targetId
+                } else {
+                    switchTo(targetId)
                 }
             },
             selectionEnabled = !saving,

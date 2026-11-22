@@ -6,7 +6,6 @@ package features.resources
 import features.resources.runtime.withScannedResourceFiles
 
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -470,7 +469,6 @@ fun ResourceManagementPage(
         val useResourceGrid = useWideResourceLayout()
         val builtInFiles = ResourceFileKind.entries.filter { useResourceGrid || it != ResourceFileKind.SingBoxCore }
         val customFiles = appState.customResourceFiles
-        val largestResourceSectionItemCount = maxOf(builtInFiles.size, customFiles.size)
         val reorderEnabled = customFiles.size > 1 && !resourceActionRunning
         val preview = rememberReorderPreview(
             items = customFiles,
@@ -493,7 +491,9 @@ fun ResourceManagementPage(
             rememberAsteriskReorderableLazyGridState(
                 lazyGridState = gridState,
                 itemCount = preview.items.size,
-                scrollThresholdPadding = PaddingValues(horizontal = 16.dp),
+                // Overview and both section titles precede the custom cards.
+                indexOffset = 3 + builtInFiles.size,
+                scrollThresholdPadding = verticalReorderScrollThresholdPadding(listPadding),
                 onMove = preview.onMove,
             )
         } else {
@@ -638,91 +638,65 @@ fun ResourceManagementPage(
             )
         }
 
-        SectionedLazyColumn(
-            modifier = Modifier.pageReadableWidth(),
-            contentPadding = listPadding,
-            itemSpacing = 10.dp,
-            state = listState,
-        ) {
-            item(key = "resource_overview") {
-                ResourceOverviewCard(
-                    overview = overview,
-                    sourceOptions = sourceOptions,
-                    selectedSource = appState.resourceFileSource,
-                    lastUpdatedAtMillis = lastUpdatedAtMillis,
-                    updating = updateQueueState.isBusy,
-                    actionsEnabled = !resourceActionRunning,
-                    onSourceChange = { index ->
-                        if (index == ResourceFileSourceCustom) {
-                            openCustomSourceEditor()
-                        } else {
-                            updateAppState { state -> state.copy(resourceFileSource = index) }
-                        }
-                    },
-                    onUpdate = {
-                        resourceFileUpdateCoordinator.enqueue(
-                            ResourceFileUpdateRequest.All(
-                                source = appState.resourceFileUpdateSource(),
-                                options = appState.resourceFileUpdateOptions(),
-                                customResourceFiles = appState.customResourceFiles.toList(),
-                            ),
-                        )
-                    },
-                    onCancel = resourceFileUpdateCoordinator::cancelAll,
-                    onSettings = { showResourceAutoUpdateSheet = true },
-                )
-            }
-            if (!useResourceGrid) {
-                sectionTitleItem(key = "resource_core_section") {
-                    ResourceSectionTitle(stringResource(R.string.settings_resource_files_core_files))
-                }
-
-                item(key = ResourceFileKind.SingBoxCore.fileName) {
-                    CoreFileCard()
-                }
-            }
-            sectionTitleItem(key = "resource_rules_section") {
-                ResourceSectionTitle(stringResource(R.string.settings_resource_files_files))
-            }
-            if (useResourceGrid) {
-                item(key = "built_in_resource_grid") {
-                    ResourceFileGrid(
-                        itemCount = builtInFiles.size,
-                        largestSectionItemCount = largestResourceSectionItemCount,
-                        key = { builtInFiles[it].fileName },
-                    ) { index, cardModifier ->
-                        BuiltInFileCard(builtInFiles[index], cardModifier)
+        @Composable
+        fun OverviewCard() {
+            ResourceOverviewCard(
+                overview = overview,
+                sourceOptions = sourceOptions,
+                selectedSource = appState.resourceFileSource,
+                lastUpdatedAtMillis = lastUpdatedAtMillis,
+                updating = updateQueueState.isBusy,
+                actionsEnabled = !resourceActionRunning,
+                onSourceChange = { index ->
+                    if (index == ResourceFileSourceCustom) {
+                        openCustomSourceEditor()
+                    } else {
+                        updateAppState { state -> state.copy(resourceFileSource = index) }
                     }
+                },
+                onUpdate = {
+                    resourceFileUpdateCoordinator.enqueue(
+                        ResourceFileUpdateRequest.All(
+                            source = appState.resourceFileUpdateSource(),
+                            options = appState.resourceFileUpdateOptions(),
+                            customResourceFiles = appState.customResourceFiles.toList(),
+                        ),
+                    )
+                },
+                onCancel = resourceFileUpdateCoordinator::cancelAll,
+                onSettings = { showResourceAutoUpdateSheet = true },
+            )
+        }
+
+        if (useResourceGrid) {
+            ResourceFileGrid(
+                contentPadding = listPadding,
+                modifier = Modifier.pageReadableWidth(),
+                state = gridState,
+            ) {
+                resourceGridHeader("resource_overview") { OverviewCard() }
+                resourceGridHeader("resource_rules_section") {
+                    ResourceSectionTitle(stringResource(R.string.settings_resource_files_files))
                 }
-            } else {
-                builtInFiles.forEach { kind ->
-                    item(key = kind.fileName) { BuiltInFileCard(kind) }
+                items(builtInFiles.size, key = { builtInFiles[it].fileName }) { index ->
+                    BuiltInFileCard(builtInFiles[index])
                 }
-            }
-            if (customFiles.isNotEmpty()) {
-                sectionTitleItem(key = "resource_custom_section") {
-                    ResourceSectionTitle(stringResource(R.string.settings_resource_files_custom_section))
-                }
-            }
-            if (gridReorderState != null && preview.items.isNotEmpty()) {
-                item(key = "custom_resource_grid") {
-                    ResourceFileGrid(
-                        itemCount = preview.items.size,
-                        largestSectionItemCount = largestResourceSectionItemCount,
-                        key = { "custom_resource_file_" + preview.items[it].id },
-                        state = gridState,
-                    ) { index, cardModifier ->
+                if (gridReorderState != null && preview.items.isNotEmpty()) {
+                    resourceGridHeader("resource_custom_section") {
+                        ResourceSectionTitle(stringResource(R.string.settings_resource_files_custom_section))
+                    }
+                    items(preview.items.size, key = { "custom_resource_file_" + preview.items[it].id }) { index ->
                         val customFile = preview.items[index]
                         ReorderableItem(
                             state = gridReorderState.reorderableState,
                             key = "custom_resource_file_" + customFile.id,
-                            modifier = cardModifier,
+                            modifier = Modifier.fillMaxWidth(),
                             animateItemModifier = Modifier.animateItem(),
                         ) { isDragging ->
                             val lift = animateDraggedCardLift(isDragging, label = "custom-resource-card")
                             CustomFileCard(
                                 customFile,
-                                Modifier.fillMaxHeight()
+                                Modifier
                                     .longPressReorderDragHandle(
                                         scope = this,
                                         enabled = reorderEnabled,
@@ -735,27 +709,52 @@ fun ResourceManagementPage(
                         }
                     }
                 }
-            } else if (listReorderState != null) {
-                preview.items.forEach { customFile ->
-                    val key = "custom_resource_file_" + customFile.id
-                    itemWithPadding(key = key) { itemPadding ->
-                        ReorderableItem(
-                            state = listReorderState.reorderableState,
-                            key = key,
-                            modifier = itemPadding.fillMaxWidth(),
-                            animateItemModifier = Modifier.animateItem(),
-                        ) { isDragging ->
-                            val lift = animateDraggedCardLift(isDragging, label = "custom-resource-card")
-                            CustomFileCard(
-                                customFile,
-                                Modifier.longPressReorderDragHandle(
-                                    scope = this,
-                                    enabled = reorderEnabled,
-                                    state = listReorderState,
-                                    onDragStarted = preview.onDragStarted,
-                                    onDragStopped = preview.onDragStopped,
-                                ).draggedCardLift(lift, cornerRadius = AsteriskShapeTokens.InnerContainerRadius),
-                            )
+            }
+        } else {
+            SectionedLazyColumn(
+                modifier = Modifier.pageReadableWidth(),
+                contentPadding = listPadding,
+                itemSpacing = 10.dp,
+                state = listState,
+            ) {
+                item(key = "resource_overview") { OverviewCard() }
+                sectionTitleItem(key = "resource_core_section") {
+                    ResourceSectionTitle(stringResource(R.string.settings_resource_files_core_files))
+                }
+                item(key = ResourceFileKind.SingBoxCore.fileName) { CoreFileCard() }
+                sectionTitleItem(key = "resource_rules_section") {
+                    ResourceSectionTitle(stringResource(R.string.settings_resource_files_files))
+                }
+                builtInFiles.forEach { kind ->
+                    item(key = kind.fileName) { BuiltInFileCard(kind) }
+                }
+                if (customFiles.isNotEmpty()) {
+                    sectionTitleItem(key = "resource_custom_section") {
+                        ResourceSectionTitle(stringResource(R.string.settings_resource_files_custom_section))
+                    }
+                }
+                if (listReorderState != null) {
+                    preview.items.forEach { customFile ->
+                        val key = "custom_resource_file_" + customFile.id
+                        itemWithPadding(key = key) { itemPadding ->
+                            ReorderableItem(
+                                state = listReorderState.reorderableState,
+                                key = key,
+                                modifier = itemPadding.fillMaxWidth(),
+                                animateItemModifier = Modifier.animateItem(),
+                            ) { isDragging ->
+                                val lift = animateDraggedCardLift(isDragging, label = "custom-resource-card")
+                                CustomFileCard(
+                                    customFile,
+                                    Modifier.longPressReorderDragHandle(
+                                        scope = this,
+                                        enabled = reorderEnabled,
+                                        state = listReorderState,
+                                        onDragStarted = preview.onDragStarted,
+                                        onDragStopped = preview.onDragStopped,
+                                    ).draggedCardLift(lift, cornerRadius = AsteriskShapeTokens.InnerContainerRadius),
+                                )
+                            }
                         }
                     }
                 }

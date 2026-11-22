@@ -8,6 +8,8 @@ import engine.singbox.config.DnsConfigurationServerTypes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.Arrangement
+import ui.layout.rememberRuleGridColumns
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -247,7 +249,6 @@ internal fun DnsManagementPage(
             rules = appState.dnsRules,
             referenceLabels = visibleReferenceLabels,
             unavailableLabel = unavailableLabel,
-            columns = if (isWideScreen) 2 else 1,
             contentPadding = pageListPadding(contentPadding, bottomExtra = 24.dp),
             pendingEnableRuleId = pendingEnableRuleId,
             onOpenDnsSettings = {
@@ -372,7 +373,6 @@ private fun DnsRuleGrid(
     rules: List<SingBoxDnsRuleState>,
     referenceLabels: Map<String, String>,
     unavailableLabel: String,
-    columns: Int,
     contentPadding: PaddingValues,
     pendingEnableRuleId: Int?,
     onOpenDnsSettings: () -> Unit,
@@ -394,65 +394,67 @@ private fun DnsRuleGrid(
         scrollThresholdPadding = verticalReorderScrollThresholdPadding(contentPadding),
         onMove = preview.onMove,
     )
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(columns),
-        state = gridState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        layout.sections.forEach { section ->
-            when (section) {
-                DnsManagementGridSection.Settings -> {
-                    item(key = "dns-settings", span = { GridItemSpan(maxLineSpan) }) {
-                        SettingsSectionCard(bottomPadding = 0.dp) {
-                            SettingsActionRow(
-                                title = stringResource(R.string.settings_dns),
-                                summary = stringResource(R.string.dns_settings_entry_summary),
-                                icon = Icons.Rounded.Tune,
-                                onClick = onOpenDnsSettings,
-                            )
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(rememberRuleGridColumns(maxWidth, contentPadding)),
+            state = gridState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            layout.sections.forEach { section ->
+                when (section) {
+                    DnsManagementGridSection.Settings -> {
+                        item(key = "dns-settings", span = { GridItemSpan(maxLineSpan) }) {
+                            SettingsSectionCard(bottomPadding = 0.dp) {
+                                SettingsActionRow(
+                                    title = stringResource(R.string.settings_dns),
+                                    summary = stringResource(R.string.dns_settings_entry_summary),
+                                    icon = Icons.Rounded.Tune,
+                                    onClick = onOpenDnsSettings,
+                                )
+                            }
                         }
                     }
-                }
-                DnsManagementGridSection.EmptyState -> {
-                    item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
-                        DnsRuleEmptyState()
+                    DnsManagementGridSection.EmptyState -> {
+                        item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                            DnsRuleEmptyState()
+                        }
                     }
-                }
-                DnsManagementGridSection.Rules -> {
-                    items(
-                        items = preview.items,
-                        key = SingBoxDnsRuleState::id,
-                        contentType = { "dns-rule" },
-                    ) { rule ->
-                        ReorderableItem(
-                            state = reorderableState.reorderableState,
-                            key = rule.id,
-                            modifier = Modifier.fillMaxWidth(),
-                            animateItemModifier = Modifier.animateItem(),
-                        ) { isDragging ->
-                            DnsRuleCard(
-                                rule = rule,
-                                displayedEnabled = rule.enabled || pendingEnableRuleId == rule.id,
-                                enablePending = pendingEnableRuleId == rule.id,
-                                referenceLabels = referenceLabels,
-                                unavailableLabel = unavailableLabel,
-                                isDragging = isDragging,
-                                onEnabledChange = { enabled -> onEnabledChange(rule, enabled) },
-                                onEdit = { onEdit(rule) },
-                                onDelete = { onDelete(rule) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .longPressReorderDragHandle(
-                                        scope = this,
-                                        enabled = rules.size > 1,
-                                        state = reorderableState,
-                                        onDragStarted = preview.onDragStarted,
-                                        onDragStopped = preview.onDragStopped,
-                                    ),
-                            )
+                    DnsManagementGridSection.Rules -> {
+                        items(
+                            items = preview.items,
+                            key = SingBoxDnsRuleState::id,
+                            contentType = { "dns-rule" },
+                        ) { rule ->
+                            ReorderableItem(
+                                state = reorderableState.reorderableState,
+                                key = rule.id,
+                                modifier = Modifier.fillMaxWidth(),
+                                animateItemModifier = Modifier.animateItem(),
+                            ) { isDragging ->
+                                DnsRuleCard(
+                                    rule = rule,
+                                    displayedEnabled = rule.enabled || pendingEnableRuleId == rule.id,
+                                    enablePending = pendingEnableRuleId == rule.id,
+                                    referenceLabels = referenceLabels,
+                                    unavailableLabel = unavailableLabel,
+                                    isDragging = isDragging,
+                                    onEnabledChange = { enabled -> onEnabledChange(rule, enabled) },
+                                    onEdit = { onEdit(rule) },
+                                    onDelete = { onDelete(rule) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .longPressReorderDragHandle(
+                                            scope = this,
+                                            enabled = rules.size > 1,
+                                            state = reorderableState,
+                                            onDragStarted = preview.onDragStarted,
+                                            onDragStopped = preview.onDragStopped,
+                                        ),
+                                )
+                            }
                         }
                     }
                 }

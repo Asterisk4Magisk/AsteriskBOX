@@ -7,19 +7,32 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import ui.layout.pageReadableWidth
+import ui.layout.LocalAdaptiveWindow
+import ui.components.AsteriskSheetHeader
+import androidx.compose.runtime.SideEffect
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -75,6 +88,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import app.DefaultOutboundSubscriptionUserAgent
 import app.AppState
@@ -169,6 +183,10 @@ internal fun OutboundGroupListPage(
     val scope = rememberCoroutineScope()
     var editorGroup by remember { mutableStateOf<OutboundGroupState?>(null) }
     var showGroupEditor by remember { mutableStateOf(createOnOpen) }
+    var groupEditorDirty by remember { mutableStateOf(false) }
+    var pendingGroupSwitchId by remember { mutableStateOf<Int?>(null) }
+    val inlineEditor = LocalAdaptiveWindow.current.showTwoColumns && LocalDensity.current.fontScale <= 1.3f
+    val showInlineEditor = showGroupEditor && inlineEditor
     var groupEditorSession by remember { mutableIntStateOf(0) }
     var savingGroupEditorSession by remember { mutableStateOf<Int?>(null) }
     var pendingDelete by remember { mutableStateOf<OutboundGroupState?>(null) }
@@ -768,6 +786,34 @@ internal fun OutboundGroupListPage(
         syncJob.start()
     }
 
+    fun editGroup(group: OutboundGroupState) {
+        groupEditorDirty = false
+        editorGroup = group
+        groupEditorSession += 1
+        showGroupEditor = true
+    }
+
+    fun requestGroupSwitch(group: OutboundGroupState) {
+        if (!showGroupEditor) {
+            editGroup(group)
+        } else if (showInlineEditor && savingGroupEditorSession == null && editorGroup?.id != group.id) {
+            if (groupEditorDirty) {
+                pendingGroupSwitchId = group.id
+            } else {
+                editGroup(group)
+            }
+        }
+    }
+
+    fun dismissGroupEditor() {
+        if (savingGroupEditorSession == groupEditorSession) return
+        showGroupEditor = false
+        groupEditorDirty = false
+        if (createOnOpen) navigator.pop()
+    }
+
+    BackHandler(enabled = showInlineEditor, onBack = ::dismissGroupEditor)
+
     AsteriskScaffold(
         topBar = {
             AsteriskTopAppBar(
@@ -787,7 +833,9 @@ internal fun OutboundGroupListPage(
                 },
                 navigationIcon = {
                     onBack?.let { navigateBack ->
-                        IconButton(onClick = navigateBack) {
+                        IconButton(onClick = {
+                            if (showInlineEditor) dismissGroupEditor() else navigateBack()
+                        }) {
                             Icon(
                                 Icons.AutoMirrored.Rounded.ArrowBack,
                                 stringResource(R.string.common_back),
@@ -809,6 +857,7 @@ internal fun OutboundGroupListPage(
                     }
                     IconButton(
                         onClick = { showAddMethodSheet = true },
+                        enabled = !showGroupEditor,
                     ) {
                         Icon(Icons.Rounded.Add, stringResource(R.string.common_add))
                     }
@@ -883,7 +932,14 @@ internal fun OutboundGroupListPage(
             scrollThresholdPadding = verticalReorderScrollThresholdPadding(groupListPadding),
             onMove = preview.onMove,
         )
-        Column(modifier = Modifier.fillMaxSize()) {
+        val pageWidth by animateDpAsState(
+            targetValue = if (showInlineEditor) 1160.dp else 920.dp,
+            animationSpec = AsteriskMotion.fastSpatial(),
+            label = "outboundGroupPageWidth",
+        )
+        Column(
+            modifier = Modifier.pageReadableWidth(maxWidth = pageWidth).fillMaxSize(),
+        ) {
             if (pinnedRestartBanner) {
                 AsteriskConfigApplyBanner(
                     title = stringResource(R.string.outbound_group_config_apply_title),
@@ -899,103 +955,127 @@ internal fun OutboundGroupListPage(
                     ),
                 )
             }
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                state = listState,
-                contentPadding = groupListPadding,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                if (displayedGroups.isEmpty()) {
-                    item(key = "empty") {
-                        OutboundGroupEmptyState(
-                            onAdd = { showAddMethodSheet = true },
-                        )
-                    }
-                }
-                items(
-                    items = displayedGroups,
-                    key = OutboundGroupState::id,
-                    contentType = { "outbound-group" },
-                ) { group ->
-                    ReorderableItem(
-                        state = reorderableState.reorderableState,
-                        key = group.id,
-                        modifier = Modifier.fillMaxWidth(),
-                        animateItemModifier = Modifier.animateItem(),
-                    ) { isDragging ->
-                        OutboundGroupCard(
-                            group = group,
-                            outboundCount = outboundCountsByGroup[group.id] ?: 0,
-                            syncing = group.id in syncingGroupIds,
-                            isDragging = isDragging,
-                            enabledChangeBusy = group.id in enabledChangingGroupIds,
-                            onEnabledChange = { enabled ->
-                                val groupId = group.id
-                                if (groupId in enabledChangingGroupIds) return@OutboundGroupCard
-                                enabledChangingGroupIds += groupId
-                                scope.launch {
-                                    try {
-                                        when (
-                                            val result = services.outboundRepository.setGroupEnabled(
-                                                groupId,
-                                                enabled,
-                                            )
-                                        ) {
-                                            OutboundCommandResult.GroupEnabledChanged -> Unit
-                                            OutboundCommandResult.Conflict ->
-                                                services.tipNotifier.show(stateChangedMessage)
-                                            is OutboundCommandResult.PersistenceFailed ->
-                                                services.tipNotifier.showError(
-                                                    result.error,
-                                                    importFailedMessage,
-                                                    FailureLogContext(
-                                                        operation = "outbound_group_enabled",
-                                                        stage = "persist",
-                                                    ),
-                                                )
-                                            is OutboundCommandResult.Invalid ->
-                                                services.tipNotifier.show(importFailedMessage)
-                                            OutboundCommandResult.Deleted,
-                                            OutboundCommandResult.GroupDeleted,
-                                            OutboundCommandResult.GroupsReordered,
-                                            OutboundCommandResult.ImportPersisted,
-                                            OutboundCommandResult.Reordered,
-                                            is OutboundCommandResult.Saved,
-                                            is OutboundCommandResult.GroupSaved,
-                                            -> error("Unexpected outbound group enable result: $result")
-                                        }
-                                    } finally {
-                                        enabledChangingGroupIds -= groupId
-                                    }
-                                }
-                            },
-                            onSync = { syncGroup(group) },
-                            onEdit = {
-                                editorGroup = group
-                                groupEditorSession += 1
-                                showGroupEditor = true
-                            },
-                            onDelete = { pendingDelete = group },
-                            onShowSubscriptionQr = {
-                                shareQrCodeState = OutboundShareQrState(
-                                    title = group.name,
-                                    url = group.url,
+            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                val editorWidth = maxWidth / 2
+                Row(Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        state = listState,
+                        contentPadding = groupListPadding,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        if (displayedGroups.isEmpty()) {
+                            item(key = "empty") {
+                                OutboundGroupEmptyState(
+                                    onAdd = { if (!showGroupEditor) showAddMethodSheet = true },
                                 )
-                            },
-                            onCopySubscriptionLink = { copyGroupSubscriptionLink(group) },
-                            onCopyOutboundLinks = { copyGroupOutboundLinks(group) },
-                            onExportOutboundLinks = { exportGroupOutboundLinks(group) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .longPressReorderDragHandle(
-                                    scope = this,
-                                    enabled = displayedGroups.size > 1,
-                                    state = reorderableState,
-                                    onDragStarted = preview.onDragStarted,
-                                    onDragStopped = preview.onDragStopped,
-                                ),
-                        )
+                            }
+                        }
+                        items(
+                            items = displayedGroups,
+                            key = OutboundGroupState::id,
+                            contentType = { "outbound-group" },
+                        ) { group ->
+                            ReorderableItem(
+                                state = reorderableState.reorderableState,
+                                key = group.id,
+                                modifier = Modifier.fillMaxWidth(),
+                                animateItemModifier = Modifier.animateItem(),
+                            ) { isDragging ->
+                                OutboundGroupCard(
+                                    group = group,
+                                    outboundCount = outboundCountsByGroup[group.id] ?: 0,
+                                    syncing = group.id in syncingGroupIds,
+                                    isDragging = isDragging,
+                                    enabledChangeBusy = group.id in enabledChangingGroupIds,
+                                    onEnabledChange = { enabled ->
+                                        val groupId = group.id
+                                        if (groupId in enabledChangingGroupIds) return@OutboundGroupCard
+                                        enabledChangingGroupIds += groupId
+                                        scope.launch {
+                                            try {
+                                                when (
+                                                    val result = services.outboundRepository.setGroupEnabled(
+                                                        groupId,
+                                                        enabled,
+                                                    )
+                                                ) {
+                                                    OutboundCommandResult.GroupEnabledChanged -> Unit
+                                                    OutboundCommandResult.Conflict ->
+                                                        services.tipNotifier.show(stateChangedMessage)
+                                                    is OutboundCommandResult.PersistenceFailed ->
+                                                        services.tipNotifier.showError(
+                                                            result.error,
+                                                            importFailedMessage,
+                                                            FailureLogContext(
+                                                                operation = "outbound_group_enabled",
+                                                                stage = "persist",
+                                                            ),
+                                                        )
+                                                    is OutboundCommandResult.Invalid ->
+                                                        services.tipNotifier.show(importFailedMessage)
+                                                    OutboundCommandResult.Deleted,
+                                                    OutboundCommandResult.GroupDeleted,
+                                                    OutboundCommandResult.GroupsReordered,
+                                                    OutboundCommandResult.ImportPersisted,
+                                                    OutboundCommandResult.Reordered,
+                                                    is OutboundCommandResult.Saved,
+                                                    is OutboundCommandResult.GroupSaved,
+                                                    -> error("Unexpected outbound group enable result: $result")
+                                                }
+                                            } finally {
+                                                enabledChangingGroupIds -= groupId
+                                            }
+                                        }
+                                    },
+                                    onSync = { syncGroup(group) },
+                                    selected = showInlineEditor && editorGroup?.id == group.id,
+                                    editEnabled = !showGroupEditor ||
+                                        (showInlineEditor && savingGroupEditorSession == null && editorGroup?.id != group.id),
+                                    onEdit = { requestGroupSwitch(group) },
+                                    onDelete = { pendingDelete = group },
+                                    deleteEnabled = !showInlineEditor || editorGroup?.id != group.id,
+                                    onShowSubscriptionQr = {
+                                        shareQrCodeState = OutboundShareQrState(
+                                            title = group.name,
+                                            url = group.url,
+                                        )
+                                    },
+                                    onCopySubscriptionLink = { copyGroupSubscriptionLink(group) },
+                                    onCopyOutboundLinks = { copyGroupOutboundLinks(group) },
+                                    onExportOutboundLinks = { exportGroupOutboundLinks(group) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .longPressReorderDragHandle(
+                                            scope = this,
+                                            enabled = displayedGroups.size > 1,
+                                            state = reorderableState,
+                                            onDragStarted = preview.onDragStarted,
+                                            onDragStopped = preview.onDragStopped,
+                                        ),
+                                )
+                            }
+                        }
                     }
+                    OutboundGroupEditorSheet(
+                        show = showGroupEditor,
+                        inline = inlineEditor,
+                        appState = appState,
+                        group = editorGroup,
+                        editorSession = groupEditorSession,
+                        busy = savingGroupEditorSession == groupEditorSession,
+                        modifier = Modifier.width(editorWidth)
+                            .padding(
+                                start = listContentPadding.calculateStartPadding(layoutDirection),
+                                end = listContentPadding.calculateEndPadding(layoutDirection),
+                                top = groupListPadding.calculateTopPadding(),
+                                bottom = groupListPadding.calculateBottomPadding(),
+                            )
+                            .imePadding(),
+                        onDirtyChanged = { groupEditorDirty = it },
+                        onDismissRequest = ::dismissGroupEditor,
+                        onSave = ::saveGroup,
+                    )
                 }
             }
         }
@@ -1015,20 +1095,7 @@ internal fun OutboundGroupListPage(
                 addFromFile()
             },
         )
-        OutboundGroupEditorSheet(
-            show = showGroupEditor,
-            appState = appState,
-            group = editorGroup,
-            editorSession = groupEditorSession,
-            busy = savingGroupEditorSession == groupEditorSession,
-            onDismissRequest = {
-                if (savingGroupEditorSession != groupEditorSession) {
-                    showGroupEditor = false
-                    if (createOnOpen) navigator.pop()
-                }
-            },
-            onSave = ::saveGroup,
-        )
+
     }
 
     shareQrCodeState?.let { state ->
@@ -1046,6 +1113,21 @@ internal fun OutboundGroupListPage(
             onCancel = {
                 batchSyncCancelling = true
                 batchSyncJob?.cancel()
+            },
+        )
+    }
+
+    pendingGroupSwitchId?.let { targetId ->
+        WarningConfirmDialog(
+            show = true,
+            title = stringResource(R.string.editor_switch_unsaved_title),
+            summary = stringResource(R.string.editor_switch_unsaved_message),
+            dismissText = stringResource(R.string.editor_switch_cancel),
+            confirmText = stringResource(R.string.editor_switch_discard),
+            onDismissRequest = { pendingGroupSwitchId = null },
+            onConfirm = {
+                pendingGroupSwitchId = null
+                stateStore.state.value.outboundGroups.firstOrNull { it.id == targetId }?.let(::editGroup)
             },
         )
     }
@@ -1516,12 +1598,15 @@ internal fun OutboundGroupCard(
     onCopyOutboundLinks: () -> Unit,
     onExportOutboundLinks: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    editEnabled: Boolean = true,
+    deleteEnabled: Boolean = true,
 ) {
     val containerColor by animateColorAsState(
-        targetValue = if (isDragging) {
-            MaterialTheme.colorScheme.surfaceContainerHigh
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
+        targetValue = when {
+            isDragging -> MaterialTheme.colorScheme.surfaceContainerHigh
+            selected -> MaterialTheme.colorScheme.secondaryContainer
+            else -> MaterialTheme.colorScheme.surfaceContainerLow
         },
         animationSpec = AsteriskMotion.effects(),
         label = "outbound-group-card-color",
@@ -1540,13 +1625,17 @@ internal fun OutboundGroupCard(
     }
     Card(
         onClick = { showUpdateInfo = false; onEdit() },
-        enabled = !enabledChangeBusy,
+        enabled = !enabledChangeBusy && editEnabled,
         modifier = modifier
             .fillMaxWidth()
             .draggedCardLift(lift, cornerRadius = AsteriskShapeTokens.ListCardRadius)
             .animateContentSize(animationSpec = AsteriskMotion.contentSize()),
         shape = AsteriskShapeTokens.ListCard,
-        colors = CardDefaults.cardColors(containerColor = containerColor),
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor,
+            disabledContainerColor = if (selected) containerColor else Color.Unspecified,
+            disabledContentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else Color.Unspecified,
+        ),
     ) {
         val status = group.subscriptionStatusPresentation()
         Column(Modifier.fillMaxWidth().padding(start = 16.dp, top = 14.dp, end = 8.dp, bottom = 16.dp)) {
@@ -1704,6 +1793,7 @@ internal fun OutboundGroupCard(
                                     )
                                 }
                                 DropdownMenuItem(
+                                    enabled = editEnabled,
                                     text = { Text(stringResource(R.string.common_edit)) },
                                     leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
                                     onClick = {
@@ -1726,6 +1816,7 @@ internal fun OutboundGroupCard(
                                     )
                                 }
                                 DropdownMenuItem(
+                                    enabled = deleteEnabled,
                                     text = { Text(stringResource(R.string.common_delete)) },
                                     leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
                                     onClick = {
@@ -1861,10 +1952,13 @@ private fun OutboundGroupCardMeta(group: OutboundGroupState) {
 @Composable
 private fun OutboundGroupEditorSheet(
     show: Boolean,
+    inline: Boolean,
     appState: AppState,
     group: OutboundGroupState?,
     editorSession: Int,
     busy: Boolean,
+    modifier: Modifier,
+    onDirtyChanged: (Boolean) -> Unit,
     onDismissRequest: () -> Unit,
     onSave: (OutboundGroupState) -> Unit,
 ) {
@@ -1885,16 +1979,12 @@ private fun OutboundGroupEditorSheet(
     val notSpecified = stringResource(R.string.common_not_specified)
     val unavailable = stringResource(R.string.common_unavailable)
     val initialUserAgent = group?.userAgent ?: DefaultOutboundSubscriptionUserAgent
-    var userAgentOption by remember(editorSession) {
-        mutableStateOf(subscriptionUserAgentOptionFor(initialUserAgent))
-    }
-    var customUserAgent by remember(editorSession) {
-        mutableStateOf(
-            initialUserAgent.takeIf {
-                subscriptionUserAgentOptionFor(it) == SubscriptionUserAgentOption.Custom
-            }.orEmpty(),
-        )
-    }
+    val initialUserAgentOption = subscriptionUserAgentOptionFor(initialUserAgent)
+    val initialCustomUserAgent = initialUserAgent.takeIf {
+        initialUserAgentOption == SubscriptionUserAgentOption.Custom
+    }.orEmpty()
+    var userAgentOption by remember(editorSession) { mutableStateOf(initialUserAgentOption) }
+    var customUserAgent by remember(editorSession) { mutableStateOf(initialCustomUserAgent) }
     var customUserAgentDraft by remember(editorSession) { mutableStateOf(customUserAgent) }
     var showCustomUserAgentDialog by remember(editorSession) { mutableStateOf(false) }
     var updateInterval by remember(editorSession) { mutableStateOf(group?.updateInterval.orEmpty()) }
@@ -1917,57 +2007,61 @@ private fun OutboundGroupEditorSheet(
         .indexOf(userAgentOption)
         .coerceAtLeast(0)
     val selectedUserAgentLabel = userAgentLabels[selectedUserAgentIndex]
-    AsteriskModalBottomSheet(
-        show = show,
-        title = stringResource(
-            if (group == null) R.string.outbound_group_add else R.string.outbound_group_edit,
-        ),
-        dismissEnabled = !busy,
-        onDismissRequest = onDismissRequest,
-        startAction = {
-            AsteriskCancelButton(
-                onClick = onDismissRequest,
-                enabled = !busy,
-            )
-        },
-        endAction = {
-            AsteriskSaveButton(
-                enabled = canSave && !busy,
-                loading = busy,
-                onClick = {
-                    val trimmedUrl = url.trim()
-                    val trimmedHwid = hwid.trim()
-                    val trimmedAgeSecretKey = ageSecretKey.trim()
-                    val edited = group?.copy(
-                        name = name.trim(),
-                        url = trimmedUrl,
-                        userAgent = userAgent,
-                        detour = detour,
-                        updateInterval = updateInterval.trim(),
-                        hwid = trimmedHwid,
-                        updateViaProxy = updateViaProxy,
-                        ageSecretKey = trimmedAgeSecretKey,
-                        strictImport = strictImport,
-                    ) ?: OutboundGroupState(
-                        id = 0,
-                        name = name.trim(),
-                        url = trimmedUrl,
-                        userAgent = userAgent,
-                        detour = detour,
-                        updateInterval = updateInterval.trim(),
-                        hwid = trimmedHwid,
-                        updateViaProxy = updateViaProxy,
-                        ageSecretKey = trimmedAgeSecretKey,
-                        strictImport = strictImport,
-                    )
-                    onSave(
-                        edited.clearingSubscriptionMetadataChangedFrom(group),
-                    )
-                },
-            )
-        },
-    ) {
+    val dirty = name != group?.name.orEmpty() || url != group?.url.orEmpty() ||
+        hwid != group?.hwid.orEmpty() || detour != group?.detour.orEmpty() ||
+        updateInterval != group?.updateInterval.orEmpty() ||
+        userAgent != initialUserAgentOption.resolveUserAgent(initialCustomUserAgent) ||
+        ageSecretKey != group?.ageSecretKey.orEmpty() || updateViaProxy != (group?.updateViaProxy == true) ||
+        strictImport != (group?.strictImport == true)
+    SideEffect { onDirtyChanged(show && dirty) }
+
+    val title = stringResource(if (group == null) R.string.outbound_group_add else R.string.outbound_group_edit)
+    val cancel: @Composable () -> Unit = {
+        AsteriskCancelButton(
+            onClick = onDismissRequest,
+            enabled = !busy,
+        )
+    }
+    val save: @Composable () -> Unit = {
+        AsteriskSaveButton(
+            enabled = canSave && !busy,
+            loading = busy,
+            onClick = {
+                val trimmedUrl = url.trim()
+                val trimmedHwid = hwid.trim()
+                val trimmedAgeSecretKey = ageSecretKey.trim()
+                val edited = group?.copy(
+                    name = name.trim(),
+                    url = trimmedUrl,
+                    userAgent = userAgent,
+                    detour = detour,
+                    updateInterval = updateInterval.trim(),
+                    hwid = trimmedHwid,
+                    updateViaProxy = updateViaProxy,
+                    ageSecretKey = trimmedAgeSecretKey,
+                    strictImport = strictImport,
+                ) ?: OutboundGroupState(
+                    id = 0,
+                    name = name.trim(),
+                    url = trimmedUrl,
+                    userAgent = userAgent,
+                    detour = detour,
+                    updateInterval = updateInterval.trim(),
+                    hwid = trimmedHwid,
+                    updateViaProxy = updateViaProxy,
+                    ageSecretKey = trimmedAgeSecretKey,
+                    strictImport = strictImport,
+                )
+                onSave(
+                    edited.clearingSubscriptionMetadataChangedFrom(group),
+                )
+            },
+        )
+    }
+    val formState = remember(editorSession) { LazyListState() }
+    val form: @Composable () -> Unit = {
         LazyColumn(
+            state = formState,
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(max = 720.dp),
@@ -2159,6 +2253,36 @@ private fun OutboundGroupEditorSheet(
                 }
             }
         }
+    }
+    if (inline) {
+        val sizeMotion = AsteriskMotion.fastSpatial<IntSize>()
+        val fadeMotion = AsteriskMotion.fastEffects<Float>()
+        AnimatedVisibility(
+            visible = show,
+            enter = expandHorizontally(sizeMotion, expandFrom = Alignment.End) + AsteriskMotion.fadeEnter(fadeMotion),
+            exit = shrinkHorizontally(sizeMotion, shrinkTowards = Alignment.End) + AsteriskMotion.fadeExit(fadeMotion),
+            label = "outboundGroupEditorPane",
+        ) {
+            Surface(
+                modifier = modifier.fillMaxHeight(),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = AsteriskShapeTokens.Sheet,
+            ) {
+                Column {
+                    AsteriskSheetHeader(title, cancel, save, compact = true)
+                    Box(Modifier.weight(1f)) { form() }
+                }
+            }
+        }
+    } else {
+        AsteriskModalBottomSheet(
+            show = show,
+            title = title,
+            dismissEnabled = !busy,
+            onDismissRequest = onDismissRequest,
+            startAction = cancel,
+            endAction = save,
+        ) { form() }
     }
     CustomSubscriptionUserAgentDialog(
         show = show && showCustomUserAgentDialog,

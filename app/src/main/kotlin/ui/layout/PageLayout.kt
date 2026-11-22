@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -31,6 +32,14 @@ fun Modifier.pageReadableWidth(maxWidth: Dp = 1120.dp): Modifier = this
     .wrapContentWidth(Alignment.CenterHorizontally)
     .widthIn(max = maxWidth)
     .fillMaxWidth()
+
+@Composable
+internal fun rememberRuleGridColumns(maxWidth: Dp, padding: PaddingValues): Int {
+    val direction = LocalLayoutDirection.current
+    val contentWidth = maxWidth - padding.calculateStartPadding(direction) - padding.calculateEndPadding(direction)
+    val minimumCardWidth = 320.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
+    return if (contentWidth >= minimumCardWidth * 2 + 12.dp) 2 else 1
+}
 
 internal val SingleColumnPageMaxWidth = 760.dp
 

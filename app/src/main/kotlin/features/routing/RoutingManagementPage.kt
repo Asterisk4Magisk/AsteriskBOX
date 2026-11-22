@@ -14,6 +14,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.layout.Arrangement
+import ui.layout.rememberRuleGridColumns
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -245,7 +247,6 @@ internal fun RoutingManagementPage(
         RoutingRuleGrid(
             rules = appState.routeRules,
             pendingEnableRuleId = pendingEnableRuleId,
-            columns = if (isWideScreen) 2 else 1,
             contentPadding = pageListPadding(contentPadding, bottomExtra = 24.dp),
             finalOutbound = appState.routeFinal.ifBlank { APP_GLOBAL_SELECTOR },
             outboundChoices = outboundChoices,
@@ -368,7 +369,6 @@ internal fun managedOutboundChoices(appState: AppState): List<RuleEditorChoice> 
 private fun RoutingRuleGrid(
     rules: List<SingBoxRouteRuleState>,
     pendingEnableRuleId: Int?,
-    columns: Int,
     contentPadding: PaddingValues,
     finalOutbound: String,
     outboundChoices: List<RuleEditorChoice>,
@@ -394,72 +394,74 @@ private fun RoutingRuleGrid(
         scrollThresholdPadding = verticalReorderScrollThresholdPadding(contentPadding),
         onMove = preview.onMove,
     )
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(columns),
-        state = gridState,
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = contentPadding,
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item(key = "route-settings", span = { GridItemSpan(maxLineSpan) }) {
-            RoutingSettingsEntryCard(onClick = onOpenRouteSettings)
-        }
-        item(key = "final-outbound", span = { GridItemSpan(maxLineSpan) }) {
-            RuleEditorChoiceCard(
-                title = stringResource(R.string.routing_default_outbound),
-                summary = stringResource(R.string.routing_default_outbound_summary),
-                choices = outboundChoices,
-                selectedValue = finalOutbound,
-                missingLabel = { value ->
-                    app.visibleManagedReference(
-                        value = value,
-                        labels = outboundChoices.associate { choice ->
-                            choice.value to choice.label
-                        },
-                        unavailableLabel = unavailableLabel,
-                    )
-                },
-                onSelected = onFinalOutboundChange,
-            )
-        }
-        if (rules.isEmpty()) {
-            item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
-                RoutingEmptyState()
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(rememberRuleGridColumns(maxWidth, contentPadding)),
+            state = gridState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = contentPadding,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item(key = "route-settings", span = { GridItemSpan(maxLineSpan) }) {
+                RoutingSettingsEntryCard(onClick = onOpenRouteSettings)
             }
-        } else {
-            items(
-                items = preview.items,
-                key = SingBoxRouteRuleState::id,
-                contentType = { "route-rule" },
-            ) { rule ->
-                ReorderableItem(
-                    state = reorderableState.reorderableState,
-                    key = rule.id,
-                    modifier = Modifier.fillMaxWidth(),
-                    animateItemModifier = Modifier.animateItem(),
-                ) { isDragging ->
-                    RouteRuleCard(
-                        rule = rule,
-                        displayedEnabled = rule.enabled || pendingEnableRuleId == rule.id,
-                        enablePending = pendingEnableRuleId == rule.id,
-                        referenceLabels = referenceLabels,
-                        unavailableLabel = unavailableLabel,
-                        globalLabel = globalLabel,
-                        isDragging = isDragging,
-                        onEnabledChange = { enabled -> onEnabledChange(rule, enabled) },
-                        onEdit = { onEdit(rule) },
-                        onDelete = { onDelete(rule) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .longPressReorderDragHandle(
-                                scope = this,
-                                enabled = rules.size > 1,
-                                state = reorderableState,
-                                onDragStarted = preview.onDragStarted,
-                                onDragStopped = preview.onDragStopped,
-                            ),
-                    )
+            item(key = "final-outbound", span = { GridItemSpan(maxLineSpan) }) {
+                RuleEditorChoiceCard(
+                    title = stringResource(R.string.routing_default_outbound),
+                    summary = stringResource(R.string.routing_default_outbound_summary),
+                    choices = outboundChoices,
+                    selectedValue = finalOutbound,
+                    missingLabel = { value ->
+                        app.visibleManagedReference(
+                            value = value,
+                            labels = outboundChoices.associate { choice ->
+                                choice.value to choice.label
+                            },
+                            unavailableLabel = unavailableLabel,
+                        )
+                    },
+                    onSelected = onFinalOutboundChange,
+                )
+            }
+            if (rules.isEmpty()) {
+                item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                    RoutingEmptyState()
+                }
+            } else {
+                items(
+                    items = preview.items,
+                    key = SingBoxRouteRuleState::id,
+                    contentType = { "route-rule" },
+                ) { rule ->
+                    ReorderableItem(
+                        state = reorderableState.reorderableState,
+                        key = rule.id,
+                        modifier = Modifier.fillMaxWidth(),
+                        animateItemModifier = Modifier.animateItem(),
+                    ) { isDragging ->
+                        RouteRuleCard(
+                            rule = rule,
+                            displayedEnabled = rule.enabled || pendingEnableRuleId == rule.id,
+                            enablePending = pendingEnableRuleId == rule.id,
+                            referenceLabels = referenceLabels,
+                            unavailableLabel = unavailableLabel,
+                            globalLabel = globalLabel,
+                            isDragging = isDragging,
+                            onEnabledChange = { enabled -> onEnabledChange(rule, enabled) },
+                            onEdit = { onEdit(rule) },
+                            onDelete = { onDelete(rule) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .longPressReorderDragHandle(
+                                    scope = this,
+                                    enabled = rules.size > 1,
+                                    state = reorderableState,
+                                    onDragStarted = preview.onDragStarted,
+                                    onDragStopped = preview.onDragStopped,
+                                ),
+                        )
+                    }
                 }
             }
         }
