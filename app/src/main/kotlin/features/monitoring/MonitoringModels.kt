@@ -3,6 +3,7 @@
 
 package features.monitoring
 
+import engine.proxy.RuntimeRouteRule
 import engine.singbox.runtime.SingBoxConnectionsState
 import engine.singbox.runtime.connectionCounts
 import features.monitoring.resource.ProcessStatsSample
@@ -40,6 +41,13 @@ internal data class MonitoringConnectionsSummary(
     val sessionUploadBytes: Long? = null,
     val sessionDownloadBytes: Long? = null,
     val snapshot: SingBoxConnectionsState = SingBoxConnectionsState(),
+    val status: ConnectionMonitorStatus = ConnectionMonitorStatus.ServiceStopped,
+    val error: String = "",
+    val stale: Boolean = false,
+)
+
+internal data class MonitoringRulesSummary(
+    val rules: List<RuntimeRouteRule> = emptyList(),
     val status: ConnectionMonitorStatus = ConnectionMonitorStatus.ServiceStopped,
     val error: String = "",
     val stale: Boolean = false,
@@ -87,6 +95,7 @@ internal data class MonitoringState(
     val serviceRunning: Boolean = false,
     val resource: MonitoringResourceSummary = MonitoringResourceSummary(),
     val connections: MonitoringConnectionsSummary = MonitoringConnectionsSummary(),
+    val rules: MonitoringRulesSummary = MonitoringRulesSummary(),
     val traffic: MonitoringTrafficSummary = MonitoringTrafficSummary(),
     val network: MonitoringNetworkSummary = MonitoringNetworkSummary(),
 )
