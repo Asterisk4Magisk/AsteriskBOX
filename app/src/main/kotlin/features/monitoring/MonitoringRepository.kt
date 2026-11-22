@@ -40,12 +40,10 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -115,15 +113,6 @@ internal class MonitoringRepository(
                         plan.connectionIntervalMillis?.let { interval ->
                             launch { collectConnections(interval, plan.collectConnectionDetails) }
                         }
-                        plan.ruleIntervalMillis?.let { interval ->
-                            launch {
-                                try {
-                                    collectRules(interval)
-                                } finally {
-                                    mutableState.update { it.copy(rules = MonitoringRulesSummary()) }
-                                }
-                            }
-                        }
                         plan.trafficIntervalMillis?.let { interval ->
                             launch { collectTrafficStats(interval) }
                         }
@@ -176,39 +165,6 @@ internal class MonitoringRepository(
         val result = singBoxRuntime.closeAllConnections(stateStore.state.value)
         if (result.isSuccess) refreshConnections()
         return result
-    }
-
-    private suspend fun collectRules(intervalMillis: Long) {
-        val running = stateStore.state.map { it.proxyRunning }.distinctUntilChanged()
-        val epoch = singBoxRuntime.state.map { it.serviceStartedAtMillis }.distinctUntilChanged()
-        combine(running, epoch) { isRunning, runtimeEpoch -> runtimeEpoch.takeIf { isRunning } }
-            .distinctUntilChanged()
-            .collectLatest { session ->
-                val status = if (session == null) ConnectionMonitorStatus.ServiceStopped else ConnectionMonitorStatus.Loading
-                mutableState.update { it.copy(rules = MonitoringRulesSummary(status = status)) }
-                if (session == null) return@collectLatest
-                while (currentCoroutineContext().isActive) {
-                    val result = singBoxRuntime.getRules(stateStore.state.value)
-                    currentCoroutineContext().ensureActive()
-                    mutableState.update { current ->
-                        current.copy(
-                            rules = result.fold(
-                                onSuccess = { rules ->
-                                    MonitoringRulesSummary(rules = rules, status = ConnectionMonitorStatus.Available)
-                                },
-                                onFailure = { error ->
-                                    current.rules.copy(
-                                        status = ConnectionMonitorStatus.Error,
-                                        error = error.message.orEmpty(),
-                                        stale = current.rules.status == ConnectionMonitorStatus.Available || current.rules.stale,
-                                    )
-                                },
-                            ),
-                        )
-                    }
-                    delay(intervalMillis.milliseconds)
-                }
-            }
     }
 
     private fun refreshRuntimeSummary(running: Boolean) {

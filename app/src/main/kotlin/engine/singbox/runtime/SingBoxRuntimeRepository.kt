@@ -11,7 +11,6 @@ import app.DefaultConnectionTestUrl
 import app.isValidConnectionTestUrl
 import app.modes.RunModeVpnService
 import engine.proxy.ProxyEngineStartRequest
-import engine.proxy.RuntimeRouteRule
 import engine.network.ProxyIpProbeException
 import engine.network.ProxyIpProbeRequest
 import engine.network.ProxyIpProbeResponse
@@ -174,20 +173,6 @@ internal class SingBoxRuntimeRepository(
 
     suspend fun getConnectionCounts(appState: AppState): Result<ConnectionCounts> =
         getConnections(appState).map { it.connections.connectionCounts() }
-
-    suspend fun getRules(appState: AppState): Result<List<RuntimeRouteRule>> = runCatching {
-        val active = requireActiveSession(appState)
-        val epoch = state.value.serviceStartedAtMillis
-        // The Command API exposes selections, while the published configuration contains the route rules.
-        withContext(Dispatchers.IO) {
-            val rules = parseSingBoxRouteRules(readPublishedConfiguration())
-            val runtime = state.value
-            check(session === active && runtime.serviceStartedAtMillis == epoch) {
-                "sing-box API session changed during rules refresh"
-            }
-            rules.withSingBoxRuleOutbounds(runtime.proxies.groups)
-        }
-    }
 
     suspend fun closeConnection(appState: AppState, connectionId: String): Result<Boolean> = runCatching {
         val active = requireActiveSession(appState)
@@ -564,11 +549,9 @@ internal class SingBoxRuntimeRepository(
         !appContext.skipsBundledCoreConfigCheck(runMode)
     }
 
-    private fun readPublishedConfiguration(): JsonObject =
-        parseSingBoxJson(File(appContext.singBoxResourceFilePaths().dataDir, "config.json").readText())
-
     suspend fun proxyEntryHosts(node: String): List<String> = withContext(Dispatchers.IO) {
-        val config = readPublishedConfiguration()
+        val file = File(appContext.singBoxResourceFilePaths().dataDir, "config.json")
+        val config = parseSingBoxJson(file.readText())
         val outbound = sequenceOf("outbounds", "endpoints")
             .flatMap { (config[it] as? JsonArray).orEmpty().asSequence() }
             .filterIsInstance<JsonObject>()
