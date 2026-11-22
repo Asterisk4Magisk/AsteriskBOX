@@ -88,7 +88,6 @@ internal class ImportOutcome<T>(
             issues.size + mutations.size - this.issues.size - this.mutations.size
 
     val skippedCount: Int = detectedCount - this.accepted.size - duplicateCount
-    val hasEntryErrors: Boolean = skippedCount > 0
     val isCleanSuccess: Boolean =
         this.accepted.isNotEmpty() &&
             skippedCount == 0 &&

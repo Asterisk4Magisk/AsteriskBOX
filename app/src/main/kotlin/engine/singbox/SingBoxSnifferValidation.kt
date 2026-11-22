@@ -15,9 +15,6 @@ internal fun List<String>.sanitizedSnifferProtocols(): List<String> =
 internal fun String.sanitizedSnifferTimeout(): String =
     trim().takeIf(::isNonNegativeSingBoxDuration) ?: DefaultSingBoxSnifferTimeout
 
-internal fun isSingBoxDuration(value: String): Boolean =
-    singBoxDurationNanosOrNull(value) != null
-
 internal fun isNonNegativeSingBoxDuration(value: String): Boolean =
     singBoxDurationNanosOrNull(value)?.let { duration -> duration.signum() >= 0 } == true
 

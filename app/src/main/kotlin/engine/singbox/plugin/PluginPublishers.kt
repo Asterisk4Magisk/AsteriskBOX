@@ -7,7 +7,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ProviderInfo
 import android.content.pm.Signature
 import android.os.Build
-import engine.singbox.sha256Hex
+import utils.sha256Hex
 
 /**
  * Plugin provider families AsteriskBOX accepts. Authority prefix plus signing

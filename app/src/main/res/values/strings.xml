@@ -1444,7 +1444,6 @@
     <string name="settings_traffic_stats_notification_summary">Show current speed and total traffic in notifications and the status bar</string>
 
     <!-- Quick settings tile -->
-    <string name="quick_settings_tile_label">AsteriskBOX</string>
     <string name="quick_settings_tile_processing">Processing…</string>
     <string name="quick_settings_tile_running">Proxy running</string>
     <string name="quick_settings_tile_stopped">Proxy stopped</string>
@@ -1692,7 +1691,6 @@
     <!-- Logs -->
     <string name="core_logs_title">Core logs</string>
     <string name="error_log_export_launcher_missing">Log export launcher is not registered</string>
-    <string name="logcat_logs_title">Logcat</string>
     <string name="logs_clear_message">This permanently removes all entries in this log.</string>
     <string name="logs_clear_title">Clear logs?</string>
     <string name="logs_export">Export logs</string>

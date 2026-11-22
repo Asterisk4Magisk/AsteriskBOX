@@ -90,10 +90,6 @@ private fun AppState.toRootStartConfig(
     )
 }
 
-internal fun AppState.tun2SocksInternalProxyPortValue(): Int {
-    return socks5ProxyPort.toPortOrNull() ?: DefaultRootTun2SocksProxyPort
-}
-
 internal fun AppState.bpf2SocksBridgePortValue(): Int {
     return bpf2SocksBridgePort.toPortOrNull() ?: RootBpf2SocksDefaultBridgePort
 }

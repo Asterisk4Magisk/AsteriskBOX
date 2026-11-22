@@ -3,6 +3,7 @@
 
 package app
 
+import engine.network.NetworkDefaults
 import androidx.compose.runtime.Stable
 import features.resources.ResourceFileDirectCidrIpv4Name
 import features.resources.ResourceFileDirectCidrIpv4Url
@@ -126,7 +127,7 @@ data class SingBoxEndpointState(
 
 const val SingBoxSelectorTypeSelector = "selector"
 const val SingBoxSelectorTypeUrlTest = "urltest"
-const val DefaultSingBoxUrlTestUrl = "https://www.gstatic.com/generate_204"
+const val DefaultSingBoxUrlTestUrl = NetworkDefaults.CONNECTIVITY_CHECK_URL
 const val DefaultSingBoxUrlTestInterval = "3m"
 const val DefaultSingBoxUrlTestTolerance = 50
 const val DefaultSingBoxUrlTestIdleTimeout = "30m"

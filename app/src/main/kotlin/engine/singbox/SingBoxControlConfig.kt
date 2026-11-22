@@ -12,8 +12,6 @@ import engine.vpn.VpnDefaults
 
 internal const val SingBoxControlHost = "127.0.0.1"
 internal const val DefaultSingBoxControlPort = 9090
-internal const val DefaultSingBoxDelayTestUrl = "https://www.gstatic.com/generate_204"
-internal const val DefaultSingBoxDelayTimeoutMillis = 5000
 
 internal data class SingBoxControlConfig(
     val host: String = SingBoxControlHost,

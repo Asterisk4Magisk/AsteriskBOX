@@ -3,6 +3,7 @@
 
 package features.resources.runtime
 
+import utils.sha256Hex
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
@@ -145,7 +146,7 @@ internal fun String.resourceFileRevision(): ResourceFileRevision {
     return ResourceFileRevision(
         exists = true,
         sizeBytes = bytes.size.toLong(),
-        sha256 = MessageDigest.getInstance("SHA-256").digest(bytes).toHexString(),
+        sha256 = bytes.sha256Hex(),
     )
 }
 

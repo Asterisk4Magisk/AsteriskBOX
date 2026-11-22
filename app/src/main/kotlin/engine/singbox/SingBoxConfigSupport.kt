@@ -11,10 +11,6 @@ internal data class SingBoxCoreLogPaths(
     val errorLogPath: String,
 )
 
-internal object SingBoxTags {
-    const val DNS_OUT = "dns-out"
-}
-
 internal fun Context.prepareSingBoxCoreLogPaths(): SingBoxCoreLogPaths {
     return SingBoxCoreLogPaths(
         errorLogPath = androidCoreLogErrorFile().absolutePath,

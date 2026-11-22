@@ -26,7 +26,6 @@ import features.subscription.usecase.OutboundSubscriptionUpdater
 import features.subscription.usecase.SubscriptionInstallConfig
 import kotlinx.coroutines.CoroutineScope
 import features.home.HomeServiceOperationState
-import system.AndroidNetworkInterfaceProvider
 import system.AndroidPackageProvider
 import system.AndroidRootShellGateway
 import system.AndroidUserSpaceProvider
@@ -39,7 +38,6 @@ internal data class AppServices(
     val rootAccess: AndroidRootShellGateway,
     val userSpaces: AndroidUserSpaceProvider,
     val packageCatalog: AndroidPackageProvider,
-    val networkInterfaces: AndroidNetworkInterfaceProvider,
     val resourceFileUseCase: ResourceFileUseCase,
     val resourceFileUpdateCoordinator: ResourceFileUpdateCoordinator,
     val appBackupUseCase: AppBackupUseCase,

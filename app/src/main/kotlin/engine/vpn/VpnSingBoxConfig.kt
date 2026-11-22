@@ -20,7 +20,7 @@ import engine.singbox.config.SingBoxConfigCompiler
 import engine.singbox.plugin.buildPluginEnvelope
 import engine.singbox.plugin.publishPluginEnvelope
 import engine.singbox.prepareSingBoxCoreLogPaths
-import engine.singbox.sha256Hex
+import utils.sha256Hex
 import features.resources.runtime.prepareSingBoxResourceFilePaths
 import java.io.File
 import system.toAndroidUserId
