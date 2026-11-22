@@ -94,6 +94,7 @@ import kotlinx.coroutines.withContext
 import app.R
 import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskInfoChip
+import ui.components.EditorPagePane
 import ui.components.EditorPageScaffold
 import ui.components.ReferenceSelectionCard
 import ui.components.RuleEditorChipGroupCard
@@ -613,6 +614,7 @@ internal fun RouteRuleEditorScaffold(
     onSave: (SingBoxRouteRuleState) -> Unit,
     onEditChild: (SingBoxRouteRuleState, SingBoxRouteRuleState) -> Unit,
     nested: Boolean = false,
+    editorPane: EditorPagePane? = null,
 ) {
     var draft by remember(rule.id) {
         mutableStateOf<SingBoxRouteRuleState?>(rule.withoutInactiveFields())
@@ -660,6 +662,8 @@ internal fun RouteRuleEditorScaffold(
             (draft?.type == SingBoxRouteRuleTypeLogical || activePendingDnsMatchers.values.none { it }),
         onBack = onDismiss,
         onSave = { draft?.let(onSave) },
+        editorPane = editorPane?.copy(selectionEnabled = editorPane.selectionEnabled && draft == rule.withoutInactiveFields() && activePendingDnsMatchers.values.none { it }),
+        formMaxWidth = 800.dp,
     ) { contentPadding ->
         draft?.let { current ->
             AnimatedContent(

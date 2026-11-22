@@ -84,6 +84,7 @@ import app.R
 import ui.components.AsteriskCancelButton
 import ui.components.AsteriskInfoChip
 import ui.components.AsteriskSaveButton
+import ui.components.EditorPagePane
 import ui.components.EditorPageScaffold
 import ui.components.ReferenceSelectionCard
 import ui.components.RuleEditorChipGroupCard
@@ -904,6 +905,7 @@ internal fun DnsRuleEditorScaffold(
     onSave: (SingBoxDnsRuleState) -> Unit,
     onEditChild: (SingBoxDnsRuleState, SingBoxDnsRuleState) -> Unit,
     nested: Boolean = false,
+    editorPane: EditorPagePane? = null,
 ) {
     val rule = editor.rule.withoutInactiveFields()
     val appState by LocalAppStateStore.current.collectAppState()
@@ -1015,6 +1017,8 @@ internal fun DnsRuleEditorScaffold(
         saveEnabled = canSave,
         onBack = onDismissRequest,
         onSave = { onSave(rule.sanitized()) },
+        editorPane = editorPane?.copy(selectionEnabled = editorPane.selectionEnabled && pendingMatchers.isEmpty()),
+        formMaxWidth = 800.dp,
     ) { contentPadding ->
         AnimatedContent(
             targetState = rule.type to typeGeneration,

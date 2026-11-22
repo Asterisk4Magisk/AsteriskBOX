@@ -23,14 +23,17 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.LocalAppServices
@@ -57,9 +60,11 @@ import app.R
 import ui.clipboard.setPlainText
 import ui.components.AsteriskCodeActionButton
 import ui.components.AsteriskCodeSearchHost
+import ui.components.EditorPagePane
 import ui.components.EditorPageScaffold
 import ui.components.localizedLabel
 import ui.components.rememberAsteriskCodeSearchState
+import ui.layout.EditorListItem
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 import ui.icons.AsteriskIcons as Icons
@@ -79,21 +84,19 @@ internal fun EndpointEditorPage(
     val context = LocalContext.current
     val isWideScreen = LocalIsWideScreen.current
     val scope = rememberCoroutineScope()
-    val editing = appState.endpoints.firstOrNull { endpoint -> endpoint.id == endpointId }
+    val focusManager = LocalFocusManager.current
+    var activeEndpointId by rememberSaveable(endpointId) { mutableIntStateOf(endpointId) }
+    val editing = appState.endpoints.firstOrNull { endpoint -> endpoint.id == activeEndpointId }
     val type = editing?.type ?: initialType.takeIf { it in SupportedSingBoxEndpointTypes }
         ?: SupportedSingBoxEndpointTypes.first()
     val initialRemarks = editing?.remarks ?: draftRemarks
-    var remarks by remember(endpointId, editing?.remarks, initialRemarks) {
+    var remarks by remember(activeEndpointId, editing?.remarks, initialRemarks) {
         mutableStateOf(initialRemarks)
     }
-    var detour by remember(endpointId, editing?.json) {
-        mutableStateOf(editing?.json?.let { json -> endpointManagedReference(json, "detour") }.orEmpty())
-    }
-    var domainResolver by remember(endpointId, editing?.json) {
-        mutableStateOf(
-            editing?.json?.let { json -> endpointManagedReference(json, "domain_resolver") }.orEmpty(),
-        )
-    }
+    val initialDetour = editing?.json?.let { json -> endpointManagedReference(json, "detour") }.orEmpty()
+    val initialResolver = editing?.json?.let { json -> endpointManagedReference(json, "domain_resolver") }.orEmpty()
+    var detour by remember(activeEndpointId, editing?.json) { mutableStateOf(initialDetour) }
+    var domainResolver by remember(activeEndpointId, editing?.json) { mutableStateOf(initialResolver) }
     val detourChoices = selectableDetourOutbounds(
         state = appState,
         excludedTag = editing?.tag.orEmpty(),
@@ -107,13 +110,13 @@ internal fun EndpointEditorPage(
         appState.dnsServers.map { server ->
             server.remarks.ifBlank { dnsServerTypeLabel(server.type) }
         }
-    val editorState = remember(endpointId, editing?.json, type) {
-        SingBoxCodeEditorState(
-            editing?.json?.let(::endpointJsonForEditing) ?: newEndpointJson(type),
-        )
+    val initialJson = remember(editing?.json, type) {
+        editing?.json?.let(::endpointJsonForEditing) ?: newEndpointJson(type)
     }
-    var saving by remember(endpointId) { mutableStateOf(false) }
-    val missing = endpointId != 0 && editing == null
+    val editorState = remember(activeEndpointId, initialJson) { SingBoxCodeEditorState(initialJson) }
+    val currentJson = remember(editorState, editorState.documentVersion) { editorState.snapshotText() }
+    var saving by remember(activeEndpointId) { mutableStateOf(false) }
+    val missing = activeEndpointId != 0 && editing == null
     val invalidMessage = stringResource(R.string.endpoint_editor_invalid)
     val invalidJsonMessage = stringResource(R.string.endpoint_editor_json_invalid)
     val formatJsonContentDescription = stringResource(R.string.endpoint_editor_format_json)
@@ -264,6 +267,23 @@ internal fun EndpointEditorPage(
             },
             onSave = ::save,
             backdrop = backdrop,
+            editorPane = EditorPagePane(
+                title = stringResource(R.string.endpoint_management),
+                entries = appState.endpoints.map { endpoint ->
+                    EditorListItem(endpoint.id, endpoint.remarks.ifBlank { endpointTypeTitle(endpoint.type) })
+                },
+                selectedId = activeEndpointId,
+                selectionEnabled = !missing && remarks == initialRemarks && detour == initialDetour &&
+                    domainResolver == initialResolver && currentJson == initialJson,
+                onSelect = { selectedId ->
+                    if (selectedId != activeEndpointId) {
+                        focusManager.clearFocus(force = true)
+                        activeEndpointId = selectedId
+                    }
+                },
+                show = showProperties,
+            ),
+            formMaxWidth = if (showProperties) 800.dp else null,
             actions = {
                 AsteriskCodeActionButton(
                     icon = Icons.Rounded.ContentCopy,

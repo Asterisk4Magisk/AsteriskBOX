@@ -14,6 +14,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import app.LocalAppServices
 import app.LocalAppStateStore
@@ -24,6 +25,7 @@ import app.SingBoxDnsRuleState
 import app.collectAppState
 import app.managedInboundTags
 import app.managedRuleSetChoices
+import app.navigation.Route
 import app.nextAvailableDnsRuleId
 import app.selectablePreferredByDnsServers
 import engine.singbox.config.sanitized
@@ -38,7 +40,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import app.R
+import ui.components.EditorPagePane
 import ui.components.managedInboundChoices
+import ui.layout.EditorListItem
 import java.util.UUID
 
 @Composable
@@ -57,7 +61,9 @@ internal fun DnsRuleEditorPage(
     val tipNotifier = LocalAppServices.current.tipNotifier
     val scope = rememberCoroutineScope()
     val isWideScreen = LocalIsWideScreen.current
-    val stored = appState.dnsRules.firstOrNull { rule -> rule.id == ruleId }
+    val focusManager = LocalFocusManager.current
+    var activeRuleId by rememberSaveable(ruleId) { mutableIntStateOf(ruleId) }
+    val stored = appState.dnsRules.firstOrNull { rule -> rule.id == activeRuleId }
     val serverChoices = appState.dnsServers.map { server ->
         server.tag to server.remarks.ifBlank { dnsServerTypeLabel(server.type) }
     } + if (appState.enableFakeIp) listOf(features.dns.ManagedFakeIpDnsTag to "FakeIP") else emptyList()
@@ -68,14 +74,14 @@ internal fun DnsRuleEditorPage(
             .takeIf(serverTags::contains)
             ?: serverTags.firstOrNull().orEmpty(),
     )
-    var editorRuleJson by rememberSaveable(ruleId, initialDraft, resultKey) {
+    var editorRuleJson by rememberSaveable(activeRuleId, initialDraft, resultKey) {
         mutableStateOf(encodeDnsRule(initial))
     }
     val editorSessionId = rememberSaveable { UUID.randomUUID().toString() }
     val editorRule = remember(editorRuleJson) { decodeDnsRule(editorRuleJson) }
     var childSession by rememberSaveable { mutableIntStateOf(0) }
     var childResultKey by rememberSaveable { mutableStateOf<String?>(null) }
-    var saving by remember(ruleId) { mutableStateOf(false) }
+    var saving by remember(activeRuleId) { mutableStateOf(false) }
     val saveFailedMessage = stringResource(R.string.dns_rule_save_failed)
     val ruleSetChoices = remember(appState.customResourceFiles) {
         appState.managedRuleSetChoices(
@@ -91,7 +97,7 @@ internal fun DnsRuleEditorPage(
                 .orEmpty()
         }
     }
-    val evaluationOwnerId = if (nested) topLevelRuleId else ruleId
+    val evaluationOwnerId = if (nested) topLevelRuleId else activeRuleId
     val editorIndex = if (evaluationOwnerId == 0) {
         null
     } else {
@@ -107,8 +113,8 @@ internal fun DnsRuleEditorPage(
         }
     }
 
-    LaunchedEffect(ruleId, stored, nested) {
-        if (!nested && ruleId != 0 && stored == null) {
+    LaunchedEffect(activeRuleId, stored, nested) {
+        if (!nested && activeRuleId != 0 && stored == null) {
             tipNotifier.show(saveFailedMessage)
             navigator.pop()
         }
@@ -137,7 +143,7 @@ internal fun DnsRuleEditorPage(
         val key = "dns-rule:$editorSessionId:${parent.id}:child:${child.id}:$childSession"
         childResultKey = key
         navigator.navigateForResult(
-            app.navigation.Route.DnsRuleEdit(
+            Route.DnsRuleEdit(
                 initialDraft = child,
                 resultKey = key,
                 nested = true,
@@ -157,13 +163,13 @@ internal fun DnsRuleEditorPage(
             return
         }
         val baseState = appState
-        if (ruleId != 0 && baseState.dnsRules.none { rule -> rule.id == ruleId }) {
+        if (activeRuleId != 0 && baseState.dnsRules.none { rule -> rule.id == activeRuleId }) {
             scope.launch { tipNotifier.show(saveFailedMessage) }
             return
         }
         val candidateState = baseState.withSavedDnsRule(
             rule = saved,
-            isNew = ruleId == 0,
+            isNew = activeRuleId == 0,
         )
         saving = true
         scope.launch {
@@ -210,6 +216,7 @@ internal fun DnsRuleEditorPage(
         }
     }
 
+    val unnamedRule = stringResource(R.string.settings_dns_edit_rule)
     DnsRuleEditorScaffold(
         outerPadding = padding,
         isWideScreen = isWideScreen,
@@ -228,6 +235,20 @@ internal fun DnsRuleEditorPage(
         onSave = ::save,
         onEditChild = ::editChild,
         nested = nested,
+        editorPane = if (nested) null else EditorPagePane(
+            title = stringResource(R.string.dns_management_title),
+            entries = appState.dnsRules.mapIndexed { index, rule ->
+                EditorListItem(rule.id, rule.remarks.ifBlank { "$unnamedRule ${index + 1}" })
+            },
+            selectedId = activeRuleId,
+            selectionEnabled = editorRule == initial,
+            onSelect = { selectedId ->
+                if (selectedId != activeRuleId) {
+                    focusManager.clearFocus(force = true)
+                    activeRuleId = selectedId
+                }
+            },
+        ),
     )
 }
 

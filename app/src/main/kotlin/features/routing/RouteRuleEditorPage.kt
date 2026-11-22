@@ -14,6 +14,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import app.LocalAppServices
 import app.LocalAppStateStore
@@ -38,7 +39,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import app.R
+import ui.components.EditorPagePane
 import ui.components.managedInboundChoices
+import ui.layout.EditorListItem
 import java.util.UUID
 
 @Composable
@@ -56,19 +59,21 @@ internal fun RouteRuleEditorPage(
     val tipNotifier = LocalAppServices.current.tipNotifier
     val scope = rememberCoroutineScope()
     val isWideScreen = LocalIsWideScreen.current
-    val stored = appState.routeRules.firstOrNull { rule -> rule.id == ruleId }
+    val focusManager = LocalFocusManager.current
+    var activeRuleId by rememberSaveable(ruleId) { mutableIntStateOf(ruleId) }
+    val stored = appState.routeRules.firstOrNull { rule -> rule.id == activeRuleId }
     val initial = initialDraft ?: stored ?: SingBoxRouteRuleState(
         id = appState.nextAvailableRouteRuleId(),
         outbound = APP_GLOBAL_SELECTOR,
     )
-    var editorRuleJson by rememberSaveable(ruleId, initialDraft, resultKey) {
+    var editorRuleJson by rememberSaveable(activeRuleId, initialDraft, resultKey) {
         mutableStateOf(encodeRouteRule(initial))
     }
     val editorSessionId = rememberSaveable { UUID.randomUUID().toString() }
     val editorRule = remember(editorRuleJson) { decodeRouteRule(editorRuleJson) }
     var childSession by rememberSaveable { mutableIntStateOf(0) }
     var childResultKey by rememberSaveable { mutableStateOf<String?>(null) }
-    var saving by remember(ruleId, resultKey) { mutableStateOf(false) }
+    var saving by remember(activeRuleId, resultKey) { mutableStateOf(false) }
     val saveFailedMessage = stringResource(R.string.routing_save_failed)
     val outboundChoices = managedOutboundChoices(appState)
     val inboundChoices = managedInboundChoices(managedInboundTags(appState))
@@ -78,8 +83,8 @@ internal fun RouteRuleEditorPage(
         ).map { choice -> choice.tag to choice.remarks }
     }
 
-    LaunchedEffect(ruleId, stored, nested) {
-        if (!nested && ruleId != 0 && stored == null) {
+    LaunchedEffect(activeRuleId, stored, nested) {
+        if (!nested && activeRuleId != 0 && stored == null) {
             tipNotifier.show(saveFailedMessage)
             navigator.pop()
         }
@@ -127,13 +132,13 @@ internal fun RouteRuleEditorPage(
             return
         }
         val baseState = appState
-        if (ruleId != 0 && baseState.routeRules.none { rule -> rule.id == ruleId }) {
+        if (activeRuleId != 0 && baseState.routeRules.none { rule -> rule.id == activeRuleId }) {
             scope.launch { tipNotifier.show(saveFailedMessage) }
             return
         }
         val candidateState = baseState.withSavedRouteRule(
             rule = saved,
-            isNew = ruleId == 0,
+            isNew = activeRuleId == 0,
         )
         saving = true
         scope.launch {
@@ -171,6 +176,7 @@ internal fun RouteRuleEditorPage(
         }
     }
 
+    val unnamedRule = stringResource(R.string.routing_edit_rule)
     RouteRuleEditorScaffold(
         outerPadding = padding,
         isWideScreen = isWideScreen,
@@ -183,6 +189,20 @@ internal fun RouteRuleEditorPage(
         onSave = ::save,
         onEditChild = ::editChild,
         nested = nested,
+        editorPane = if (nested) null else EditorPagePane(
+            title = stringResource(R.string.routing_title),
+            entries = appState.routeRules.mapIndexed { index, rule ->
+                EditorListItem(rule.id, rule.remarks.ifBlank { "$unnamedRule ${index + 1}" })
+            },
+            selectedId = activeRuleId,
+            selectionEnabled = editorRule == initial,
+            onSelect = { selectedId ->
+                if (selectedId != activeRuleId) {
+                    focusManager.clearFocus(force = true)
+                    activeRuleId = selectedId
+                }
+            },
+        ),
     )
 }
 

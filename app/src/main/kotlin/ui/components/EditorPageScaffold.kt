@@ -4,20 +4,27 @@
 package ui.components
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.R
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.rememberHazeState
+import ui.layout.EditorListItem
+import ui.layout.EditorListPane
 import ui.layout.pageContentPaddingWithCutout
 import ui.layout.pageListPadding
+import ui.layout.pageReadableWidth
 import ui.icons.AsteriskIcons as Icons
 
 internal data class EditorPageScaffoldState(
@@ -27,6 +34,15 @@ internal data class EditorPageScaffoldState(
     val backEnabled: Boolean get() = !saving
     val saveEnabled: Boolean get() = requestedSaveEnabled && !saving
 }
+
+internal data class EditorPagePane(
+    val title: String,
+    val entries: List<EditorListItem>,
+    val selectedId: Int,
+    val selectionEnabled: Boolean,
+    val onSelect: (Int) -> Unit,
+    val show: Boolean = true,
+)
 
 @Composable
 internal fun EditorPageScaffold(
@@ -45,6 +61,8 @@ internal fun EditorPageScaffold(
     searchPlaceholder: String = "",
     searchField: @Composable ((Modifier) -> Unit)? = null,
     backdrop: HazeState = rememberHazeState(),
+    editorPane: EditorPagePane? = null,
+    formMaxWidth: Dp? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     val state = EditorPageScaffoldState(saving, saveEnabled)
@@ -109,15 +127,36 @@ internal fun EditorPageScaffold(
             }
         },
     ) { innerPadding ->
-        content(
-            pageListPadding(
-                pageContentPaddingWithCutout(
-                    innerPadding = innerPadding,
-                    outerPadding = outerPadding,
-                    isWideScreen = isWideScreen,
-                ),
-                topExtra = topExtra,
-            ),
+        val pagePadding = pageContentPaddingWithCutout(
+            innerPadding = innerPadding,
+            outerPadding = outerPadding,
+            isWideScreen = isWideScreen,
         )
+        val contentPadding = pageListPadding(pagePadding, topExtra = topExtra)
+        val form: @Composable () -> Unit = {
+            if (formMaxWidth != null) {
+                Box(Modifier.pageReadableWidth(maxWidth = formMaxWidth).fillMaxSize()) {
+                    content(contentPadding)
+                }
+            } else {
+                content(contentPadding)
+            }
+        }
+        if (editorPane == null) {
+            form()
+        } else {
+            EditorListPane(
+                title = editorPane.title,
+                entries = editorPane.entries,
+                selectedId = editorPane.selectedId,
+                padding = pagePadding,
+                show = editorPane.show && LocalDensity.current.fontScale <= 1.3f,
+                onSelect = editorPane.onSelect,
+                selectionEnabled = editorPane.selectionEnabled && !saving,
+                content = {
+                    key(editorPane.selectedId) { form() }
+                },
+            )
+        }
     }
 }

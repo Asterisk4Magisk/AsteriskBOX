@@ -30,8 +30,10 @@ internal data class AdaptiveWindow(
     val width: Dp = 0.dp,
     val height: Dp = 0.dp,
     val foldPadding: PaddingValues = PaddingValues(),
+    val hasSeparatingFold: Boolean = false,
 ) {
-    val showNavigationRail: Boolean get() = width >= 600.dp
+    val showNavigationRail: Boolean
+        get() = width >= 840.dp || (width >= 600.dp && height / width < 1.2f)
     val supportsWideContent: Boolean get() = width >= 600.dp && height >= 480.dp
     val showTwoColumns: Boolean get() = width >= 840.dp && height >= 480.dp
 }
@@ -65,6 +67,7 @@ internal fun rememberAdaptiveWindow(): AdaptiveWindow {
                 end = if (direction == LayoutDirection.Ltr) right else left,
                 bottom = (size.height - pane.bottom).toDp(),
             ),
+            hasSeparatingFold = pane.width < size.width || pane.height < size.height,
         )
     }
 }
