@@ -40,7 +40,7 @@ internal interface SubscriptionScheduleGateway {
     fun storeScheduledGroupIds(groupIds: Set<Int>)
 }
 
-internal class OutboundSubscriptionScheduler(
+internal class SubscriptionScheduler(
     private val gateway: SubscriptionScheduleGateway,
 ) {
     fun reconcile(groups: List<OutboundGroupState>) {

@@ -32,7 +32,7 @@ import features.logs.AndroidAsteriskdLogRepository
 import features.logs.AndroidLogcatRepository
 import features.subscription.runtime.AndroidSubscriptionPreparer
 import features.subscription.runtime.AndroidSubscriptionScheduleGateway
-import features.subscription.runtime.OutboundSubscriptionScheduler
+import features.subscription.runtime.SubscriptionScheduler
 import features.subscription.usecase.toSubscriptionFetchOptions
 import features.subscription.usecase.OutboundSubscriptionUpdater
 import features.subscription.usecase.SubscriptionStateGateway
@@ -134,8 +134,8 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
                 .getOrCreateSubscriptionHwid(),
         )
     }
-    private val outboundSubscriptionScheduler: OutboundSubscriptionScheduler by lazy {
-        OutboundSubscriptionScheduler(
+    private val outboundSubscriptionScheduler: SubscriptionScheduler by lazy {
+        SubscriptionScheduler(
             AndroidSubscriptionScheduleGateway(applicationContext),
         )
     }
