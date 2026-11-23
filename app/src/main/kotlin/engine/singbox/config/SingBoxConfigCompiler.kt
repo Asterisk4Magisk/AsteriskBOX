@@ -9,7 +9,6 @@ import android.os.Process
 import app.AppState
 import app.DefaultSingBoxUrlTestUrl
 import app.effectiveFakeIpEnabled
-import app.isValidConnectionTestUrl
 import app.ManagedApiServiceTag
 import app.ManagedDirectOutboundTag
 import app.ManagedGlobalSelectorTag
@@ -24,6 +23,7 @@ import app.SingBoxRouteRuleState
 import app.SingBoxRouteRuleTypeLogical
 import app.SingBoxSelectorTypeSelector
 import app.SingBoxSelectorTypeUrlTest
+import features.settings.isValidConnectionTestUrl
 import features.selector.expandSelectorMemberReferences
 import app.isManagedSingBoxTag
 import app.managedOutboundGroupSelectorTag

@@ -7,8 +7,6 @@ import engine.root.dns.withRootDnsMutation
 import android.content.Context
 import app.AppState
 import app.effects.SingBoxRuntimeLifecycleTarget
-import app.DefaultConnectionTestUrl
-import app.isValidConnectionTestUrl
 import app.modes.RunModeVpnService
 import engine.proxy.ProxyEngineStartRequest
 import engine.network.ProxyIpProbeException
@@ -20,6 +18,8 @@ import engine.singbox.config.parseSingBoxJson
 import engine.singbox.singBoxControlConfig
 import engine.singbox.singBoxModeName
 import engine.vpn.VpnSingBoxConfigFactory
+import features.settings.DefaultConnectionTestUrl
+import features.settings.isValidConnectionTestUrl
 import features.logs.AndroidAppLogger
 import features.resources.runtime.singBoxResourceFilesDir
 import features.resources.runtime.singBoxResourceFilePaths

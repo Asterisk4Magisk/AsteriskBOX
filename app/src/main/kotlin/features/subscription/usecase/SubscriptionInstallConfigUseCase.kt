@@ -12,7 +12,7 @@ import features.subscription.SubscriptionInstallConfig
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-internal class SubscriptionInstallConfig(
+internal class SubscriptionInstallConfigUseCase(
     private val currentState: () -> AppState,
     private val repository: OutboundRepository,
     private val updater: OutboundSubscriptionUpdater,

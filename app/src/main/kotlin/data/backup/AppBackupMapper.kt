@@ -11,7 +11,7 @@ import app.withCompatibleProxyAppListMode
 import app.AppState
 import app.modes.normalizeNetworkActivityStyle
 import app.modes.normalizeNavigationBarStyle
-import app.withNormalizedConnectionTestSettings
+import features.settings.withNormalizedConnectionTestSettings
 import features.resources.withInitializedBundledRuleSets
 import features.settings.servicecontrol.ServiceControlSchedule
 import features.settings.servicecontrol.ServiceControlKeyguard

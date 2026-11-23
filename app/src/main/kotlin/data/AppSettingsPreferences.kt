@@ -10,7 +10,7 @@ import androidx.core.content.edit
 import app.AppState
 import app.modes.normalizeNetworkActivityStyle
 import app.modes.normalizeNavigationBarStyle
-import app.withNormalizedConnectionTestSettings
+import features.settings.withNormalizedConnectionTestSettings
 import features.settings.servicecontrol.ServiceControlSchedule
 import features.settings.servicecontrol.ServiceControlKeyguard
 import features.settings.servicecontrol.ServiceControlSettings

@@ -34,6 +34,11 @@ import engine.singbox.DefaultSingBoxSnifferTimeout
 import engine.root.RootModeEngine
 import engine.vpn.VpnDefaults
 import features.resources.ResourceFileSourceDefault
+import features.settings.DefaultConnectionTestConcurrent
+import features.settings.DefaultConnectionTestIgnoreHandshakeTime
+import features.settings.DefaultConnectionTestTimeoutMillis
+import features.settings.DefaultConnectionTestUnifiedDelay
+import features.settings.DefaultConnectionTestUrl
 import features.settings.servicecontrol.ServiceControlSettings
 import features.dns.withIpv4FakeIpSettings
 
