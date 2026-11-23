@@ -30,10 +30,12 @@ import ui.layout.LocalAdaptiveWindow
 import ui.components.AsteriskSheetHeader
 import androidx.compose.runtime.SideEffect
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -74,18 +76,27 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
@@ -134,6 +145,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import app.R
@@ -1962,9 +1974,12 @@ private fun OutboundGroupEditorSheet(
     onDismissRequest: () -> Unit,
     onSave: (OutboundGroupState) -> Unit,
 ) {
-    var name by remember(editorSession) { mutableStateOf(group?.name.orEmpty()) }
-    var url by remember(editorSession) { mutableStateOf(group?.url.orEmpty()) }
-    var hwid by remember(editorSession) { mutableStateOf(group?.hwid.orEmpty()) }
+    var nameInput by remember(editorSession) { mutableStateOf(TextFieldValue(group?.name.orEmpty())) }
+    val name = nameInput.text
+    var urlInput by remember(editorSession) { mutableStateOf(TextFieldValue(group?.url.orEmpty())) }
+    val url = urlInput.text
+    var hwidInput by remember(editorSession) { mutableStateOf(TextFieldValue(group?.hwid.orEmpty())) }
+    val hwid = hwidInput.text
     var detour by remember(editorSession) { mutableStateOf(group?.detour.orEmpty()) }
     val detourChoices = remember(
         appState.outboundGroups, appState.outbounds, appState.endpoints, appState.selectors, group?.id,
@@ -1987,10 +2002,12 @@ private fun OutboundGroupEditorSheet(
     var customUserAgent by remember(editorSession) { mutableStateOf(initialCustomUserAgent) }
     var customUserAgentDraft by remember(editorSession) { mutableStateOf(customUserAgent) }
     var showCustomUserAgentDialog by remember(editorSession) { mutableStateOf(false) }
-    var updateInterval by remember(editorSession) { mutableStateOf(group?.updateInterval.orEmpty()) }
+    var updateIntervalInput by remember(editorSession) { mutableStateOf(TextFieldValue(group?.updateInterval.orEmpty())) }
+    val updateInterval = updateIntervalInput.text
     var updateViaProxy by remember(editorSession) { mutableStateOf(group?.updateViaProxy == true) }
     var strictImport by remember(editorSession) { mutableStateOf(group?.strictImport == true) }
-    var ageSecretKey by remember(editorSession) { mutableStateOf(group?.ageSecretKey.orEmpty()) }
+    var ageSecretKeyInput by remember(editorSession) { mutableStateOf(TextFieldValue(group?.ageSecretKey.orEmpty())) }
+    val ageSecretKey = ageSecretKeyInput.text
     val validUrl = url.isBlank() || url.isHttpUrl()
     val validInterval =
         parseSubscriptionSchedule(updateInterval) !is SubscriptionSchedule.Invalid
@@ -2059,7 +2076,14 @@ private fun OutboundGroupEditorSheet(
         )
     }
     val formState = remember(editorSession) { LazyListState() }
+    val inputFocus = remember(editorSession) { GroupEditorInputFocus() }
+    val folded = LocalAdaptiveWindow.current.hasSeparatingFold
+    var fieldToRestore by remember(inputFocus, inline, folded) {
+        mutableStateOf(inputFocus.field.takeIf { show && inputFocus.imeVisible })
+    }
     val form: @Composable () -> Unit = {
+        val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+        SideEffect { inputFocus.imeVisible = imeVisible }
         LazyColumn(
             state = formState,
             modifier = Modifier
@@ -2069,23 +2093,26 @@ private fun OutboundGroupEditorSheet(
         ) {
             item(key = "name") {
                 OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
+                    value = nameInput,
+                    onValueChange = { nameInput = it },
                     label = { Text(stringResource(R.string.outbound_group_name)) },
                     placeholder = {
                         Text(stringResource(R.string.outbound_group_name_placeholder))
                     },
                     singleLine = true,
                     shape = AsteriskShapeTokens.InnerContainer,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().restoreGroupEditorFocus(
+                        field = "name", inputFocus = inputFocus, target = fieldToRestore,
+                        onRestored = { fieldToRestore = null },
+                    ),
                 )
             }
             item(key = "url") {
                 Column {
                     Spacer(Modifier.height(GroupEditorSectionSpacing))
                     OutlinedTextField(
-                        value = url,
-                        onValueChange = { url = it },
+                        value = urlInput,
+                        onValueChange = { urlInput = it },
                         label = { Text(stringResource(R.string.outbound_group_url_optional)) },
                         supportingText = if (!validUrl) {
                             { Text(stringResource(R.string.outbound_group_url_invalid)) }
@@ -2095,7 +2122,10 @@ private fun OutboundGroupEditorSheet(
                         isError = !validUrl,
                         singleLine = true,
                         shape = AsteriskShapeTokens.InnerContainer,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().restoreGroupEditorFocus(
+                            field = "url", inputFocus = inputFocus, target = fieldToRestore,
+                            onRestored = { fieldToRestore = null },
+                        ),
                     )
                 }
             }
@@ -2108,12 +2138,15 @@ private fun OutboundGroupEditorSheet(
                     Column {
                         Spacer(Modifier.height(GroupEditorSectionSpacing))
                         OutlinedTextField(
-                            value = hwid,
-                            onValueChange = { hwid = it },
+                            value = hwidInput,
+                            onValueChange = { hwidInput = it },
                             label = { Text(stringResource(R.string.outbound_group_hwid)) },
                             singleLine = true,
                             shape = AsteriskShapeTokens.InnerContainer,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().restoreGroupEditorFocus(
+                                field = "hwid", inputFocus = inputFocus, target = fieldToRestore,
+                                onRestored = { fieldToRestore = null },
+                            ),
                         )
                     }
                 }
@@ -2161,12 +2194,15 @@ private fun OutboundGroupEditorSheet(
                     Column {
                         Spacer(Modifier.height(GroupEditorSectionSpacing))
                         OutlinedTextField(
-                            value = ageSecretKey,
-                            onValueChange = { ageSecretKey = it },
+                            value = ageSecretKeyInput,
+                            onValueChange = { ageSecretKeyInput = it },
                             label = { Text(stringResource(R.string.outbound_group_age_secret_key)) },
                             singleLine = true,
                             shape = AsteriskShapeTokens.InnerContainer,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().restoreGroupEditorFocus(
+                                field = "age-secret-key", inputFocus = inputFocus, target = fieldToRestore,
+                                onRestored = { fieldToRestore = null },
+                            ),
                         )
                     }
                 }
@@ -2232,9 +2268,17 @@ private fun OutboundGroupEditorSheet(
                                 onCheckedChange = { strictImport = it },
                             )
                             OutlinedTextField(
-                                value = updateInterval,
+                                value = updateIntervalInput,
                                 onValueChange = { value ->
-                                    updateInterval = value.filter { it.isDigit() || it == '.' }
+                                    fun Char.isIntervalDigit() = isDigit() || this == '.'
+                                    val text = value.text.filter { it.isIntervalDigit() }
+                                    updateIntervalInput = if (text == value.text) value else TextFieldValue(
+                                        text = text,
+                                        selection = TextRange(
+                                            value.text.take(value.selection.start).count { it.isIntervalDigit() },
+                                            value.text.take(value.selection.end).count { it.isIntervalDigit() },
+                                        ),
+                                    )
                                 },
                                 label = { Text(stringResource(R.string.outbound_group_update_interval)) },
                                 isError = !validInterval,
@@ -2246,7 +2290,10 @@ private fun OutboundGroupEditorSheet(
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 singleLine = true,
                                 shape = AsteriskShapeTokens.InnerContainer,
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth().restoreGroupEditorFocus(
+                                    field = "subscription-options", inputFocus = inputFocus, target = fieldToRestore,
+                                    onRestored = { fieldToRestore = null },
+                                ),
                             )
                         }
                     }
@@ -2308,6 +2355,42 @@ private fun SubscriptionUserAgentOption.localizedLabel(): String =
             SubscriptionUserAgentOption.Custom -> R.string.outbound_group_user_agent_custom
         },
     )
+
+private class GroupEditorInputFocus {
+    var field: String? = null
+    var requester: FocusRequester? = null
+    var imeVisible: Boolean = false
+}
+
+@Composable
+private fun Modifier.restoreGroupEditorFocus(
+    field: String,
+    inputFocus: GroupEditorInputFocus,
+    target: String?,
+    onRestored: () -> Unit,
+): Modifier {
+    val requester = remember { FocusRequester() }
+    val window = LocalWindowInfo.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(target) {
+        if (target != field) return@LaunchedEffect
+        snapshotFlow { window.isWindowFocused }.first { it }
+        withFrameNanos {}
+        if (requester.requestFocus()) {
+            keyboard?.show()
+            onRestored()
+        }
+    }
+    return focusRequester(requester).onFocusChanged { focus ->
+        if (focus.isFocused) {
+            inputFocus.field = field
+            inputFocus.requester = requester
+        } else if (inputFocus.requester === requester) {
+            inputFocus.field = null
+            inputFocus.requester = null
+        }
+    }
+}
 
 @Composable
 private fun CustomSubscriptionUserAgentDialog(

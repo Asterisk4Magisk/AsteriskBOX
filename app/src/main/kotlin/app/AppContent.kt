@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -30,9 +31,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -64,10 +68,12 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavKey
@@ -127,6 +133,7 @@ import ui.components.asteriskNavigationSelection
 import ui.components.floatingActionChrome
 import ui.components.floatingActionContentColor
 import ui.icons.AsteriskIcons as Icons
+import ui.layout.FoldAdaptiveLayout
 import ui.layout.LocalAdaptiveWindow
 import ui.layout.avoidFold
 import ui.layout.pageWindowPadding
@@ -189,13 +196,15 @@ fun AppContent(
         LocalMainDestinationState provides mainDestinationState,
         LocalHomeServiceControl provides serviceControl,
     ) {
-        Box(
+        FoldAdaptiveLayout(
+            window = window,
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface)
                 .avoidFold(window)
                 .clipToBounds()
                 .imePadding(),
+            companion = { AppFoldOverview() },
         ) {
             val entryProvider = remember(backStack) {
                 entryProvider<NavKey> {
@@ -354,6 +363,50 @@ fun AppContent(
             // diagnostic immediately on the home page after a failed proxy start, regardless of
             // which tab they are on.
             features.proxy.ProxyErrorHost()
+        }
+    }
+}
+
+@Composable
+private fun AppFoldOverview() {
+    val state by LocalAppStateStore.current.collectAppState()
+    val status = stringResource(
+        if (state.proxyRunning) R.string.home_service_enabled else R.string.home_service_disabled,
+    )
+    val outboundCounts = remember(state.outbounds) { state.outbounds.groupingBy(OutboundState::groupId).eachCount() }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item(key = "status") {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Text(status, modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.titleMedium)
+            }
+        }
+        item(key = "title") {
+            Text(stringResource(R.string.outbound_group_management), style = MaterialTheme.typography.titleMedium)
+        }
+        items(state.outboundGroups, key = { it.id }) { group ->
+            val count = outboundCounts[group.id] ?: 0
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        text = group.name,
+                        color = if (group.enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = pluralStringResource(R.plurals.outbound_count, count, count),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
