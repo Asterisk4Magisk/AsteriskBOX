@@ -132,7 +132,17 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
     var dnsFilter by rememberSaveable { mutableStateOf<DnsRecordFilter?>(null) }
     var selectedDnsUpstream by rememberSaveable { mutableStateOf<String?>(null) }
     val dnsListState = rememberLazyListState()
-    var tab by rememberSaveable { mutableStateOf(ConnectionMonitorTab.App) }
+    val dnsAvailable by services.monitoring.dnsAvailable.collectAsState(initial = null)
+    val tabs = remember(dnsAvailable) {
+        ConnectionMonitorTab.entries.filter { it != ConnectionMonitorTab.Dns || dnsAvailable == true }
+    }
+    var selectedTab by rememberSaveable { mutableStateOf(ConnectionMonitorTab.App) }
+    val tab = selectedTab.takeIf { it in tabs } ?: ConnectionMonitorTab.App
+    LaunchedEffect(dnsAvailable) {
+        if (dnsAvailable == false && selectedTab == ConnectionMonitorTab.Dns) {
+            selectedTab = ConnectionMonitorTab.App
+        }
+    }
     val showDns = tab == ConnectionMonitorTab.Dns
     var sort by rememberSaveable { mutableStateOf(ConnectionSort.Traffic) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -287,9 +297,10 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
         toolbar = {
             AsteriskTopBarControls {
                 ConnectionControls(
+                    tabs = tabs,
                     tab = tab,
                     onTabChange = { next ->
-                        tab = next
+                        selectedTab = next
                         if (next == ConnectionMonitorTab.Dns) {
                             showCloseAllConfirmation = false
                         }
@@ -569,6 +580,7 @@ private fun ConnectionsMonitorStatus(
 
 @Composable
 private fun ConnectionControls(
+    tabs: List<ConnectionMonitorTab>,
     tab: ConnectionMonitorTab,
     onTabChange: (ConnectionMonitorTab) -> Unit,
 ) {
@@ -577,7 +589,7 @@ private fun ConnectionControls(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ConnectionMonitorTab.entries.forEach { option ->
+        tabs.forEach { option ->
             AsteriskFilterChip(
                 selected = tab == option,
                 onClick = { onTabChange(option) },
