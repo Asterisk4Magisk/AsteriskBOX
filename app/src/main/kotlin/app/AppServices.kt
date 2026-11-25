@@ -12,6 +12,7 @@ import engine.proxy.VpnPermissionRequester
 import engine.singbox.runtime.SingBoxRuntimeRepository
 import features.logs.CoreLogRepository
 import features.monitoring.MonitoringRepository
+import features.monitoring.overlay.ConnectionMonitorOverlay
 import features.outbound.OutboundListProjectionCache
 import features.outbound.OutboundPingRuntimeRepository
 import features.outbound.OutboundRepository
@@ -50,8 +51,10 @@ internal data class AppServices(
     val outboundRepository: OutboundRepository,
     val outboundListProjectionCache: OutboundListProjectionCache,
     val monitoring: MonitoringRepository,
+    val connectionMonitorOverlay: ConnectionMonitorOverlay,
     val proxyServiceUseCase: ProxyServiceUseCase,
     val requestVpnPermission: VpnPermissionRequester,
+    val requestConnectionOverlayPermission: () -> Boolean,
     val switchRunModeUseCase: SwitchRunModeUseCase,
     val applyServiceControlUseCase: ApplyServiceControlUseCase,
     val enhancementModuleCoordinator: EnhancementModuleCoordinator,

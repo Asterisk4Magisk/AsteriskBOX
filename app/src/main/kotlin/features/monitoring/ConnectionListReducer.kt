@@ -9,17 +9,6 @@ import engine.singbox.runtime.connectionCounts
 import engine.singbox.runtime.resolvedConnectionRoute
 import java.util.Locale
 
-internal enum class ConnectionRouteFilter {
-    /** Keeps every route and only changes the list into an application grouping. */
-    App,
-    Proxy,
-    Direct,
-}
-
-/** Whether the filter narrows connections by their route instead of regrouping them. */
-internal val ConnectionRouteFilter.restrictsRoute: Boolean
-    get() = this == ConnectionRouteFilter.Proxy || this == ConnectionRouteFilter.Direct
-
 internal enum class ConnectionSort {
     StartedAt,
     Traffic,
@@ -60,18 +49,13 @@ internal fun clearDisplayedConnections(
 internal fun reduceConnections(
     connections: List<SingBoxConnection>,
     query: String = "",
-    route: ConnectionRouteFilter = ConnectionRouteFilter.App,
+    route: ConnectionRouteKind? = null,
     sort: ConnectionSort = ConnectionSort.Traffic,
     descending: Boolean = true,
 ): List<SingBoxConnection> {
     val normalizedQuery = query.trim().lowercase(Locale.ROOT)
     val filtered = connections.filter { connection ->
-        val resolvedRoute = connection.resolvedConnectionRoute()
-        val matchesRoute = when (route) {
-            ConnectionRouteFilter.App -> true
-            ConnectionRouteFilter.Proxy -> resolvedRoute == ConnectionRouteKind.Proxy
-            ConnectionRouteFilter.Direct -> resolvedRoute == ConnectionRouteKind.Direct
-        }
+        val matchesRoute = route == null || connection.resolvedConnectionRoute() == route
         val matchesQuery = normalizedQuery.isEmpty() || connection.searchableText().contains(normalizedQuery)
         matchesRoute && matchesQuery
     }
@@ -135,14 +119,13 @@ private fun SingBoxConnection.totalBytes(): Long {
     return if (Long.MAX_VALUE - upload < download) Long.MAX_VALUE else upload + download
 }
 
-private fun SingBoxConnection.sortableRateOrTraffic(): Long {
+private fun SingBoxConnection.sortableRateOrTraffic(): Long = totalRate() ?: totalBytes()
+
+internal fun SingBoxConnection.totalRate(): Long? {
     val upload = uploadBytesPerSecond
     val download = downloadBytesPerSecond
-    return if (upload != null || download != null) {
-        saturatedConnectionAdd(upload ?: 0L, download ?: 0L)
-    } else {
-        totalBytes()
-    }
+    if (upload == null && download == null) return null
+    return saturatedConnectionAdd(upload ?: 0L, download ?: 0L)
 }
 
 private fun bytesPerSecond(previous: Long, current: Long, elapsedMillis: Long): Long? {

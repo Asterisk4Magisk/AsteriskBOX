@@ -6,9 +6,12 @@ package engine.singbox.runtime
 import engine.root.dns.withRootDnsMutation
 import android.content.Context
 import app.AppState
+import app.effects.RuntimeObservation
 import app.effects.SingBoxRuntimeLifecycleTarget
 import app.modes.RunModeVpnService
 import engine.proxy.ProxyEngineStartRequest
+import engine.network.DnsEventUpdate
+import engine.network.DnsEventsUnavailable
 import engine.network.ProxyIpProbeException
 import engine.network.ProxyIpProbeRequest
 import engine.network.ProxyIpProbeResponse
@@ -41,7 +44,10 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -73,6 +79,9 @@ internal class SingBoxRuntimeRepository(
     @Volatile
     private var session: SingBoxCommandClient? = null
     private var sessionTarget: SingBoxCommandTarget? = null
+    private var sessionObservation: RuntimeObservation? = null
+    @Volatile
+    private var runtimeObservation = RuntimeObservation.Foreground
     private var connectJob: Job? = null
     private var generation = 0L
     @Volatile
@@ -103,14 +112,16 @@ internal class SingBoxRuntimeRepository(
             return
         }
         synchronized(sessionLock) {
-            if (sessionTarget == target && (session != null || connectJob?.isActive == true)) {
-                return
-            }
+            val observation = runtimeObservation
+            if (sessionTarget == target && sessionObservation == observation &&
+                (session != null || connectJob?.isActive == true)
+            ) return
+            replaceSession(target, appState, observation)
         }
-        replaceSession(target, appState)
     }
 
-    override fun resumeForForeground(appState: AppState) {
+    override fun resumeObservation(appState: AppState, observation: RuntimeObservation) {
+        runtimeObservation = observation
         start(appState)
     }
 
@@ -125,6 +136,7 @@ internal class SingBoxRuntimeRepository(
             connectJob?.cancel()
             connectJob = null
             sessionTarget = null
+            sessionObservation = null
             session.also { session = null }
         }
         if (previous != null) {
@@ -224,7 +236,7 @@ internal class SingBoxRuntimeRepository(
                     refreshServiceStartedAt(activeGeneration, active)
                     throw error
                 }
-                replaceSession(appState.commandTarget(), appState)
+                replaceSession(appState.commandTarget(), appState, runtimeObservation)
             } else {
                 error("ROOT runtime configuration changes require a supervised restart")
             }
@@ -312,7 +324,11 @@ internal class SingBoxRuntimeRepository(
         }.getOrNull()
     }
 
-    private fun replaceSession(target: SingBoxCommandTarget, appState: AppState) {
+    private fun replaceSession(
+        target: SingBoxCommandTarget,
+        appState: AppState,
+        observation: RuntimeObservation,
+    ) {
         val old: SingBoxCommandClient?
         val nextGeneration: Long
         lateinit var next: SingBoxCommandClient
@@ -322,8 +338,14 @@ internal class SingBoxRuntimeRepository(
             nextGeneration = generation
             connectJob?.cancel()
             old = session
+            val sameTarget = sessionTarget == target
+            val observationChanged = sameTarget && old != null && sessionObservation != observation
             session = null
             sessionTarget = target
+            sessionObservation = observation
+            if (!sameTarget || observation == RuntimeObservation.Overlay) {
+                latestConnections = SingBoxConnectionsState()
+            }
             next = SingBoxCommandClient(
                 target,
                 commandListener(nextGeneration, target, appState),
@@ -331,10 +353,10 @@ internal class SingBoxRuntimeRepository(
             mutableState.update { current ->
                 current.copy(
                     running = false,
-                    serviceStartedAtMillis = 0L,
+                    serviceStartedAtMillis = if (sameTarget) current.serviceStartedAtMillis else 0L,
                     control = target.control,
                     traffic = current.traffic.copy(connected = false),
-                    proxiesRefreshing = true,
+                    proxiesRefreshing = observation == RuntimeObservation.Foreground,
                     delayTestingTarget = null,
                     delayTestingCompleted = 0,
                     delayTestingTotal = 0,
@@ -348,7 +370,12 @@ internal class SingBoxRuntimeRepository(
                 var lastError: Throwable? = null
                 repeat(ConnectAttempts) { attempt ->
                     if (!isCurrent(nextGeneration, target)) return@launch
-                    val result = runCatching { next.connect() }
+                    val result = runCatching {
+                        next.connect(
+                            includeGroupsAndLogs = observation == RuntimeObservation.Foreground,
+                            includeConnections = observation != RuntimeObservation.Overlay,
+                        )
+                    }
                     if (result.isSuccess) {
                         val installed = synchronized(sessionLock) {
                             if (isCurrentLocked(nextGeneration, target)) {
@@ -363,6 +390,7 @@ internal class SingBoxRuntimeRepository(
                             return@launch
                         }
                         refreshServiceStartedAt(nextGeneration, next)
+                        if (observationChanged) return@launch
                         runCatching {
                             // Read inside the lock: a reconnect must not restore its original snapshot.
                             modeMutex.withLock {
@@ -444,7 +472,7 @@ internal class SingBoxRuntimeRepository(
                         delay(ReconnectDelayMillis.milliseconds)
                         synchronized(sessionLock) {
                             if (isCurrentLocked(listenerGeneration, target)) {
-                replaceSession(target, appState)
+                                replaceSession(target, appState, runtimeObservation)
                             }
                         }
                     }
@@ -591,6 +619,13 @@ internal class SingBoxRuntimeRepository(
             if (session !== active) throw ProxyIpProbeException("RUNTIME_CHANGED")
             result
         }
+
+    fun dnsEvents(appState: AppState): Flow<DnsEventUpdate> = flow {
+        if (appContext.skipsBundledCoreConfigCheck(appState.runMode)) throw DnsEventsUnavailable()
+        val active = activeCommandClient(appState)
+        val token = readOrCreateProxyIpProbeToken(appContext.singBoxResourceFilesDir())
+        emitAll(active.dnsEvents(token))
+    }.flowOn(Dispatchers.IO)
 
     private suspend fun runDelayTest(
         appState: AppState,

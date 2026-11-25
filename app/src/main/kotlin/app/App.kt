@@ -27,7 +27,6 @@ import engine.proxy.VpnPermissionRequester
 import features.logs.AndroidCoreLogRepository
 import features.logs.AndroidAsteriskdLogRepository
 import features.logs.AndroidLogcatRepository
-import features.monitoring.MonitoringRepository
 import features.resources.ResourceFileUseCase
 import features.settings.locale.ProvideAppLanguage
 import features.settings.usecase.RootBootScriptUseCase
@@ -52,6 +51,7 @@ fun App(
     logFileCreator: suspend (String) -> Uri?,
     outboundShareFileCreator: suspend (String) -> Uri?,
     requestVpnPermission: VpnPermissionRequester,
+    requestConnectionOverlayPermission: () -> Boolean,
 ) {
     val appContext = LocalContext.current.applicationContext
     val systemUiSnapshot = appContext.currentSystemUiSnapshot()
@@ -96,9 +96,7 @@ fun App(
     val outboundPingRuntime = remember(application) { application.outboundPingRuntime }
     val outboundRepository = remember(application) { application.outboundRepository }
     val outboundListProjectionCache = remember(application) { application.outboundListProjectionCache }
-    val monitoring = remember(appScope, appContext, rootAccess, stateStore, singBoxRuntime) {
-        MonitoringRepository(appScope, appContext, rootAccess, stateStore, singBoxRuntime)
-    }
+    val monitoring = application.monitoring
     val proxyEngine = remember(application) { application.proxyEngine }
     val enhancementModuleCoordinator = remember(appContext) {
         EnhancementModuleCoordinator { AndroidEnhancementModuleBackend(appContext) }
@@ -150,6 +148,7 @@ fun App(
         monitoring,
         proxyServiceUseCase,
         requestVpnPermission,
+        requestConnectionOverlayPermission,
         switchRunModeUseCase,
         applyServiceControlUseCase,
         rootBootScriptUseCase,
@@ -178,8 +177,10 @@ fun App(
             outboundRepository = outboundRepository,
             outboundListProjectionCache = outboundListProjectionCache,
             monitoring = monitoring,
+            connectionMonitorOverlay = application.connectionMonitorOverlay,
             proxyServiceUseCase = proxyServiceUseCase,
             requestVpnPermission = requestVpnPermission,
+            requestConnectionOverlayPermission = requestConnectionOverlayPermission,
             switchRunModeUseCase = switchRunModeUseCase,
             applyServiceControlUseCase = applyServiceControlUseCase,
             rootBootScriptUseCase = rootBootScriptUseCase,

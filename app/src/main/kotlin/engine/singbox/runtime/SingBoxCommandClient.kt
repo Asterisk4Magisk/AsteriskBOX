@@ -65,13 +65,21 @@ internal class SingBoxCommandClient(
     private val modeStatus = MutableStateFlow(ClashModeStatus(disconnected = true))
 
     @JvmOverloads
-    fun connect(modeOnly: Boolean = false) {
+    fun connect(
+        modeOnly: Boolean = false,
+        includeGroupsAndLogs: Boolean = true,
+        includeConnections: Boolean = true,
+    ) {
         val options = CommandClientOptions().apply {
             if (!modeOnly) {
                 addCommand(Libbox.CommandStatus)
-                addCommand(Libbox.CommandGroup)
-                addCommand(Libbox.CommandConnections)
-                addCommand(Libbox.CommandLog)
+                if (includeGroupsAndLogs) {
+                    addCommand(Libbox.CommandGroup)
+                    addCommand(Libbox.CommandLog)
+                }
+                if (includeConnections) {
+                    addCommand(Libbox.CommandConnections)
+                }
             }
             addCommand(Libbox.CommandClashMode)
             statusInterval = StatusIntervalNanos
@@ -120,6 +128,8 @@ internal class SingBoxCommandClient(
         }
         previous?.let { runCatching { it.disconnect() } }
     }
+
+    fun dnsEvents(token: String) = requireClient().streamDnsEvents(token)
 
     suspend fun probeProxyIp(request: ProxyIpProbeRequest, token: String): ProxyIpProbeResponse =
         suspendCancellableCoroutine { continuation ->

@@ -4,24 +4,16 @@
 package features.monitoring.connections
 
 import android.text.format.DateUtils
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,25 +22,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -63,9 +51,10 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import app.LocalAppServices
 import app.LocalAppStateStore
@@ -74,39 +63,59 @@ import app.collectAppState
 import app.managedReferenceRemarks
 import app.visibleManagedReference
 import coil3.compose.AsyncImage
+import engine.singbox.runtime.ConnectionRouteKind
 import engine.singbox.runtime.SingBoxConnection
 import features.monitoring.ConnectionMonitorStatus
-import features.monitoring.ConnectionRouteFilter
 import features.monitoring.ConnectionSort
 import features.monitoring.MonitoringConnectionsFocusState
+import features.monitoring.overlay.ConnectionOverlayToggle
+import features.monitoring.MonitoringDnsSummary
 import features.monitoring.MonitoringIntent
 import features.monitoring.MonitoringScaffold
+import features.monitoring.MonitoringMenuGroupHeader
+import features.monitoring.MonitoringPauseButton
 import features.monitoring.MonitoringStatusHeader
+import features.monitoring.MonitoringStatusMenu
 import features.monitoring.MonitoringValueRow
+import features.monitoring.formatMonitoringRatePair
 import features.monitoring.ObserveMonitoring
 import features.monitoring.buildMonitoringConnectionsFocusState
 import features.monitoring.clearDisplayedConnections
 import features.monitoring.discardDisplayedConnection
+import features.monitoring.dns.DnsRecordFilter
+import features.monitoring.dns.filterDnsRecords
 import features.monitoring.reduceConnections
 import features.monitoring.resolveDisplayedConnections
-import features.monitoring.restrictsRoute
 import features.proxy.app.model.ProxyAppIconRequest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import system.ANDROID_APP_ICON_SIZE_DP
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskCancelButton
-import ui.components.AsteriskDropdownAnchor
 import ui.components.AsteriskDropdownMenuItem
 import ui.components.AsteriskExpansionIndicator
 import ui.components.AsteriskFilterChip
+import ui.components.AsteriskSelectionCard
 import ui.components.AsteriskTopBarControls
 import ui.layout.LocalAdaptiveWindow
-import ui.layout.pageReadableWidth
 import ui.layout.rememberPageGutter
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 import utils.toReadableBytes
 import ui.icons.AsteriskIcons as Icons
+
+private enum class ConnectionMonitorTab(val routeFilter: ConnectionRouteKind? = null) {
+    App,
+    Proxy(ConnectionRouteKind.Proxy),
+    Direct(ConnectionRouteKind.Direct),
+    Dns;
+
+    val replacesConnections: Boolean
+        get() = this == Dns
+}
+
+private val ConnectionAppLookupDispatcher = Dispatchers.IO.limitedParallelism(1)
 
 @Composable
 internal fun ConnectionsMonitorPage(padding: PaddingValues) {
@@ -119,15 +128,20 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
     val context = LocalContext.current
     val iconSizePx = with(LocalDensity.current) { ANDROID_APP_ICON_SIZE_DP.dp.roundToPx() }
     var query by rememberSaveable { mutableStateOf("") }
-    var route by rememberSaveable { mutableStateOf(ConnectionRouteFilter.App) }
+    var dnsQuery by rememberSaveable { mutableStateOf("") }
+    var dnsFilter by rememberSaveable { mutableStateOf<DnsRecordFilter?>(null) }
+    var selectedDnsUpstream by rememberSaveable { mutableStateOf<String?>(null) }
+    val dnsListState = rememberLazyListState()
+    var tab by rememberSaveable { mutableStateOf(ConnectionMonitorTab.App) }
+    val showDns = tab == ConnectionMonitorTab.Dns
     var sort by rememberSaveable { mutableStateOf(ConnectionSort.Traffic) }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     var expandedAppKeys by remember { mutableStateOf(emptySet<String>()) }
-    var showMenu by rememberSaveable { mutableStateOf(false) }
     var showCloseAllConfirmation by rememberSaveable { mutableStateOf(false) }
     var operationInProgress by rememberSaveable { mutableStateOf(false) }
     var paused by remember { mutableStateOf(false) }
+    var frozenDns by remember { mutableStateOf<MonitoringDnsSummary?>(null) }
     var frozenConnections by remember { mutableStateOf(connections) }
     val history = remember { ConnectionPageHistory(SingBoxConnection::id) }
     var pageSnapshot by remember { mutableStateOf(ConnectionPageSnapshot<SingBoxConnection>()) }
@@ -146,8 +160,8 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
         )
         if (restarted || !appState.proxyRunning) {
             showCloseAllConfirmation = false
-            showMenu = false
             paused = false
+            frozenDns = null
             selectedId = null
             frozenPageSnapshot = pageSnapshot
             frozenConnections = connections
@@ -159,7 +173,7 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
             it.connection.copy(uploadBytesPerSecond = 0L, downloadBytesPerSecond = 0L)
         }
     } else displayedHistory.active
-    val liveIds = pageSnapshot.active.mapTo(HashSet(), SingBoxConnection::id)
+    val liveIds = remember(pageSnapshot.active) { pageSnapshot.active.mapTo(HashSet(), SingBoxConnection::id) }
     val closeFailed = stringResource(R.string.monitor_connections_close_failed)
     val closeAllFailed = stringResource(R.string.monitor_connections_close_all_failed)
     val unavailableLabel = stringResource(R.string.common_unavailable)
@@ -172,36 +186,50 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
             directLabel = directLabel,
         )
     }
-    ObserveMonitoring(MonitoringIntent.Connections)
+    ObserveMonitoring(if (showDns) MonitoringIntent.Dns else MonitoringIntent.Connections)
+    val dnsState = if (showDns && appState.proxyRunning) {
+        val dns = frozenDns ?: services.monitoring.dns.collectAsState().value
+        if (dns.status == ConnectionMonitorStatus.ServiceStopped) {
+            MonitoringDnsSummary(status = ConnectionMonitorStatus.Loading)
+        } else dns
+    } else MonitoringDnsSummary()
+    val filteredDnsRecords = if (showDns) {
+        remember(dnsState.records, dnsFilter, dnsQuery, selectedDnsUpstream) {
+            filterDnsRecords(dnsState.records, dnsFilter, dnsQuery, selectedDnsUpstream)
+        }
+    } else {
+        emptyList()
+    }
 
     val displayedConnections = resolveDisplayedConnections(
         latest = connections,
         frozen = frozenConnections,
         paused = paused,
     )
-    val visibleConnections = remember(listedConnections, query, route, sort) {
-        reduceConnections(
+    val visibleConnections = remember(listedConnections, query, tab, sort) {
+        if (tab.replacesConnections) emptyList() else reduceConnections(
             connections = listedConnections,
             query = query,
-            route = route,
+            route = tab.routeFilter,
             sort = sort,
         )
     }
-
     val appResolver = remember(context) { ConnectionAppResolver(context) }
-    val appGroups: List<ConnectionAppGroup> = remember(visibleConnections, route) {
-        if (route == ConnectionRouteFilter.App) {
-            groupConnectionsByApp(visibleConnections, appResolver::resolve)
-        } else {
-            emptyList()
+    val appGroups = if (tab == ConnectionMonitorTab.App) {
+        val groups by produceState(emptyList<ConnectionAppGroup>(), visibleConnections, appResolver) {
+            value = withContext(ConnectionAppLookupDispatcher) {
+                groupConnectionsByApp(visibleConnections, appResolver::resolve)
+            }
         }
-    }
+        groups
+    } else emptyList()
     val appRows = remember(appGroups, expandedAppKeys) {
         buildConnectionAppRows(appGroups, expandedAppKeys)
     }
 
     fun closeConnection(connection: SingBoxConnection) {
         if (operationInProgress || !appState.proxyRunning || connection.id !in liveIds) return
+        if (selectedId == connection.id) selectedId = null
         operationInProgress = true
         scope.launch {
             services.monitoring.closeConnection(connection.id)
@@ -220,21 +248,24 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
     fun ConnectionCardItem(
         connection: SingBoxConnection,
         modifier: Modifier = Modifier,
-        groupPackageName: String? = null,
-        inlineDetails: Boolean = true,
     ) {
+        val app = if (tab.routeFilter != null) {
+            key(connection.uid, connection.process, connection.processPath) {
+                val identity by produceState<ConnectionAppIdentity?>(null, appResolver) {
+                    value = withContext(ConnectionAppLookupDispatcher) { appResolver.resolve(connection) }
+                }
+                identity
+            }
+        } else null
         ConnectionCard(
             connection = connection,
-            groupPackageName = groupPackageName,
-            expanded = selectedId == connection.id,
-            inlineDetails = inlineDetails,
+            app = app,
+            iconSizePx = iconSizePx,
+            selected = selectedId == connection.id,
             onOpen = {
                 selectedId = if (selectedId == connection.id) null else connection.id
             },
-            onClose = {
-                if (selectedId == connection.id) selectedId = null
-                closeConnection(connection)
-            },
+            onClose = { closeConnection(connection) },
             closeEnabled = !showClosed && appState.proxyRunning &&
                 connection.id in liveIds && !operationInProgress,
             detectedClosedAt = if (showClosed) displayedHistory.closed[connection.id]?.detectedAtMillis else null,
@@ -245,53 +276,58 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
     }
 
     MonitoringScaffold(
-        searchQuery = query,
-        onSearchQueryChange = { query = it },
-        searchPlaceholder = stringResource(R.string.monitor_connections_search),
+        searchQuery = if (showDns) dnsQuery else query,
+        onSearchQueryChange = { if (showDns) dnsQuery = it else query = it },
+        searchPlaceholder = stringResource(
+            if (showDns) R.string.monitor_dns_search else R.string.monitor_connections_search,
+        ),
         title = stringResource(R.string.monitor_connections_title),
+        beforeSearch = { ConnectionOverlayToggle(appState.proxyRunning) },
         outerPadding = padding,
-        actions = {
-            Box {
-                IconButton(
-                    onClick = { showMenu = true },
-                    enabled = appState.proxyRunning && liveIds.isNotEmpty() && !operationInProgress,
-                ) {
-                    Icon(Icons.Rounded.MoreVert, stringResource(R.string.common_more_actions))
-                }
-                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.monitor_connections_close_all)) },
-                        leadingIcon = { Icon(Icons.Rounded.LinkOff, contentDescription = null) },
-                        onClick = {
-                            showMenu = false
-                            showCloseAllConfirmation = true
-                        },
-                    )
-                }
-            }
-        },
         toolbar = {
             AsteriskTopBarControls {
                 ConnectionControls(
-                    route = route,
-                    onRouteChange = { route = it },
-                    sort = sort,
-                    onSortChange = { sort = it },
+                    tab = tab,
+                    onTabChange = { next ->
+                        tab = next
+                        if (next == ConnectionMonitorTab.Dns) {
+                            showCloseAllConfirmation = false
+                        }
+                    },
                 )
             }
         },
     ) { contentPadding ->
-        BoxWithConstraints(Modifier.pageReadableWidth(maxWidth = 1260.dp).fillMaxSize()) {
-            val split = LocalAdaptiveWindow.current.supportsWideContent &&
-                maxWidth >= 760.dp && LocalDensity.current.fontScale <= 1.3f
-            val selectedConnection = visibleConnections.firstOrNull { it.id == selectedId }
-            val detailsWidth = (maxWidth * 0.43f).coerceAtMost(520.dp)
-            val spatial = AsteriskMotion.fastSpatial<IntSize>()
-            val effects = AsteriskMotion.fastEffects<Float>()
-            Row(Modifier.fillMaxSize()) {
+        if (showDns) {
+            DnsMonitorContent(
+                status = dnsState.status,
+                records = dnsState.records,
+                filteredRecords = filteredDnsRecords,
+                paused = frozenDns != null,
+                onTogglePaused = { frozenDns = dnsState.takeIf { frozenDns == null } },
+                error = if (dnsState.unsupported) stringResource(R.string.monitor_dns_unsupported) else "",
+                hasActiveFilter = dnsFilter != null || dnsQuery.isNotBlank() || selectedDnsUpstream != null,
+                filter = dnsFilter,
+                onFilterChange = { dnsFilter = it },
+                selectedUpstream = selectedDnsUpstream,
+                onUpstreamSelect = { selectedDnsUpstream = it },
+                iconSizePx = iconSizePx,
+                listState = dnsListState,
+                contentPadding = contentPadding,
+            )
+            return@MonitoringScaffold
+        }
+        val selectedConnection = selectedId?.let { id -> visibleConnections.firstOrNull { it.id == id } }
+        ConnectionMonitorLayout(
+            contentPadding = contentPadding,
+            selection = selectedConnection,
+            title = stringResource(R.string.monitor_connections_details),
+            selectionKey = SingBoxConnection::id,
+            onDismiss = { selectedId = null },
+            list = { modifier ->
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    modifier = modifier,
                     contentPadding = PaddingValues(
                         start = horizontalPadding,
                         top = contentPadding.calculateTopPadding() + 8.dp,
@@ -310,6 +346,10 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
                                     snapshot = displayedConnections.snapshot.copy(connections = listedConnections),
                                 ),
                             ),
+                            sort = sort,
+                            onSortChange = { sort = it },
+                            closeAllEnabled = appState.proxyRunning && liveIds.isNotEmpty() && !operationInProgress,
+                            onCloseAll = { showCloseAllConfirmation = true },
                             paused = paused,
                             onTogglePaused = {
                                 if (!paused) {
@@ -338,7 +378,7 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
                         }
                         visibleConnections.isEmpty() -> item("empty") {
                             StatusCard(
-                                if (query.isBlank() && !route.restrictsRoute) {
+                                if (query.isBlank() && tab.routeFilter == null) {
                                     stringResource(
                                         if (showClosed) R.string.monitor_connections_closed_empty
                                         else R.string.monitor_connections_empty,
@@ -352,7 +392,7 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
                             if (displayedConnections.stale) item("stale") {
                                 StatusCard(stringResource(R.string.monitor_data_stale))
                             }
-                            if (route == ConnectionRouteFilter.App) {
+                            if (tab == ConnectionMonitorTab.App) {
                                 items(appRows, key = ConnectionAppRow::key) { row ->
                                     val modifier = Modifier.animateItem(
                                         fadeInSpec = AsteriskMotion.effects(),
@@ -372,41 +412,35 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
                                         is ConnectionAppRow.Link -> ConnectionCardItem(
                                             connection = row.connection,
                                             modifier = modifier.then(NestedConnectionModifier),
-                                            groupPackageName = row.group.packageName,
-                                            inlineDetails = !split,
                                         )
                                     }
                                 }
                             } else {
                                 items(visibleConnections, key = SingBoxConnection::id) { connection ->
-                                    ConnectionCardItem(connection, inlineDetails = !split)
+                                    ConnectionCardItem(connection)
                                 }
                             }
                         }
                     }
                 }
-                AnimatedVisibility(
-                    visible = split && selectedConnection != null,
-                    enter = expandHorizontally(spatial, expandFrom = Alignment.End) + fadeIn(effects),
-                    exit = shrinkHorizontally(spatial, shrinkTowards = Alignment.End) + fadeOut(effects),
-                ) {
-                    Column(
-                        modifier = Modifier.width(detailsWidth).fillMaxHeight()
-                            .padding(
-                                top = contentPadding.calculateTopPadding() + 8.dp,
-                                bottom = contentPadding.calculateBottomPadding() + 20.dp,
-                                end = horizontalPadding,
-                            )
-                            .verticalScroll(rememberScrollState()),
-                    ) {
-                        selectedConnection?.let { ConnectionCardItem(it) }
-                    }
-                }
-            }
-        }
+            },
+            details = { connection ->
+                DetailRow(
+                    stringResource(R.string.monitor_connections_rate),
+                    formatConnectionRate(connection),
+                )
+                ConnectionDetails(
+                    connection = connection,
+                    policyChain = connectionPolicyChain(connection, referenceLabels, unavailableLabel),
+                    detectedClosedAt = if (showClosed) {
+                        displayedHistory.closed[connection.id]?.detectedAtMillis
+                    } else null,
+                )
+            },
+        )
     }
 
-    if (showCloseAllConfirmation) {
+    if (!showDns && showCloseAllConfirmation) {
         AlertDialog(
             onDismissRequest = { showCloseAllConfirmation = false },
             title = { Text(stringResource(R.string.monitor_connections_close_all)) },
@@ -452,32 +486,27 @@ internal fun ConnectionsMonitorPage(padding: PaddingValues) {
 @Composable
 private fun ConnectionsMonitorStatus(
     state: MonitoringConnectionsFocusState,
+    sort: ConnectionSort,
+    onSortChange: (ConnectionSort) -> Unit,
+    closeAllEnabled: Boolean,
+    onCloseAll: () -> Unit,
     paused: Boolean,
     onTogglePaused: () -> Unit,
     showClosed: Boolean,
     onShowClosedChange: (Boolean) -> Unit,
 ) {
-    var showStateMenu by remember { mutableStateOf(false) }
+    var showOptionsMenu by remember { mutableStateOf(false) }
     val activeLabel = stringResource(R.string.monitor_connections_active)
     val closedLabel = stringResource(R.string.monitor_connections_closed)
     val summary = when (state.status) {
         ConnectionMonitorStatus.ServiceStopped -> stringResource(R.string.monitor_service_not_enabled)
         ConnectionMonitorStatus.Loading -> stringResource(R.string.monitor_loading)
         ConnectionMonitorStatus.Error -> state.error.ifBlank { stringResource(R.string.monitor_data_unavailable) }
-        ConnectionMonitorStatus.Available -> {
-            val routeSummary = stringResource(
-                R.string.monitor_connections_focus_routes,
-                state.proxyCount,
-                state.directCount,
-            )
-            if (showClosed) routeSummary else stringResource(
-                R.string.monitor_connections_status_summary,
-                routeSummary,
-                stringResource(
-                    if (paused) R.string.monitor_connections_paused else R.string.monitor_connections_live,
-                ),
-            )
-        }
+        ConnectionMonitorStatus.Available -> stringResource(
+            R.string.monitor_connections_focus_routes,
+            state.proxyCount,
+            state.directCount,
+        )
     }
     MonitoringStatusHeader(
         title = stringResource(R.string.monitor_connections_total),
@@ -485,42 +514,53 @@ private fun ConnectionsMonitorStatus(
         summary = summary,
         modifier = ContentWidthModifier,
         statusRowOffset = 4.dp,
-        titleAction = { buttonModifier ->
-            IconButton(onClick = onTogglePaused, modifier = buttonModifier) {
-                Icon(
-                    imageVector = if (paused) Icons.Rounded.PlayArrow else Icons.Rounded.Pause,
+        titleActionWidth = 96.dp,
+        titleAction = { actionsModifier ->
+            Row(actionsModifier) {
+                IconButton(onClick = onCloseAll, enabled = closeAllEnabled) {
+                    Icon(
+                        imageVector = Icons.Rounded.LinkOff,
+                        contentDescription = stringResource(R.string.monitor_connections_close_all),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                MonitoringPauseButton(
+                    paused = paused,
                     contentDescription = stringResource(
                         if (paused) R.string.monitor_connections_resume else R.string.monitor_connections_pause,
                     ),
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    onClick = onTogglePaused,
                 )
             }
         },
         controls = {
-            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 40.dp) {
-                TextButton(
-                    onClick = { showStateMenu = true },
-                    // Align the arrow with the header icon while keeping the button padding symmetric.
-                    modifier = Modifier.offset(x = 12.dp),
-                ) {
-                    Text(text = if (showClosed) closedLabel else activeLabel, maxLines = 1)
-                    Spacer(Modifier.width(4.dp))
-                    AsteriskDropdownAnchor(
-                        expanded = showStateMenu,
-                        onDismissRequest = { showStateMenu = false },
-                    ) {
-                        listOf(false, true).forEach { closed ->
-                            AsteriskDropdownMenuItem(
-                                text = if (closed) closedLabel else activeLabel,
-                                selected = closed == showClosed,
-                                onClick = {
-                                    showStateMenu = false
-                                    onShowClosedChange(closed)
-                                },
-                            )
-                        }
-                    }
+            val stateLabel = if (showClosed) closedLabel else activeLabel
+            MonitoringStatusMenu(
+                label = "$stateLabel · ${connectionSortLabel(sort)}",
+                expanded = showOptionsMenu,
+                onExpandedChange = { showOptionsMenu = it },
+            ) {
+                MonitoringMenuGroupHeader(stringResource(R.string.monitor_connections_menu_state))
+                listOf(false, true).forEach { closed ->
+                    AsteriskDropdownMenuItem(
+                        text = if (closed) closedLabel else activeLabel,
+                        selected = closed == showClosed,
+                        onClick = {
+                            showOptionsMenu = false
+                            onShowClosedChange(closed)
+                        },
+                    )
+                }
+                MonitoringMenuGroupHeader(stringResource(R.string.monitor_connections_menu_sort))
+                ConnectionSort.entries.forEach { option ->
+                    AsteriskDropdownMenuItem(
+                        text = connectionSortLabel(option),
+                        selected = sort == option,
+                        onClick = {
+                            showOptionsMenu = false
+                            onSortChange(option)
+                        },
+                    )
                 }
             }
         },
@@ -529,47 +569,19 @@ private fun ConnectionsMonitorStatus(
 
 @Composable
 private fun ConnectionControls(
-    route: ConnectionRouteFilter,
-    onRouteChange: (ConnectionRouteFilter) -> Unit,
-    sort: ConnectionSort,
-    onSortChange: (ConnectionSort) -> Unit,
+    tab: ConnectionMonitorTab,
+    onTabChange: (ConnectionMonitorTab) -> Unit,
 ) {
-    var showSortMenu by rememberSaveable { mutableStateOf(false) }
     Row(
         modifier = ContentWidthModifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ConnectionRouteFilter.entries.forEach { option ->
+        ConnectionMonitorTab.entries.forEach { option ->
             AsteriskFilterChip(
-                selected = route == option,
-                onClick = { onRouteChange(option) },
-                label = connectionRouteLabel(option),
-            )
-        }
-        Box {
-            AsteriskFilterChip(
-                selected = false,
-                onClick = { showSortMenu = true },
-                label = connectionSortLabel(sort),
-                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Sort, contentDescription = null) },
-                trailingIcon = {
-                    AsteriskDropdownAnchor(
-                        expanded = showSortMenu,
-                        onDismissRequest = { showSortMenu = false },
-                    ) {
-                        ConnectionSort.entries.forEach { option ->
-                            AsteriskDropdownMenuItem(
-                                text = connectionSortLabel(option),
-                                selected = sort == option,
-                                onClick = {
-                                    onSortChange(option)
-                                    showSortMenu = false
-                                },
-                            )
-                        }
-                    }
-                },
+                selected = tab == option,
+                onClick = { onTabChange(option) },
+                label = connectionMonitorTabLabel(option),
             )
         }
     }
@@ -645,7 +657,7 @@ private fun ConnectionAppGroupCard(
 }
 
 @Composable
-private fun ConnectionAppIcon(
+internal fun ConnectionAppIcon(
     packageName: String?,
     label: String,
     iconSizePx: Int,
@@ -677,9 +689,9 @@ private fun ConnectionAppIcon(
 @Composable
 private fun ConnectionCard(
     connection: SingBoxConnection,
-    groupPackageName: String?,
-    expanded: Boolean,
-    inlineDetails: Boolean,
+    app: ConnectionAppIdentity?,
+    iconSizePx: Int,
+    selected: Boolean,
     onOpen: () -> Unit,
     onClose: () -> Unit,
     closeEnabled: Boolean,
@@ -688,23 +700,25 @@ private fun ConnectionCard(
     referenceLabels: Map<String, String>,
     unavailableLabel: String,
 ) {
-    // The core reports the final outbound first, followed by its enclosing groups.
-    val visibleChains = connection.chains.asReversed().map { chain ->
-        visibleManagedReference(chain, referenceLabels, unavailableLabel)
-    }
-    Card(
+    val policyChain = connectionPolicyChain(connection, referenceLabels, unavailableLabel)
+    AsteriskSelectionCard(
+        selected = selected,
         onClick = onOpen,
-        modifier = ContentWidthModifier.then(modifier),
-        colors = CardDefaults.cardColors(
-            containerColor = if (expanded && !inlineDetails) MaterialTheme.colorScheme.secondaryContainer
-            else MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
-        shape = MaterialTheme.shapes.large,
+        modifier = ContentWidthModifier.then(modifier).semantics { this.selected = selected },
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Row(
             modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (app != null) {
+                ConnectionAppIcon(
+                    packageName = app.packageName,
+                    label = app.label,
+                    iconSizePx = iconSizePx,
+                )
+                Spacer(Modifier.width(12.dp))
+            }
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
                     text = connection.destinationAddress.ifBlank { stringResource(R.string.common_unknown) },
@@ -714,9 +728,7 @@ private fun ConnectionCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = listOfNotNull(
-                        connection.process.takeUnless { it.trim() == groupPackageName }
-                            ?.ifBlank { stringResource(R.string.monitor_connections_unknown_source) },
+                    text = listOf(
                         connection.network.uppercase().ifBlank { stringResource(R.string.common_unknown) },
                         formatDuration(connection.startedAtMillis, detectedClosedAt),
                     ).joinToString(" · "),
@@ -725,8 +737,7 @@ private fun ConnectionCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                val routing = visibleChains.joinToString(" → ")
-                    .ifBlank { connection.rule }
+                val routing = policyChain.ifBlank { connection.rule }
                 if (routing.isNotBlank()) {
                     Text(
                         text = routing,
@@ -743,11 +754,7 @@ private fun ConnectionCard(
                 )
             }
             Icon(
-                imageVector = when {
-                    !inlineDetails -> Icons.Rounded.ChevronRight
-                    expanded -> Icons.Rounded.ExpandLess
-                    else -> Icons.Rounded.ExpandMore
-                },
+                Icons.AutoMirrored.Rounded.KeyboardArrowRight,
                 contentDescription = stringResource(R.string.monitor_connections_details),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -755,39 +762,44 @@ private fun ConnectionCard(
                 Icon(Icons.Rounded.LinkOff, stringResource(R.string.monitor_connections_close_one))
             }
         }
-        AnimatedVisibility(
-            visible = expanded && inlineDetails,
-            enter = AsteriskMotion.contentEnter(),
-            exit = AsteriskMotion.contentExit(),
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 14.dp),
-            ) {
-                detectedClosedAt?.let { time ->
-                    DetailRow(
-                        stringResource(R.string.monitor_connections_closed_time),
-                        java.text.DateFormat.getDateTimeInstance().format(java.util.Date(time)),
-                    )
-                }
-                DetailRow(stringResource(R.string.monitor_connections_source), connection.sourceAddress)
-                DetailRow(stringResource(R.string.monitor_connections_target), connection.destinationAddress)
-                DetailRow(stringResource(R.string.monitor_connections_process), connection.process)
-                DetailRow(stringResource(R.string.monitor_connections_network), connection.network.uppercase())
-                DetailRow(
-                    stringResource(R.string.monitor_connections_rule),
-                    connection.rule,
-                )
-                DetailRow(
-                    stringResource(R.string.monitor_connections_chain),
-                    visibleChains.joinToString(" → "),
-                )
-                DetailRow(stringResource(R.string.monitor_connections_download), connection.downloadBytes.toReadableBytes())
-                DetailRow(stringResource(R.string.monitor_connections_upload), connection.uploadBytes.toReadableBytes())
-            }
-        }
     }
+}
+
+@Composable
+private fun ConnectionDetails(
+    connection: SingBoxConnection,
+    policyChain: String,
+    detectedClosedAt: Long?,
+) {
+    detectedClosedAt?.let { time ->
+        DetailRow(
+            stringResource(R.string.monitor_connections_closed_time),
+            java.text.DateFormat.getDateTimeInstance().format(java.util.Date(time)),
+        )
+    }
+    DetailRow(stringResource(R.string.monitor_connections_source), connection.sourceAddress)
+    DetailRow(stringResource(R.string.monitor_connections_target), connection.destinationAddress)
+    DetailRow(stringResource(R.string.monitor_connections_process), connection.process)
+    DetailRow(stringResource(R.string.monitor_connections_network), connection.network.uppercase())
+    DetailRow(
+        stringResource(R.string.monitor_connections_rule),
+        connection.rule,
+    )
+    DetailRow(
+        stringResource(R.string.monitor_connections_chain),
+        policyChain,
+    )
+    DetailRow(stringResource(R.string.monitor_connections_download), connection.downloadBytes.toReadableBytes())
+    DetailRow(stringResource(R.string.monitor_connections_upload), connection.uploadBytes.toReadableBytes())
+}
+
+// The core reports the final outbound first, followed by its enclosing groups.
+private fun connectionPolicyChain(
+    connection: SingBoxConnection,
+    referenceLabels: Map<String, String>,
+    unavailableLabel: String,
+): String = connection.chains.asReversed().joinToString(" → ") { chain ->
+    visibleManagedReference(chain, referenceLabels, unavailableLabel)
 }
 
 @Composable
@@ -797,7 +809,7 @@ private fun DetailRow(label: String, value: String) {
 }
 
 @Composable
-private fun StatusCard(message: String, loading: Boolean = false) {
+internal fun StatusCard(message: String, loading: Boolean = false) {
     Card(
         modifier = ContentWidthModifier,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -814,11 +826,12 @@ private fun StatusCard(message: String, loading: Boolean = false) {
 }
 
 @Composable
-private fun connectionRouteLabel(route: ConnectionRouteFilter): String = stringResource(
-    when (route) {
-        ConnectionRouteFilter.App -> R.string.monitor_filter_app
-        ConnectionRouteFilter.Proxy -> R.string.monitor_filter_proxy
-        ConnectionRouteFilter.Direct -> R.string.monitor_filter_direct
+private fun connectionMonitorTabLabel(tab: ConnectionMonitorTab): String = stringResource(
+    when (tab) {
+        ConnectionMonitorTab.App -> R.string.monitor_filter_app
+        ConnectionMonitorTab.Proxy -> R.string.monitor_filter_proxy
+        ConnectionMonitorTab.Direct -> R.string.monitor_filter_direct
+        ConnectionMonitorTab.Dns -> R.string.monitor_filter_dns
     },
 )
 
@@ -832,21 +845,8 @@ private fun connectionSortLabel(sort: ConnectionSort): String = stringResource(
 )
 
 @Composable
-private fun formatConnectionRate(connection: SingBoxConnection): String {
-    val up = connection.uploadBytesPerSecond
-    val down = connection.downloadBytesPerSecond
-    return formatRatePair(upload = up, download = down)
-}
-
-@Composable
-private fun formatRatePair(upload: Long?, download: Long?): String {
-    if (upload == null && download == null) return "—"
-    return stringResource(
-        R.string.monitor_rate_pair,
-        (upload ?: 0L).toReadableBytes(),
-        (download ?: 0L).toReadableBytes(),
-    )
-}
+private fun formatConnectionRate(connection: SingBoxConnection): String =
+    formatMonitoringRatePair(connection.uploadBytesPerSecond, connection.downloadBytesPerSecond)
 
 private fun formatDuration(startedAtMillis: Long?, endedAtMillis: Long? = null): String {
     val start = startedAtMillis ?: return "—"
@@ -854,7 +854,7 @@ private fun formatDuration(startedAtMillis: Long?, endedAtMillis: Long? = null):
     return DateUtils.formatElapsedTime(elapsed / 1_000L)
 }
 
-private val ContentWidthModifier = Modifier.widthIn(max = 960.dp).fillMaxWidth()
+private val ContentWidthModifier = Modifier.widthIn(max = ConnectionMonitorContentMaxWidth).fillMaxWidth()
 
 /** Inset applied to the connections listed under their application. */
 private val NestedConnectionModifier = Modifier.padding(start = 12.dp)

@@ -13,7 +13,7 @@ import kotlin.time.Duration.Companion.milliseconds
 // Unlike Mihomo, sing-box keeps no standby runtime in the app process, so pausing only
 // disconnects the command client.
 internal interface SingBoxRuntimeLifecycleTarget {
-    fun resumeForForeground(appState: AppState)
+    fun resumeObservation(appState: AppState, observation: RuntimeObservation)
     fun pauseForBackground(appState: AppState)
 }
 
@@ -23,42 +23,36 @@ internal class SingBoxRuntimeLifecycleCoordinator(
     private val backgroundGraceMillis: Long = DefaultBackgroundGraceMillis,
 ) {
     private val lock = Any()
-    private var stage = RuntimeLifecycleStage.BackgroundPaused
+    private var observation: RuntimeObservation? = null
     private var latestAppState: AppState? = null
     private var backgroundJob: Job? = null
 
     fun updateAppState(appState: AppState) {
-        val shouldResume = synchronized(lock) {
+        synchronized(lock) {
             latestAppState = appState
-            stage == RuntimeLifecycleStage.Foreground
+            observation?.let { demand -> target.resumeObservation(appState, demand) }
         }
-        if (shouldResume) target.resumeForForeground(appState)
     }
 
-    fun onForeground() {
-        val state = synchronized(lock) {
+    fun updateObservation(demand: RuntimeObservation?) {
+        synchronized(lock) {
+            if (observation == demand) return
+            observation = demand
             backgroundJob?.cancel()
             backgroundJob = null
-            stage = RuntimeLifecycleStage.Foreground
-            latestAppState
-        }
-        state?.let(target::resumeForForeground)
-    }
-
-    fun onBackground() {
-        synchronized(lock) {
-            if (stage != RuntimeLifecycleStage.Foreground) return
-            stage = RuntimeLifecycleStage.BackgroundGrace
-            backgroundJob?.cancel()
+            if (demand != null) {
+                latestAppState?.let { target.resumeObservation(it, demand) }
+                return
+            }
             backgroundJob = appScope.launch {
                 delay(backgroundGraceMillis.milliseconds)
-                val state = synchronized(lock) {
-                    if (stage != RuntimeLifecycleStage.BackgroundGrace) return@launch
-                    stage = RuntimeLifecycleStage.BackgroundPaused
+                synchronized(lock) {
+                    if (observation != null) return@launch
                     backgroundJob = null
-                    latestAppState
-                } ?: return@launch
-                target.pauseForBackground(state)
+                    latestAppState?.let { appState ->
+                        target.pauseForBackground(appState)
+                    }
+                }
             }
         }
     }
@@ -67,15 +61,9 @@ internal class SingBoxRuntimeLifecycleCoordinator(
         synchronized(lock) {
             backgroundJob?.cancel()
             backgroundJob = null
-            stage = RuntimeLifecycleStage.BackgroundPaused
+            observation = null
         }
     }
-}
-
-private enum class RuntimeLifecycleStage {
-    Foreground,
-    BackgroundGrace,
-    BackgroundPaused,
 }
 
 internal const val DefaultBackgroundGraceMillis = 5_000L

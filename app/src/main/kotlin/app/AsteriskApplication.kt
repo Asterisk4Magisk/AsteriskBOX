@@ -12,6 +12,7 @@ import features.resources.runtime.AndroidResourceFileDownloadCancellation
 import android.app.Application
 import features.home.HomeServiceOperationState
 import app.effects.AppActivityForegroundTracker
+import app.effects.observeRootProxyStatus
 import app.effects.SingBoxRuntimeLifecycleCoordinator
 import app.modes.RunModeVpnService
 import features.boot.BootAutoConnect
@@ -27,6 +28,8 @@ import features.outbound.OutboundPingRuntimeRepository
 import features.outbound.OutboundRepository
 import features.outbound.OutboundStateGateway
 import features.logs.AndroidAppLogger
+import features.monitoring.MonitoringRepository
+import features.monitoring.overlay.ConnectionMonitorOverlay
 import features.logs.AndroidCoreLogRepository
 import features.logs.AndroidAsteriskdLogRepository
 import features.logs.AndroidLogcatRepository
@@ -44,6 +47,7 @@ import coil3.SingletonImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -71,6 +75,14 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     internal val homeServiceOperationState = HomeServiceOperationState()
     internal val singBoxRuntime: SingBoxRuntimeRepository by lazy { SingBoxRuntimeRepository(appScope, this) }
+    internal val monitoring: MonitoringRepository by lazy {
+        MonitoringRepository(appScope, this, AndroidRootShellGateway(), stateStore, singBoxRuntime)
+    }
+    internal val connectionMonitorOverlay: ConnectionMonitorOverlay by lazy {
+        ConnectionMonitorOverlay(this, appScope, monitoring, stateStore.state) { active, connectionsVisible ->
+            foregroundTracker.setOverlayObservation(active, connectionsVisible)
+        }
+    }
     internal val singBoxRuntimeLifecycle: SingBoxRuntimeLifecycleCoordinator by lazy {
         SingBoxRuntimeLifecycleCoordinator(appScope, singBoxRuntime)
     }
@@ -355,6 +367,11 @@ class AsteriskApplication : Application(), SingletonImageLoader.Factory {
         AndroidAsteriskdLogRepository.initialize(applicationContext)
         foregroundTracker = AppActivityForegroundTracker(singBoxRuntimeLifecycle)
         registerActivityLifecycleCallbacks(foregroundTracker)
+        appScope.launch {
+            foregroundTracker.statusWatchRequired.collectLatest { required ->
+                if (required) observeRootProxyStatus(stateStore, proxyEngine, stateStore::update)
+            }
+        }
         appScope.launch {
             stateStore.state
                 .map { state ->

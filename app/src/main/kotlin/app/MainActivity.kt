@@ -6,6 +6,8 @@ package app
 import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -43,6 +45,7 @@ import ui.feedback.AndroidToastTipNotifier
 
 class MainActivity : ComponentActivity() {
     private var pendingAutoConnect = false
+    private var overlayPermissionPending = false
 
     private val vpnPermissionRequester = AndroidVpnPermissionRequester {
         appString(R.string.error_vpn_permission_launcher_missing)
@@ -91,6 +94,22 @@ class MainActivity : ComponentActivity() {
         vpnPermissionRequester.complete(result.resultCode == RESULT_OK)
     }
 
+    private val overlayPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        if (overlayPermissionPending) {
+            overlayPermissionPending = false
+            if (Settings.canDrawOverlays(this)) {
+                val overlay = (application as AsteriskApplication).connectionMonitorOverlay
+                if (!overlay.show(this)) {
+                    lifecycleScope.launch {
+                        AndroidToastTipNotifier(application).show(appString(R.string.monitor_overlay_open_failed))
+                    }
+                }
+            }
+        }
+    }
+
     private val qrCodePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -125,6 +144,18 @@ class MainActivity : ComponentActivity() {
         outboundShareFileCreator.complete(uri)
     }
 
+    private fun requestConnectionOverlayPermission(): Boolean {
+        if (overlayPermissionPending) return true
+        overlayPermissionPending = true
+        val intent = Intent(
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.fromParts("package", packageName, null),
+        )
+        if (runCatching { overlayPermissionLauncher.launch(intent) }.isSuccess) return true
+        overlayPermissionPending = false
+        return false
+    }
+
     private fun appString(@StringRes id: Int, vararg args: Any): String {
         val languageMode = (application as AsteriskApplication).stateStore.state.value.languageMode
         return applicationContext.localizedAppContext(languageMode).getString(id, *args)
@@ -137,7 +168,13 @@ class MainActivity : ComponentActivity() {
         )
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (overlayPermissionPending) outState.putBoolean(OverlayPermissionPendingKey, true)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        overlayPermissionPending = savedInstanceState?.getBoolean(OverlayPermissionPendingKey) == true
         super.onCreate(savedInstanceState)
         observeRecentTasksVisibility()
         observeScreenshotProtection()
@@ -322,6 +359,7 @@ class MainActivity : ComponentActivity() {
                 logFileCreator = logFileCreator::request,
                 outboundShareFileCreator = outboundShareFileCreator::request,
                 requestVpnPermission = vpnPermissionRequester::request,
+                requestConnectionOverlayPermission = ::requestConnectionOverlayPermission,
             )
         }
     }
@@ -333,3 +371,5 @@ private val BackupFileMimeTypes = arrayOf(
     "text/json",
     "text/plain",
 )
+
+private const val OverlayPermissionPendingKey = "connectionOverlayPermissionPending"
