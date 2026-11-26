@@ -14,7 +14,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -35,6 +34,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,7 +47,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -74,7 +73,6 @@ import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -89,6 +87,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.AppState
 import app.R
 import app.modes.NetworkActivityStyleDotted
@@ -99,12 +99,13 @@ import features.monitoring.ConnectionOverlayStats
 import features.monitoring.ConnectionOverlayTrafficSampleLimit
 import features.monitoring.MonitoringIntent
 import features.monitoring.MonitoringRepository
-import features.monitoring.formatMonitoringRate
-import features.monitoring.formatMonitoringRatePair
 import features.monitoring.connections.ConnectionAppResolver
 import features.monitoring.dns.DnsRecord
 import features.monitoring.dns.dnsRcodeLabel
 import features.monitoring.dns.dnsStatusLabel
+import features.monitoring.formatMonitoringRate
+import features.monitoring.formatMonitoringRatePair
+import features.monitoring.observeWhileStarted
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -118,12 +119,12 @@ import ui.charts.rememberDottedWaveformRamp
 import ui.components.AsteriskExpansionIndicator
 import ui.components.AsteriskSegmentItem
 import ui.components.AsteriskSegmentedControl
-import ui.icons.AsteriskIcons as Icons
 import ui.theme.AsteriskMotion
 import ui.theme.AsteriskShapeTokens
 import ui.theme.LocalReduceMotion
 import ui.theme.LocalSpacing
 import utils.toReadableBytes
+import ui.icons.AsteriskIcons as Icons
 
 private enum class OverlayDimension(val label: Int) {
     Connections(R.string.home_monitor_connections),
@@ -162,10 +163,10 @@ internal fun ConnectionOverlayContent(
     val (running, chartStyle) = if (panelVisible) {
         remember(appState) {
             appState.map { it.proxyRunning to it.networkActivityStyle }.distinctUntilChanged()
-        }.collectAsState(initial = true to NetworkActivityStyleDotted).value
+        }.collectAsStateWithLifecycle(initialValue = true to NetworkActivityStyleDotted).value
     } else false to NetworkActivityStyleDotted
     val stats = if (panelVisible) {
-        remember(monitoring) { monitoring.connectionOverlayStats() }.collectAsState(ConnectionOverlayStats()).value
+        remember(monitoring) { monitoring.connectionOverlayStats() }.collectAsStateWithLifecycle(ConnectionOverlayStats()).value
     } else ConnectionOverlayStats()
 
     Surface(
@@ -205,7 +206,7 @@ internal fun ConnectionOverlayContent(
                     )
                 }
                 if (panelVisible && hasCustomSize) {
-                    val dnsAvailable by monitoring.dnsAvailable.collectAsState(initial = null)
+                    val dnsAvailable by monitoring.dnsAvailable.collectAsStateWithLifecycle(initialValue = null)
                     val dimensions = remember(dnsAvailable) {
                         OverlayDimension.entries.filter { it != OverlayDimension.Dns || dnsAvailable == true }
                     }
@@ -331,9 +332,10 @@ private fun OverlayRankings(
     onSelectRank: (String) -> Unit,
 ) {
     val onVisibilityChanged by rememberUpdatedState(onConnectionsVisibilityChanged)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     if (active && dimension == OverlayDimension.Connections) {
-        DisposableEffect(monitoring) {
-            val observation = monitoring.observe(MonitoringIntent.Connections)
+        DisposableEffect(monitoring, lifecycle) {
+            val observation = monitoring.observeWhileStarted(MonitoringIntent.Connections, lifecycle)
             onVisibilityChanged(true)
             onDispose {
                 observation.close()
@@ -671,7 +673,7 @@ private fun OverlayConnectionRanking(
             }
             Triple(summary.status, rankOverlayConnections(connections), pinned)
         }.flowOn(Dispatchers.Default)
-    }.collectAsState(Triple(ConnectionMonitorStatus.Loading, emptyList(), null))
+    }.collectAsStateWithLifecycle(Triple(ConnectionMonitorStatus.Loading, emptyList(), null))
     val (status, rows, resolvedPinned) = ranking
     val pinned = resolvedPinned?.takeIf { it.row.id == selectedId }
     val pinnedKey = pinned?.row?.id
@@ -838,7 +840,7 @@ private fun OverlayDnsRanking(
         monitoring.dns.map { summary ->
             Triple(summary.status, summary.unsupported, rankOverlayDns(summary.records, selectedDomain))
         }.flowOn(Dispatchers.Default)
-    }.collectAsState(Triple(ConnectionMonitorStatus.Loading, false, emptyList<OverlayDnsRank>() to null))
+    }.collectAsStateWithLifecycle(Triple(ConnectionMonitorStatus.Loading, false, emptyList<OverlayDnsRank>() to null))
     val (status, unsupported, ranked) = ranking
     val (rows, pinned) = ranked
     OverlayExpandableRankList(
