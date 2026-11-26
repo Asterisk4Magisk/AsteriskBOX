@@ -9,12 +9,14 @@ import engine.network.decodeDnsEvent
 import io.nekohasekai.libbox.CommandClient
 import io.nekohasekai.libbox.DnsEventsHandler
 import java.io.IOException
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.channels.trySendBlocking
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.launch
 
 private sealed interface DnsCallbackUpdate {
     data object Ready : DnsCallbackUpdate
@@ -25,21 +27,28 @@ internal fun CommandClient.streamDnsEvents(token: String): Flow<DnsEventUpdate> 
     dnsEventCallbacks(token).transform { update ->
         when (update) {
             DnsCallbackUpdate.Ready -> emit(DnsEventUpdate.Ready)
-            is DnsCallbackUpdate.Received -> decodeDnsEvent(update.json)?.let {
-                emit(DnsEventUpdate.Received(it))
+            is DnsCallbackUpdate.Received -> {
+                for (line in update.json.lineSequence()) {
+                    if (line.isEmpty()) continue
+                    decodeDnsEvent(line)?.let { emit(DnsEventUpdate.Received(it)) }
+                }
             }
         }
     }
 
 private fun CommandClient.dnsEventCallbacks(token: String): Flow<DnsCallbackUpdate> = callbackFlow {
-    if (getDnsEventsVersion(token) != 1) throw DnsEventsUnavailable()
+    val handshake = launch {
+        delay(DnsHandshakeTimeoutMillis)
+        close(IOException("DNS events handshake timed out"))
+    }
     val handler = object : DnsEventsHandler {
         override fun onReady() {
+            handshake.cancel()
             trySend(DnsCallbackUpdate.Ready)
         }
 
-        override fun onEvent(eventJSON: String) {
-            trySend(DnsCallbackUpdate.Received(eventJSON))
+        override fun onEvent(payload: String) {
+            trySendBlocking(DnsCallbackUpdate.Received(payload))
         }
 
         override fun onError(code: String) {
@@ -49,7 +58,13 @@ private fun CommandClient.dnsEventCallbacks(token: String): Flow<DnsCallbackUpda
             )
         }
     }
-    val subscription = subscribeDnsEvents(token, handler)
+    val subscription = subscribeDnsEventBatches(token, handler)
         ?: throw IOException("Missing DNS events session")
-    awaitClose { runCatching { subscription.close() } }
-}.buffer(capacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    awaitClose {
+        handshake.cancel()
+        runCatching { subscription.close() }
+    }
+}.buffer(DnsBatchBufferCapacity)
+
+private const val DnsBatchBufferCapacity = 8
+private const val DnsHandshakeTimeoutMillis = 3_000L
