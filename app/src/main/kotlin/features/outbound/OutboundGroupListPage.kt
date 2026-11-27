@@ -53,6 +53,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -158,6 +159,7 @@ import sh.calvin.reorderable.ReorderableItem
 import ui.components.AsteriskActionButton
 import ui.components.AsteriskConfigApplyBanner
 import ui.components.AsteriskModalBottomSheet
+import ui.components.AsteriskNoWrapTextField
 import ui.components.WarningConfirmDialog
 import ui.components.animateDraggedCardLift
 import ui.components.draggedCardLift
@@ -1990,8 +1992,11 @@ private fun OutboundGroupEditorSheet(
     val initialRequestHeaders = remember(editorSession, defaultRequestHeaders) {
         formatSubscriptionRequestHeaders(group?.requestHeaders ?: defaultRequestHeaders)
     }
-    var requestHeadersInput by remember(editorSession) { mutableStateOf(TextFieldValue(initialRequestHeaders)) }
-    val requestHeaders = remember(requestHeadersInput.text) { parseSubscriptionRequestHeaders(requestHeadersInput.text) }
+    val requestHeadersState = remember(editorSession) {
+        TextFieldState(initialText = initialRequestHeaders, initialSelection = TextRange.Zero)
+    }
+    val requestHeadersText = requestHeadersState.text.toString()
+    val requestHeaders = remember(requestHeadersText) { parseSubscriptionRequestHeaders(requestHeadersText) }
     var detour by remember(editorSession) { mutableStateOf(group?.detour.orEmpty()) }
     val detourChoices = remember(
         appState.outboundGroups, appState.outbounds, appState.endpoints, appState.selectors, group?.id,
@@ -2038,7 +2043,7 @@ private fun OutboundGroupEditorSheet(
         .coerceAtLeast(0)
     val selectedUserAgentLabel = userAgentLabels[selectedUserAgentIndex]
     val dirty = name != group?.name.orEmpty() || url != group?.url.orEmpty() ||
-        requestHeadersInput.text != initialRequestHeaders ||
+        requestHeadersText != initialRequestHeaders ||
         detour != group?.detour.orEmpty() ||
         updateInterval != group?.updateInterval.orEmpty() ||
         userAgent != initialUserAgentOption.resolveUserAgent(initialCustomUserAgent) ||
@@ -2197,9 +2202,8 @@ private fun OutboundGroupEditorSheet(
                 ) {
                     Column {
                         Spacer(Modifier.height(GroupEditorSectionSpacing))
-                        OutlinedTextField(
-                            value = requestHeadersInput,
-                            onValueChange = { requestHeadersInput = it },
+                        AsteriskNoWrapTextField(
+                            state = requestHeadersState,
                             label = { Text(stringResource(R.string.subscription_request_headers)) },
                             isError = requestHeaders == null,
                             supportingText = if (requestHeaders == null) {
