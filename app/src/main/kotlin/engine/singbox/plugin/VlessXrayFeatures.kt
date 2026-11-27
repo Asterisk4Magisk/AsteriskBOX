@@ -9,6 +9,7 @@ import engine.singbox.config.encodeSingBoxJson
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
@@ -34,11 +35,20 @@ internal class VlessXrayRequiredException(
     val features: List<String>,
 ) : IllegalArgumentException("Outbound $tag uses Xray-only features (${features.joinToString(", ")})")
 
-/** The Xray-only features [this] vless outbound uses; empty when the built-in core can run it. */
-internal fun JsonObject.xrayOnlyVlessFeatures(): List<String> = buildList {
-    val transport = this@xrayOnlyVlessFeatures["transport"] as? JsonObject
+internal fun JsonObject.usesXdriveTransport(tag: String): Boolean {
+    val override = jsonObjectField("xray_stream_settings", tag)
+    // Xray gives method precedence over network when both are set.
+    val network = override?.get("method")?.takeUnless { it == JsonNull }
+        ?: override?.get("network")
+        ?: (this["transport"] as? JsonObject)?.get("type")
+    return (network as? JsonPrimitive)?.contentOrNull.equals("xdrive", ignoreCase = true)
+}
+
+internal fun JsonObject.xrayOnlyVlessTransportFeatures(): List<String> = buildList {
+    val transport = this@xrayOnlyVlessTransportFeatures["transport"] as? JsonObject
     when (transport?.stringOrEmpty("type")?.lowercase()) {
         "xhttp" -> add("XHTTP")
+        "xdrive" -> add("XDRIVE")
         "mkcp" -> add("mKCP")
         "raw" -> add("RAW header")
         "grpc" -> {
@@ -46,6 +56,11 @@ internal fun JsonObject.xrayOnlyVlessFeatures(): List<String> = buildList {
             if (transport.isTrue("multi_mode")) add("gRPC multiMode")
         }
     }
+}
+
+/** The Xray-only features [this] vless outbound uses; empty when the built-in core can run it. */
+internal fun JsonObject.xrayOnlyVlessFeatures(): List<String> = buildList {
+    addAll(xrayOnlyVlessTransportFeatures())
     val encryption = stringOrEmpty("encryption")
     if (encryption.isNotBlank() && !encryption.equals("none", ignoreCase = true)) add("VLESS Encryption")
     val tls = this@xrayOnlyVlessFeatures["tls"] as? JsonObject
@@ -135,6 +150,7 @@ internal fun buildVlessConfig(
     tag: String,
     socksPort: Int,
     mappingAddress: String,
+    mappingUsesSocks: Boolean,
     protectPath: String,
 ): String {
     val uuid = outbound.stringOrEmpty("uuid")
@@ -178,7 +194,9 @@ internal fun buildVlessConfig(
         }
         (outbound["transport"] as? JsonObject)?.let { transport ->
             putJsonObject("transport") {
-                put("type", transport.stringOrEmpty("type"))
+                val type = transport.stringOrEmpty("type")
+                val usesXdrive = type.equals("xdrive", ignoreCase = true)
+                put("type", if (usesXdrive) "xdrive" else type)
                 listOf("path", "service_name", "authority", "mode", "early_data_header_name", "header_type", "seed")
                     .forEach { name -> copyString(transport, name) }
                 copyList(transport, "host")
@@ -186,6 +204,14 @@ internal fun buildVlessConfig(
                 if (transport.isTrue("multi_mode")) put("multi_mode", true)
                 listOf("max_early_data", "mtu", "tti").forEach { name -> copyInt(transport, name, tag) }
                 transport.jsonObjectField("extra", tag)?.let { extra -> put("extra", extra) }
+                if (usesXdrive) {
+                    copyString(transport, "service")
+                    copyString(transport, "remote_folder")
+                    val secrets = transport["secrets"].vlessXdriveSecrets()
+                    if (secrets.isNotEmpty()) {
+                        putJsonArray("secrets") { secrets.forEach { value -> add(value) } }
+                    }
+                }
             }
         }
         outbound.jsonObjectField("xray_finalmask", tag)?.let { mask -> put("xray_finalmask", mask) }
@@ -194,7 +220,7 @@ internal fun buildVlessConfig(
     return encodeSingBoxJson(
         buildJsonObject {
             put("listen", "$PluginSocksHost:$socksPort")
-            if (mappingAddress.isNotBlank()) put("dial", mappingAddress)
+            if (mappingAddress.isNotBlank()) put(if (mappingUsesSocks) "dial_proxy" else "dial", mappingAddress)
             if (protectPath.isNotBlank()) put("protect_path", protectPath)
             put("log_level", "warn")
             put("outbound", vless)
@@ -218,6 +244,11 @@ internal fun JsonElement?.vlessListValues(): List<String> = when (this) {
     is JsonPrimitive -> contentOrNull.orEmpty().split(',', ' ', '\n', '\r', '\t')
     else -> emptyList()
 }.map(String::trim).filter(String::isNotEmpty)
+
+private fun JsonElement?.vlessXdriveSecrets(): List<String> = when (this) {
+    is JsonPrimitive -> contentOrNull.orEmpty().split(',', '\n', '\r').map(String::trim).filter(String::isNotEmpty)
+    else -> vlessListValues()
+}
 
 private fun JsonObjectBuilder.copyList(source: JsonObject, name: String) {
     val values = source[name].vlessListValues()

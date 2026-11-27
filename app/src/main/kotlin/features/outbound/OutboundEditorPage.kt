@@ -52,6 +52,7 @@ import app.LocalNavigator
 import app.collectAppState
 import app.selectableDetourOutbounds
 import engine.singbox.config.SingBoxJson
+import engine.singbox.plugin.xrayOnlyVlessTransportFeatures
 import features.logs.FailureLogContext
 import features.settings.SettingsDropdownRow
 import features.settings.SettingsSectionCard
@@ -742,15 +743,21 @@ internal fun OutboundEditorSection.localizedTitle(): String = when (this) {
     OutboundEditorSection.DIAL -> stringResource(R.string.outbound_editor_section_dial)
 }
 
-@Composable
-internal fun OutboundEditorSection.localizedSummary(): String = when (this) {
-    OutboundEditorSection.SERVER -> stringResource(R.string.outbound_editor_section_server_summary)
-    OutboundEditorSection.PROTOCOL -> stringResource(R.string.outbound_editor_section_protocol_summary)
-    OutboundEditorSection.TLS -> stringResource(R.string.outbound_editor_section_tls_summary)
-    OutboundEditorSection.TRANSPORT -> stringResource(R.string.outbound_editor_section_transport_summary)
-    OutboundEditorSection.MULTIPLEX -> stringResource(R.string.outbound_editor_section_multiplex_summary)
-    OutboundEditorSection.QUIC -> stringResource(R.string.outbound_editor_section_quic_summary)
-    OutboundEditorSection.DIAL -> stringResource(R.string.outbound_editor_section_dial_summary)
+internal fun OutboundEditorSection.summaryRes(document: OutboundEditorDocument): Int = when (this) {
+    OutboundEditorSection.SERVER -> R.string.outbound_editor_section_server_summary
+    OutboundEditorSection.PROTOCOL -> R.string.outbound_editor_section_protocol_summary
+    OutboundEditorSection.TLS -> R.string.outbound_editor_section_tls_summary
+    OutboundEditorSection.TRANSPORT -> when {
+        document.type != "vless" -> R.string.outbound_editor_section_transport_summary
+        document.text("transport.type").equals("xdrive", ignoreCase = true) ->
+            R.string.outbound_editor_section_xdrive_summary
+        document.value.xrayOnlyVlessTransportFeatures().isNotEmpty() ->
+            R.string.outbound_editor_section_transport_plugin_summary
+        else -> R.string.outbound_editor_section_transport_summary
+    }
+    OutboundEditorSection.MULTIPLEX -> R.string.outbound_editor_section_multiplex_summary
+    OutboundEditorSection.QUIC -> R.string.outbound_editor_section_quic_summary
+    OutboundEditorSection.DIAL -> R.string.outbound_editor_section_dial_summary
 }
 
 @Composable

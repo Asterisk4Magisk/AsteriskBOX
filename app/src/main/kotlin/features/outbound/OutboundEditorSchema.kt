@@ -376,7 +376,31 @@ internal object OutboundEditorRegistry {
                     listOf("", "auto", "packet-up", "stream-up", "stream-one"),
                     conditions = onType("xhttp"),
                 ),
-                field("transport.extra", "XHTTP extra (JSON)", OutboundFieldKind.MULTILINE, conditions = onType("xhttp")),
+                field(
+                    "transport.extra",
+                    "XHTTP extra (JSON)",
+                    OutboundFieldKind.MULTILINE,
+                    conditions = onType("xhttp"),
+                ),
+                select(
+                    "transport.service",
+                    "Storage service",
+                    listOf("", "google-drive", "s3", "template", "local"),
+                    conditions = onType("xdrive"),
+                ),
+                field("transport.remote_folder", "Remote folder", conditions = onType("xdrive")),
+                field(
+                    "transport.secrets",
+                    "Storage secrets",
+                    OutboundFieldKind.TEXT_LIST,
+                    conditions = onType("xdrive"),
+                ),
+                field(
+                    "transport.extra",
+                    "XDRIVE extra (JSON)",
+                    OutboundFieldKind.MULTILINE,
+                    conditions = onType("xdrive"),
+                ),
                 select(
                     "transport.header_type",
                     "Header type",
@@ -419,7 +443,7 @@ internal object OutboundEditorRegistry {
             "transport.type",
             "Transport",
             listOf("", "http", "ws", "quic", "grpc", "httpupgrade") +
-                if (xray) listOf("xhttp", "mkcp", "raw") else emptyList(),
+                if (xray) listOf("xhttp", "mkcp", "raw", "xdrive") else emptyList(),
         ),
         field(
             "transport.host",
@@ -836,7 +860,11 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "Reality spider X" -> R.string.outbound_field_reality_spider_x
     "TTI" -> R.string.outbound_field_tti
     "VLESS Encryption" -> R.string.outbound_field_vless_encryption
+    "XDRIVE extra (JSON)" -> R.string.outbound_field_xdrive_extra
     "XHTTP extra (JSON)" -> R.string.outbound_field_xhttp_extra
+    "Storage service" -> R.string.outbound_field_storage_service
+    "Remote folder" -> R.string.outbound_field_remote_folder
+    "Storage secrets" -> R.string.outbound_field_storage_secrets
     "XHTTP mode" -> R.string.outbound_field_xhttp_mode
     "Xray finalmask (JSON)" -> R.string.outbound_field_xray_finalmask
     "Xray stream settings (JSON)" -> R.string.outbound_field_xray_stream_settings

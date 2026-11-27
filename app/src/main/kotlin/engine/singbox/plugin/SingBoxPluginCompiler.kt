@@ -53,7 +53,8 @@ private const val ValidationPort = 1
 /**
  * Replaces every plugin-backed outbound with stock pieces the core can run: a
  * SOCKS outbound to the plugin's loopback listener and, when the plugin cannot
- * dial the server itself, a `direct` inbound plus destination override.
+ * dial the server itself, a loopback inbound. XDRIVE uses SOCKS to preserve
+ * storage destinations, while fixed endpoints use a direct inbound with an override.
  *
  * A null [target] compiles for a core check only: no port is reserved and no
  * plan is produced.
@@ -125,6 +126,8 @@ internal fun compilePluginOutbounds(
             // dials would loop into the tunnel.
             val protectPath = target.protectPath?.takeIf { requirement.canSelfProtect }
             val mappingPort = if (protectPath == null) allocateLoopbackPort(usedPorts) else 0
+            val mappingUsesSocks = protectPath == null &&
+                requirement == PluginOutbounds.vless && outbound.usesXdriveTransport(tag)
             plans += buildPluginOutboundPlan(
                 requirement = requirement,
                 outbound = outbound,
@@ -133,6 +136,7 @@ internal fun compilePluginOutbounds(
                 serverPort = serverPort,
                 socksPort = socksPort,
                 mappingPort = mappingPort,
+                mappingUsesSocks = mappingUsesSocks,
                 workingDir = target.workingDir,
                 useProtect = protectPath != null,
                 protectPath = protectPath.orEmpty(),
@@ -140,12 +144,12 @@ internal fun compilePluginOutbounds(
             if (protectPath == null) {
                 val mappingTag = "$PluginMappingInboundPrefix${plans.size}"
                 inbounds += buildJsonObject {
-                    put("type", "direct")
+                    put("type", if (mappingUsesSocks) "socks" else "direct")
                     put("tag", mappingTag)
                     put("listen", PluginSocksHost)
                     put("listen_port", mappingPort)
                 }
-                mappingRules += buildJsonObject {
+                if (!mappingUsesSocks) mappingRules += buildJsonObject {
                     putJsonArray("inbound") { add(mappingTag) }
                     put("action", "route-options")
                     put("override_address", server)
@@ -208,6 +212,7 @@ private fun buildPluginOutboundPlan(
     serverPort: Int,
     socksPort: Int,
     mappingPort: Int,
+    mappingUsesSocks: Boolean,
     workingDir: String,
     useProtect: Boolean,
     protectPath: String,
@@ -325,8 +330,8 @@ private fun buildPluginOutboundPlan(
                             outbound = outbound,
                             tag = tag,
                             socksPort = socksPort,
-                            // The plugin keeps the real server for SNI/Host and dials the mapping port.
                             mappingAddress = if (useProtect) "" else dialAddress,
+                            mappingUsesSocks = mappingUsesSocks,
                             protectPath = protect,
                         ),
                     ),

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import ui.theme.AsteriskMotion
 
 internal data class OutboundEditorContentState(
@@ -84,7 +85,7 @@ internal fun LazyListScope.outboundEditorSections(state: OutboundEditorContentSt
     ) { section ->
         EditorSectionCard(
             title = section.section.localizedTitle(),
-            description = section.section.localizedSummary(),
+            description = stringResource(section.section.summaryRes(state.document)),
             endsWithTextField = when (section.fields.last { it.visible }.field.kind) {
                 OutboundFieldKind.TEXT,
                 OutboundFieldKind.INTEGER,
@@ -99,7 +100,7 @@ internal fun LazyListScope.outboundEditorSections(state: OutboundEditorContentSt
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 section.fields.forEach { slot ->
-                    key(slot.field.path) {
+                    key(slot.field.path, slot.field.labelRes) {
                         AnimatedVisibility(
                             visible = slot.visible,
                             enter = fieldEnter,

@@ -54,7 +54,7 @@ private fun canonicalV2RayTransport(transport: String): String? =
     }
 
 /** Link transport names only the VLESS (Xray) plugin implements. */
-private val VlessXrayLinkTransportTypes = setOf("xhttp", "splithttp", "kcp", "mkcp")
+private val VlessXrayLinkTransportTypes = setOf("xhttp", "splithttp", "kcp", "mkcp", "xdrive")
 
 private fun canonicalMihomoOutboundType(sourceType: String): String =
     when (sourceType.lowercase()) {

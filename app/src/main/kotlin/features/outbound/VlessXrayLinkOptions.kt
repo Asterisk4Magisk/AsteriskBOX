@@ -22,7 +22,7 @@ import kotlinx.serialization.json.put
 
 /**
  * The transport for the link options sing-box has no equivalent for: XHTTP,
- * mKCP, RAW with header camouflage, and gRPC with authority or multi mode.
+ * XDRIVE, mKCP, RAW with header camouflage, and gRPC with authority or multi mode.
  * Null for everything else, which the shared link transport handles.
  */
 internal fun vlessXrayLinkTransport(query: Map<String, List<String>>): JsonObject? {
@@ -35,6 +35,10 @@ internal fun vlessXrayLinkTransport(query: Map<String, List<String>>): JsonObjec
             query.param("extra").takeIf(String::isNotBlank)?.let { extra ->
                 put("extra", parseLinkJsonObject("extra", extra))
             }
+        }
+
+        "xdrive" -> buildJsonObject {
+            put("type", "xdrive")
         }
 
         "kcp", "mkcp" -> buildJsonObject {
@@ -227,6 +231,8 @@ private fun JsonObject.vlessXrayTransportShareParameters(): List<Pair<String, St
             addText("mode", "mode")
             transport["extra"].compactJsonObjectText()?.let { add("extra" to it) }
         }
+
+        "xdrive" -> listOf("type" to "xdrive")
 
         "mkcp" -> buildList {
             add("type" to "kcp")
