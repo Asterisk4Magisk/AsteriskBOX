@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 internal data class AndroidSubscriptionFetchOptions(
     val useRunningProxy: Boolean = false,
     val fallbackProxy: LocalProxyOptions? = null,
-    val hwid: String = "",
+    val requestHeaders: Map<String, String>? = null,
 )
 
 internal data class AndroidSubscriptionProxy(

@@ -400,7 +400,8 @@
     <string name="outbound_group_empty">No outbound groups</string>
     <string name="outbound_group_empty_summary">Create a group before importing or adding outbounds.</string>
     <string name="outbound_group_http_warning">This subscription uses unencrypted HTTP. HTTPS is recommended.</string>
-    <string name="outbound_group_hwid">HWID</string>
+    <string name="subscription_request_headers">Custom request headers (JSON)</string>
+    <string name="subscription_request_headers_invalid">Enter a JSON object with unique, valid header names and string values.</string>
     <string name="outbound_group_local">Local group</string>
     <string name="outbound_group_management">Group management</string>
     <string name="outbound_group_config_apply_title">Changes not applied</string>

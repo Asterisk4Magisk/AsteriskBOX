@@ -100,6 +100,6 @@ internal fun AppState.toSubscriptionFetchOptions(group: OutboundGroupState): And
     return AndroidSubscriptionFetchOptions(
         useRunningProxy = group.updateViaProxy,
         fallbackProxy = toLocalProxyOptions(),
-        hwid = group.hwid,
+        requestHeaders = group.requestHeaders,
     )
 }

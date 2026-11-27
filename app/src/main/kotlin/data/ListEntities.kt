@@ -3,6 +3,8 @@
 
 package data
 
+import features.subscription.encodeSubscriptionRequestHeaders
+import features.subscription.decodeSubscriptionRequestHeaders
 import androidx.room.Entity
 import androidx.room.ColumnInfo
 import androidx.room.Index
@@ -31,7 +33,7 @@ internal data class OutboundGroupEntity(
     val userAgent: String,
     @ColumnInfo(defaultValue = "''") val detour: String,
     val updateInterval: String,
-    val hwid: String,
+    val requestHeaders: String?,
     val updateViaProxy: Boolean,
     val ageSecretKey: String,
     val enabled: Boolean,
@@ -59,7 +61,7 @@ internal data class OutboundGroupEntity(
             userAgent = userAgent,
             detour = detour,
             updateInterval = updateInterval,
-            hwid = hwid,
+            requestHeaders = requestHeaders?.let(::decodeSubscriptionRequestHeaders),
             updateViaProxy = updateViaProxy,
             ageSecretKey = ageSecretKey,
             enabled = enabled,
@@ -94,7 +96,7 @@ internal data class OutboundGroupEntity(
                 userAgent = group.userAgent,
                 detour = group.detour,
                 updateInterval = group.updateInterval,
-                hwid = group.hwid,
+                requestHeaders = group.requestHeaders?.let(::encodeSubscriptionRequestHeaders),
                 updateViaProxy = group.updateViaProxy,
                 ageSecretKey = group.ageSecretKey,
                 enabled = group.enabled,

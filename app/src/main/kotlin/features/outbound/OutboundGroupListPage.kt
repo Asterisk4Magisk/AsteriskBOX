@@ -3,6 +3,11 @@
 
 package features.outbound
 
+import features.subscription.formatSubscriptionRequestHeaders
+import features.subscription.defaultSubscriptionRequestHeaders
+import data.AppSettingsPreferences
+import features.subscription.parseSubscriptionRequestHeaders
+import features.subscription.withoutImplicitSubscriptionHeaders
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -252,7 +257,7 @@ internal fun OutboundGroupListPage(
 
     /**
      * Copies the group's subscription link. Only the link itself is shared: the group's
-     * user agent, HWID and AGE key stay local.
+     * user agent, request headers and AGE key stay local.
      */
     fun copyGroupSubscriptionLink(group: OutboundGroupState) {
         if (group.url.isBlank()) return
@@ -1978,8 +1983,15 @@ private fun OutboundGroupEditorSheet(
     val name = nameInput.text
     var urlInput by remember(editorSession) { mutableStateOf(TextFieldValue(group?.url.orEmpty())) }
     val url = urlInput.text
-    var hwidInput by remember(editorSession) { mutableStateOf(TextFieldValue(group?.hwid.orEmpty())) }
-    val hwid = hwidInput.text
+    val context = LocalContext.current.applicationContext
+    val defaultRequestHeaders = remember(context) {
+        defaultSubscriptionRequestHeaders(AppSettingsPreferences(context).getOrCreateSubscriptionHwid())
+    }
+    val initialRequestHeaders = remember(editorSession, defaultRequestHeaders) {
+        formatSubscriptionRequestHeaders(group?.requestHeaders ?: defaultRequestHeaders)
+    }
+    var requestHeadersInput by remember(editorSession) { mutableStateOf(TextFieldValue(initialRequestHeaders)) }
+    val requestHeaders = remember(requestHeadersInput.text) { parseSubscriptionRequestHeaders(requestHeadersInput.text) }
     var detour by remember(editorSession) { mutableStateOf(group?.detour.orEmpty()) }
     val detourChoices = remember(
         appState.outboundGroups, appState.outbounds, appState.endpoints, appState.selectors, group?.id,
@@ -2014,7 +2026,8 @@ private fun OutboundGroupEditorSheet(
     // A blank name is only safe when the subscription URL can supply one on the
     // first successful sync. A local group has no such source, so it still needs
     // a title; a typed name always wins and is never auto-overwritten.
-    val canSave = validUrl && validInterval && (url.isNotBlank() || name.isNotBlank())
+    val canSave = validUrl && validInterval && (url.isNotBlank() || name.isNotBlank()) &&
+        (url.isBlank() || requestHeaders != null)
     val hasSubscription = url.isNotBlank()
     val userAgent = userAgentOption.resolveUserAgent(customUserAgent)
     val userAgentLabels = SubscriptionUserAgentOptions.map { option ->
@@ -2025,7 +2038,8 @@ private fun OutboundGroupEditorSheet(
         .coerceAtLeast(0)
     val selectedUserAgentLabel = userAgentLabels[selectedUserAgentIndex]
     val dirty = name != group?.name.orEmpty() || url != group?.url.orEmpty() ||
-        hwid != group?.hwid.orEmpty() || detour != group?.detour.orEmpty() ||
+        requestHeadersInput.text != initialRequestHeaders ||
+        detour != group?.detour.orEmpty() ||
         updateInterval != group?.updateInterval.orEmpty() ||
         userAgent != initialUserAgentOption.resolveUserAgent(initialCustomUserAgent) ||
         ageSecretKey != group?.ageSecretKey.orEmpty() || updateViaProxy != (group?.updateViaProxy == true) ||
@@ -2039,40 +2053,30 @@ private fun OutboundGroupEditorSheet(
             enabled = !busy,
         )
     }
+    fun saveGroup() {
+        if (!canSave || busy) return
+        val trimmedUrl = url.trim()
+        val storedRequestHeaders = requestHeaders?.withoutImplicitSubscriptionHeaders(
+            group?.requestHeaders, defaultRequestHeaders,
+        )
+        val edited = (group ?: OutboundGroupState(id = 0, name = "")).copy(
+            name = name.trim(),
+            url = trimmedUrl,
+            userAgent = userAgent,
+            detour = detour,
+            updateInterval = updateInterval.trim(),
+            requestHeaders = storedRequestHeaders,
+            updateViaProxy = updateViaProxy,
+            ageSecretKey = ageSecretKey.trim(),
+            strictImport = strictImport,
+        )
+        onSave(edited.clearingSubscriptionMetadataChangedFrom(group))
+    }
     val save: @Composable () -> Unit = {
         AsteriskSaveButton(
             enabled = canSave && !busy,
             loading = busy,
-            onClick = {
-                val trimmedUrl = url.trim()
-                val trimmedHwid = hwid.trim()
-                val trimmedAgeSecretKey = ageSecretKey.trim()
-                val edited = group?.copy(
-                    name = name.trim(),
-                    url = trimmedUrl,
-                    userAgent = userAgent,
-                    detour = detour,
-                    updateInterval = updateInterval.trim(),
-                    hwid = trimmedHwid,
-                    updateViaProxy = updateViaProxy,
-                    ageSecretKey = trimmedAgeSecretKey,
-                    strictImport = strictImport,
-                ) ?: OutboundGroupState(
-                    id = 0,
-                    name = name.trim(),
-                    url = trimmedUrl,
-                    userAgent = userAgent,
-                    detour = detour,
-                    updateInterval = updateInterval.trim(),
-                    hwid = trimmedHwid,
-                    updateViaProxy = updateViaProxy,
-                    ageSecretKey = trimmedAgeSecretKey,
-                    strictImport = strictImport,
-                )
-                onSave(
-                    edited.clearingSubscriptionMetadataChangedFrom(group),
-                )
-            },
+            onClick = { saveGroup() },
         )
     }
     val formState = remember(editorSession) { LazyListState() }
@@ -2129,28 +2133,6 @@ private fun OutboundGroupEditorSheet(
                     )
                 }
             }
-            item(key = "hwid") {
-                AnimatedVisibility(
-                    visible = hasSubscription,
-                    enter = AsteriskMotion.contentEnter(),
-                    exit = AsteriskMotion.contentExit(),
-                ) {
-                    Column {
-                        Spacer(Modifier.height(GroupEditorSectionSpacing))
-                        OutlinedTextField(
-                            value = hwidInput,
-                            onValueChange = { hwidInput = it },
-                            label = { Text(stringResource(R.string.outbound_group_hwid)) },
-                            singleLine = true,
-                            shape = AsteriskShapeTokens.InnerContainer,
-                            modifier = Modifier.fillMaxWidth().restoreGroupEditorFocus(
-                                field = "hwid", inputFocus = inputFocus, target = fieldToRestore,
-                                onRestored = { fieldToRestore = null },
-                            ),
-                        )
-                    }
-                }
-            }
             item(key = "http-warning") {
                 AnimatedVisibility(
                     visible = url.startsWith("http://", ignoreCase = true),
@@ -2201,6 +2183,32 @@ private fun OutboundGroupEditorSheet(
                             shape = AsteriskShapeTokens.InnerContainer,
                             modifier = Modifier.fillMaxWidth().restoreGroupEditorFocus(
                                 field = "age-secret-key", inputFocus = inputFocus, target = fieldToRestore,
+                                onRestored = { fieldToRestore = null },
+                            ),
+                        )
+                    }
+                }
+            }
+            item(key = "subscription-request-headers") {
+                AnimatedVisibility(
+                    visible = hasSubscription,
+                    enter = AsteriskMotion.contentEnter(),
+                    exit = AsteriskMotion.contentExit(),
+                ) {
+                    Column {
+                        Spacer(Modifier.height(GroupEditorSectionSpacing))
+                        OutlinedTextField(
+                            value = requestHeadersInput,
+                            onValueChange = { requestHeadersInput = it },
+                            label = { Text(stringResource(R.string.subscription_request_headers)) },
+                            isError = requestHeaders == null,
+                            supportingText = if (requestHeaders == null) {
+                                { Text(stringResource(R.string.subscription_request_headers_invalid)) }
+                            } else null,
+                            maxLines = 5,
+                            shape = AsteriskShapeTokens.InnerContainer,
+                            modifier = Modifier.fillMaxWidth().restoreGroupEditorFocus(
+                                field = "subscription-request-headers", inputFocus = inputFocus, target = fieldToRestore,
                                 onRestored = { fieldToRestore = null },
                             ),
                         )
@@ -2454,7 +2462,7 @@ private fun OutboundGroupState.clearingSubscriptionMetadataChangedFrom(
     }
     if (
         userAgent != previous.userAgent ||
-        hwid != previous.hwid ||
+        requestHeaders != previous.requestHeaders ||
         updateViaProxy != previous.updateViaProxy ||
         ageSecretKey != previous.ageSecretKey
     ) {

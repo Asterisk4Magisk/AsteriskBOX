@@ -3,6 +3,7 @@
 
 package data.backup
 
+import features.subscription.legacySubscriptionRequestHeaders
 import engine.singbox.config.DnsConfigurationMatchFields
 import engine.singbox.config.dnsConfigurationEntryTag
 import engine.singbox.normalizedEbpfLocalDataPlane
@@ -229,7 +230,7 @@ private fun OutboundGroupState.toBackup(): AppBackupOutboundGroup =
         userAgent = userAgent,
         detour = detour,
         updateInterval = updateInterval,
-        hwid = hwid,
+        requestHeaders = requestHeaders,
         updateViaProxy = updateViaProxy,
         ageSecretKey = ageSecretKey,
         enabled = enabled,
@@ -438,7 +439,7 @@ private fun AppBackupOutboundGroup.toState(): OutboundGroupState =
         userAgent = userAgent,
         detour = detour,
         updateInterval = updateInterval,
-        hwid = hwid,
+        requestHeaders = requestHeaders ?: legacySubscriptionRequestHeaders(hwid),
         updateViaProxy = updateViaProxy,
         ageSecretKey = ageSecretKey,
         enabled = enabled,

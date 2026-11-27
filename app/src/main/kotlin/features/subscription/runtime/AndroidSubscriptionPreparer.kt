@@ -3,6 +3,12 @@
 
 package features.subscription.runtime
 
+import features.subscription.hasSameSubscriptionOrigin
+import features.subscription.isSubscriptionRedirect
+import features.subscription.resolveSubscriptionRedirect
+import features.subscription.toSubscriptionRequestUrl
+
+import features.subscription.resolveSubscriptionRequestHeaders
 import app.SubscriptionInfo
 import engine.singbox.config.SingBoxConfigChecker
 import engine.singbox.config.encodeSingBoxJson
@@ -64,7 +70,7 @@ internal class AndroidSubscriptionPreparer(
         request: MihomoProviderRequest,
         userAgent: String,
         fetchOptions: AndroidSubscriptionFetchOptions,
-    ): String = fetchMihomoProvider(request, userAgent, fetchOptions, installationHwid)
+    ): String = fetchMihomoProvider(request, userAgent, fetchOptions)
 
     suspend fun prepare(
         sourceContent: String?,
@@ -95,7 +101,10 @@ internal class AndroidSubscriptionPreparer(
                         track = track,
                         sourceUrl = sourceUrl,
                         userAgent = userAgent,
-                        hwid = fetchOptions.hwid.trim().ifBlank { installationHwid },
+                        headers = resolveSubscriptionRequestHeaders(
+                            fetchOptions.requestHeaders,
+                            { installationHwid },
+                        ).mapValues { (_, value) -> listOf(value) },
                         proxy = proxy,
                         etag = etag,
                         lastModified = lastModified,
@@ -164,13 +173,12 @@ internal suspend fun fetchMihomoProvider(
     request: MihomoProviderRequest,
     userAgent: String = DefaultUserAgent,
     fetchOptions: AndroidSubscriptionFetchOptions = AndroidSubscriptionFetchOptions(),
-    installationHwid: String = "",
 ): String {
     val proxy = fetchOptions.toHttpProxy()
     return runCancellableHttpRequest { track ->
         val result = downloadSubscription(
             track, request.url, userAgent,
-            fetchOptions.hwid.trim().ifBlank { installationHwid }, proxy,
+            proxy,
             etag = "", lastModified = "", headers = request.headers,
         )
         (result as? DownloadedSubscription.Content)?.content
@@ -203,84 +211,94 @@ private fun downloadSubscription(
     track: (HttpURLConnection) -> Unit,
     sourceUrl: String,
     userAgent: String,
-    hwid: String,
     proxy: AndroidSubscriptionProxy?,
     etag: String,
     lastModified: String,
-    headers: Map<String, List<String>> = emptyMap(),
+    headers: Map<String, List<String>>,
 ): DownloadedSubscription {
-    val url = URI(sourceUrl).toURL()
-    val connection = (
-        if (proxy == null) url.openConnection() else url.openConnection(proxy.proxy)
-    ) as HttpURLConnection
-    try {
-        track(connection)
-        connection.instanceFollowRedirects = true
-        connection.connectTimeout = ConnectTimeoutMillis
-        connection.readTimeout = ReadTimeoutMillis
-        connection.setRequestProperty("Accept", "application/json, text/plain, */*")
-        connection.setRequestProperty("User-Agent", userAgent.ifBlank { DefaultUserAgent })
-        connection.setRequestProperty("X-Hwid", hwid)
-        etag.takeIf(String::isNotBlank)?.let { value ->
-            connection.setRequestProperty("If-None-Match", value)
-        }
-        lastModified.takeIf(String::isNotBlank)?.let { value ->
-            connection.setRequestProperty("If-Modified-Since", value)
-        }
-        proxy?.basicAuthorizationOrNull()?.let { authorization ->
-            connection.setRequestProperty("Proxy-Authorization", authorization)
-        }
-        applySubscriptionRequestHeaders(connection, headers)
-        val responseCode = connection.responseCode
-        val responseEtag = connection.getHeaderField(EtagHeader).orEmpty().ifBlank { etag }
-        val responseLastModified = connection
-            .getHeaderField(LastModifiedHeader)
-            .orEmpty()
-            .ifBlank { lastModified }
-        val subscriptionInfo = connection
-            .getHeaderField(SubscriptionUserInfoHeader)
-            .toSubscriptionInfo()
-        val remoteName = decodeContentDispositionFilename(
-            connection.getHeaderField(ContentDispositionHeader),
-        )
-        if (responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) {
-            return DownloadedSubscription.NotModified(
+    var currentUrl = URI(sourceUrl)
+    var currentHeaders = headers
+    repeat(10) {
+        val url = currentUrl.toSubscriptionRequestUrl()
+        val connection = (
+            if (proxy == null) url.openConnection() else url.openConnection(proxy.proxy)
+        ) as HttpURLConnection
+        try {
+            track(connection)
+            connection.instanceFollowRedirects = false
+            connection.connectTimeout = ConnectTimeoutMillis
+            connection.readTimeout = ReadTimeoutMillis
+            connection.setRequestProperty("Accept", "application/json, text/plain, */*")
+            connection.setRequestProperty("User-Agent", userAgent.ifBlank { DefaultUserAgent })
+            etag.takeIf(String::isNotBlank)?.let { value ->
+                connection.setRequestProperty("If-None-Match", value)
+            }
+            lastModified.takeIf(String::isNotBlank)?.let { value ->
+                connection.setRequestProperty("If-Modified-Since", value)
+            }
+            proxy?.basicAuthorizationOrNull()?.let { authorization ->
+                connection.setRequestProperty("Proxy-Authorization", authorization)
+            }
+            applySubscriptionRequestHeaders(connection, currentHeaders)
+            val responseCode = connection.responseCode
+            if (isSubscriptionRedirect(responseCode)) {
+                val location = connection.getHeaderField("Location") ?: error("Redirect location missing")
+                val nextUrl = resolveSubscriptionRedirect(currentUrl, location)
+                if (!currentUrl.hasSameSubscriptionOrigin(nextUrl)) currentHeaders = emptyMap()
+                currentUrl = nextUrl
+                return@repeat
+            }
+            val responseEtag = connection.getHeaderField(EtagHeader).orEmpty().ifBlank { etag }
+            val responseLastModified = connection
+                .getHeaderField(LastModifiedHeader)
+                .orEmpty()
+                .ifBlank { lastModified }
+            val subscriptionInfo = connection
+                .getHeaderField(SubscriptionUserInfoHeader)
+                .toSubscriptionInfo()
+            val remoteName = decodeContentDispositionFilename(
+                connection.getHeaderField(ContentDispositionHeader),
+            )
+            if (responseCode == HttpURLConnection.HTTP_NOT_MODIFIED) {
+                return DownloadedSubscription.NotModified(
+                    subscriptionInfo = subscriptionInfo,
+                    etag = responseEtag,
+                    lastModified = responseLastModified,
+                    remoteName = remoteName,
+                )
+            }
+            if (responseCode !in 200..299) {
+                // The server may echo request headers in its error response.
+                val message = connection.takeIf { headers.isEmpty() }?.errorStream
+                    ?.use { it.readUtf8Preview(MaxImportErrorPreviewBytes) }
+                    ?.let(::sanitizeImportErrorPreview)
+                    ?.trim()
+                    .orEmpty()
+                error(
+                    buildString {
+                        append("Subscription request failed: HTTP ")
+                        append(responseCode)
+                        if (message.isNotBlank()) append(" ($message)")
+                    },
+                )
+            }
+            requireImportSizeWithinLimit(connection.contentLengthLong)
+            val content = connection.inputStream.use(InputStream::readImportUtf8WithinLimit)
+            return DownloadedSubscription.Content(
+                content = content,
                 subscriptionInfo = subscriptionInfo,
                 etag = responseEtag,
                 lastModified = responseLastModified,
                 remoteName = remoteName,
             )
+        } finally {
+            connection.disconnect()
         }
-        if (responseCode !in 200..299) {
-            val message = connection.errorStream
-                ?.use { it.readUtf8Preview(MaxImportErrorPreviewBytes) }
-                ?.let(::sanitizeImportErrorPreview)
-                ?.trim()
-                .orEmpty()
-            error(
-                buildString {
-                    append("Subscription request failed: HTTP ")
-                    append(responseCode)
-                    if (message.isNotBlank()) append(" ($message)")
-                },
-            )
-        }
-        requireImportSizeWithinLimit(connection.contentLengthLong)
-        val content = connection.inputStream.use(InputStream::readImportUtf8WithinLimit)
-        val rawContentDisposition = connection.getHeaderField(ContentDispositionHeader).orEmpty()
-        return DownloadedSubscription.Content(
-            content = content,
-            subscriptionInfo = subscriptionInfo,
-            etag = responseEtag,
-            lastModified = responseLastModified,
-            remoteName = decodeContentDispositionFilename(rawContentDisposition),
-        )
-    } finally {
-        connection.disconnect()
     }
+    error("Too many subscription redirects")
 }
 
-internal fun applySubscriptionRequestHeaders(
+private fun applySubscriptionRequestHeaders(
     connection: HttpURLConnection,
     headers: Map<String, List<String>>,
 ) {

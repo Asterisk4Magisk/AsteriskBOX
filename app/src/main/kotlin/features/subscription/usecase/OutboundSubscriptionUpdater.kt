@@ -487,7 +487,7 @@ internal class OutboundSubscriptionUpdater(
     private fun OutboundGroupState.fetchIdentity(): FetchIdentity = FetchIdentity(
         url = url,
         userAgent = userAgent,
-        hwid = hwid,
+        requestHeaders = requestHeaders,
         updateViaProxy = updateViaProxy,
         ageSecretKey = ageSecretKey,
         etag = subscriptionEtag,
@@ -571,7 +571,7 @@ internal class OutboundSubscriptionUpdater(
     private data class FetchIdentity(
         val url: String,
         val userAgent: String,
-        val hwid: String,
+        val requestHeaders: Map<String, String>?,
         val updateViaProxy: Boolean,
         val ageSecretKey: String,
         val etag: String,

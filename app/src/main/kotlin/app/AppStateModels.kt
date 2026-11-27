@@ -76,7 +76,7 @@ data class OutboundGroupState(
     val userAgent: String = DefaultOutboundSubscriptionUserAgent,
     val detour: String = "",
     val updateInterval: String = "",
-    val hwid: String = "",
+    val requestHeaders: Map<String, String>? = null,
     val updateViaProxy: Boolean = false,
     val ageSecretKey: String = "",
     val enabled: Boolean = true,
