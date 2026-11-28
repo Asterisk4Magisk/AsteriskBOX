@@ -56,13 +56,13 @@ import engine.singbox.EbpfLocalDataPlanes
 import engine.singbox.EbpfSharedDataPlanes
 import engine.singbox.singBoxControlConfig
 import engine.vpn.toTunOptions
-import features.resources.runtime.singBoxHostsFiles
-import features.resources.runtime.skipsBundledCoreConfigCheck
 import features.resources.SingBoxRuleSetFileFormat
+import features.resources.resourceAutoUpdateIntervalMillis
+import features.resources.runtime.singBoxHostsFiles
 import features.resources.runtime.singBoxRuleSetFiles
+import features.resources.runtime.skipsBundledCoreConfigCheck
 import features.resources.singBoxRuleSetFormatOrNull
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
@@ -79,14 +79,18 @@ internal const val APP_TUN_INBOUND = ManagedTunInboundTag
 internal const val APP_DIRECT_OUTBOUND = ManagedDirectOutboundTag
 internal const val APP_ROOT_INBOUND = ManagedRootInboundTag
 
-internal data class SingBoxLocalRuleSet(
+private data class SingBoxManagedRuleSet(
     val tag: String,
     val path: String,
     val format: SingBoxRuleSetFileFormat,
-    val url: String = "",
-    val updateInterval: String? = null,
-    val downloadDetour: String? = null,
-)
+    val remote: Remote?,
+) {
+    data class Remote(
+        val url: String,
+        val updateInterval: String,
+        val detour: String?,
+    )
+}
 
 internal object SingBoxConfigCompiler {
     fun compile(
@@ -158,39 +162,42 @@ internal object SingBoxConfigCompiler {
             .associateBy { choice -> choice.fileName }
         val customFilesByFileName = canonicalState.customResourceFiles
             .associateBy { file -> file.name.lowercase() }
-        val coreUpdateInterval = if (canonicalState.enableResourceCoreAutoUpdate) {
-            formatCoreRuleSetUpdateInterval(canonicalState.resourceAutoUpdateInterval)
-        } else {
-            null
-        }
-        val localRuleSets = choicesByFileName.values.mapNotNull { choice ->
-            val file = filesByName[choice.fileName.lowercase()] ?: return@mapNotNull null
+        val coreUpdateInterval = resourceAutoUpdateIntervalMillis(
+            enabled = canonicalState.enableResourceCoreAutoUpdate,
+            hours = canonicalState.resourceAutoUpdateInterval,
+        )?.let { millis -> "${millis / 1_000L}s" }
+        val remoteDetour = APP_GLOBAL_SELECTOR.takeIf { exposePorts }
+        val managedRuleSets = choicesByFileName.values.mapNotNull { choice ->
+            val fileName = choice.fileName.lowercase()
+            val file = filesByName[fileName] ?: return@mapNotNull null
             val format = choice.fileName.singBoxRuleSetFormatOrNull() ?: return@mapNotNull null
-            val customFile = customFilesByFileName[choice.fileName.lowercase()]
-            val remoteUrl = customFile?.url?.trim().orEmpty()
-            val useRemote = coreUpdateInterval != null &&
-                customFile != null &&
-                customResourceFileOverrides[customFile.id] == null &&
-                (remoteUrl.startsWith("http://", ignoreCase = true) || remoteUrl.startsWith("https://", ignoreCase = true))
-            SingBoxLocalRuleSet(
+            val remoteUrl = customFilesByFileName[fileName]
+                ?.takeUnless { customFile -> customFile.id in customResourceFileOverrides }
+                ?.url?.trim()
+                ?.takeIf { url ->
+                    url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true)
+                }
+            SingBoxManagedRuleSet(
                 tag = choice.tag,
                 path = file.absolutePath,
                 format = format,
-                url = if (useRemote) remoteUrl else "",
-                updateInterval = if (useRemote) coreUpdateInterval else null,
-                downloadDetour = if (useRemote && exposePorts) APP_GLOBAL_SELECTOR else null,
+                remote = if (remoteUrl != null && coreUpdateInterval != null) {
+                    SingBoxManagedRuleSet.Remote(remoteUrl, coreUpdateInterval, remoteDetour)
+                } else {
+                    null
+                },
             )
-        }.distinctBy(SingBoxLocalRuleSet::tag)
+        }.distinctBy(SingBoxManagedRuleSet::tag)
         val runtimeState = canonicalState
             .withUnavailableManagedRuleSetsDisabled(
-                localRuleSets.mapTo(mutableSetOf(), SingBoxLocalRuleSet::tag),
+                managedRuleSets.mapTo(mutableSetOf(), SingBoxManagedRuleSet::tag),
             )
             .withPrunedDnsServerReferences()
         return compileGeneratedRoot(
             appState = runtimeState,
             runMode = runMode,
             exposePorts = exposePorts,
-            localRuleSets = localRuleSets,
+            managedRuleSets = managedRuleSets,
             hostsResourcePaths = hostsResourcePaths,
             rootUidPolicy = if (runMode == RunModeEbpf || runMode == RunModeTun) {
                 context.resolveRootInboundUidPolicy(runtimeState)
@@ -200,19 +207,19 @@ internal object SingBoxConfigCompiler {
         )
     }
 
-    internal fun compileGeneratedRoot(
+    private fun compileGeneratedRoot(
         appState: AppState,
-        runMode: Int = appState.runMode,
-        exposePorts: Boolean = true,
-        localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
-        rootUidPolicy: RootInboundUidPolicy = RootInboundUidPolicy(),
-        hostsResourcePaths: Map<Int, String> = emptyMap(),
+        runMode: Int,
+        exposePorts: Boolean,
+        managedRuleSets: List<SingBoxManagedRuleSet>,
+        rootUidPolicy: RootInboundUidPolicy,
+        hostsResourcePaths: Map<Int, String>,
     ): JsonObject = generateRoot(
         sourceRoot = JsonObject(emptyMap()),
         appState = appState.withCanonicalManagedTagReferences().withResolvedSelectorRegexMembers(),
         runMode = runMode,
         exposePorts = exposePorts,
-        localRuleSets = localRuleSets,
+        managedRuleSets = managedRuleSets,
         hostsResourcePaths = hostsResourcePaths,
         rootUidPolicy = rootUidPolicy,
     )
@@ -220,14 +227,14 @@ internal object SingBoxConfigCompiler {
     private fun generateRoot(
         sourceRoot: JsonObject,
         appState: AppState,
-        runMode: Int = appState.runMode,
-        exposePorts: Boolean = true,
-        localRuleSets: List<SingBoxLocalRuleSet> = emptyList(),
-        rootUidPolicy: RootInboundUidPolicy = RootInboundUidPolicy(),
-        hostsResourcePaths: Map<Int, String> = emptyMap(),
+        runMode: Int,
+        exposePorts: Boolean,
+        managedRuleSets: List<SingBoxManagedRuleSet>,
+        rootUidPolicy: RootInboundUidPolicy,
+        hostsResourcePaths: Map<Int, String>,
     ): JsonObject {
-        val managedSourceRoot = sourceRoot.withLocalRuleSets(localRuleSets)
-        val availableRuleSetTags = localRuleSets.mapTo(linkedSetOf(), SingBoxLocalRuleSet::tag)
+        val managedSourceRoot = sourceRoot.withManagedRuleSets(managedRuleSets)
+        val availableRuleSetTags = managedRuleSets.mapTo(linkedSetOf(), SingBoxManagedRuleSet::tag)
         val dnsResult = SingBoxDnsCompiler.compile(appState, hostsResourcePaths)
         var runtime = managedSourceRoot
             .updated("log", compileLog(managedSourceRoot["log"] as? JsonObject, appState))
@@ -279,35 +286,31 @@ internal object SingBoxConfigCompiler {
     }
 }
 
-internal fun JsonObject.withLocalRuleSets(localRuleSets: List<SingBoxLocalRuleSet>): JsonObject {
+private fun JsonObject.withManagedRuleSets(managedRuleSets: List<SingBoxManagedRuleSet>): JsonObject {
     val sourceRoute = this["route"] as? JsonObject
     val sourceRuleSets = sourceRoute?.get("rule_set") as? JsonArray
-    if (sourceRuleSets == null && localRuleSets.isEmpty()) return this
+    if (sourceRuleSets == null && managedRuleSets.isEmpty()) return this
     val retainedRuleSets = sourceRuleSets
         ?.filterNot { element ->
             val tag = ((element as? JsonObject)?.get("tag") as? JsonPrimitive)?.contentOrNull
             tag?.let(::isManagedSingBoxTag) == true
         }
         .orEmpty()
-    val compiledRuleSets: List<JsonElement> = retainedRuleSets + localRuleSets.map { ruleSet ->
+    val compiledRuleSets = retainedRuleSets + managedRuleSets.map { ruleSet ->
         buildJsonObject {
-            if (ruleSet.url.isNotBlank() && ruleSet.updateInterval != null) {
-                put("type", "remote")
-                put("tag", ruleSet.tag)
-                put("format", ruleSet.format.configValue)
-                put("url", ruleSet.url)
-                if (ruleSet.path.isNotBlank()) {
-                    put("initial_path", ruleSet.path)
-                }
-                putJsonObject("http_client") {
-                    ruleSet.downloadDetour?.let { put("detour", it) }
-                }
-                put("update_interval", ruleSet.updateInterval)
-            } else {
-                put("type", "local")
-                put("tag", ruleSet.tag)
-                put("format", ruleSet.format.configValue)
+            val remote = ruleSet.remote
+            put("type", if (remote == null) "local" else "remote")
+            put("tag", ruleSet.tag)
+            put("format", ruleSet.format.configValue)
+            if (remote == null) {
                 put("path", ruleSet.path)
+            } else {
+                put("url", remote.url)
+                put("initial_path", ruleSet.path)
+                putJsonObject("http_client") {
+                    remote.detour?.let { put("detour", it) }
+                }
+                put("update_interval", remote.updateInterval)
             }
         }
     }
@@ -1095,9 +1098,10 @@ private fun JsonObject.hasAppTag(): Boolean =
 private fun compileExperimental(appState: AppState): JsonObject? {
     // The FakeIP store only matters while the managed FakeIP server is compiled.
     val storeFakeIp = appState.storeFakeIp && appState.effectiveFakeIpEnabled
-    // ROOT can restart independently of the UI; retain the last API-selected mode.
-    // Core-managed remote rule sets require cache_file to persist downloaded rules across restarts.
-    if (!appState.runMode.isRootRunMode() && !storeFakeIp && !appState.storeDns && !appState.enableResourceCoreAutoUpdate) return null
+    // The cache also retains the ROOT mode and downloaded remote rule sets across restarts.
+    val useCacheFile = appState.runMode.isRootRunMode() || storeFakeIp ||
+        appState.storeDns || appState.enableResourceCoreAutoUpdate
+    if (!useCacheFile) return null
     return buildJsonObject {
         putJsonObject("cache_file") {
             put("enabled", true)
@@ -1105,15 +1109,6 @@ private fun compileExperimental(appState: AppState): JsonObject? {
             if (appState.storeDns) put("store_dns", true)
         }
     }
-}
-
-private fun formatCoreRuleSetUpdateInterval(hours: String): String? {
-    val millis = features.resources.resourceAutoUpdateIntervalMillis(true, hours) ?: return null
-    val totalSeconds = (millis / 1000L).coerceAtLeast(1L)
-    val h = totalSeconds / 3600L
-    val m = (totalSeconds % 3600L) / 60L
-    val s = totalSeconds % 60L
-    return "${h}h${m}m${s}s"
 }
 
 private val RouteRejectMethods = setOf("default", "drop", "reply")

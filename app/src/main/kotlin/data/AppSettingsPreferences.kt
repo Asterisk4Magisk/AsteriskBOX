@@ -178,7 +178,10 @@ internal class AppSettingsPreferences(
                 defaults.enableAutoConnect,
             ),
             enableResourceAutoUpdate = preferences.getBoolean(KeyEnableResourceAutoUpdate, defaults.enableResourceAutoUpdate),
-            enableResourceCoreAutoUpdate = preferences.getBoolean(KeyEnableResourceCoreAutoUpdate, defaults.enableResourceCoreAutoUpdate),
+            enableResourceCoreAutoUpdate = preferences.getBoolean(
+                KeyEnableResourceCoreAutoUpdate,
+                defaults.enableResourceCoreAutoUpdate,
+            ),
             resourceAutoUpdateInterval = preferences.getString(KeyResourceAutoUpdateInterval, defaults.resourceAutoUpdateInterval)
                 ?: defaults.resourceAutoUpdateInterval,
             resourceFileSource = preferences.getInt(
