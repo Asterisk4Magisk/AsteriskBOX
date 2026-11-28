@@ -124,6 +124,7 @@ data class AppState(
     val enableTrafficStatsNotification: Boolean = false,
     val enableBroadcastControl: Boolean = false,
     val enableResourceAutoUpdate: Boolean = false,
+    val enableResourceCoreAutoUpdate: Boolean = false,
     val resourceAutoUpdateInterval: String = "24",
     val resourceFileSource: Int = ResourceFileSourceDefault,
     val customResourceFileGeositeCategoryAdsAllUrl: String = "",

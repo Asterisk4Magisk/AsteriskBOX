@@ -1543,6 +1543,8 @@
     <string name="settings_resource_files_auto_update_interval">更新周期（小时）</string>
     <string name="settings_resource_files_auto_update_summary">联网时定期更新资源文件</string>
     <string name="settings_resource_files_auto_update_title">资源自动更新</string>
+    <string name="settings_resource_files_core_auto_update_summary">将带远程链接的规则集交由 sing-box 内核在后台按周期自动更新（无需打开 App；仅对远程 .srs/.json 规则集生效）</string>
+    <string name="settings_resource_files_core_auto_update_title">由内核自动更新规则集</string>
     <string name="settings_resource_files_catalog_add_selected">添加 %1$d 个</string>
     <string name="settings_resource_files_catalog_added">已添加并下载 {count} 个资源文件</string>
     <string name="settings_resource_files_catalog_conflicts_skipped">已忽略 {count} 个同名资源文件</string>
