@@ -31,7 +31,6 @@ import app.R
 import ui.components.AsteriskCancelButton
 import ui.components.AsteriskModalBottomSheet
 import ui.components.AsteriskSaveButton
-import ui.icons.AsteriskIcons as Icons
 import ui.theme.AsteriskShapeTokens
 
 @Composable
@@ -70,40 +69,18 @@ internal fun ResourceAutoUpdateSheet(
                 .padding(bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .toggleable(enabledDraft, role = Role.Switch, onValueChange = { enabledDraft = it })
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.settings_resource_files_auto_update_title), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(R.string.settings_resource_files_auto_update_summary),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = enabledDraft, onCheckedChange = null)
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth()
-                    .toggleable(coreEnabledDraft, role = Role.Switch, onValueChange = { coreEnabledDraft = it })
-                    .padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.settings_resource_files_core_auto_update_title), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(R.string.settings_resource_files_core_auto_update_summary),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(checked = coreEnabledDraft, onCheckedChange = null)
-            }
+            ResourceAutoUpdateSwitch(
+                title = stringResource(R.string.settings_resource_files_auto_update_title),
+                summary = stringResource(R.string.settings_resource_files_auto_update_summary),
+                checked = enabledDraft,
+                onCheckedChange = { enabledDraft = it },
+            )
+            ResourceAutoUpdateSwitch(
+                title = stringResource(R.string.settings_resource_files_core_auto_update_title),
+                summary = stringResource(R.string.settings_resource_files_core_auto_update_summary),
+                checked = coreEnabledDraft,
+                onCheckedChange = { coreEnabledDraft = it },
+            )
             OutlinedTextField(
                 shape = AsteriskShapeTokens.InnerContainer,
                 value = intervalDraft,
@@ -120,5 +97,31 @@ internal fun ResourceAutoUpdateSheet(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             )
         }
+    }
+}
+
+@Composable
+private fun ResourceAutoUpdateSwitch(
+    title: String,
+    summary: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .toggleable(checked, role = Role.Switch, onValueChange = onCheckedChange)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                summary,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
