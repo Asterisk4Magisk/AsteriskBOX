@@ -199,7 +199,7 @@ val AppState.effectiveLocalDnsEnabled: Boolean
 /**
  * Whether [previous] and this state disagree on any field that feeds the compiled
  * outbound section of the sing-box configuration: the outbound list itself, and each
- * group's identity, name, enablement and detour.
+ * group's identity, name, enablement, detour and landing.
  *
  * Subscription bookkeeping (URL, HWID, user agent, update interval, last-update
  * counters) is deliberately excluded: editing it never changes the running core.
@@ -211,7 +211,8 @@ internal fun AppState.outboundConfigChangedFrom(previous: AppState): Boolean {
         current.id != prior.id ||
             current.name != prior.name ||
             current.enabled != prior.enabled ||
-            current.detour != prior.detour
+            current.detour != prior.detour ||
+            current.landing != prior.landing
     }
 }
 

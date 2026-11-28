@@ -3,6 +3,8 @@
 
 package engine.singbox.plugin
 
+import app.ManagedTagKind
+import app.managedTagIdentityOrNull
 import engine.singbox.config.APP_DIRECT_OUTBOUND
 import engine.singbox.config.encodeSingBoxJson
 import engine.singbox.config.updated
@@ -70,6 +72,25 @@ internal fun compilePluginOutbounds(
     val inbounds = (root["inbounds"] as? JsonArray).orEmptyArray().toMutableList()
     val mappingRules = mutableListOf<JsonObject>()
 
+    fun addMapping(tag: String, port: Int, server: String, serverPort: Int, detour: String, socks: Boolean = false) {
+        inbounds += buildJsonObject {
+            put("type", if (socks) "socks" else "direct")
+            put("tag", tag)
+            put("listen", PluginSocksHost)
+            put("listen_port", port)
+        }
+        if (!socks) mappingRules += buildJsonObject {
+            putJsonArray("inbound") { add(tag) }
+            put("action", "route-options")
+            put("override_address", server)
+            put("override_port", serverPort)
+        }
+        mappingRules += buildJsonObject {
+            putJsonArray("inbound") { add(tag) }
+            put("outbound", detour)
+        }
+    }
+
     val compiledOutbounds = buildJsonArray {
         outbounds.forEach { element ->
             val outbound = element as? JsonObject
@@ -103,6 +124,14 @@ internal fun compilePluginOutbounds(
             val tag = outbound.stringOrEmpty("tag")
             require(tag.isNotBlank()) { "Plugin outbound needs a tag" }
             outbound.requireSupportedByPlugin(requirement, tag)
+            val landingDetour = if (managedTagIdentityOrNull(tag)?.kind == ManagedTagKind.OUTBOUND_GROUP_LANDING) {
+                require(outbound.supportsPluginGroupLanding(requirement)) {
+                    "Plugin landing outbound $tag has a dial path that cannot use the group member"
+                }
+                outbound.stringOrEmpty("detour").trim().also { detour ->
+                    require(detour.isNotEmpty()) { "Plugin landing outbound $tag needs a detour" }
+                }
+            } else null
             val server = outbound.stringOrEmpty("server")
             val serverPort = outbound.intOrNull("server_port") ?: 0
             require(server.isNotBlank() && serverPort in 1..65535) {
@@ -124,13 +153,26 @@ internal fun compilePluginOutbounds(
             if (target == null) return@forEach
             // A plugin that cannot hand sockets back is always mapped, or its
             // dials would loop into the tunnel.
-            val protectPath = target.protectPath?.takeIf { requirement.canSelfProtect }
+            val protectPath = target.protectPath?.takeIf { requirement.canSelfProtect && landingDetour == null }
             val mappingPort = if (protectPath == null) allocateLoopbackPort(usedPorts) else 0
             val mappingUsesSocks = protectPath == null &&
                 requirement == PluginOutbounds.vless && outbound.usesXdriveTransport(tag)
+            val mappingTag = "$PluginMappingInboundPrefix${plans.size + 1}"
+            val extraPaths = if (landingDetour != null && requirement == PluginOutbounds.shadowQuic) {
+                outbound.sunnyQuicExtraPaths().mapIndexed { index, path ->
+                    val (host, port) = requireNotNull(path.pluginServerAddress())
+                    val listenPort = allocateLoopbackPort(usedPorts)
+                    addMapping("$mappingTag-path-${index + 1}", listenPort, host, port, landingDetour)
+                    joinAddress(PluginSocksHost, listenPort)
+                }
+            } else emptyList()
+            val pluginOutbound = if (extraPaths.isEmpty()) outbound else outbound.updated(
+                "extra_paths",
+                JsonArray(extraPaths.map(::JsonPrimitive)),
+            )
             plans += buildPluginOutboundPlan(
                 requirement = requirement,
-                outbound = outbound,
+                outbound = pluginOutbound,
                 tag = tag,
                 server = server,
                 serverPort = serverPort,
@@ -142,23 +184,7 @@ internal fun compilePluginOutbounds(
                 protectPath = protectPath.orEmpty(),
             )
             if (protectPath == null) {
-                val mappingTag = "$PluginMappingInboundPrefix${plans.size}"
-                inbounds += buildJsonObject {
-                    put("type", if (mappingUsesSocks) "socks" else "direct")
-                    put("tag", mappingTag)
-                    put("listen", PluginSocksHost)
-                    put("listen_port", mappingPort)
-                }
-                if (!mappingUsesSocks) mappingRules += buildJsonObject {
-                    putJsonArray("inbound") { add(mappingTag) }
-                    put("action", "route-options")
-                    put("override_address", server)
-                    put("override_port", serverPort)
-                }
-                mappingRules += buildJsonObject {
-                    putJsonArray("inbound") { add(mappingTag) }
-                    put("outbound", APP_DIRECT_OUTBOUND)
-                }
+                addMapping(mappingTag, mappingPort, server, serverPort, landingDetour ?: APP_DIRECT_OUTBOUND, mappingUsesSocks)
             }
         }
     }
@@ -168,6 +194,24 @@ internal fun compilePluginOutbounds(
         compiled = compiled.updated("inbounds", JsonArray(inbounds)).withLeadingRouteRules(mappingRules)
     }
     return PluginCompiledConfig(compiled, plans)
+}
+
+internal fun JsonObject.supportsPluginGroupLanding(requirement: PluginRequirement): Boolean =
+    when (requirement) {
+        PluginOutbounds.shadowQuic -> sunnyQuicExtraPaths().all { path -> path.pluginServerAddress() != null }
+        PluginOutbounds.vless -> supportsVlessPluginGroupLanding()
+        else -> true
+    }
+
+private fun JsonObject.sunnyQuicExtraPaths(): List<String> =
+    if (stringOrEmpty("sub_protocol").equals("sunnyquic", ignoreCase = true)) textList(this, "extra_paths")
+    else emptyList()
+
+private fun String.pluginServerAddress(): Pair<String, Int>? {
+    val text = trim()
+    val host = text.substringBeforeLast(':', "").removeSurrounding("[", "]")
+    val port = text.substringAfterLast(':').toIntOrNull()?.takeIf { it in 1..65535 }
+    return if (host.isNotEmpty() && port != null) host to port else null
 }
 
 /** Options the plugin binary cannot honour fail the compile instead of being dropped. */

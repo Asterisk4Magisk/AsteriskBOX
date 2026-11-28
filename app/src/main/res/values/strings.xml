@@ -396,6 +396,7 @@
     <string name="outbound_group_delete_message">The group “%1$s” and all of its outbounds will be permanently deleted.</string>
     <string name="outbound_group_delete_title">Delete group?</string>
     <string name="outbound_group_detour">Pre-proxy</string>
+    <string name="outbound_group_landing_proxy">Exit proxy</string>
     <string name="outbound_group_edit">Edit group</string>
     <string name="outbound_group_empty">No outbound groups</string>
     <string name="outbound_group_empty_summary">Create a group before importing or adding outbounds.</string>
@@ -462,6 +463,8 @@
     <string name="outbound_group_update_via_proxy">Update through the running proxy</string>
     <string name="outbound_group_url_invalid">Enter a valid HTTP or HTTPS URL</string>
     <string name="outbound_group_url_optional">Subscription URL (optional)</string>
+    <string name="subscription_alias_filter">Alias regex filter</string>
+    <string name="subscription_alias_filter_invalid">Invalid regular expression.</string>
     <string name="outbound_group_user_agent">User-Agent</string>
     <string name="outbound_group_user_agent_clash_meta">Clash Meta</string>
     <string name="outbound_group_user_agent_custom">Custom</string>

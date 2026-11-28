@@ -275,7 +275,7 @@ internal fun AppState.withImportedOutbounds(
     require(outboundGroups.any { group -> group.id == groupId }) {
         "Outbound group does not exist: $groupId"
     }
-    if (imported.isEmpty()) return this
+    if (imported.isEmpty() && !replaceGroup) return this
 
     val previousGroup = outbounds.filter { outbound -> replaceGroup && outbound.groupId == groupId }
     val reusableIds = if (replaceGroup) {
@@ -393,6 +393,7 @@ internal fun AppState.planOutboundImport(
     parsed: ImportOutcome<ImportedSingBoxOutbound>,
     replaceGroup: Boolean,
     strict: Boolean,
+    allowEmpty: Boolean = false,
 ): OutboundImportPlan {
     require(outboundGroups.any { group -> group.id == groupId }) {
         "Outbound group does not exist: $groupId"
@@ -422,7 +423,7 @@ internal fun AppState.planOutboundImport(
             committed = false,
         )
     }
-    if (preliminaryOutcome.accepted.isEmpty()) {
+    if (preliminaryOutcome.accepted.isEmpty() && !(replaceGroup && allowEmpty)) {
         val needsNoSupportedIssue =
             preliminaryOutcome.skippedCount > 0 &&
                 preliminaryOutcome.issues.none { issue ->

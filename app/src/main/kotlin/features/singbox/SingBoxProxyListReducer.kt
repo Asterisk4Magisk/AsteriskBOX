@@ -12,6 +12,7 @@ import app.modes.SingBoxProxySortDefault
 import app.modes.SingBoxProxySortDelay
 import app.modes.SingBoxProxySortName
 import app.selectableManagedOutbounds
+import app.outboundSelectionTag
 import engine.singbox.config.APP_DIRECT_OUTBOUND
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.runtime.SingBoxProxiesState
@@ -60,8 +61,9 @@ internal fun managedOutboundAlias(state: AppState, tag: String?): String? {
     // Direct/global carry their tag as label; callers substitute a localized
     // name for those two, so never return the raw tag here.
     if (tag == APP_DIRECT_OUTBOUND || tag == APP_GLOBAL_SELECTOR) return null
+    val outboundTag = state.outboundSelectionTag(tag)
     return selectableManagedOutbounds(state)
-        .firstOrNull { choice -> choice.tag == tag }
+        .firstOrNull { choice -> choice.tag == outboundTag }
         ?.label
         ?.takeIf { label -> label.isNotBlank() }
 }

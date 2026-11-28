@@ -75,6 +75,8 @@ data class OutboundGroupState(
     val url: String = "",
     val userAgent: String = DefaultOutboundSubscriptionUserAgent,
     val detour: String = "",
+    val landing: String = "",
+    val aliasFilter: String = "",
     val updateInterval: String = "",
     val requestHeaders: Map<String, String>? = null,
     val updateViaProxy: Boolean = false,
@@ -496,12 +498,18 @@ fun AppState.withSelectorSelection(
     outboundTag: String,
 ): AppState {
     val normalizedSelectorTag = selectorTag.trim()
-    val normalizedOutboundTag = outboundTag.trim()
+    val normalizedOutboundTag = outboundSelectionTag(outboundTag.trim())
     if (normalizedSelectorTag.isEmpty() || normalizedOutboundTag.isEmpty()) return this
     if (selectorSelections[normalizedSelectorTag] == normalizedOutboundTag) return this
     return copy(
         selectorSelections = selectorSelections + (normalizedSelectorTag to normalizedOutboundTag),
     )
+}
+
+internal fun AppState.outboundSelectionTag(tag: String): String {
+    val identity = managedTagIdentityOrNull(tag)
+    if (identity?.kind != ManagedTagKind.OUTBOUND_GROUP_LANDING) return tag
+    return identity.key.ifEmpty { outbounds.firstOrNull { it.id == identity.id }?.tag ?: tag }
 }
 
 fun AppState.withRemovedManagedOutboundTags(

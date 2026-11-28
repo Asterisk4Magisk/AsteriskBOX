@@ -21,6 +21,8 @@ import features.settings.servicecontrol.ServiceControlSettings
 import features.settings.servicecontrol.ServiceControlWifi
 import features.settings.servicecontrol.ServiceControlWifiRule
 import app.CustomResourceFileState
+import app.ManagedDirectOutboundTag
+import app.ManagedGlobalSelectorTag
 import app.OutboundGroupState
 import app.OutboundGroupUpdateStatus
 import app.OutboundState
@@ -31,6 +33,9 @@ import app.SingBoxEndpointState
 import app.SingBoxRouteRuleState
 import app.SingBoxSelectorState
 import app.isManagedSingBoxTag
+import app.ManagedTagKind
+import app.managedOutboundGroupSelectorTag
+import app.managedTagIdentityOrNull
 import app.selectableManagedOutbounds
 import app.withCanonicalManagedTagReferences
 import app.modes.RunModeVpnService
@@ -229,6 +234,8 @@ private fun OutboundGroupState.toBackup(): AppBackupOutboundGroup =
         url = url,
         userAgent = userAgent,
         detour = detour,
+        landing = landing,
+        aliasFilter = aliasFilter,
         updateInterval = updateInterval,
         requestHeaders = requestHeaders,
         updateViaProxy = updateViaProxy,
@@ -318,7 +325,10 @@ private fun AppBackupData.toAppState(): AppState {
             restoredOutboundGroups.map(OutboundGroupState::id),
         ),
         outbounds = restoredOutbounds,
-        nextOutboundId = nextId(defaults.nextOutboundId, restoredOutbounds.map(OutboundState::id)),
+        nextOutboundId = nextId(
+            defaults.nextOutboundId,
+            restoredOutbounds.map(OutboundState::id),
+        ),
         outboundListLayout = settings.outboundListLayout,
         outboundListSort = settings.outboundListSort,
         endpoints = restoredEndpoints,
@@ -427,8 +437,37 @@ private fun AppBackupData.toAppState(): AppState {
         proxyAppListSelectedApps = proxyAppListSelectedApps,
     ).withInitializedBundledRuleSets()
         .withCanonicalManagedTagReferences()
+        .withRestoredGroupProxies()
         .withCompatibleProxyAppListMode()
         .withNormalizedConnectionTestSettings()
+}
+
+private fun AppState.withRestoredGroupProxies(): AppState {
+    val landingTags = outbounds.mapTo(mutableSetOf(), OutboundState::tag)
+    selectors.mapTo(landingTags, SingBoxSelectorState::tag)
+    val detourTags = buildSet {
+        addAll(landingTags)
+        endpoints.mapTo(this, SingBoxEndpointState::tag)
+        outboundGroups.mapTo(this) { group -> managedOutboundGroupSelectorTag(group.id, group.name) }
+        add(ManagedDirectOutboundTag)
+        add(ManagedGlobalSelectorTag)
+    }
+    val restoredGroups = outboundGroups.map { group ->
+        group.copy(
+            detour = group.detour.takeIf(detourTags::contains).orEmpty(),
+            landing = group.landing.takeIf(landingTags::contains).orEmpty(),
+        )
+    }
+    val landingGroupIds = restoredGroups.filter { it.landing.isNotEmpty() }.mapTo(mutableSetOf(), OutboundGroupState::id)
+    val landingMemberIds = outbounds.filter { it.groupId in landingGroupIds }.mapTo(mutableSetOf(), OutboundState::id)
+    return copy(
+        outboundGroups = restoredGroups,
+        selectorSelections = selectorSelections.filterKeys { tag ->
+            val identity = managedTagIdentityOrNull(tag)
+            identity?.kind != ManagedTagKind.OUTBOUND_GROUP_LANDING ||
+                (identity.id in landingMemberIds && (identity.key.isEmpty() || identity.key in landingTags))
+        },
+    )
 }
 
 private fun AppBackupOutboundGroup.toState(): OutboundGroupState =
@@ -438,6 +477,8 @@ private fun AppBackupOutboundGroup.toState(): OutboundGroupState =
         url = url,
         userAgent = userAgent,
         detour = detour,
+        landing = landing,
+        aliasFilter = aliasFilter,
         updateInterval = updateInterval,
         requestHeaders = requestHeaders ?: legacySubscriptionRequestHeaders(hwid),
         updateViaProxy = updateViaProxy,
@@ -510,13 +551,12 @@ private fun AppBackupCustomResourceFile.toState(): CustomResourceFileState =
 private fun AppState.restoreWarnings(): List<AppBackupWarning> {
     val availableOutbounds = selectableManagedOutbounds(this).mapTo(mutableSetOf()) { choice -> choice.tag }
     val outboundReferences = buildList {
-        outboundGroups.forEach { group -> add(group.detour) }
         selectors.forEach { selector ->
             addAll(selector.outbounds)
             add(selector.default)
         }
         selectorSelections.forEach { (selector, outbound) ->
-            add(selector)
+            if (managedTagIdentityOrNull(selector)?.kind != ManagedTagKind.OUTBOUND_GROUP_LANDING) add(selector)
             add(outbound)
         }
         add(routeFinal)

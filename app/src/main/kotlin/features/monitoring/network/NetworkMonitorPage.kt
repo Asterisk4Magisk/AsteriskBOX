@@ -56,6 +56,7 @@ import app.LocalAppStateStore
 import app.collectAppState
 import engine.singbox.runtime.delayTestLeaf
 import app.managedReferenceRemarks
+import app.outboundSelectionTag
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import features.monitoring.MonitoringIntent
 import features.monitoring.MonitoringScaffold
@@ -101,7 +102,7 @@ internal fun NetworkMonitorPage(padding: PaddingValues) {
     var selectedGroup by remember(sessionKey) { mutableStateOf<String?>(null) }
     val target = if (showGroupPicker) groups.firstOrNull { it.tag == selectedGroup } else null
     val selectedOutbound = runtime.proxies.groups.firstOrNull { it.name == target?.tag }?.now
-    val selectedNode = target?.let { runtime.proxies.delayTestLeaf(it.tag) }
+    val selectedNode = target?.let { runtime.proxies.delayTestLeaf(it.tag) }?.let(appState::outboundSelectionTag)
     val strategyProbe = remember(sessionKey, target?.tag, selectedOutbound, selectedNode, runtime.proxySelectionRevision) {
         ProxyIpProbeState()
     }

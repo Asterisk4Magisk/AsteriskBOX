@@ -15,7 +15,6 @@ import app.SingBoxRouteRuleState
 import app.SingBoxSelectorTypeSelector
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 internal const val AppBackupFormat = "asteriskbox-backup"
@@ -188,10 +187,11 @@ internal data class AppBackupOutboundGroup(
     val id: Int = 0,
     val name: String = "",
     val url: String = "",
+    val aliasFilter: String = "",
     val userAgent: String = "",
     val detour: String = "",
+    val landing: String = "",
     val updateInterval: String = "",
-    @OptIn(ExperimentalSerializationApi::class)
     @EncodeDefault(EncodeDefault.Mode.NEVER)
     val hwid: String? = null,
     val requestHeaders: Map<String, String>? = null,

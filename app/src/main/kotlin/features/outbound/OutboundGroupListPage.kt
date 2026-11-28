@@ -5,6 +5,8 @@ package features.outbound
 
 import features.subscription.formatSubscriptionRequestHeaders
 import features.subscription.defaultSubscriptionRequestHeaders
+import features.subscription.compileSubscriptionAliasFilter
+import features.subscription.isValidManualSubscriptionUrl
 import data.AppSettingsPreferences
 import features.subscription.parseSubscriptionRequestHeaders
 import features.subscription.withoutImplicitSubscriptionHeaders
@@ -24,6 +26,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
@@ -110,6 +113,7 @@ import androidx.compose.ui.unit.dp
 import app.DefaultOutboundSubscriptionUserAgent
 import app.AppState
 import app.selectableGroupDetourOutbounds
+import app.selectableGroupLandingOutbounds
 import app.LocalAppServices
 import app.LocalAppStateStore
 import app.LocalIsWideScreen
@@ -575,7 +579,8 @@ internal fun OutboundGroupListPage(
             is OutboundSubscriptionUpdateResult.Success ->
                 OutboundGroupUpdateResult.Success(
                     outboundCount = result.outcome.accepted.size,
-                    presentation = result.outcome.toImportResultPresentation(committed = true),
+                    presentation = result.outcome.takeIf { it.accepted.isNotEmpty() }
+                        ?.toImportResultPresentation(committed = true),
                 )
             is OutboundSubscriptionUpdateResult.Partial ->
                 OutboundGroupUpdateResult.Success(
@@ -1985,6 +1990,9 @@ private fun OutboundGroupEditorSheet(
     val name = nameInput.text
     var urlInput by remember(editorSession) { mutableStateOf(TextFieldValue(group?.url.orEmpty())) }
     val url = urlInput.text
+    var aliasFilterInput by remember(editorSession) { mutableStateOf(TextFieldValue(group?.aliasFilter.orEmpty())) }
+    val aliasFilter = aliasFilterInput.text
+    val validAliasFilter = remember(aliasFilter) { runCatching { aliasFilter.compileSubscriptionAliasFilter() }.isSuccess }
     val context = LocalContext.current.applicationContext
     val defaultRequestHeaders = remember(context) {
         defaultSubscriptionRequestHeaders(AppSettingsPreferences(context).getOrCreateSubscriptionHwid())
@@ -2003,13 +2011,14 @@ private fun OutboundGroupEditorSheet(
     ) {
         selectableGroupDetourOutbounds(appState, group?.id ?: 0)
     }
-    val detourValues = listOf("") + detourChoices.map { it.tag } +
-        listOfNotNull(detour.takeIf { value ->
-            value.isNotBlank() && detourChoices.none { it.tag == value }
-        })
     val detourLabels = detourChoices.associate { it.tag to it.localizedLabel() }
-    val notSpecified = stringResource(R.string.common_not_specified)
-    val unavailable = stringResource(R.string.common_unavailable)
+    var landing by remember(editorSession) { mutableStateOf(group?.landing.orEmpty()) }
+    val landingChoices = remember(
+        appState.outboundGroups, appState.outbounds, appState.selectors, appState.endpoints, appState.pluginProtocols, group?.id,
+    ) {
+        selectableGroupLandingOutbounds(appState, group?.id)
+    }
+    val landingLabels = landingChoices.associate { it.tag to it.localizedLabel() }
     val initialUserAgent = group?.userAgent ?: DefaultOutboundSubscriptionUserAgent
     val initialUserAgentOption = subscriptionUserAgentOptionFor(initialUserAgent)
     val initialCustomUserAgent = initialUserAgent.takeIf {
@@ -2025,15 +2034,16 @@ private fun OutboundGroupEditorSheet(
     var strictImport by remember(editorSession) { mutableStateOf(group?.strictImport == true) }
     var ageSecretKeyInput by remember(editorSession) { mutableStateOf(TextFieldValue(group?.ageSecretKey.orEmpty())) }
     val ageSecretKey = ageSecretKeyInput.text
-    val validUrl = url.isBlank() || url.isHttpUrl()
+    val validUrl = url.isBlank() || url.isValidManualSubscriptionUrl()
     val validInterval =
         parseSubscriptionSchedule(updateInterval) !is SubscriptionSchedule.Invalid
     // A blank name is only safe when the subscription URL can supply one on the
     // first successful sync. A local group has no such source, so it still needs
     // a title; a typed name always wins and is never auto-overwritten.
-    val canSave = validUrl && validInterval && (url.isNotBlank() || name.isNotBlank()) &&
-        (url.isBlank() || requestHeaders != null)
     val hasSubscription = url.isNotBlank()
+    val savedAliasFilter = if (hasSubscription) aliasFilter.ifBlank { "" } else group?.aliasFilter.orEmpty()
+    val canSave = validUrl && validInterval && (hasSubscription || name.isNotBlank()) &&
+        (!hasSubscription || (validAliasFilter && requestHeaders != null))
     val userAgent = userAgentOption.resolveUserAgent(customUserAgent)
     val userAgentLabels = SubscriptionUserAgentOptions.map { option ->
         option.localizedLabel()
@@ -2043,8 +2053,10 @@ private fun OutboundGroupEditorSheet(
         .coerceAtLeast(0)
     val selectedUserAgentLabel = userAgentLabels[selectedUserAgentIndex]
     val dirty = name != group?.name.orEmpty() || url != group?.url.orEmpty() ||
+        savedAliasFilter != group?.aliasFilter.orEmpty() ||
         requestHeadersText != initialRequestHeaders ||
         detour != group?.detour.orEmpty() ||
+        landing != group?.landing.orEmpty() ||
         updateInterval != group?.updateInterval.orEmpty() ||
         userAgent != initialUserAgentOption.resolveUserAgent(initialCustomUserAgent) ||
         ageSecretKey != group?.ageSecretKey.orEmpty() || updateViaProxy != (group?.updateViaProxy == true) ||
@@ -2067,8 +2079,10 @@ private fun OutboundGroupEditorSheet(
         val edited = (group ?: OutboundGroupState(id = 0, name = "")).copy(
             name = name.trim(),
             url = trimmedUrl,
+            aliasFilter = savedAliasFilter,
             userAgent = userAgent,
             detour = detour,
+            landing = landing,
             updateInterval = updateInterval.trim(),
             requestHeaders = storedRequestHeaders,
             updateViaProxy = updateViaProxy,
@@ -2093,6 +2107,7 @@ private fun OutboundGroupEditorSheet(
     val form: @Composable () -> Unit = {
         val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
         SideEffect { inputFocus.imeVisible = imeVisible }
+        val subscriptionVisibility = updateTransition(hasSubscription, label = "subscription fields")
         LazyColumn(
             state = formState,
             modifier = Modifier
@@ -2138,6 +2153,32 @@ private fun OutboundGroupEditorSheet(
                     )
                 }
             }
+            item(key = "alias-filter") {
+                subscriptionVisibility.AnimatedVisibility(
+                    visible = { it },
+                    enter = AsteriskMotion.contentEnter(),
+                    exit = AsteriskMotion.contentExit(),
+                ) {
+                    Column {
+                        Spacer(Modifier.height(GroupEditorSectionSpacing))
+                        OutlinedTextField(
+                            value = aliasFilterInput,
+                            onValueChange = { aliasFilterInput = it },
+                            label = { Text(stringResource(R.string.subscription_alias_filter)) },
+                            supportingText = if (!validAliasFilter) {
+                                { Text(stringResource(R.string.subscription_alias_filter_invalid)) }
+                            } else null,
+                            isError = !validAliasFilter,
+                            singleLine = true,
+                            shape = AsteriskShapeTokens.InnerContainer,
+                            modifier = Modifier.fillMaxWidth().restoreGroupEditorFocus(
+                                field = "alias-filter", inputFocus = inputFocus, target = fieldToRestore,
+                                onRestored = { fieldToRestore = null },
+                            ),
+                        )
+                    }
+                }
+            }
             item(key = "http-warning") {
                 AnimatedVisibility(
                     visible = url.startsWith("http://", ignoreCase = true),
@@ -2173,8 +2214,8 @@ private fun OutboundGroupEditorSheet(
                 }
             }
             item(key = "age-secret-key") {
-                AnimatedVisibility(
-                    visible = hasSubscription,
+                subscriptionVisibility.AnimatedVisibility(
+                    visible = { it },
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
@@ -2195,8 +2236,8 @@ private fun OutboundGroupEditorSheet(
                 }
             }
             item(key = "subscription-request-headers") {
-                AnimatedVisibility(
-                    visible = hasSubscription,
+                subscriptionVisibility.AnimatedVisibility(
+                    visible = { it },
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
@@ -2219,49 +2260,59 @@ private fun OutboundGroupEditorSheet(
                     }
                 }
             }
-            item(key = "detour") {
-                Column {
-                    Spacer(Modifier.height(GroupEditorSectionSpacing))
+            item(key = "subscription-user-agent") {
+                subscriptionVisibility.AnimatedVisibility(
+                    visible = { it },
+                    enter = AsteriskMotion.contentEnter(),
+                    exit = AsteriskMotion.contentExit(),
+                ) {
                     SettingsDropdownRow(
-                        title = stringResource(R.string.outbound_group_detour),
+                        title = stringResource(R.string.outbound_group_user_agent),
+                        modifier = Modifier.padding(top = GroupEditorSectionSpacing),
                         horizontalPadding = 0.dp,
-                        icon = Icons.AutoMirrored.Rounded.AltRoute,
-                        items = detourValues.map { value ->
-                            if (value.isBlank()) notSpecified else detourLabels[value] ?: unavailable
+                        summary = userAgent
+                            .takeUnless { it == selectedUserAgentLabel }
+                            .orEmpty(),
+                        icon = Icons.Rounded.Language,
+                        items = userAgentLabels,
+                        selectedIndex = selectedUserAgentIndex,
+                        onSelectedIndexChange = { index ->
+                            val nextOption = SubscriptionUserAgentOptions[index]
+                            if (nextOption == SubscriptionUserAgentOption.Custom) {
+                                customUserAgentDraft = customUserAgent.ifBlank { userAgent }
+                                showCustomUserAgentDialog = true
+                            } else {
+                                userAgentOption = nextOption
+                            }
                         },
-                        selectedIndex = detourValues.indexOf(detour).coerceAtLeast(0),
-                        onSelectedIndexChange = { index -> detour = detourValues[index] },
                     )
                 }
             }
+            item(key = "detour") {
+                OutboundGroupProxyDropdown(
+                    title = stringResource(R.string.outbound_group_detour),
+                    choices = detourLabels,
+                    selected = detour,
+                    onSelect = { detour = it },
+                )
+            }
+            item(key = "landing-proxy") {
+                OutboundGroupProxyDropdown(
+                    title = stringResource(R.string.outbound_group_landing_proxy),
+                    choices = landingLabels,
+                    selected = landing,
+                    onSelect = { landing = it },
+                )
+            }
             item(key = "subscription-options") {
-                AnimatedVisibility(
-                    visible = hasSubscription,
+                subscriptionVisibility.AnimatedVisibility(
+                    visible = { it },
                     enter = AsteriskMotion.contentEnter(),
                     exit = AsteriskMotion.contentExit(),
                 ) {
                     Column {
                         Spacer(Modifier.height(GroupEditorSectionSpacing))
                         Column(verticalArrangement = Arrangement.spacedBy(GroupEditorSectionSpacing)) {
-                            SettingsDropdownRow(
-                                title = stringResource(R.string.outbound_group_user_agent),
-                                horizontalPadding = 0.dp,
-                                summary = userAgent
-                                    .takeUnless { it == selectedUserAgentLabel }
-                                    .orEmpty(),
-                                icon = Icons.Rounded.Language,
-                                items = userAgentLabels,
-                                selectedIndex = selectedUserAgentIndex,
-                                onSelectedIndexChange = { index ->
-                                    val nextOption = SubscriptionUserAgentOptions[index]
-                                    if (nextOption == SubscriptionUserAgentOption.Custom) {
-                                        customUserAgentDraft = customUserAgent.ifBlank { userAgent }
-                                        showCustomUserAgentDialog = true
-                                    } else {
-                                        userAgentOption = nextOption
-                                    }
-                                },
-                            )
                             SettingsSwitchRow(
                                 title = stringResource(R.string.outbound_group_update_via_proxy),
                                 horizontalPadding = 0.dp,
@@ -2375,6 +2426,29 @@ private class GroupEditorInputFocus {
 }
 
 @Composable
+private fun OutboundGroupProxyDropdown(
+    title: String,
+    choices: Map<String, String>,
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
+    val values = listOf("") + choices.keys + listOfNotNull(selected.takeIf { it.isNotBlank() && it !in choices })
+    val notSpecified = stringResource(R.string.common_not_specified)
+    val unavailable = stringResource(R.string.common_unavailable)
+    Column {
+        Spacer(Modifier.height(GroupEditorSectionSpacing))
+        SettingsDropdownRow(
+            title = title,
+            horizontalPadding = 0.dp,
+            icon = Icons.AutoMirrored.Rounded.AltRoute,
+            items = values.map { if (it.isBlank()) notSpecified else choices[it] ?: unavailable },
+            selectedIndex = values.indexOf(selected).coerceAtLeast(0),
+            onSelectedIndexChange = { index -> onSelect(values[index]) },
+        )
+    }
+}
+
+@Composable
 private fun Modifier.restoreGroupEditorFocus(
     field: String,
     inputFocus: GroupEditorInputFocus,
@@ -2439,12 +2513,6 @@ private fun CustomSubscriptionUserAgentDialog(
     )
 }
 
-private fun String.isHttpUrl(): Boolean =
-    runCatching {
-        val uri = URI(trim())
-        (uri.scheme == "http" || uri.scheme == "https") && !uri.host.isNullOrBlank()
-    }.getOrDefault(false)
-
 private fun OutboundGroupState.clearingSubscriptionMetadataChangedFrom(
     previous: OutboundGroupState?,
 ): OutboundGroupState {
@@ -2465,6 +2533,7 @@ private fun OutboundGroupState.clearingSubscriptionMetadataChangedFrom(
         )
     }
     if (
+        aliasFilter != previous.aliasFilter ||
         userAgent != previous.userAgent ||
         requestHeaders != previous.requestHeaders ||
         updateViaProxy != previous.updateViaProxy ||

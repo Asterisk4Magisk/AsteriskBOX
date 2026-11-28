@@ -13,12 +13,15 @@ import utils.resolveSubscriptionName
 import features.importing.sanitizePersistedImportSummary
 import features.outbound.ImportedSingBoxOutbound
 import features.outbound.planOutboundImport
+import features.subscription.compileSubscriptionAliasFilter
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 
 internal enum class SubscriptionUpdateTrigger {
     MANUAL,
@@ -106,6 +109,11 @@ internal class OutboundSubscriptionUpdater(
                     "Disabled subscription group was not updated",
                 )
             }
+            val aliasFilter = try {
+                group.aliasFilter.compileSubscriptionAliasFilter()
+            } catch (error: IllegalArgumentException) {
+                return recordFailure(groupId, trigger, ImportStage.PARSE, error)
+            }
             val prepared = try {
                 onStage(ImportStage.DOWNLOAD)
                 preparePermits.withPermit {
@@ -164,13 +172,18 @@ internal class OutboundSubscriptionUpdater(
                             error = error,
                         )
                     }
+                    val filteredOutcome = if (aliasFilter == null) outcome else withContext(Dispatchers.Default) {
+                        outcome.withoutAliasMatches(aliasFilter)
+                    }
+                    val allowEmpty = filteredOutcome.accepted.size < outcome.accepted.size && outcome.skippedCount == 0
                     val commit = validationCommitMutex.withLock {
                         commitParsed(
                             groupId = groupId,
                             trigger = trigger,
                             fetchedGroup = group,
                             prepared = prepared,
-                            outcome = outcome,
+                            outcome = filteredOutcome,
+                            allowEmpty = allowEmpty,
                             onStage = onStage,
                         )
                     }
@@ -249,6 +262,7 @@ internal class OutboundSubscriptionUpdater(
         fetchedGroup: OutboundGroupState,
         prepared: SubscriptionPreparation.Success,
         outcome: ImportOutcome<ImportedSingBoxOutbound>,
+        allowEmpty: Boolean,
         onStage: (ImportStage) -> Unit,
     ): CommitResult {
         repeat(MaxCommitAttempts) {
@@ -263,6 +277,7 @@ internal class OutboundSubscriptionUpdater(
                 parsed = outcome,
                 replaceGroup = true,
                 strict = currentGroup.strictImport,
+                allowEmpty = allowEmpty,
             )
             if (!plan.committed) {
                 val message = plan.outcome.issues.lastOrNull()?.message
@@ -486,6 +501,7 @@ internal class OutboundSubscriptionUpdater(
 
     private fun OutboundGroupState.fetchIdentity(): FetchIdentity = FetchIdentity(
         url = url,
+        aliasFilter = aliasFilter,
         userAgent = userAgent,
         requestHeaders = requestHeaders,
         updateViaProxy = updateViaProxy,
@@ -570,6 +586,7 @@ internal class OutboundSubscriptionUpdater(
 
     private data class FetchIdentity(
         val url: String,
+        val aliasFilter: String,
         val userAgent: String,
         val requestHeaders: Map<String, String>?,
         val updateViaProxy: Boolean,
@@ -583,4 +600,21 @@ internal class OutboundSubscriptionUpdater(
         const val MaxCommitAttempts = 2
         const val StateChangedMessage = "Application state changed during subscription update"
     }
+}
+
+private fun ImportOutcome<ImportedSingBoxOutbound>.withoutAliasMatches(
+    filter: Regex,
+): ImportOutcome<ImportedSingBoxOutbound> {
+    val retained = accepted.filterNot { outbound -> filter.containsMatchIn(outbound.remarks) }
+    val ignoredCount = accepted.size - retained.size
+    if (ignoredCount == 0) return this
+    return ImportOutcome(
+        format = format,
+        detectedCount = detectedCount - ignoredCount,
+        accepted = retained,
+        duplicateCount = duplicateCount,
+        issues = issues,
+        mutations = mutations,
+        priorOmittedDetailCount = omittedDetailCount,
+    )
 }

@@ -15,10 +15,13 @@ internal fun validateSingBoxRuntimeConfiguration(
     state: AppState,
     customResourceFileOverrides: Map<Int, File> = emptyMap(),
 ) {
-    // Validate editable settings independently of the script used for runtime configs and previews.
+    // Check editable settings without the optional group hops. Runtime compilation uses the saved hops.
+    val editableState = state.copy(
+        outboundGroups = state.outboundGroups.map { group -> group.copy(detour = "", landing = "") },
+    )
     val generated = SingBoxConfigCompiler.generate(
         context = context,
-        appState = state,
+        appState = editableState,
         exposePorts = false,
         customResourceFileOverrides = customResourceFileOverrides,
     )

@@ -16,6 +16,7 @@ import app.modes.RunModeVpnService
 import engine.network.isIpAddress
 import engine.singbox.config.SingBoxJson
 import engine.singbox.config.inheritedGroupDetour
+import engine.singbox.config.groupLandingTargets
 import engine.singbox.config.APP_DIRECT_OUTBOUND
 import engine.singbox.config.APP_GLOBAL_SELECTOR
 import engine.singbox.config.APP_LOCAL_INBOUND
@@ -60,6 +61,7 @@ internal fun AppState.managedReferenceRemarks(): Map<String, String> = buildMap 
     }
     outbounds.forEach { outbound ->
         putVisibleRemarks(outbound.tag, outbound.remarks)
+        putVisibleRemarks(managedOutboundGroupLandingTag(outbound.id), outbound.remarks)
     }
     selectors.forEach { selector ->
         putVisibleRemarks(selector.tag, selector.remarks)
@@ -197,15 +199,27 @@ internal fun selectableGroupDetourOutbounds(
     }
 }
 
+internal fun selectableGroupLandingOutbounds(state: AppState, groupId: Int? = null): List<ManagedOutboundChoice> {
+    val resolved = state.withResolvedSelectorRegexMembers()
+    return ManagedOutboundReferenceIndex(resolved).groupLandingChoices(resolved, groupId)
+}
+
 internal fun AppState.withCanonicalManagedTagReferences(): AppState {
     val tagsByIdentity = currentManagedTagsByIdentity()
     val resolve: (String) -> String = { value ->
-        managedTagIdentityOrNull(value)
-            ?.let(tagsByIdentity::get)
-            ?: value
+        val identity = managedTagIdentityOrNull(value)
+        val landingSource = identity?.takeIf { it.kind == ManagedTagKind.OUTBOUND_GROUP_LANDING }
+            ?.key?.let(::managedTagIdentityOrNull)?.let(tagsByIdentity::get)
+        if (landingSource != null && identity.id != null) {
+            managedOutboundGroupLandingMemberTag(identity.id, landingSource)
+        } else {
+            identity?.let(tagsByIdentity::get) ?: value
+        }
     }
     val canonical = copy(
-        outboundGroups = outboundGroups.map { group -> group.copy(detour = resolve(group.detour)) },
+        outboundGroups = outboundGroups.map { group ->
+            group.copy(detour = resolve(group.detour), landing = resolve(group.landing))
+        },
         outbounds = outbounds.map { outbound ->
             outbound.withCanonicalManagedReferences(resolve)
         },
@@ -250,7 +264,9 @@ internal fun AppState.withReplacedManagedTag(
         if (value == previousTag) replacementTag else value
     }
     val replaced = copy(
-        outboundGroups = outboundGroups.map { group -> group.copy(detour = resolve(group.detour)) },
+        outboundGroups = outboundGroups.map { group ->
+            group.copy(detour = resolve(group.detour), landing = resolve(group.landing))
+        },
         outbounds = outbounds.map { outbound -> outbound.withCanonicalManagedReferences(resolve) },
         endpoints = endpoints.map { endpoint -> endpoint.withCanonicalManagedReferences(resolve) },
         selectors = selectors.map { selector ->
@@ -850,6 +866,41 @@ private class ManagedOutboundReferenceIndex(state: AppState) {
         if (selectorsByTag[selectorTag]?.value?.nodeNameRegex.isNullOrBlank()) emptyList()
         else referenceGraph.regexMembersByTag[selectorTag].orEmpty()
 
+    fun groupLandingChoices(state: AppState, groupId: Int?): List<ManagedOutboundChoice> {
+        val enabledOutbounds = outbounds.filter { outbound -> outbound.value.groupId in enabledGroupIds }
+        val sources = enabledOutbounds.mapNotNull { outbound ->
+            val json = outbound.json ?: return@mapNotNull null
+            outbound.tag to JsonObject(
+                json + mapOf("tag" to JsonPrimitive(outbound.tag), "type" to JsonPrimitive(outbound.value.type)),
+            )
+        }.toMap()
+        val eligible = state.groupLandingTargets(sources, groupId)
+        return (enabledOutbounds.map(::outboundChoice) + selectors.map(::selectorChoice))
+            .filter { it.tag in eligible }
+            .distinctBy(ManagedOutboundChoice::tag)
+    }
+
+    private fun selectorChoice(selector: IndexedSelector): ManagedOutboundChoice = ManagedOutboundChoice(
+        tag = selector.tag,
+        label = selector.value.remarks,
+        kind = if (selector.value.type == SingBoxSelectorTypeUrlTest) {
+            ManagedOutboundChoiceKind.UrlTest
+        } else {
+            ManagedOutboundChoiceKind.Selector
+        },
+    )
+
+    private fun outboundChoice(outbound: IndexedOutbound): ManagedOutboundChoice = ManagedOutboundChoice(
+        tag = outbound.tag,
+        label = outbound.value.remarks.trim(),
+        kind = when (outbound.value.type) {
+            SingBoxSelectorTypeSelector -> ManagedOutboundChoiceKind.Selector
+            SingBoxSelectorTypeUrlTest -> ManagedOutboundChoiceKind.UrlTest
+            else -> ManagedOutboundChoiceKind.Outbound
+        },
+        groupName = enabledGroupsById[outbound.value.groupId]?.value?.name?.trim()?.takeIf(String::isNotEmpty),
+    )
+
     fun selectableChoices(
         excludedTag: String,
         excludedSelectorId: Int = 0,
@@ -887,39 +938,10 @@ private class ManagedOutboundReferenceIndex(state: AppState) {
                         regexMembers(selector.tag).isNotEmpty()
                     }
                 }
-                .forEach { selector ->
-                    add(
-                        ManagedOutboundChoice(
-                            tag = selector.tag,
-                            label = selector.value.remarks,
-                            kind = if (selector.value.type == SingBoxSelectorTypeUrlTest) {
-                                ManagedOutboundChoiceKind.UrlTest
-                            } else {
-                                ManagedOutboundChoiceKind.Selector
-                            },
-                        ),
-                    )
-                }
+                .mapTo(this, ::selectorChoice)
             outbounds
                 .filter { outbound -> outbound.value.groupId in enabledGroupIds }
-                .forEach { outbound ->
-                    add(
-                        ManagedOutboundChoice(
-                            tag = outbound.tag,
-                            label = outbound.value.remarks,
-                            kind = when (outbound.value.type) {
-                                SingBoxSelectorTypeSelector -> ManagedOutboundChoiceKind.Selector
-                                SingBoxSelectorTypeUrlTest -> ManagedOutboundChoiceKind.UrlTest
-                                else -> ManagedOutboundChoiceKind.Outbound
-                            },
-                            groupName = enabledGroupsById[outbound.value.groupId]
-                                ?.value
-                                ?.name
-                                ?.trim()
-                                ?.takeIf(String::isNotEmpty),
-                        ),
-                    )
-                }
+                .mapTo(this, ::outboundChoice)
             if (includeEndpoints) {
                 endpoints.forEach { endpoint ->
                     add(

@@ -35,6 +35,31 @@ internal class VlessXrayRequiredException(
     val features: List<String>,
 ) : IllegalArgumentException("Outbound $tag uses Xray-only features (${features.joinToString(", ")})")
 
+internal fun JsonObject.supportsVlessPluginGroupLanding(): Boolean = try {
+    val tag = stringOrEmpty("tag")
+    val transportExtra = (this["transport"] as? JsonObject)?.jsonObjectField("extra", tag)
+    val stream = jsonObjectField("xray_stream_settings", tag)
+    // The plugin's fixed dial address applies to its primary transport.
+    val transportDownload = transportExtra.hasIndependentXrayDownload()
+    val streamDownload = stream?.values.orEmpty().any { value -> (value as? JsonObject).hasIndependentXrayDownload() }
+    val customDialer = stream.hasXrayOption("sockopt") { sockopt ->
+        (sockopt as? JsonObject).hasXrayOption("dialerProxy")
+    }
+    !transportDownload && !streamDownload && !customDialer
+} catch (_: IllegalArgumentException) {
+    false
+}
+
+private fun JsonObject?.hasIndependentXrayDownload(): Boolean =
+    hasXrayOption("downloadSettings") || hasXrayOption("extra") { extra ->
+        (extra as? JsonObject).hasXrayOption("downloadSettings")
+    }
+
+private fun JsonObject?.hasXrayOption(
+    name: String,
+    matches: (JsonElement) -> Boolean = { !it.isEmptyValue() },
+): Boolean = this?.entries?.any { (key, value) -> key.equals(name, ignoreCase = true) && matches(value) } == true
+
 internal fun JsonObject.usesXdriveTransport(tag: String): Boolean {
     val override = jsonObjectField("xray_stream_settings", tag)
     // Xray gives method precedence over network when both are set.

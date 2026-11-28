@@ -90,6 +90,8 @@ import app.LocalUpdateAppState
 import app.R
 import app.collectAppState
 import app.isManagedSingBoxTag
+import app.managedOutboundGroupLandingTag
+import app.outboundSelectionTag
 import app.managedOutboundGroupSelectorTag
 import app.modes.SingBoxProxyGroupLayoutExpandable
 import app.modes.SingBoxProxyGroupLayoutTabs
@@ -213,16 +215,41 @@ fun SingBoxProxyPage(
     val globalGroupName = stringResource(R.string.routing_global)
     val unavailableLabel = stringResource(R.string.common_unavailable)
     val outboundChoices = selectableManagedOutbounds(appState)
-    // Plugin outbounds run as core `socks` outbounds; show the protocol they carry.
-    val outboundProtocolTypes = remember(appState.outbounds, appState.pluginProtocols) {
-        appState.outbounds
-            .filter { outbound -> PluginOutbounds.requirementFor(outbound.type, appState.pluginProtocols) != null }
-            .associate { outbound -> outbound.tag to outbound.type }
+    val landingTagsByMember = remember(appState.outbounds) {
+        appState.outbounds.associate { it.tag to managedOutboundGroupLandingTag(it.id) }
     }
-    val outboundDisplayNames = outboundChoices.associate { choice ->
+    val runtimeTags = proxies.groups.flatMap { group -> listOf(group.name) + group.all }.distinct()
+    val choicesByTag = outboundChoices.associateBy { it.tag }
+    val choicesWithLanding = outboundChoices + outboundChoices.mapNotNull { choice ->
+        landingTagsByMember[choice.tag]?.let { choice.copy(tag = it) }
+    } + runtimeTags.mapNotNull { tag ->
+        val source = appState.outboundSelectionTag(tag)
+        if (source == tag || landingTagsByMember[source] == tag) null
+        else choicesByTag[source]?.copy(tag = tag)
+    }
+    // Plugin outbounds run as core `socks` outbounds; show the protocol they carry.
+    val outboundProtocolTypes = remember(
+        appState.outboundGroups, appState.outbounds, appState.selectors, appState.pluginProtocols, runtimeTags,
+    ) {
+        val types = appState.outbounds.associate { it.tag to it.type } + appState.selectors.associate { it.tag to it.type }
+        val landings = appState.outboundGroups.associate { it.id to it.landing }
+        buildMap {
+            appState.outbounds.forEach { outbound ->
+                types[landings[outbound.groupId]]?.let { type -> put(managedOutboundGroupLandingTag(outbound.id), type) }
+                if (PluginOutbounds.requirementFor(outbound.type, appState.pluginProtocols) != null) {
+                    put(outbound.tag, outbound.type)
+                }
+            }
+            runtimeTags.forEach { tag ->
+                val source = appState.outboundSelectionTag(tag)
+                if (tag != source && landingTagsByMember[source] != tag) types[source]?.let { put(tag, it) }
+            }
+        }
+    }
+    val outboundDisplayNames = choicesWithLanding.associate { choice ->
         choice.tag to choice.localizedLabel()
     }
-    val outboundDisplayNamesWithoutGroup = outboundChoices.associate { choice ->
+    val outboundDisplayNamesWithoutGroup = choicesWithLanding.associate { choice ->
         choice.tag to choice.localizedLabel(includeGroupName = false)
     }
     val managedGroupNames = appState.outboundGroups.associate { group ->

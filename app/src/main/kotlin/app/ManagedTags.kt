@@ -21,6 +21,7 @@ internal enum class ManagedTagKind {
     ENDPOINT,
     SELECTOR,
     OUTBOUND_GROUP,
+    OUTBOUND_GROUP_LANDING,
     DNS_SERVER,
     DNS_EVALUATION,
     CUSTOM_RULE_SET,
@@ -72,6 +73,12 @@ internal fun managedSelectorTag(id: Int, remarks: String): String =
 internal fun managedOutboundGroupSelectorTag(id: Int, name: String): String =
     "outbound_group_${id}_${sanitizeManagedTagPart(name)}"
 
+internal fun managedOutboundGroupLandingTag(id: Int): String =
+    "outbound_group_landing_$id"
+
+internal fun managedOutboundGroupLandingMemberTag(id: Int, sourceTag: String): String =
+    "${managedOutboundGroupLandingTag(id)}_$sourceTag"
+
 internal fun managedDnsServerTag(id: Int, remarks: String): String =
     "dns_server_${id}_${sanitizeManagedTagPart(remarks)}"
 
@@ -90,7 +97,7 @@ internal fun managedTagIdentityOrNull(tag: String): ManagedTagIdentity? {
     DynamicManagedTagPatterns.forEach { pattern ->
         pattern.regex.matchEntire(normalized)?.let { match ->
             val id = match.groupValues[1].toIntOrNull() ?: return@let
-            return ManagedTagIdentity(kind = pattern.kind, id = id)
+            return ManagedTagIdentity(kind = pattern.kind, id = id, key = match.groupValues.getOrElse(2) { "" })
         }
     }
     BundledRuleSet.entries
@@ -134,6 +141,7 @@ private val FixedManagedTagIdentities = mapOf(
 
 private val DynamicManagedTagPatterns = listOf(
     DynamicManagedTagPattern(ManagedTagKind.OUTBOUND_GROUP, Regex("^outbound_group_(\\d+)_.+$")),
+    DynamicManagedTagPattern(ManagedTagKind.OUTBOUND_GROUP_LANDING, Regex("^outbound_group_landing_(\\d+)(?:_(.+))?$")),
     DynamicManagedTagPattern(ManagedTagKind.DNS_EVALUATION, Regex("^dns_evaluation_(\\d+)_.+$")),
     DynamicManagedTagPattern(ManagedTagKind.DNS_SERVER, Regex("^dns_server_(\\d+)_.+$")),
     DynamicManagedTagPattern(ManagedTagKind.CUSTOM_RULE_SET, Regex("^rule_set_(\\d+)_.+$")),

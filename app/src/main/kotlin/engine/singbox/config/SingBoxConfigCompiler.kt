@@ -72,6 +72,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import java.io.File
+import utils.stringOrEmpty
 
 internal const val APP_GLOBAL_SELECTOR = ManagedGlobalSelectorTag
 internal const val APP_LOCAL_INBOUND = ManagedLocalInboundTag
@@ -513,8 +514,8 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
             (outbound["tag"] as? JsonPrimitive)?.contentOrNull
         }
         .toList()
-    val managedTags = managedOutbounds.mapNotNullTo(mutableSetOf()) { (_, outbound) ->
-        (outbound["tag"] as? JsonPrimitive)?.contentOrNull
+    val managedOutboundsByTag = managedOutbounds.associate { (_, outbound) ->
+        outbound.stringOrEmpty("tag") to outbound
     }
     val claimedCustomSelectorTags = appState.selectors
         .mapTo(mutableSetOf()) { selector -> selector.tag }
@@ -522,7 +523,7 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
         .orEmptyObjects()
         .filterNot { outbound ->
             outbound.hasAppTag() ||
-                (outbound["tag"] as? JsonPrimitive)?.contentOrNull in managedTags ||
+                (outbound["tag"] as? JsonPrimitive)?.contentOrNull in managedOutboundsByTag ||
                 (outbound["tag"] as? JsonPrimitive)?.contentOrNull in claimedCustomSelectorTags
         }
         .toMutableList()
@@ -556,6 +557,9 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
         put("tag", APP_DIRECT_OUTBOUND)
     }
     val managedGroupTags = mutableListOf<String>()
+    val landingTags = mutableMapOf<String, String>()
+    val managedOutboundIds = appState.outbounds.associate { outbound -> outbound.tag to outbound.id }
+    val landingTargets by lazy { appState.groupLandingTargets(managedOutboundsByTag) }
     enabledGroups.forEach { group ->
         val members = managedOutbounds
             .filter { (groupId, _) -> groupId == group.id }
@@ -565,13 +569,25 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
             }
         if (members.isNotEmpty()) {
             val groupTag = managedOutboundGroupSelectorTag(group.id, group.name)
+            val landingTag = group.landing.trim()
+            val effectiveMembers = if (landingTag.isEmpty()) members else {
+                val landing = requireNotNull(landingTargets[landingTag]) {
+                    "Landing proxy for outbound group '${group.name}' is unavailable or unsupported"
+                }
+                members.map { member ->
+                    appState.appendGroupLanding(landing, member, managedOutboundIds.getValue(member), retained).also { tag ->
+                        if (tag != member) landingTags[member] = tag
+                    }
+                }
+            }
             retained += buildSelectorOutbound(
                 tag = groupTag,
-                members = members,
+                members = effectiveMembers,
                 default = appState.selectorDefault(
                     selectorTag = groupTag,
-                    members = members,
-                    fallback = members.first(),
+                    members = effectiveMembers,
+                    fallback = effectiveMembers.first(),
+                    landingTags = landingTags,
                 ),
                 interruptExistConnections = true,
             )
@@ -590,7 +606,8 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
             candidateUrlTestTags +
             APP_DIRECT_OUTBOUND +
             APP_GLOBAL_SELECTOR +
-            ordinaryCandidateTags
+            ordinaryCandidateTags +
+            landingTags.values
         ).distinct()
     val emittableManagedSelectorTags = mutableSetOf<String>()
     while (
@@ -602,6 +619,7 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
                 val canEmit = appState.expandSelectorMemberReferences(
                     references = selector.outbounds,
                     availableMemberTags = availableMembers,
+                    landingTags = landingTags,
                 ).any { member -> member != selector.tag }
                 if (canEmit) emittableManagedSelectorTags += selector.tag
                 canEmit
@@ -634,7 +652,8 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
             candidateUrlTestTags +
             APP_DIRECT_OUTBOUND +
             APP_GLOBAL_SELECTOR +
-            ordinaryCandidateTags
+            ordinaryCandidateTags +
+            landingTags.values
         ).distinct()
     managedSelectors
         .asSequence()
@@ -643,6 +662,7 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
             val members = appState.expandSelectorMemberReferences(
                 references = selector.outbounds,
                 availableMemberTags = availableCustomMembers,
+                landingTags = landingTags,
             ).filter { member -> member != selector.tag }
             if (members.isNotEmpty()) {
                 when (selector.type) {
@@ -653,8 +673,9 @@ internal fun compileOutbounds(root: JsonObject, appState: AppState): JsonArray {
                             default = appState.selectorDefault(
                                 selectorTag = selector.tag,
                                 members = members,
-                                fallback = selector.default.trim().takeIf(members::contains)
-                                    ?: members.first(),
+                                fallback = selector.default.trim()
+                                    .availableSelectorMember(members, landingTags) ?: members.first(),
+                                landingTags = landingTags,
                             ),
                             interruptExistConnections = selector.interruptExistConnections,
                         )
@@ -704,11 +725,15 @@ private fun AppState.selectorDefault(
     selectorTag: String,
     members: List<String>,
     fallback: String,
+    landingTags: Map<String, String> = emptyMap(),
 ): String = selectorSelections[selectorTag]
-    ?.takeIf(members::contains)
+    ?.availableSelectorMember(members, landingTags)
     ?: fallback
 
-private fun buildSelectorOutbound(
+private fun String.availableSelectorMember(members: List<String>, landingTags: Map<String, String>): String? =
+    takeIf(members::contains) ?: landingTags[this]?.takeIf(members::contains)
+
+internal fun buildSelectorOutbound(
     tag: String,
     members: List<String>,
     default: String,
@@ -723,7 +748,7 @@ private fun buildSelectorOutbound(
     put("interrupt_exist_connections", interruptExistConnections)
 }
 
-private fun buildUrlTestOutbound(
+internal fun buildUrlTestOutbound(
     selector: app.SingBoxSelectorState,
     members: List<String>,
     appState: AppState,

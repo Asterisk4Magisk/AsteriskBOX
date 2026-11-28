@@ -388,6 +388,7 @@
     <string name="outbound_group_delete_message">分组“%1$s”及其中的所有出站将被永久删除。</string>
     <string name="outbound_group_delete_title">删除分组？</string>
     <string name="outbound_group_detour">前置代理</string>
+    <string name="outbound_group_landing_proxy">落地代理</string>
     <string name="outbound_group_edit">编辑分组</string>
     <string name="outbound_group_empty">暂无出站分组</string>
     <string name="outbound_group_empty_summary">请先创建分组，再导入或添加出站。</string>
@@ -454,6 +455,8 @@
     <string name="outbound_group_update_via_proxy">通过当前运行的代理更新</string>
     <string name="outbound_group_url_invalid">请输入有效的 HTTP 或 HTTPS 地址</string>
     <string name="outbound_group_url_optional">订阅地址（可选）</string>
+    <string name="subscription_alias_filter">别名正则过滤</string>
+    <string name="subscription_alias_filter_invalid">正则表达式无效。</string>
     <string name="outbound_group_user_agent">User-Agent</string>
     <string name="outbound_group_user_agent_clash_meta">Clash Meta</string>
     <string name="outbound_group_user_agent_custom">自定义</string>

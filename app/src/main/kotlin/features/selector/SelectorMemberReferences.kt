@@ -25,6 +25,7 @@ internal fun AppState.selectorGroupMembersByReference(): Map<String, List<String
 internal fun AppState.expandSelectorMemberReferences(
     references: Iterable<String>,
     availableMemberTags: Iterable<String>,
+    landingTags: Map<String, String> = emptyMap(),
 ): List<String> {
     val requested = references
         .map(String::trim)
@@ -39,9 +40,10 @@ internal fun AppState.expandSelectorMemberReferences(
         .asSequence()
         .filter { (reference, _) -> reference in requested }
         .flatMap { (_, members) -> members.asSequence() }
+        .toSet()
     val independentMembers = availableMembers.asSequence()
-        .filter { member -> member in requested && member !in groups }
-    return (groupMembers + independentMembers)
+        .filter { member -> member in requested && member !in groups && member !in groupMembers }
+    return (groupMembers.asSequence().map { member -> landingTags[member] ?: member } + independentMembers)
         .filter(available::contains)
         .distinct()
         .toList()
