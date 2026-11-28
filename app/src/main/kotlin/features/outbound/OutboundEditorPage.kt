@@ -253,7 +253,7 @@ internal fun OutboundEditorPage(
                     onClick = {
                         scope.launch {
                             clipboard.setPlainText(
-                                JsonObject(document.value - "tag").toString(),
+                                JsonObject(document.configurationForExport() - "tag").toString(),
                             )
                             services.tipNotifier.show(copiedMessage)
                         }
@@ -564,9 +564,12 @@ private fun OutboundSelectField(
     error: String?,
     onDocumentChange: (OutboundEditorDocument) -> Unit,
 ) {
-    val current = document.text(field.path)
+    val isHttpVersion = field.labelRes == R.string.outbound_field_http_version
+    val current = document.text(field.path).let { if (isHttpVersion && it == "0") "" else it }
     val values = if (current in field.options) field.options else listOf(current) + field.options
-    val defaultLabel = stringResource(R.string.common_default)
+    val defaultLabel = stringResource(
+        if (isHttpVersion) R.string.outbound_editor_http_version_auto else R.string.common_default,
+    )
     SettingsDropdownRow(
         title = field.localizedLabel(),
         icon = field.editorIcon(),
@@ -717,6 +720,13 @@ private fun OutboundFieldSpec.editorIcon(): ImageVector = when {
 
 @Composable
 private fun OutboundFieldSpec.localizedOptionLabel(option: String): String {
+    if (labelRes == R.string.outbound_field_http_version) {
+        return when (option) {
+            "1" -> "HTTP/1.1"
+            "2", "3" -> "HTTP/$option"
+            else -> option
+        }
+    }
     val labelRes = if (path in setOf("network_type", "fallback_network_type")) {
         when (option) {
             "wifi" -> R.string.routing_network_type_wifi
@@ -733,9 +743,11 @@ private fun OutboundFieldSpec.localizedOptionLabel(option: String): String {
 }
 
 @Composable
-internal fun OutboundEditorSection.localizedTitle(): String = when (this) {
+internal fun OutboundEditorSection.localizedTitle(httpVersion: Int?): String = when (this) {
     OutboundEditorSection.SERVER -> stringResource(R.string.outbound_editor_section_server)
     OutboundEditorSection.PROTOCOL -> stringResource(R.string.outbound_editor_section_protocol)
+    OutboundEditorSection.HTTP_VERSION_OPTIONS ->
+        if (httpVersion == 3) stringResource(R.string.outbound_editor_section_quic) else "HTTP/2"
     OutboundEditorSection.TLS -> stringResource(R.string.outbound_editor_section_tls)
     OutboundEditorSection.TRANSPORT -> stringResource(R.string.outbound_editor_section_transport)
     OutboundEditorSection.MULTIPLEX -> stringResource(R.string.outbound_editor_section_multiplex)
@@ -743,9 +755,14 @@ internal fun OutboundEditorSection.localizedTitle(): String = when (this) {
     OutboundEditorSection.DIAL -> stringResource(R.string.outbound_editor_section_dial)
 }
 
-internal fun OutboundEditorSection.summaryRes(document: OutboundEditorDocument): Int = when (this) {
+internal fun OutboundEditorSection.summaryRes(document: OutboundEditorDocument, httpVersion: Int?): Int = when (this) {
     OutboundEditorSection.SERVER -> R.string.outbound_editor_section_server_summary
     OutboundEditorSection.PROTOCOL -> R.string.outbound_editor_section_protocol_summary
+    OutboundEditorSection.HTTP_VERSION_OPTIONS -> if (httpVersion == 3) {
+        R.string.outbound_editor_section_quic_summary
+    } else {
+        R.string.outbound_editor_section_http2_summary
+    }
     OutboundEditorSection.TLS -> R.string.outbound_editor_section_tls_summary
     OutboundEditorSection.TRANSPORT -> when {
         document.type != "vless" -> R.string.outbound_editor_section_transport_summary
@@ -782,6 +799,12 @@ private fun OutboundEditorValidationError.localizedMessage(field: OutboundFieldS
             R.string.outbound_editor_reference_unavailable,
             field.localizedLabel(),
         )
+        OutboundEditorValidationReason.HTTP_PATH_HOST_CONFLICT ->
+            stringResource(R.string.outbound_editor_http_path_host_conflict)
+        OutboundEditorValidationReason.HTTP_VERSION_PATH_OR_HOST_CONFLICT ->
+            stringResource(R.string.outbound_editor_http_version_path_or_host_conflict)
+        OutboundEditorValidationReason.HTTP_VERSION_REQUIRES_TLS ->
+            stringResource(R.string.outbound_editor_http_version_requires_tls)
     }
 
 @Composable

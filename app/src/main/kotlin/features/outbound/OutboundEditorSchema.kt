@@ -31,6 +31,7 @@ internal enum class OutboundFieldKind {
 internal enum class OutboundEditorSection {
     SERVER,
     PROTOCOL,
+    HTTP_VERSION_OPTIONS,
     TLS,
     TRANSPORT,
     MULTIPLEX,
@@ -194,6 +195,9 @@ internal object OutboundEditorRegistry {
         sections = buildList {
             add(OutboundSectionSpec(OutboundEditorSection.SERVER, serverFields()))
             add(OutboundSectionSpec(OutboundEditorSection.PROTOCOL, protocolFields))
+            if (type == "http") {
+                add(OutboundSectionSpec(OutboundEditorSection.HTTP_VERSION_OPTIONS, httpVersionFields()))
+            }
             if (tls) {
                 add(
                     OutboundSectionSpec(
@@ -563,12 +567,24 @@ internal object OutboundEditorRegistry {
         ),
     )
 
-    private fun quicFields() = listOf(
+    private fun httpVersionFields() =
+        http2AndQuicFields("Keep-alive period").map { field ->
+            field.copy(conditions = listOf(OutboundFieldCondition("version", setOf("2", "3"))))
+        } + quicOnlyFields().map { field ->
+            field.copy(conditions = listOf(OutboundFieldCondition("version", setOf("3"))))
+        }
+
+    private fun quicFields() = http2AndQuicFields("QUIC keep-alive period") + quicOnlyFields()
+
+    private fun http2AndQuicFields(keepAliveLabel: String) = listOf(
         field("idle_timeout", "Idle timeout"),
-        field("keep_alive_period", "QUIC keep-alive period"),
+        field("keep_alive_period", keepAliveLabel),
         field("stream_receive_window", "Stream receive window"),
         field("connection_receive_window", "Connection receive window"),
         field("max_concurrent_streams", "Maximum concurrent streams", OutboundFieldKind.INTEGER),
+    )
+
+    private fun quicOnlyFields() = listOf(
         field("initial_packet_size", "Initial packet size", OutboundFieldKind.INTEGER),
         field(
             "disable_path_mtu_discovery",
@@ -876,6 +892,8 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "HTTP mask mode" -> R.string.outbound_field_http_mask_mode
     "HTTP mask TLS" -> R.string.outbound_field_http_mask_tls
     "HTTP method" -> R.string.outbound_field_http_method
+    "HTTP version" -> R.string.outbound_field_http_version
+    "Disable HTTP version fallback" -> R.string.outbound_field_http_disable_version_fallback
     "Idle session check interval" -> R.string.outbound_field_idle_session_check_interval
     "Idle session timeout" -> R.string.outbound_field_idle_session_timeout
     "Idle timeout" -> R.string.outbound_field_idle_timeout
@@ -884,6 +902,7 @@ internal fun outboundFieldLabelResource(label: String): Int = when (label) {
     "IPv4 bind address" -> R.string.outbound_field_ipv4_bind_address
     "IPv6 bind address" -> R.string.outbound_field_ipv6_bind_address
     "Key" -> R.string.outbound_field_key
+    "Keep-alive period" -> R.string.outbound_field_keep_alive_period
     "Key exchange algorithms" -> R.string.outbound_field_key_exchange_algorithms
     "MAC algorithms" -> R.string.outbound_field_mac_algorithms
     "Maximum connections" -> R.string.outbound_field_maximum_connections
@@ -979,6 +998,9 @@ internal enum class OutboundEditorValidationReason {
     INVALID_PORT,
     INVALID_INTEGER,
     INVALID_REFERENCE,
+    HTTP_PATH_HOST_CONFLICT,
+    HTTP_VERSION_PATH_OR_HOST_CONFLICT,
+    HTTP_VERSION_REQUIRES_TLS,
 }
 
 internal data class OutboundEditorDocument(
@@ -1009,7 +1031,37 @@ internal data class OutboundEditorDocument(
             .orEmpty()
 
     fun isVisible(field: OutboundFieldSpec): Boolean =
-        field.conditions.all { condition -> text(condition.path) in condition.values }
+        field.conditions.all { condition ->
+            val value = if (condition.path == "version" && type == "http") {
+                effectiveHttpVersion().toString()
+            } else {
+                text(condition.path)
+            }
+            value in condition.values
+        }
+
+    fun effectiveHttpVersion(): Int = text("version").toIntOrNull()?.takeUnless { it == 0 }
+        ?: if (hasHttpPath || hasHttpHostHeader) 1 else 2
+
+    private val hasHttpPath: Boolean get() = text("path").isNotEmpty()
+
+    private val hasHttpHostHeader: Boolean
+        get() = (value["headers"] as? JsonObject)?.any { (name, entry) ->
+            val first = if (entry is JsonArray) entry.firstOrNull() else entry
+            name.equals("Host", ignoreCase = true) && !(first as? JsonPrimitive)?.contentOrNull.isNullOrEmpty()
+        } == true
+
+    private fun inactiveHttpOptionPaths(): List<String> {
+        if (type != "http") return emptyList()
+        return OutboundEditorRegistry.schema(type).sections
+            .first { it.section == OutboundEditorSection.HTTP_VERSION_OPTIONS }
+            .fields.filterNot(::isVisible).map(OutboundFieldSpec::path)
+    }
+
+    fun configurationForExport(): JsonObject {
+        val inactivePaths = inactiveHttpOptionPaths()
+        return if (inactivePaths.isEmpty()) value else JsonObject(value - inactivePaths)
+    }
 
     fun setText(path: String, text: String): OutboundEditorDocument {
         val field = runCatching {
@@ -1050,6 +1102,7 @@ internal data class OutboundEditorDocument(
 
     fun validate(): List<OutboundEditorValidationError> {
         val schema = OutboundEditorRegistry.schema(type)
+        val inactiveHttpOptions = inactiveHttpOptionPaths()
         val errors = buildList {
             schema.fields.filter { it.required && isVisible(it) }.forEach { field ->
                 if (text(field.path).isBlank()) {
@@ -1065,7 +1118,7 @@ internal data class OutboundEditorDocument(
                     ),
                 )
             }
-            schema.fields.filter { it.kind == OutboundFieldKind.INTEGER }.forEach { field ->
+            schema.fields.filter { it.kind == OutboundFieldKind.INTEGER && it.path !in inactiveHttpOptions }.forEach { field ->
                 val value = text(field.path)
                 if (value.isNotBlank() && value.toLongOrNull() == null) {
                     add(
@@ -1076,12 +1129,28 @@ internal data class OutboundEditorDocument(
                     )
                 }
             }
+            if (type == "http") addAll(validateHttpOptions())
         }
         if (errors.isEmpty()) {
-            val root = buildJsonObject { put("outbounds", JsonArray(listOf(value))) }
+            val root = buildJsonObject { put("outbounds", JsonArray(listOf(configurationForExport()))) }
             SingBoxDeprecatedConfigValidator.validate(root)
         }
         return errors.distinctBy(OutboundEditorValidationError::path)
+    }
+
+    private fun validateHttpOptions(): List<OutboundEditorValidationError> = buildList {
+        val hasPath = hasHttpPath
+        val hasHost = hasHttpHostHeader
+        val version = effectiveHttpVersion()
+        if (hasPath && hasHost) {
+            add(OutboundEditorValidationError("path", OutboundEditorValidationReason.HTTP_PATH_HOST_CONFLICT))
+        }
+        if (version >= 2 && (hasPath || hasHost)) {
+            add(OutboundEditorValidationError("version", OutboundEditorValidationReason.HTTP_VERSION_PATH_OR_HOST_CONFLICT))
+        }
+        if (!boolean("tls.enabled") && (version == 3 || version == 2 && boolean("disable_version_fallback"))) {
+            add(OutboundEditorValidationError("tls.enabled", OutboundEditorValidationReason.HTTP_VERSION_REQUIRES_TLS))
+        }
     }
 
     fun validateReferences(
@@ -1112,7 +1181,7 @@ internal data class OutboundEditorDocument(
             sourceTag = tag,
             remarks = remarks.trim(),
             type = type,
-            json = SingBoxJson.encodeToString(JsonElement.serializer(), value),
+            json = SingBoxJson.encodeToString(JsonElement.serializer(), configurationForExport()),
         )
     }
 

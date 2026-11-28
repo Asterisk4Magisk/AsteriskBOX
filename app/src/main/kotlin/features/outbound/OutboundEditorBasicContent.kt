@@ -22,6 +22,8 @@ internal fun socksOutboundFields() = listOf(
 internal fun httpOutboundFields() = listOf(
     outboundField("username", "Username"),
     outboundField("password", "Password"),
+    outboundSelect("version", "HTTP version", listOf("", "1", "2", "3")),
+    outboundField("disable_version_fallback", "Disable HTTP version fallback", OutboundFieldKind.BOOLEAN),
     outboundField("path", "Request path"),
     outboundField("headers", "Headers", OutboundFieldKind.KEY_VALUE),
 )

@@ -537,6 +537,10 @@
     <string name="outbound_choice_with_group">%1$s（%2$s）</string>
     <string name="outbound_choice_with_type">%1$s（%2$s）</string>
     <string name="outbound_editor_field_required">%1$s不能为空</string>
+    <string name="outbound_editor_http_path_host_conflict">请求路径与 Host 请求头只能设置其中一个。</string>
+    <string name="outbound_editor_http_version_auto">自动</string>
+    <string name="outbound_editor_http_version_path_or_host_conflict">设置请求路径或 Host 请求头时必须使用 HTTP/1.1。</string>
+    <string name="outbound_editor_http_version_requires_tls">当前 HTTP 版本设置要求启用 TLS。</string>
     <string name="outbound_editor_integer_invalid">%1$s必须是整数</string>
     <string name="outbound_editor_key">名称</string>
     <string name="outbound_editor_key_value_empty">暂无条目</string>
@@ -551,6 +555,7 @@
     <string name="outbound_editor_section_multiplex_summary">让多个数据流复用同一条连接</string>
     <string name="outbound_editor_section_protocol">协议</string>
     <string name="outbound_editor_section_protocol_summary">所选代理协议的专属选项</string>
+    <string name="outbound_editor_section_http2_summary">HTTP/2 超时、保活与流量控制选项</string>
     <string name="outbound_editor_section_quic">QUIC</string>
     <string name="outbound_editor_section_quic_summary">通用 QUIC 连接选项</string>
     <string name="outbound_editor_section_server">服务器</string>
@@ -641,6 +646,8 @@
     <string name="outbound_field_http_mask_mode">HTTP 伪装模式</string>
     <string name="outbound_field_http_mask_tls">HTTP 伪装 TLS</string>
     <string name="outbound_field_http_method">HTTP 方法</string>
+    <string name="outbound_field_http_version">HTTP 版本</string>
+    <string name="outbound_field_http_disable_version_fallback">禁用版本回退</string>
     <string name="outbound_field_idle_session_check_interval">空闲会话检查间隔</string>
     <string name="outbound_field_idle_session_timeout">空闲会话超时</string>
     <string name="outbound_field_idle_timeout">空闲超时</string>
@@ -649,6 +656,7 @@
     <string name="outbound_field_ipv4_bind_address">IPv4 绑定地址</string>
     <string name="outbound_field_ipv6_bind_address">IPv6 绑定地址</string>
     <string name="outbound_field_key">密钥</string>
+    <string name="outbound_field_keep_alive_period">保活间隔</string>
     <string name="outbound_field_key_exchange_algorithms">密钥交换算法</string>
     <string name="outbound_field_mac_algorithms">MAC 算法</string>
     <string name="outbound_field_maximum_concurrent_streams">最大并发流数</string>

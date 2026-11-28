@@ -3,11 +3,14 @@
 
 package features.outbound
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -34,12 +37,18 @@ internal data class OutboundEditorFieldSlot(
 internal data class OutboundEditorSectionSlot(
     val section: OutboundEditorSection,
     val fields: List<OutboundEditorFieldSlot>,
+    val httpVersion: Int? = null,
 )
 
 internal fun resolveOutboundEditorSections(
     schema: OutboundEditorSchema,
     document: OutboundEditorDocument,
 ): List<OutboundEditorSectionSlot> = schema.sections.mapNotNull { section ->
+    val httpVersion = if (section.section == OutboundEditorSection.HTTP_VERSION_OPTIONS) {
+        document.effectiveHttpVersion()
+    } else {
+        null
+    }
     section.fields
         .map { field ->
             OutboundEditorFieldSlot(
@@ -47,11 +56,12 @@ internal fun resolveOutboundEditorSections(
                 visible = document.isVisible(field),
             )
         }
-        .takeIf { fields -> fields.any(OutboundEditorFieldSlot::visible) }
+        .takeIf { fields -> httpVersion != null || fields.any(OutboundEditorFieldSlot::visible) }
         ?.let { fields ->
             OutboundEditorSectionSlot(
                 section = section.section,
                 fields = fields,
+                httpVersion = httpVersion,
             )
         }
 }
@@ -78,43 +88,64 @@ internal fun LazyListScope.outboundEditorContent(state: OutboundEditorContentSta
 }
 
 internal fun LazyListScope.outboundEditorSections(state: OutboundEditorContentState) {
-    val visibleSections = resolveOutboundEditorSections(state.schema, state.document)
+    val sections = resolveOutboundEditorSections(state.schema, state.document)
     items(
-        items = visibleSections,
+        items = sections,
         key = { section -> section.section.name },
     ) { section ->
-        EditorSectionCard(
-            title = section.section.localizedTitle(),
-            description = stringResource(section.section.summaryRes(state.document)),
-            endsWithTextField = when (section.fields.last { it.visible }.field.kind) {
-                OutboundFieldKind.TEXT,
-                OutboundFieldKind.INTEGER,
-                OutboundFieldKind.TEXT_LIST,
-                OutboundFieldKind.MULTILINE -> true
-                else -> false
-            },
-        ) {
-            val fieldEnter = AsteriskMotion.contentEnter()
-            val fieldExit = AsteriskMotion.contentExit()
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                section.fields.forEach { slot ->
-                    key(slot.field.path, slot.field.labelRes) {
-                        AnimatedVisibility(
-                            visible = slot.visible,
-                            enter = fieldEnter,
-                            exit = fieldExit,
-                            label = "outbound-${slot.field.path}-visibility",
-                        ) {
-                            OutboundEditorField(
-                                field = slot.field,
-                                document = state.document,
-                                error = state.errors[slot.field.path],
-                                referenceOptions = state.referenceOptions[slot.field.path].orEmpty(),
-                                onDocumentChange = state.onDocumentChange,
-                            )
-                        }
+        if (section.section == OutboundEditorSection.HTTP_VERSION_OPTIONS) {
+            AnimatedContent(
+                targetState = section.takeIf { it.fields.any(OutboundEditorFieldSlot::visible) },
+                contentKey = { it?.httpVersion },
+                transitionSpec = AsteriskMotion.fadeThrough(AsteriskMotion.contentFade(), AsteriskMotion.contentSize()),
+                label = "outbound-http-version-options",
+            ) { visibleSection ->
+                if (visibleSection == null) {
+                    Spacer(Modifier.fillMaxWidth())
+                } else {
+                    OutboundEditorSectionCard(visibleSection, state)
+                }
+            }
+        } else {
+            OutboundEditorSectionCard(section, state)
+        }
+    }
+}
+
+@Composable
+private fun OutboundEditorSectionCard(
+    section: OutboundEditorSectionSlot,
+    state: OutboundEditorContentState,
+) {
+    EditorSectionCard(
+        title = section.section.localizedTitle(section.httpVersion),
+        description = stringResource(section.section.summaryRes(state.document, section.httpVersion)),
+        endsWithTextField = when (section.fields.last { it.visible }.field.kind) {
+            OutboundFieldKind.TEXT,
+            OutboundFieldKind.INTEGER,
+            OutboundFieldKind.TEXT_LIST,
+            OutboundFieldKind.MULTILINE -> true
+            else -> false
+        },
+    ) {
+        val fieldEnter = AsteriskMotion.contentEnter()
+        val fieldExit = AsteriskMotion.contentExit()
+        Column(Modifier.fillMaxWidth()) {
+            section.fields.forEach { slot ->
+                key(slot.field.path, slot.field.labelRes) {
+                    AnimatedVisibility(
+                        visible = slot.visible,
+                        enter = fieldEnter,
+                        exit = fieldExit,
+                        label = "outbound-${slot.field.path}-visibility",
+                    ) {
+                        OutboundEditorField(
+                            field = slot.field,
+                            document = state.document,
+                            error = state.errors[slot.field.path],
+                            referenceOptions = state.referenceOptions[slot.field.path].orEmpty(),
+                            onDocumentChange = state.onDocumentChange,
+                        )
                     }
                 }
             }

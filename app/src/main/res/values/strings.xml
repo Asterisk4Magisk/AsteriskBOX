@@ -550,6 +550,10 @@
     <string name="outbound_choice_with_group">%1$s (%2$s)</string>
     <string name="outbound_choice_with_type">%1$s (%2$s)</string>
     <string name="outbound_editor_field_required">%1$s is required</string>
+    <string name="outbound_editor_http_path_host_conflict">Set either a request path or a Host header.</string>
+    <string name="outbound_editor_http_version_auto">Automatic</string>
+    <string name="outbound_editor_http_version_path_or_host_conflict">A request path or Host header requires HTTP/1.1.</string>
+    <string name="outbound_editor_http_version_requires_tls">Enable TLS for the current HTTP version settings.</string>
     <string name="outbound_editor_integer_invalid">%1$s must be an integer</string>
     <string name="outbound_editor_key">Name</string>
     <string name="outbound_editor_key_value_empty">No entries</string>
@@ -564,6 +568,7 @@
     <string name="outbound_editor_section_multiplex_summary">Share a physical connection across multiple streams</string>
     <string name="outbound_editor_section_protocol">Protocol</string>
     <string name="outbound_editor_section_protocol_summary">Options specific to the selected proxy protocol</string>
+    <string name="outbound_editor_section_http2_summary">HTTP/2 timeouts, keep-alive, and stream limits</string>
     <string name="outbound_editor_section_quic">QUIC</string>
     <string name="outbound_editor_section_quic_summary">Shared QUIC connection options</string>
     <string name="outbound_editor_section_server">Server</string>
@@ -654,6 +659,8 @@
     <string name="outbound_field_http_mask_mode">HTTP mask mode</string>
     <string name="outbound_field_http_mask_tls">HTTP mask TLS</string>
     <string name="outbound_field_http_method">HTTP method</string>
+    <string name="outbound_field_http_version">HTTP version</string>
+    <string name="outbound_field_http_disable_version_fallback">Disable version fallback</string>
     <string name="outbound_field_idle_session_check_interval">Idle session check interval</string>
     <string name="outbound_field_idle_session_timeout">Idle session timeout</string>
     <string name="outbound_field_idle_timeout">Idle timeout</string>
@@ -662,6 +669,7 @@
     <string name="outbound_field_ipv4_bind_address">IPv4 bind address</string>
     <string name="outbound_field_ipv6_bind_address">IPv6 bind address</string>
     <string name="outbound_field_key">Key</string>
+    <string name="outbound_field_keep_alive_period">Keep-alive period</string>
     <string name="outbound_field_key_exchange_algorithms">Key exchange algorithms</string>
     <string name="outbound_field_mac_algorithms">MAC algorithms</string>
     <string name="outbound_field_maximum_concurrent_streams">Maximum concurrent streams</string>
