@@ -105,6 +105,7 @@ internal fun SingBoxOverrideScriptDebugDialog(
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth()
+                            .padding(bottom = if (hasDiagnostics) 8.dp else 0.dp)
                             .heightIn(max = diagnosticsMaxHeight)
                             .verticalScroll(rememberScrollState()),
                     ) {
@@ -127,7 +128,7 @@ internal fun SingBoxOverrideScriptDebugDialog(
                 }
                 AnimatedContent(
                     targetState = showOutput,
-                    modifier = Modifier.fillMaxWidth().weight(1f).padding(top = if (hasDiagnostics && !outputFocus.expanded) 8.dp else 0.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     transitionSpec = AsteriskMotion.fadeThrough(outputEffectsMotion),
                     contentAlignment = Alignment.TopStart,
                     label = "script-debug-output",

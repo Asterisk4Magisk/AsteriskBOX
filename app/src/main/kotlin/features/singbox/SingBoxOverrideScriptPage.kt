@@ -3,15 +3,11 @@
 
 package features.singbox
 
-import ui.layout.rememberCodeEditorFocusState
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.consumeWindowInsets
 import features.settings.SettingsSectionCard
 import features.settings.SettingsSwitchRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -50,7 +46,8 @@ import ui.components.rememberAsteriskCodeSearchState
 import ui.components.AsteriskScaffold
 import ui.components.AsteriskTopAppBar
 import ui.layout.pageContentPaddingWithCutout
-import ui.theme.AsteriskMotion
+import ui.layout.CodeEditorFocusLayout
+import ui.layout.rememberCodeEditorFocusState
 import ui.icons.AsteriskIcons as Icons
 
 @Composable
@@ -146,17 +143,14 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
                 )
             },
         ) { innerPadding ->
-            Column(
+            val contentPadding = pageContentPaddingWithCutout(innerPadding, padding, isWideScreen)
+            CodeEditorFocusLayout(
+                expanded = editorFocus.expanded,
                 modifier = Modifier.fillMaxSize()
-                    .padding(pageContentPaddingWithCutout(innerPadding, padding, isWideScreen))
-                    .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 12.dp)
-                    .imePadding(),
-            ) {
-                AnimatedVisibility(
-                    visible = !editorFocus.expanded,
-                    enter = AsteriskMotion.contentEnter(),
-                    exit = AsteriskMotion.contentExit(),
-                ) {
+                    .padding(contentPadding)
+                    .consumeWindowInsets(contentPadding)
+                    .padding(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 12.dp),
+                supportingContent = {
                     SettingsSectionCard {
                         SettingsSwitchRow(
                             title = stringResource(R.string.singbox_override_script_enable),
@@ -165,13 +159,14 @@ internal fun SingBoxOverrideScriptPage(padding: PaddingValues) {
                             onCheckedChange = { scriptEnabled = it },
                         )
                     }
-                }
+                },
+            ) { modifier ->
                 SoraCodeEditor(
                     state = editorState,
                     language = SingBoxCodeLanguage.JavaScript,
                     readOnly = false,
                     searchState = codeSearch,
-                    modifier = Modifier.fillMaxWidth().weight(1f).then(editorModifier),
+                    modifier = modifier.then(editorModifier),
                 )
             }
             SingBoxOverrideScriptDebugDialog(

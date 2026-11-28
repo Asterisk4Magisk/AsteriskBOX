@@ -3,13 +3,15 @@
 
 package features.endpoint
 
-import ui.layout.rememberCodeEditorFocusState
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -64,8 +66,10 @@ import ui.components.EditorPagePane
 import ui.components.EditorPageScaffold
 import ui.components.localizedLabel
 import ui.components.rememberAsteriskCodeSearchState
+import ui.layout.CodeEditorFocusLayout
 import ui.layout.EditorListItem
-import ui.theme.AsteriskMotion
+import ui.layout.codeEditorFocusFade
+import ui.layout.rememberCodeEditorFocusState
 import ui.theme.AsteriskShapeTokens
 import ui.icons.AsteriskIcons as Icons
 
@@ -236,8 +240,6 @@ internal fun EndpointEditorPage(
         EditorPageScaffold(
             outerPadding = padding,
             isWideScreen = isWideScreen,
-            // The properties title supplies spacing only while the properties are visible.
-            topExtra = if (showProperties) 0.dp else 8.dp,
             title = {
                 Column {
                     Text(
@@ -282,8 +284,8 @@ internal fun EndpointEditorPage(
                     }
                 },
                 show = showProperties,
+                animateFocusLayout = true,
             ),
-            formMaxWidth = if (showProperties) 800.dp else null,
             actions = {
                 AsteriskCodeActionButton(
                     icon = Icons.Rounded.ContentCopy,
@@ -317,18 +319,24 @@ internal fun EndpointEditorPage(
                     )
                 }
             } else {
-                Column(
+                BoxWithConstraints(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(contentPadding)
-                        .padding(bottom = 12.dp),
+                        .consumeWindowInsets(contentPadding),
+                    contentAlignment = Alignment.TopCenter,
                 ) {
-                    AnimatedVisibility(
-                        visible = showProperties,
-                        enter = AsteriskMotion.contentEnter(),
-                        exit = AsteriskMotion.contentExit(),
-                    ) {
-                        Column {
+                    val focusProgress by animateFloatAsState(
+                        targetValue = if (editorFocus.expanded) 1f else 0f,
+                        animationSpec = codeEditorFocusFade(),
+                        label = "endpoint-editor-width",
+                    )
+                    val normalWidth = minOf(maxWidth, 800.dp)
+                    val editorWidth = normalWidth + (maxWidth - normalWidth) * focusProgress
+                    CodeEditorFocusLayout(
+                        expanded = editorFocus.expanded,
+                        modifier = Modifier.width(editorWidth).fillMaxHeight(),
+                        supportingContent = {
                             EditorSectionCard(
                                 title = stringResource(R.string.endpoint_editor_type),
                                 description = endpointTypeSummary(type),
@@ -385,32 +393,22 @@ internal fun EndpointEditorPage(
                                 )
                             }
                             Spacer(Modifier.height(14.dp))
-                        }
-                    }
-
-                    Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                        AnimatedVisibility(
-                            visible = showProperties,
-                            enter = AsteriskMotion.contentEnter(),
-                            exit = AsteriskMotion.contentExit(),
-                        ) {
-                            Column {
-                                Text(
-                                    stringResource(R.string.endpoint_editor_json),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                                Text(
-                                    stringResource(R.string.endpoint_editor_json_summary),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
-                                )
-                            }
-                        }
+                            Text(
+                                stringResource(R.string.endpoint_editor_json),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            Text(
+                                stringResource(R.string.endpoint_editor_json_summary),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
+                            )
+                        },
+                    ) { modifier ->
                         JsonCodeEditor(
                             state = editorState,
                             readOnly = saving,
-                            modifier = Modifier.fillMaxWidth().weight(1f).then(editorModifier),
+                            modifier = modifier.then(editorModifier),
                             searchState = codeSearch,
                         )
                     }

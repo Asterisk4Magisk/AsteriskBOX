@@ -42,6 +42,7 @@ internal data class EditorPagePane(
     val selectionEnabled: Boolean,
     val onSelect: (Int) -> Unit,
     val show: Boolean = true,
+    val animateFocusLayout: Boolean = false,
 )
 
 @Composable
@@ -151,6 +152,7 @@ internal fun EditorPageScaffold(
                 selectedId = editorPane.selectedId,
                 padding = pagePadding,
                 show = editorPane.show && LocalDensity.current.fontScale <= 1.3f,
+                animateFocusLayout = editorPane.animateFocusLayout,
                 onSelect = editorPane.onSelect,
                 selectionEnabled = editorPane.selectionEnabled && !saving,
                 content = {

@@ -3,6 +3,7 @@
 
 package features.resources
 
+import ui.layout.CodeEditorFocusLayout
 import ui.layout.rememberCodeEditorFocusState
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -256,69 +258,63 @@ internal fun ResourceTextEditorPage(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    ResourceTextEditorLoadState.Ready -> Column(
-                        modifier = Modifier.fillMaxSize().padding(bottom = 12.dp),
-                    ) {
-                        AnimatedVisibility(
-                            visible = !editorFocus.expanded,
-                            enter = AsteriskMotion.contentEnter(),
-                            exit = AsteriskMotion.contentExit(),
-                        ) {
-                            Column {
-                                Text(
-                                    stringResource(if (isHosts) R.string.settings_resource_hosts_editor_content else R.string.settings_resource_json_editor_content),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                                AnimatedVisibility(
-                                    visible = loadedSnapshot?.isDraft == true,
-                                    enter = AsteriskMotion.contentEnter(),
-                                    exit = AsteriskMotion.contentExit(),
+                    ResourceTextEditorLoadState.Ready -> CodeEditorFocusLayout(
+                        expanded = editorFocus.expanded,
+                        modifier = Modifier.fillMaxSize().padding(bottom = 12.dp).consumeWindowInsets(contentPadding),
+                        supportingContent = {
+                            Text(
+                                stringResource(if (isHosts) R.string.settings_resource_hosts_editor_content else R.string.settings_resource_json_editor_content),
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            AnimatedVisibility(
+                                visible = loadedSnapshot?.isDraft == true,
+                                enter = AsteriskMotion.contentEnter(),
+                                exit = AsteriskMotion.contentExit(),
+                            ) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                    shape = AsteriskShapeTokens.InnerContainer,
+                                    color = MaterialTheme.colorScheme.primaryContainer,
                                 ) {
-                                    Surface(
-                                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                                        shape = AsteriskShapeTokens.InnerContainer,
-                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
                                     ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            Icon(
-                                                Icons.Rounded.Description,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(20.dp),
-                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            )
-                                            Text(
-                                                stringResource(R.string.settings_resource_json_editor_draft),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                            )
-                                        }
+                                        Icon(
+                                            Icons.Rounded.Description,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(20.dp),
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        )
+                                        Text(
+                                            stringResource(R.string.settings_resource_json_editor_draft),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        )
                                     }
                                 }
-                                Text(
-                                    stringResource(if (isHosts) R.string.settings_resource_hosts_editor_content_summary else R.string.settings_resource_json_editor_content_summary),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
-                                )
                             }
-                        }
-                        val modifier = Modifier.fillMaxWidth().weight(1f).then(editorModifier)
+                            Text(
+                                stringResource(if (isHosts) R.string.settings_resource_hosts_editor_content_summary else R.string.settings_resource_json_editor_content_summary),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
+                            )
+                        },
+                    ) { modifier ->
                         if (isHosts) {
                             HostsCodeEditor(
                                 state = editorState,
                                 readOnly = saving,
-                                modifier = modifier,
+                                modifier = modifier.then(editorModifier),
                                 searchState = codeSearch,
                             )
                         } else {
                             JsonCodeEditor(
                                 state = editorState,
                                 readOnly = saving,
-                                modifier = modifier,
+                                modifier = modifier.then(editorModifier),
                                 searchState = codeSearch,
                             )
                         }
