@@ -1239,6 +1239,7 @@ internal fun RouteRuleEditorScaffold(
                         headerActions = {
                             AppPackagePickerAction(
                                 values = current.packageName,
+                                excludeSelf = true,
                                 onValuesChange = { draft = current.copy(packageName = it) },
                             )
                         },
