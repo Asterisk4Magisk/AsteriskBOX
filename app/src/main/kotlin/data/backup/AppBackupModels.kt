@@ -95,6 +95,7 @@ internal data class AppBackupSettings(
     val enableBroadcastControl: Boolean = BackupDefaults.enableBroadcastControl,
     val enableAutoConnect: Boolean = BackupDefaults.enableAutoConnect,
     val enableResourceAutoUpdate: Boolean = BackupDefaults.enableResourceAutoUpdate,
+    val enableResourceCoreAutoUpdate: Boolean = BackupDefaults.enableResourceCoreAutoUpdate,
     val resourceAutoUpdateInterval: String = BackupDefaults.resourceAutoUpdateInterval,
     val resourceFileSource: Int = BackupDefaults.resourceFileSource,
     val customResourceFileGeositeCategoryAdsAllUrl: String =

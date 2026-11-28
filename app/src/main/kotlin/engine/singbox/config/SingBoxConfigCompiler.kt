@@ -84,6 +84,9 @@ internal data class SingBoxLocalRuleSet(
     val tag: String,
     val path: String,
     val format: SingBoxRuleSetFileFormat,
+    val url: String = "",
+    val updateInterval: String? = null,
+    val downloadDetour: String? = null,
 )
 
 internal object SingBoxConfigCompiler {
@@ -154,13 +157,29 @@ internal object SingBoxConfigCompiler {
         val choicesByFileName = canonicalState
             .managedRuleSetChoices(filesByName.keys)
             .associateBy { choice -> choice.fileName }
+        val customFilesByFileName = canonicalState.customResourceFiles
+            .associateBy { file -> file.name.lowercase() }
+        val coreUpdateInterval = if (canonicalState.enableResourceCoreAutoUpdate) {
+            formatCoreRuleSetUpdateInterval(canonicalState.resourceAutoUpdateInterval)
+        } else {
+            null
+        }
         val localRuleSets = choicesByFileName.values.mapNotNull { choice ->
             val file = filesByName[choice.fileName.lowercase()] ?: return@mapNotNull null
             val format = choice.fileName.singBoxRuleSetFormatOrNull() ?: return@mapNotNull null
+            val customFile = customFilesByFileName[choice.fileName.lowercase()]
+            val remoteUrl = customFile?.url?.trim().orEmpty()
+            val useRemote = coreUpdateInterval != null &&
+                customFile != null &&
+                customResourceFileOverrides[customFile.id] == null &&
+                (remoteUrl.startsWith("http://", ignoreCase = true) || remoteUrl.startsWith("https://", ignoreCase = true))
             SingBoxLocalRuleSet(
                 tag = choice.tag,
                 path = file.absolutePath,
                 format = format,
+                url = if (useRemote) remoteUrl else "",
+                updateInterval = if (useRemote) coreUpdateInterval else null,
+                downloadDetour = if (useRemote && exposePorts) APP_GLOBAL_SELECTOR else null,
             )
         }.distinctBy(SingBoxLocalRuleSet::tag)
         val runtimeState = canonicalState
@@ -273,10 +292,24 @@ internal fun JsonObject.withLocalRuleSets(localRuleSets: List<SingBoxLocalRuleSe
         .orEmpty()
     val compiledRuleSets: List<JsonElement> = retainedRuleSets + localRuleSets.map { ruleSet ->
         buildJsonObject {
-            put("type", "local")
-            put("tag", ruleSet.tag)
-            put("format", ruleSet.format.configValue)
-            put("path", ruleSet.path)
+            if (ruleSet.url.isNotBlank() && ruleSet.updateInterval != null) {
+                put("type", "remote")
+                put("tag", ruleSet.tag)
+                put("format", ruleSet.format.configValue)
+                put("url", ruleSet.url)
+                if (ruleSet.path.isNotBlank()) {
+                    put("initial_path", ruleSet.path)
+                }
+                putJsonObject("http_client") {
+                    ruleSet.downloadDetour?.let { put("detour", it) }
+                }
+                put("update_interval", ruleSet.updateInterval)
+            } else {
+                put("type", "local")
+                put("tag", ruleSet.tag)
+                put("format", ruleSet.format.configValue)
+                put("path", ruleSet.path)
+            }
         }
     }
     val managedRoute = JsonObject(
@@ -1088,7 +1121,8 @@ private fun compileExperimental(appState: AppState): JsonObject? {
     // The FakeIP store only matters while the managed FakeIP server is compiled.
     val storeFakeIp = appState.storeFakeIp && appState.effectiveFakeIpEnabled
     // ROOT can restart independently of the UI; retain the last API-selected mode.
-    if (!appState.runMode.isRootRunMode() && !storeFakeIp && !appState.storeDns) return null
+    // Core-managed remote rule sets require cache_file to persist downloaded rules across restarts.
+    if (!appState.runMode.isRootRunMode() && !storeFakeIp && !appState.storeDns && !appState.enableResourceCoreAutoUpdate) return null
     return buildJsonObject {
         putJsonObject("cache_file") {
             put("enabled", true)
@@ -1096,6 +1130,15 @@ private fun compileExperimental(appState: AppState): JsonObject? {
             if (appState.storeDns) put("store_dns", true)
         }
     }
+}
+
+private fun formatCoreRuleSetUpdateInterval(hours: String): String? {
+    val millis = features.resources.resourceAutoUpdateIntervalMillis(true, hours) ?: return null
+    val totalSeconds = (millis / 1000L).coerceAtLeast(1L)
+    val h = totalSeconds / 3600L
+    val m = (totalSeconds % 3600L) / 60L
+    val s = totalSeconds % 60L
+    return "${h}h${m}m${s}s"
 }
 
 private val RouteRejectMethods = setOf("default", "drop", "reply")

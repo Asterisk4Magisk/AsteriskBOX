@@ -178,6 +178,7 @@ internal class AppSettingsPreferences(
                 defaults.enableAutoConnect,
             ),
             enableResourceAutoUpdate = preferences.getBoolean(KeyEnableResourceAutoUpdate, defaults.enableResourceAutoUpdate),
+            enableResourceCoreAutoUpdate = preferences.getBoolean(KeyEnableResourceCoreAutoUpdate, defaults.enableResourceCoreAutoUpdate),
             resourceAutoUpdateInterval = preferences.getString(KeyResourceAutoUpdateInterval, defaults.resourceAutoUpdateInterval)
                 ?: defaults.resourceAutoUpdateInterval,
             resourceFileSource = preferences.getInt(
@@ -501,6 +502,7 @@ internal const val KeyEnableTrafficStatsNotification = "enable_traffic_stats_not
 internal const val KeyEnableBroadcastControl = "enable_broadcast_control"
 internal const val KeyEnableAutoConnect = "enable_auto_connect"
 internal const val KeyEnableResourceAutoUpdate = "enable_resource_auto_update"
+internal const val KeyEnableResourceCoreAutoUpdate = "enable_resource_core_auto_update"
 internal const val KeyResourceAutoUpdateInterval = "resource_auto_update_interval"
 internal const val KeyResourceFileSource = "resource_file_source"
 internal const val KeyCustomResourceFileGeositeCategoryAdsAllUrl =

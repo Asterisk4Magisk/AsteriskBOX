@@ -766,11 +766,19 @@ fun ResourceManagementPage(
         ResourceAutoUpdateSheet(
             show = showResourceAutoUpdateSheet,
             enabled = appState.enableResourceAutoUpdate,
+            coreAutoUpdateEnabled = appState.enableResourceCoreAutoUpdate,
             interval = appState.resourceAutoUpdateInterval,
             onDismissRequest = { showResourceAutoUpdateSheet = false },
-            onSave = { enabled, interval ->
+            onSave = { enabled, coreEnabled, interval ->
                 updateAppState { state ->
-                    state.copy(enableResourceAutoUpdate = enabled, resourceAutoUpdateInterval = interval)
+                    val coreChanged = state.enableResourceCoreAutoUpdate != coreEnabled ||
+                        (coreEnabled && state.resourceAutoUpdateInterval != interval)
+                    state.copy(
+                        enableResourceAutoUpdate = enabled,
+                        enableResourceCoreAutoUpdate = coreEnabled,
+                        resourceAutoUpdateInterval = interval,
+                        pendingConfigRestart = state.pendingConfigRestart || (state.proxyRunning && coreChanged),
+                    )
                 }
                 showResourceAutoUpdateSheet = false
             },

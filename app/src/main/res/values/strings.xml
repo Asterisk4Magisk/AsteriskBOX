@@ -1569,6 +1569,8 @@
     <string name="settings_resource_files_auto_update_interval">Update interval (hours)</string>
     <string name="settings_resource_files_auto_update_summary">Periodically update resource files when connected</string>
     <string name="settings_resource_files_auto_update_title">Automatic resource updates</string>
+    <string name="settings_resource_files_core_auto_update_summary">Let sing-box update remote rule sets in the background at the configured interval without opening the app (applies to remote .srs/.json rule sets)</string>
+    <string name="settings_resource_files_core_auto_update_title">Core-managed rule-set updates</string>
     <string name="settings_resource_files_catalog_add_selected">Add %1$d</string>
     <string name="settings_resource_files_catalog_added">Added and downloaded {count} resource files</string>
     <string name="settings_resource_files_catalog_conflicts_skipped">Skipped {count} files whose names are already in use</string>

@@ -38,11 +38,13 @@ import ui.theme.AsteriskShapeTokens
 internal fun ResourceAutoUpdateSheet(
     show: Boolean,
     enabled: Boolean,
+    coreAutoUpdateEnabled: Boolean,
     interval: String,
     onDismissRequest: () -> Unit,
-    onSave: (Boolean, String) -> Unit,
+    onSave: (Boolean, Boolean, String) -> Unit,
 ) {
     var enabledDraft by rememberSaveable(show) { mutableStateOf(enabled) }
+    var coreEnabledDraft by rememberSaveable(show) { mutableStateOf(coreAutoUpdateEnabled) }
     var intervalDraft by rememberSaveable(show) { mutableStateOf(interval) }
     val valid = resourceAutoUpdateIntervalMillis(true, intervalDraft) != null
     AsteriskModalBottomSheet(
@@ -57,7 +59,7 @@ internal fun ResourceAutoUpdateSheet(
         endAction = {
             AsteriskSaveButton(
                 enabled = valid,
-                onClick = { onSave(enabledDraft, intervalDraft.trim()) },
+                onClick = { onSave(enabledDraft, coreEnabledDraft, intervalDraft.trim()) },
             )
         },
     ) {
@@ -84,6 +86,23 @@ internal fun ResourceAutoUpdateSheet(
                     )
                 }
                 Switch(checked = enabledDraft, onCheckedChange = null)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .toggleable(coreEnabledDraft, role = Role.Switch, onValueChange = { coreEnabledDraft = it })
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.settings_resource_files_core_auto_update_title), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.settings_resource_files_core_auto_update_summary),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = coreEnabledDraft, onCheckedChange = null)
             }
             OutlinedTextField(
                 shape = AsteriskShapeTokens.InnerContainer,
